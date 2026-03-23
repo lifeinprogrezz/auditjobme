@@ -618,7 +618,9 @@ function generatePDFHTML(data) {
   }
 </style>
 </head><body>
-
+<div class="pb">
+  <button onclick="window.print()">Save as PDF</button>
+</div>
 <!-- HERO -->
 <section class="hero">
   <div class="hero-label"><span class="hero-dot"></span>${auditLabel} \u2014 MARCH 2026</div>
