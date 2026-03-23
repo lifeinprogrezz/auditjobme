@@ -1338,7 +1338,7 @@ Return JSON:
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={e => e.stopPropagation()}
-                    style={{ fontSize: ".55rem", color: a.accent_color || "#8a8780", fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", textDecoration: "none" }}
+                    style={{ fontSize: ".55rem", color: safeAccent(a.accent_color) || "#8a8780", fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", textDecoration: "none" }}
                   >
                     PDF ↗
                   </a>
