@@ -1153,8 +1153,10 @@ Return JSON:
       up(8, "done");
 
       const validated = validateOutput({ company, diagnosis, proposals, about });
-      setData({ cv, company: validated.company, pains, diagnosis: validated.diagnosis, proposals: validated.proposals, prototypes, about: validated.about, contacts: Array.isArray(contacts) ? contacts : [], accent, roleCtx, showProtos });
+      const finalData = { cv, company: validated.company, pains, diagnosis: validated.diagnosis, proposals: validated.proposals, prototypes, about: validated.about, contacts: Array.isArray(contacts) ? contacts : [], accent, roleCtx, showProtos };
+      setData(finalData);
       setStage("hub");
+      saveAudit(finalData);
 
     } catch (err) {
       console.error(err);
