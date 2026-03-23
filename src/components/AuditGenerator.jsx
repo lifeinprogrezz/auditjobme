@@ -677,21 +677,29 @@ async function downloadPDF(data) {
   const { company, roleCtx } = data;
   const filename = ((company?.company||"audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+"-"+((roleCtx?.audit_label||"product-audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+".pdf";
 
-  // Create a temporary container to render the HTML
+  // Create a temporary container - must be on-screen for html2canvas to render
   const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.left = "-9999px";
+  container.style.position = "absolute";
   container.style.top = "0";
+  container.style.left = "0";
   container.style.width = "210mm";
+  container.style.zIndex = "-9999";
+  container.style.opacity = "0";
+  container.style.pointerEvents = "none";
+  container.style.overflow = "hidden";
   container.innerHTML = html;
   document.body.appendChild(container);
+
+  // Wait for fonts to load
+  await document.fonts.ready;
+  await new Promise(r => setTimeout(r, 500));
 
   try {
     await html2pdf().set({
       margin: 0,
       filename,
       image: { type: "jpeg", quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: "#0f0e0c", scrollX: 0, scrollY: 0, windowWidth: container.scrollWidth },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       pagebreak: { mode: ["avoid-all", "css", "legacy"] },
     }).from(container).save();
