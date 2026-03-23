@@ -87,7 +87,19 @@ function validateOutput(data) {
 }
 
 /* ═══════════════════ API ═══════════════════ */
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+let lastCallTime = 0;
+const MIN_CALL_GAP_MS = 4000; // 4s gap between calls to stay under 30K tokens/min
+
 async function callClaude(messages, opts = {}) {
+  // Rate-limit: ensure minimum gap between calls
+  const now = Date.now();
+  const elapsed = now - lastCallTime;
+  if (elapsed < MIN_CALL_GAP_MS && lastCallTime > 0) {
+    await wait(MIN_CALL_GAP_MS - elapsed);
+  }
+  lastCallTime = Date.now();
+
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   const res = await fetch(`${supabaseUrl}/functions/v1/anthropic-proxy`, {
