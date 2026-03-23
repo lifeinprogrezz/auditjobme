@@ -689,6 +689,84 @@ export default function App() {
   const [error, setError] = useState(null);
   const [protoTab, setProtoTab] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
+  const [pastAudits, setPastAudits] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+
+  // Get auth user
+  const [user, setUser] = useState(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data?.user || null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user || null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load audit history
+  const loadHistory = async () => {
+    if (!user) return;
+    setLoadingHistory(true);
+    const { data } = await supabase
+      .from("audits")
+      .select("id, company_name, role_name, audit_label, accent_color, pdf_path, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setPastAudits(data || []);
+    setLoadingHistory(false);
+  };
+
+  useEffect(() => { if (user) loadHistory(); }, [user]);
+
+  // Load a past audit
+  const loadAudit = async (auditId) => {
+    const { data } = await supabase
+      .from("audits")
+      .select("audit_data")
+      .eq("id", auditId)
+      .single();
+    if (data?.audit_data) {
+      setData(data.audit_data);
+      setStage("hub");
+      setShowHistory(false);
+    }
+  };
+
+  // Save audit to DB + upload PDF
+  const saveAudit = async (auditData) => {
+    if (!user) return;
+    try {
+      // Generate PDF HTML blob
+      const pdfHtml = generatePDFHTML(auditData);
+      const blob = new Blob([pdfHtml], { type: "text/html" });
+      const fileName = `${user.id}/${Date.now()}-${(auditData.company?.company || "audit").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}.html`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from("audit-pdfs")
+        .upload(fileName, blob, { contentType: "text/html" });
+
+      const pdfPath = uploadError ? null : fileName;
+
+      // Save to audits table
+      await supabase.from("audits").insert({
+        user_id: user.id,
+        company_name: auditData.company?.company || "Unknown",
+        role_name: auditData.company?.role || "",
+        audit_label: auditData.roleCtx?.audit_label || "Product Audit",
+        accent_color: auditData.accent || "#8a9a8a",
+        job_link: jobLink,
+        audit_data: auditData,
+        pdf_path: pdfPath,
+      });
+
+      loadHistory();
+    } catch (err) {
+      console.error("Failed to save audit:", err);
+    }
+  };
 
   // Timer for processing stage
   useEffect(() => {
