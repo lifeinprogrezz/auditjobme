@@ -671,14 +671,33 @@ ${aboutHTML}
   return html;
 }
 
-function downloadPDF(data) {
+async function downloadPDF(data) {
+  const html2pdf = (await import("html2pdf.js")).default;
   const html = generatePDFHTML(data);
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url;
   const { company, roleCtx } = data;
-  a.download = ((company?.company||"audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+"-"+((roleCtx?.audit_label||"product-audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+".html";
-  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  const filename = ((company?.company||"audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+"-"+((roleCtx?.audit_label||"product-audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+".pdf";
+
+  // Create a temporary container to render the HTML
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-9999px";
+  container.style.top = "0";
+  container.style.width = "210mm";
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  try {
+    await html2pdf().set({
+      margin: 0,
+      filename,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+    }).from(container).save();
+  } finally {
+    document.body.removeChild(container);
+  }
 }
 
 /* ═══════════════════ MAIN APP ═══════════════════ */
