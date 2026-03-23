@@ -740,13 +740,30 @@ export default function App() {
   };
 
   // Save audit to DB + upload PDF
+  const [shareUrl, setShareUrl] = useState(null);
+  const [copied, setCopied] = useState(false);
+
   const saveAudit = async (auditData) => {
     if (!user) return;
     try {
+      // Generate slug via DB function
+      const { data: slugData } = await supabase.rpc("generate_audit_slug", {
+        p_user_id: user.id,
+        p_company: auditData.company?.company || "audit",
+      });
+      const slug = slugData || (auditData.company?.company || "audit").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
+
+      // Get username
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .single();
+
       // Generate PDF HTML blob
       const pdfHtml = generatePDFHTML(auditData);
       const blob = new Blob([pdfHtml], { type: "text/html" });
-      const fileName = `${user.id}/${Date.now()}-${(auditData.company?.company || "audit").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}.html`;
+      const fileName = `${user.id}/${slug}.html`;
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
@@ -765,7 +782,14 @@ export default function App() {
         job_link: jobLink,
         audit_data: auditData,
         pdf_path: pdfPath,
+        slug,
+        is_published: true,
       });
+
+      // Set shareable URL
+      if (profile?.username) {
+        setShareUrl(`${window.location.origin}/a/${profile.username}/${slug}`);
+      }
 
       loadHistory();
     } catch (err) {
