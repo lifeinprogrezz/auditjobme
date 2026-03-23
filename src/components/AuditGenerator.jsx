@@ -25,6 +25,28 @@ function textOn(hex) {
   return (r*299 + g*587 + b*114) / 1000 > 150 ? "#0f0e0c" : "#f0ede8";
 }
 
+/* Color safety: prevent accent colors invisible on dark background */
+function safeAccent(hex) {
+  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return "#8a9a8a";
+  let r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  const brightness = (r*299 + g*587 + b*114) / 1000;
+  if (brightness < 80) {
+    const factor = 0.55;
+    r = Math.round(r + (255 - r) * factor);
+    g = Math.round(g + (255 - g) * factor);
+    b = Math.round(b + (255 - b) * factor);
+    return `#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
+  }
+  if (brightness > 220) {
+    const factor = 0.4;
+    r = Math.round(r * (1 - factor));
+    g = Math.round(g * (1 - factor));
+    b = Math.round(b * (1 - factor));
+    return `#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
+  }
+  return hex;
+}
+
 /* Post-processing: fix common LLM output issues */
 function validateOutput(data) {
   const trim = (s, max) => {
@@ -434,7 +456,7 @@ function Prototype({ proto, accent }) {
 /* ═══════════════════ PDF HTML GENERATOR ═══════════════════ */
 function generatePDFHTML(data) {
   const { company, pains, diagnosis, proposals, about, cv, accent, roleCtx } = data;
-  const ac = accent || "#8a9a8a";
+  const ac = safeAccent(accent) || "#8a9a8a";
   const auditLabel = (roleCtx?.audit_label || "Product Audit").toUpperCase();
   const e = s => (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
@@ -1063,7 +1085,7 @@ Return JSON: {"company":"string","role":"string","role_url":"${jobLink}","compan
       up(1, "done");
 
       const company = safeParse(extractText(companyRaw)) || { company: "Company", role: "Role", stats: [], accent_color: "#8a9a8a" };
-      const accent = company.accent_color || "#8a9a8a";
+      const accent = safeAccent(company.accent_color) || "#8a9a8a";
       up(2, "done");
 
       /* ══ Stage 3: Pain points (needs company + roleCtx) ══ */
@@ -1201,7 +1223,7 @@ Return JSON:
     setCvFile(null); setCvBase64(null); setJobLink(""); setPersonal(""); setShowAdv(false); setShareUrl(null); setCopied(false);
   };
 
-  const accent = data.accent || "#8a9a8a";
+  const accent = safeAccent(data.accent) || "#8a9a8a";
   const showProtos = data.showProtos || false;
   const NAV_LINKS = showProtos
     ? ["research","diagnosis","proposals","prototypes","about"]
