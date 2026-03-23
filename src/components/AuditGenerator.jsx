@@ -102,26 +102,37 @@ async function callClaude(messages, opts = {}) {
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const res = await fetch(`${supabaseUrl}/functions/v1/anthropic-proxy`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${supabaseKey}`,
-      "apikey": supabaseKey,
-    },
-    body: JSON.stringify({
-      messages,
-      model: "claude-sonnet-4-20250514",
-      max_tokens: opts.max_tokens || 4096,
-      ...(opts.system ? { system: opts.system } : {}),
-      ...(opts.tools ? { tools: opts.tools } : {}),
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `API ${res.status}`);
+  const payload = {
+    messages,
+    model: "claude-sonnet-4-20250514",
+    max_tokens: opts.max_tokens || 4096,
+    ...(opts.system ? { system: opts.system } : {}),
+    ...(opts.tools ? { tools: opts.tools } : {}),
+  };
+  const headers = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${supabaseKey}`,
+    "apikey": supabaseKey,
+  };
+
+  // Retry up to 3 times on rate limit (429)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(`${supabaseUrl}/functions/v1/anthropic-proxy`, {
+      method: "POST", headers, body: JSON.stringify(payload),
+    });
+    if (res.status === 429 && attempt < 2) {
+      const backoff = (attempt + 1) * 15000; // 15s, 30s
+      console.warn(`Rate limited, retrying in ${backoff/1000}s...`);
+      await wait(backoff);
+      lastCallTime = Date.now();
+      continue;
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `API ${res.status}`);
+    }
+    return res.json();
   }
-  return res.json();
 }
 
 function extractText(d) {
