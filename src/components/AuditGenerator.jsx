@@ -1085,7 +1085,7 @@ Return JSON: {"company":"string","role":"string","role_url":"${jobLink}","compan
       up(1, "done");
 
       const company = safeParse(extractText(companyRaw)) || { company: "Company", role: "Role", stats: [], accent_color: "#8a9a8a" };
-      const accent = company.accent_color || "#8a9a8a";
+      const accent = safeAccent(company.accent_color) || "#8a9a8a";
       up(2, "done");
 
       /* ══ Stage 3: Pain points (needs company + roleCtx) ══ */
