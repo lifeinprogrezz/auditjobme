@@ -42,19 +42,8 @@ export default function LoginPage() {
           letterSpacing: "-.04em",
           marginBottom: "0.6rem",
         }}>
-          Audit Generator
+          auditjob.me
         </h1>
-        <p style={{
-          fontSize: ".7rem",
-          color: "#8a8780",
-          maxWidth: 320,
-          margin: "0 auto 2rem",
-          lineHeight: 1.5,
-          letterSpacing: ".04em",
-          fontWeight: 500,
-        }}>
-          Generate personalized company audits with AI.
-        </p>
 
         <button
           onClick={handleGoogleLogin}
