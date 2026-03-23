@@ -87,24 +87,27 @@ function validateOutput(data) {
 
 /* ═══════════════════ API ═══════════════════ */
 async function callClaude(messages, opts = {}) {
-  const body = {
-    model: "claude-sonnet-4-20250514",
-    max_tokens: opts.max_tokens || 4096,
-    messages,
-    ...(opts.system ? { system: opts.system } : {}),
-    ...(opts.tools ? { tools: opts.tools } : {}),
-  };
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const res = await fetch(`${supabaseUrl}/functions/v1/anthropic-proxy`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
+      "Authorization": `Bearer ${supabaseKey}`,
+      "apikey": supabaseKey,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      messages,
+      model: "claude-sonnet-4-20250514",
+      max_tokens: opts.max_tokens || 4096,
+      ...(opts.system ? { system: opts.system } : {}),
+      ...(opts.tools ? { tools: opts.tools } : {}),
+    }),
   });
-  if (!res.ok) throw new Error(`API ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `API ${res.status}`);
+  }
   return res.json();
 }
 
