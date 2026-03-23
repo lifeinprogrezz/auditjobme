@@ -618,10 +618,6 @@ function generatePDFHTML(data) {
   }
 </style>
 </head><body>
-<div class="pb">
-  <span style="font-size:13px;color:#8a8780"><b>Ctrl+P</b> / <b>\u2318P</b> \u2192 Save as PDF \u2014 Uncheck <b>"Headers and footers"</b> in More Settings</span>
-  <button onclick="window.print()">Save as PDF</button>
-</div>
 
 <!-- HERO -->
 <section class="hero">
