@@ -671,61 +671,23 @@ ${aboutHTML}
   return html;
 }
 
-async function downloadPDF(data) {
-  const html2pdf = (await import("html2pdf.js")).default;
+function downloadPDF(data) {
   const html = generatePDFHTML(data);
-  const { company, roleCtx } = data;
-  const filename = ((company?.company || "audit").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()) + "-" + ((roleCtx?.audit_label || "product-audit").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()) + ".pdf";
-
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.top = "0";
-  iframe.style.left = "0";
-  iframe.style.width = "210mm";
-  iframe.style.height = "297mm";
-  iframe.style.border = "0";
-  iframe.style.zIndex = "-1";
-  iframe.style.pointerEvents = "none";
-  iframe.setAttribute("aria-hidden", "true");
-  document.body.appendChild(iframe);
-
-  try {
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!iframeDoc) throw new Error("Unable to create PDF document");
-
-    iframeDoc.open();
-    iframeDoc.write(html);
-    iframeDoc.close();
-
-    await new Promise((resolve) => {
-      if (iframe.contentWindow?.document.readyState === "complete") return resolve();
-      iframe.onload = () => resolve();
-      setTimeout(resolve, 800);
-    });
-
-    if (iframeDoc.fonts?.ready) {
-      await iframeDoc.fonts.ready;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    await html2pdf().set({
-      margin: 0,
-      filename,
-      image: { type: "jpeg", quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        letterRendering: true,
-        backgroundColor: "#0f0e0c",
-        windowWidth: iframeDoc.documentElement.scrollWidth,
-        windowHeight: iframeDoc.documentElement.scrollHeight,
-      },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      pagebreak: { mode: ["css", "legacy"] },
-    }).from(iframeDoc.body).save();
-  } finally {
-    document.body.removeChild(iframe);
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("Please allow popups to download the PDF.");
+    return;
   }
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+
+  // Auto-trigger print once fonts and content are loaded
+  printWindow.onload = () => {
+    setTimeout(() => {
+      printWindow.print();
+    }, 600);
+  };
 }
 
 /* ═══════════════════ MAIN APP ═══════════════════ */
