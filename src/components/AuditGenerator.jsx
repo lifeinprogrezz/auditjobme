@@ -1320,11 +1320,11 @@ Return JSON:
                 padding: "12px 14px", borderRadius: 8, border: "1px solid #2a2825", marginBottom: 8,
                 cursor: "pointer", transition: "border-color .2s",
               }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = a.accent_color || "#8a8780"}
+              onMouseEnter={e => e.currentTarget.style.borderColor = safeAccent(a.accent_color) || "#8a8780"}
               onMouseLeave={e => e.currentTarget.style.borderColor = "#2a2825"}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <div style={{ width: 8, height: 8, background: a.accent_color || "#8a8780", flexShrink: 0 }} />
+                <div style={{ width: 8, height: 8, background: safeAccent(a.accent_color) || "#8a8780", flexShrink: 0 }} />
                 <span style={{ fontSize: ".78rem", fontWeight: 600, color: "#f0ede8" }}>{a.company_name}</span>
               </div>
               <p style={{ fontSize: ".62rem", color: "#8a8780", marginBottom: 4 }}>{a.audit_label || "Product Audit"}</p>
