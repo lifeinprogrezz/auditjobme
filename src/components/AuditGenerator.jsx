@@ -668,10 +668,15 @@ ${aboutHTML}
   BUILT FOR ${e(company?.company).toUpperCase()} \u2014 APPLYING FOR <a href="${company?.role_url||''}">${e(company?.role).toUpperCase()}</a>
 </div>
 </body></html>`;
+  return html;
+}
 
+function downloadPDF(data) {
+  const html = generatePDFHTML(data);
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a"); a.href = url;
+  const { company, roleCtx } = data;
   a.download = ((company?.company||"audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+"-"+((roleCtx?.audit_label||"product-audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+".html";
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 }
