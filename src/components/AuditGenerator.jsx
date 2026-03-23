@@ -1209,7 +1209,7 @@ Return JSON:
       {/* ─── NAV ─── */}
       <div className="nav">
         <span className="nav-title" style={{ cursor: stage === "results" ? "pointer" : "default" }} onClick={() => stage === "results" && scrollTo("hero")}>
-          {(stage === "results" || stage === "hub") ? `${data.company?.company || ""} ${data.roleCtx?.audit_label || "Product Audit"}` : "audit."}
+          {(stage === "results" || stage === "hub") ? `${data.company?.company || ""} ${data.roleCtx?.audit_label || "Product Audit"}` : "auditjob.me"}
         </span>
         {stage === "results" && (
           <div className="nav-links">
