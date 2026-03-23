@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 const STEPS = [
@@ -430,8 +431,8 @@ function Prototype({ proto, accent }) {
   );
 }
 
-/* ═══════════════════ PDF DOWNLOAD ═══════════════════ */
-function downloadPDF(data) {
+/* ═══════════════════ PDF HTML GENERATOR ═══════════════════ */
+function generatePDFHTML(data) {
   const { company, pains, diagnosis, proposals, about, cv, accent, roleCtx } = data;
   const ac = accent || "#8a9a8a";
   const auditLabel = (roleCtx?.audit_label || "Product Audit").toUpperCase();
@@ -667,10 +668,15 @@ ${aboutHTML}
   BUILT FOR ${e(company?.company).toUpperCase()} \u2014 APPLYING FOR <a href="${company?.role_url||''}">${e(company?.role).toUpperCase()}</a>
 </div>
 </body></html>`;
+  return html;
+}
 
+function downloadPDF(data) {
+  const html = generatePDFHTML(data);
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a"); a.href = url;
+  const { company, roleCtx } = data;
   a.download = ((company?.company||"audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+"-"+((roleCtx?.audit_label||"product-audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+".html";
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 }
@@ -688,6 +694,84 @@ export default function App() {
   const [error, setError] = useState(null);
   const [protoTab, setProtoTab] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
+  const [pastAudits, setPastAudits] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+
+  // Get auth user
+  const [user, setUser] = useState(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data?.user || null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user || null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load audit history
+  const loadHistory = async () => {
+    if (!user) return;
+    setLoadingHistory(true);
+    const { data } = await supabase
+      .from("audits")
+      .select("id, company_name, role_name, audit_label, accent_color, pdf_path, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setPastAudits(data || []);
+    setLoadingHistory(false);
+  };
+
+  useEffect(() => { if (user) loadHistory(); }, [user]);
+
+  // Load a past audit
+  const loadAudit = async (auditId) => {
+    const { data } = await supabase
+      .from("audits")
+      .select("audit_data")
+      .eq("id", auditId)
+      .single();
+    if (data?.audit_data) {
+      setData(data.audit_data);
+      setStage("hub");
+      setShowHistory(false);
+    }
+  };
+
+  // Save audit to DB + upload PDF
+  const saveAudit = async (auditData) => {
+    if (!user) return;
+    try {
+      // Generate PDF HTML blob
+      const pdfHtml = generatePDFHTML(auditData);
+      const blob = new Blob([pdfHtml], { type: "text/html" });
+      const fileName = `${user.id}/${Date.now()}-${(auditData.company?.company || "audit").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}.html`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from("audit-pdfs")
+        .upload(fileName, blob, { contentType: "text/html" });
+
+      const pdfPath = uploadError ? null : fileName;
+
+      // Save to audits table
+      await supabase.from("audits").insert({
+        user_id: user.id,
+        company_name: auditData.company?.company || "Unknown",
+        role_name: auditData.company?.role || "",
+        audit_label: auditData.roleCtx?.audit_label || "Product Audit",
+        accent_color: auditData.accent || "#8a9a8a",
+        job_link: jobLink,
+        audit_data: auditData,
+        pdf_path: pdfPath,
+      });
+
+      loadHistory();
+    } catch (err) {
+      console.error("Failed to save audit:", err);
+    }
+  };
 
   // Timer for processing stage
   useEffect(() => {
@@ -1069,8 +1153,10 @@ Return JSON:
       up(8, "done");
 
       const validated = validateOutput({ company, diagnosis, proposals, about });
-      setData({ cv, company: validated.company, pains, diagnosis: validated.diagnosis, proposals: validated.proposals, prototypes, about: validated.about, contacts: Array.isArray(contacts) ? contacts : [], accent, roleCtx, showProtos });
+      const finalData = { cv, company: validated.company, pains, diagnosis: validated.diagnosis, proposals: validated.proposals, prototypes, about: validated.about, contacts: Array.isArray(contacts) ? contacts : [], accent, roleCtx, showProtos };
+      setData(finalData);
       setStage("hub");
+      saveAudit(finalData);
 
     } catch (err) {
       console.error(err);
@@ -1109,15 +1195,109 @@ Return JSON:
           </div>
         )}
         <div className="nav-right">
-          {(stage === "results" || stage === "hub") && null}
           {stage === "results" && (
             <button className="mode-btn" onClick={() => setStage("hub")}>← HUB</button>
           )}
           {stage === "hub" && (
             <button className="mode-btn" onClick={reset} style={{ borderColor: accent, color: accent }}>NEW</button>
           )}
+          {pastAudits.length > 0 && (
+            <button className="mode-btn" onClick={() => setShowHistory(!showHistory)} style={{ fontSize: ".55rem" }}>
+              MY AUDITS ({pastAudits.length})
+            </button>
+          )}
+          {user && (
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowProfile(!showProfile)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: "4px 0",
+                }}
+              >
+                {user.user_metadata?.avatar_url ? (
+                  <img src={user.user_metadata.avatar_url} alt="" style={{ width: 26, height: 26, borderRadius: "50%", border: "1px solid var(--border)" }} />
+                ) : (
+                  <div style={{ width: 26, height: 26, borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: ".6rem", fontWeight: 700, color: textOn(accent) }}>
+                    {(user.email || "U")[0].toUpperCase()}
+                  </div>
+                )}
+              </button>
+              {showProfile && (
+                <div style={{
+                  position: "absolute", top: "100%", right: 0, marginTop: 8, background: "#1a1916", border: "1px solid #2a2825",
+                  borderRadius: 8, padding: "12px 16px", minWidth: 200, zIndex: 200, animation: "fadeIn .15s ease",
+                }}>
+                  <p style={{ fontSize: ".7rem", fontWeight: 600, color: "#f0ede8", marginBottom: 2 }}>
+                    {user.user_metadata?.full_name || user.user_metadata?.name || "User"}
+                  </p>
+                  <p style={{ fontSize: ".6rem", color: "#8a8780", marginBottom: 12 }}>{user.email}</p>
+                  <button
+                    onClick={async () => { await supabase.auth.signOut(); setShowProfile(false); }}
+                    style={{
+                      width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #2a2825", background: "transparent",
+                      color: "#f0ede8", fontSize: ".6rem", fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif",
+                      letterSpacing: ".08em", textTransform: "uppercase",
+                    }}
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ─── AUDIT HISTORY PANEL ─── */}
+      {showHistory && (
+        <div style={{
+          position: "fixed", top: 48, right: 0, bottom: 0, width: "min(360px, 100vw)", background: "#1a1916",
+          borderLeft: "1px solid #2a2825", zIndex: 150, overflowY: "auto", padding: "20px", animation: "fadeIn .2s ease",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <span style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "#8a8780" }}>MY AUDITS</span>
+            <button onClick={() => setShowHistory(false)} style={{ background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem" }}>×</button>
+          </div>
+          {loadingHistory && <p style={{ fontSize: ".7rem", color: "#8a8780" }}>Loading...</p>}
+          {pastAudits.map(a => (
+            <div
+              key={a.id}
+              onClick={() => loadAudit(a.id)}
+              style={{
+                padding: "12px 14px", borderRadius: 8, border: "1px solid #2a2825", marginBottom: 8,
+                cursor: "pointer", transition: "border-color .2s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = a.accent_color || "#8a8780"}
+              onMouseLeave={e => e.currentTarget.style.borderColor = "#2a2825"}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <div style={{ width: 8, height: 8, background: a.accent_color || "#8a8780", flexShrink: 0 }} />
+                <span style={{ fontSize: ".78rem", fontWeight: 600, color: "#f0ede8" }}>{a.company_name}</span>
+              </div>
+              <p style={{ fontSize: ".62rem", color: "#8a8780", marginBottom: 4 }}>{a.audit_label || "Product Audit"}</p>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: ".55rem", color: "#5a5850" }}>
+                  {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </span>
+                {a.pdf_path && (
+                  <a
+                    href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/audit-pdfs/${a.pdf_path}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    style={{ fontSize: ".55rem", color: a.accent_color || "#8a8780", fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", textDecoration: "none" }}
+                  >
+                    PDF ↗
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+          {!loadingHistory && pastAudits.length === 0 && (
+            <p style={{ fontSize: ".7rem", color: "#5a5850", textAlign: "center", marginTop: 40 }}>No audits yet. Generate your first one!</p>
+          )}
+        </div>
+      )}
 
       {/* ─── INPUT STAGE ─── */}
       {stage === "input" && (

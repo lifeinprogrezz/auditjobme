@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      audits: {
+        Row: {
+          accent_color: string | null
+          audit_data: Json
+          audit_label: string | null
+          company_name: string
+          created_at: string
+          id: string
+          job_link: string | null
+          pdf_path: string | null
+          role_name: string | null
+          user_id: string
+        }
+        Insert: {
+          accent_color?: string | null
+          audit_data: Json
+          audit_label?: string | null
+          company_name: string
+          created_at?: string
+          id?: string
+          job_link?: string | null
+          pdf_path?: string | null
+          role_name?: string | null
+          user_id: string
+        }
+        Update: {
+          accent_color?: string | null
+          audit_data?: Json
+          audit_label?: string | null
+          company_name?: string
+          created_at?: string
+          id?: string
+          job_link?: string | null
+          pdf_path?: string | null
+          role_name?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
