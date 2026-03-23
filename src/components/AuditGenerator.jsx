@@ -1191,7 +1191,7 @@ Return JSON:
 
   const reset = () => {
     setStage("input"); setData({ cv:null,company:null,pains:null,diagnosis:null,proposals:null,prototypes:null,about:null,contacts:null,accent:"#8a9a8a",roleCtx:null,showProtos:false });
-    setCvFile(null); setCvBase64(null); setJobLink(""); setPersonal(""); setShowAdv(false);
+    setCvFile(null); setCvBase64(null); setJobLink(""); setPersonal(""); setShowAdv(false); setShareUrl(null); setCopied(false);
   };
 
   const accent = data.accent || "#8a9a8a";
