@@ -456,7 +456,7 @@ function Prototype({ proto, accent }) {
 /* ═══════════════════ PDF HTML GENERATOR ═══════════════════ */
 function generatePDFHTML(data) {
   const { company, pains, diagnosis, proposals, about, cv, accent, roleCtx } = data;
-  const ac = accent || "#8a9a8a";
+  const ac = safeAccent(accent) || "#8a9a8a";
   const auditLabel = (roleCtx?.audit_label || "Product Audit").toUpperCase();
   const e = s => (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
