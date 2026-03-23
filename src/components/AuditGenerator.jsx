@@ -1223,7 +1223,7 @@ Return JSON:
     setCvFile(null); setCvBase64(null); setJobLink(""); setPersonal(""); setShowAdv(false); setShareUrl(null); setCopied(false);
   };
 
-  const accent = data.accent || "#8a9a8a";
+  const accent = safeAccent(data.accent) || "#8a9a8a";
   const showProtos = data.showProtos || false;
   const NAV_LINKS = showProtos
     ? ["research","diagnosis","proposals","prototypes","about"]
