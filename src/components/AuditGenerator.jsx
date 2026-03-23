@@ -675,36 +675,56 @@ async function downloadPDF(data) {
   const html2pdf = (await import("html2pdf.js")).default;
   const html = generatePDFHTML(data);
   const { company, roleCtx } = data;
-  const filename = ((company?.company||"audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+"-"+((roleCtx?.audit_label||"product-audit").replace(/[^a-zA-Z0-9]/g,"-").toLowerCase())+".pdf";
+  const filename = ((company?.company || "audit").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()) + "-" + ((roleCtx?.audit_label || "product-audit").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()) + ".pdf";
 
-  // Create a temporary container - must be on-screen for html2canvas to render
-  const container = document.createElement("div");
-  container.style.position = "absolute";
-  container.style.top = "0";
-  container.style.left = "0";
-  container.style.width = "210mm";
-  container.style.zIndex = "-9999";
-  container.style.opacity = "0";
-  container.style.pointerEvents = "none";
-  container.style.overflow = "hidden";
-  container.innerHTML = html;
-  document.body.appendChild(container);
-
-  // Wait for fonts to load
-  await document.fonts.ready;
-  await new Promise(r => setTimeout(r, 500));
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.top = "0";
+  iframe.style.left = "0";
+  iframe.style.width = "210mm";
+  iframe.style.height = "297mm";
+  iframe.style.border = "0";
+  iframe.style.zIndex = "-1";
+  iframe.style.pointerEvents = "none";
+  iframe.setAttribute("aria-hidden", "true");
+  document.body.appendChild(iframe);
 
   try {
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) throw new Error("Unable to create PDF document");
+
+    iframeDoc.open();
+    iframeDoc.write(html);
+    iframeDoc.close();
+
+    await new Promise((resolve) => {
+      if (iframe.contentWindow?.document.readyState === "complete") return resolve();
+      iframe.onload = () => resolve();
+      setTimeout(resolve, 800);
+    });
+
+    if (iframeDoc.fonts?.ready) {
+      await iframeDoc.fonts.ready;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
     await html2pdf().set({
       margin: 0,
       filename,
       image: { type: "jpeg", quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: "#0f0e0c", scrollX: 0, scrollY: 0, windowWidth: container.scrollWidth },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+        backgroundColor: "#0f0e0c",
+        windowWidth: iframeDoc.documentElement.scrollWidth,
+        windowHeight: iframeDoc.documentElement.scrollHeight,
+      },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      pagebreak: { mode: ["avoid-all", "css", "legacy"] },
-    }).from(container).save();
+      pagebreak: { mode: ["css", "legacy"] },
+    }).from(iframeDoc.body).save();
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
   }
 }
 
