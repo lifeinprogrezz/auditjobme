@@ -431,8 +431,8 @@ function Prototype({ proto, accent }) {
   );
 }
 
-/* ═══════════════════ PDF DOWNLOAD ═══════════════════ */
-function downloadPDF(data) {
+/* ═══════════════════ PDF HTML GENERATOR ═══════════════════ */
+function generatePDFHTML(data) {
   const { company, pains, diagnosis, proposals, about, cv, accent, roleCtx } = data;
   const ac = accent || "#8a9a8a";
   const auditLabel = (roleCtx?.audit_label || "Product Audit").toUpperCase();
