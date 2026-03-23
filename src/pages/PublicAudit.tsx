@@ -99,7 +99,7 @@ export default function PublicAudit() {
     );
   }
 
-  const accent = data.accent || "#8a9a8a";
+  const accent = safeAccent(data.accent) || "#8a9a8a";
   const showProtos = data.showProtos || false;
   const ABOUT_NUM = showProtos ? "05" : "04";
 
