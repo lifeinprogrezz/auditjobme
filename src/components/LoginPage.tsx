@@ -53,7 +53,7 @@ export default function LoginPage() {
           letterSpacing: ".04em",
           fontWeight: 500,
         }}>
-          Sign in with your Google account to generate personalized company audits.
+          Sign in or create an account with Google to generate personalized company audits.
         </p>
 
         <button
