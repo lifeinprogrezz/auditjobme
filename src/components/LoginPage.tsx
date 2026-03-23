@@ -40,7 +40,7 @@ export default function LoginPage() {
           fontSize: "clamp(1.9rem, 5.5vw, 3.4rem)",
           lineHeight: 1.08,
           letterSpacing: "-.04em",
-          marginBottom: "0.6rem",
+          marginBottom: "1.5rem",
         }}>
           auditjob.me
         </h1>
