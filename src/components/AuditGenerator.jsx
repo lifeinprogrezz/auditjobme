@@ -740,13 +740,30 @@ export default function App() {
   };
 
   // Save audit to DB + upload PDF
+  const [shareUrl, setShareUrl] = useState(null);
+  const [copied, setCopied] = useState(false);
+
   const saveAudit = async (auditData) => {
     if (!user) return;
     try {
+      // Generate slug via DB function
+      const { data: slugData } = await supabase.rpc("generate_audit_slug", {
+        p_user_id: user.id,
+        p_company: auditData.company?.company || "audit",
+      });
+      const slug = slugData || (auditData.company?.company || "audit").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
+
+      // Get username
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .single();
+
       // Generate PDF HTML blob
       const pdfHtml = generatePDFHTML(auditData);
       const blob = new Blob([pdfHtml], { type: "text/html" });
-      const fileName = `${user.id}/${Date.now()}-${(auditData.company?.company || "audit").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}.html`;
+      const fileName = `${user.id}/${slug}.html`;
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
@@ -765,7 +782,14 @@ export default function App() {
         job_link: jobLink,
         audit_data: auditData,
         pdf_path: pdfPath,
+        slug,
+        is_published: true,
       });
+
+      // Set shareable URL
+      if (profile?.username) {
+        setShareUrl(`${window.location.origin}/a/${profile.username}/${slug}`);
+      }
 
       loadHistory();
     } catch (err) {
@@ -1167,7 +1191,7 @@ Return JSON:
 
   const reset = () => {
     setStage("input"); setData({ cv:null,company:null,pains:null,diagnosis:null,proposals:null,prototypes:null,about:null,contacts:null,accent:"#8a9a8a",roleCtx:null,showProtos:false });
-    setCvFile(null); setCvBase64(null); setJobLink(""); setPersonal(""); setShowAdv(false);
+    setCvFile(null); setCvBase64(null); setJobLink(""); setPersonal(""); setShowAdv(false); setShareUrl(null); setCopied(false);
   };
 
   const accent = data.accent || "#8a9a8a";
@@ -1427,7 +1451,21 @@ Return JSON:
                 <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)" }} onClick={() => setStage("results")}>
                   View Interactive Audit
                 </button>
+                {shareUrl && (
+                  <button
+                    className="hub-btn"
+                    style={{ background: "transparent", color: accent, border: `1px solid ${accent}` }}
+                    onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                  >
+                    {copied ? "✓ Copied!" : "Copy Share Link"}
+                  </button>
+                )}
               </div>
+              {shareUrl && (
+                <p style={{ fontSize: ".62rem", color: "var(--muted)", marginTop: 8, wordBreak: "break-all" }}>
+                  🔗 <a href={shareUrl} target="_blank" rel="noopener noreferrer" style={{ color: accent, textDecoration: "none" }}>{shareUrl}</a>
+                </p>
+              )}
             </Anim>
             {data.contacts?.length > 0 && (
               <Anim delay={0.3}>

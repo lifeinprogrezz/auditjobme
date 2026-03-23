@@ -22,9 +22,11 @@ export type Database = {
           company_name: string
           created_at: string
           id: string
+          is_published: boolean
           job_link: string | null
           pdf_path: string | null
           role_name: string | null
+          slug: string | null
           user_id: string
         }
         Insert: {
@@ -34,9 +36,11 @@ export type Database = {
           company_name: string
           created_at?: string
           id?: string
+          is_published?: boolean
           job_link?: string | null
           pdf_path?: string | null
           role_name?: string | null
+          slug?: string | null
           user_id: string
         }
         Update: {
@@ -46,9 +50,11 @@ export type Database = {
           company_name?: string
           created_at?: string
           id?: string
+          is_published?: boolean
           job_link?: string | null
           pdf_path?: string | null
           role_name?: string | null
+          slug?: string | null
           user_id?: string
         }
         Relationships: []
@@ -61,6 +67,7 @@ export type Database = {
           email: string | null
           id: string
           updated_at: string
+          username: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -69,6 +76,7 @@ export type Database = {
           email?: string | null
           id: string
           updated_at?: string
+          username?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -77,6 +85,7 @@ export type Database = {
           email?: string | null
           id?: string
           updated_at?: string
+          username?: string | null
         }
         Relationships: []
       }
@@ -85,7 +94,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_audit_slug: {
+        Args: { p_company: string; p_user_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
