@@ -762,8 +762,16 @@ export default function App() {
 
   useEffect(() => { if (user) loadHistory(); }, [user]);
 
+  // Whitelist check — bypass free limit for whitelisted emails
+  const [isWhitelisted, setIsWhitelisted] = useState(false);
+  useEffect(() => {
+    if (!user?.email) return;
+    supabase.from("whitelisted_emails").select("id").eq("email", user.email).maybeSingle()
+      .then(({ data }) => setIsWhitelisted(!!data));
+  }, [user]);
+
   const auditCount = pastAudits.length;
-  const atLimit = auditCount >= FREE_LIMIT;
+  const atLimit = !isWhitelisted && auditCount >= FREE_LIMIT;
 
   const submitFeedback = async () => {
     if (!feedbackText.trim() || !user) return;
