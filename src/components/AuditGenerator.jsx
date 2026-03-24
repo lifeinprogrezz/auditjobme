@@ -512,7 +512,7 @@ function generatePDFHTML(data) {
   const quoteHTML = pains?.key_quote ? `
     <div class="quote-block">
       <div class="quote-label">FIELD SIGNAL</div>
-      <p>${e(pains.key_quote)}</p>
+      <p>${e((pains.key_quote || "").replace(/<cite[^>]*>/g, '').replace(/<\/cite>/g, ''))}</p>
       <div class="quote-src">Source: ${pains.quote_url ? `<a href="${pains.quote_url}">${e(pains.quote_source)}</a>` : e(pains.quote_source)}</div>
     </div>` : '';
 
