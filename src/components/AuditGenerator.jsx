@@ -760,7 +760,20 @@ export default function App() {
 
   useEffect(() => { if (user) loadHistory(); }, [user]);
 
-  // Load a past audit
+  const auditCount = pastAudits.length;
+  const atLimit = auditCount >= FREE_LIMIT;
+
+  const submitFeedback = async () => {
+    if (!feedbackText.trim() || !user) return;
+    setFeedbackSending(true);
+    await supabase.from("feedback").insert({ user_id: user.id, message: feedbackText.trim() });
+    setFeedbackSending(false);
+    setFeedbackSent(true);
+    setFeedbackText("");
+    setTimeout(() => { setShowFeedback(false); setFeedbackSent(false); }, 1800);
+  };
+
+
   const loadAudit = async (auditId) => {
     const { data } = await supabase
       .from("audits")
