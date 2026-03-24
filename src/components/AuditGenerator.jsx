@@ -1182,7 +1182,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 {"headline":"2 lines with \\n. Line 1: max 5 words. Line 2: constraint, max 8 words.",
 "sub":"max 25 words",
 "proposals":[{"phase":1,"title":"max 8 words","problem":"max 25 words","solution":"max 25 words","how_it_works":"max 25 words","target_effort_impact":"Target: metric · Effort: level · Impact: level"}]}`
-              }], { system: SYS + ` 3 proposals. ${roleCtx.proposal_frame || "Product interventions"}.`, max_tokens: 2500 });
+              }], }], { system: SYS + ` 90-DAY ACTION PLAN RULE: Every proposal must describe a specific action the candidate would execute in their first 90 days. Use concrete verbs: launch, partner, build, deploy, pitch, create, host. NEVER use abstract language like: playbook, framework, system, engine, methodology, enablement, leverage, optimize. Proposals should read like 90-day plan entries, not consulting deliverables. 3 proposals. ${roleCtx.proposal_frame || "Product interventions"}.`, max_tokens: 2500 }););
               proposals = safeParse(extractText(retryProps)) || proposals;
             }
           } catch (retryErr) {
