@@ -752,7 +752,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [protoTab, setProtoTab] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const [avgDuration, setAvgDuration] = useState(180); // default ~3min (optimized pipeline)
+  const [avgDuration, setAvgDuration] = useState(120); // default ~2min
   const [showHistory, setShowHistory] = useState(false);
   const [pastAudits, setPastAudits] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
