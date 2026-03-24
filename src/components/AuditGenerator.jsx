@@ -135,6 +135,34 @@ async function callClaude(messages, opts = {}) {
   return res.json();
 }
 
+/* Retry wrapper: retries up to maxRetries times with delay between attempts */
+async function callClaudeWithRetry(messages, opts = {}, maxRetries = 3, delayMs = 2000) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await callClaude(messages, opts);
+    } catch (err) {
+      lastError = err;
+      console.warn(`API call attempt ${attempt}/${maxRetries} failed:`, err.message);
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+  throw lastError;
+}
+
+/* Validation gate: checks that all critical sections have real data */
+function validateSections({ company, diagnosis, proposals, about, contacts }) {
+  const missing = [];
+  if (!company?.stats?.length) missing.push("company_stats");
+  if (!diagnosis?.findings?.length) missing.push("diagnosis");
+  if (!proposals?.proposals?.length) missing.push("proposals");
+  if (!about?.columns?.length && !about?.stats?.length) missing.push("about");
+  if (!Array.isArray(contacts) || contacts.length === 0) missing.push("contacts");
+  return missing;
+}
+
 function extractText(d) {
   return (d?.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
 }
