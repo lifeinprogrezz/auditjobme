@@ -723,6 +723,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [protoTab, setProtoTab] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  const [avgDuration, setAvgDuration] = useState(255); // default ~4min 15s
   const [showHistory, setShowHistory] = useState(false);
   const [pastAudits, setPastAudits] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
