@@ -723,6 +723,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [protoTab, setProtoTab] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  const [avgDuration, setAvgDuration] = useState(255); // default ~4min 15s
   const [showHistory, setShowHistory] = useState(false);
   const [pastAudits, setPastAudits] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -791,7 +792,7 @@ export default function App() {
   const [shareUrl, setShareUrl] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  const saveAudit = async (auditData) => {
+  const saveAudit = async (auditData, durationSecs) => {
     if (!user) return;
     try {
       // Generate slug via DB function
@@ -832,6 +833,7 @@ export default function App() {
         pdf_path: pdfPath,
         slug,
         is_published: true,
+        duration_seconds: durationSecs || null,
       });
 
       // Set shareable URL
@@ -851,6 +853,24 @@ export default function App() {
     const t = setInterval(() => setElapsed(e => e + 1), 1000);
     return () => clearInterval(t);
   }, [stage]);
+
+  // Fetch average audit duration for dynamic progress bar
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: rows } = await supabase
+          .from("audits")
+          .select("duration_seconds")
+          .not("duration_seconds", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(20);
+        if (rows?.length >= 3) {
+          const avg = Math.round(rows.reduce((s, r) => s + r.duration_seconds, 0) / rows.length);
+          if (avg > 60 && avg < 600) setAvgDuration(avg);
+        }
+      } catch (_) {}
+    })();
+  }, []);
 
   // Audit data
   const [data, setData] = useState({
@@ -1229,7 +1249,7 @@ Return JSON:
       const finalData = { cv, company: validated.company, pains, diagnosis: validated.diagnosis, proposals: validated.proposals, prototypes, about: validated.about, contacts: Array.isArray(contacts) ? contacts : [], accent, roleCtx, showProtos };
       setData(finalData);
       setStage("hub");
-      saveAudit(finalData);
+      saveAudit(finalData, elapsed);
 
     } catch (err) {
       console.error(err);
@@ -1487,7 +1507,7 @@ Return JSON:
 
       {/* ─── PROCESSING ─── */}
       {stage === "processing" && (() => {
-        const EST = 255; // ~4min 15s estimate
+        const EST = avgDuration; // dynamic from real audit data
         const activeStep = STEPS[stepStatus.findIndex(s => s === "active")] || STEPS[0];
         const pct = Math.min(Math.round((elapsed / EST) * 100), 99);
         const mins = Math.floor(elapsed / 60);
