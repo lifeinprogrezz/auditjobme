@@ -791,7 +791,7 @@ export default function App() {
   const [shareUrl, setShareUrl] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  const saveAudit = async (auditData) => {
+  const saveAudit = async (auditData, durationSecs) => {
     if (!user) return;
     try {
       // Generate slug via DB function
