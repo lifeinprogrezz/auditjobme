@@ -1507,7 +1507,7 @@ Return JSON:
 
       {/* ─── PROCESSING ─── */}
       {stage === "processing" && (() => {
-        const EST = 255; // ~4min 15s estimate
+        const EST = avgDuration; // dynamic from real audit data
         const activeStep = STEPS[stepStatus.findIndex(s => s === "active")] || STEPS[0];
         const pct = Math.min(Math.round((elapsed / EST) * 100), 99);
         const mins = Math.floor(elapsed / 60);
