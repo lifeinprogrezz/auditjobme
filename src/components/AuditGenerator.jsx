@@ -727,6 +727,12 @@ export default function App() {
   const [pastAudits, setPastAudits] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSending, setFeedbackSending] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const FREE_LIMIT = 2;
 
   // Get auth user
   const [user, setUser] = useState(null);
@@ -754,7 +760,20 @@ export default function App() {
 
   useEffect(() => { if (user) loadHistory(); }, [user]);
 
-  // Load a past audit
+  const auditCount = pastAudits.length;
+  const atLimit = auditCount >= FREE_LIMIT;
+
+  const submitFeedback = async () => {
+    if (!feedbackText.trim() || !user) return;
+    setFeedbackSending(true);
+    await supabase.from("feedback").insert({ user_id: user.id, message: feedbackText.trim() });
+    setFeedbackSending(false);
+    setFeedbackSent(true);
+    setFeedbackText("");
+    setTimeout(() => { setShowFeedback(false); setFeedbackSent(false); }, 1800);
+  };
+
+
   const loadAudit = async (auditId) => {
     const { data } = await supabase
       .from("audits")
@@ -868,6 +887,7 @@ export default function App() {
 
   const generate = async () => {
     if (!cvBase64 || !jobLink.trim()) return;
+    if (atLimit) { setShowPaywall(true); return; }
     setStage("processing");
     setStepStatus(STEPS.map(() => "pending"));
     setError(null);
@@ -1278,12 +1298,43 @@ Return JSON:
               {showProfile && (
                 <div style={{
                   position: "absolute", top: "100%", right: 0, marginTop: 8, background: "#1a1916", border: "1px solid #2a2825",
-                  borderRadius: 8, padding: "12px 16px", minWidth: 200, zIndex: 200, animation: "fadeIn .15s ease",
+                  borderRadius: 8, padding: "12px 16px", minWidth: 220, zIndex: 200, animation: "fadeIn .15s ease",
                 }}>
                   <p style={{ fontSize: ".7rem", fontWeight: 600, color: "#f0ede8", marginBottom: 2 }}>
                     {user.user_metadata?.full_name || user.user_metadata?.name || "User"}
                   </p>
                   <p style={{ fontSize: ".6rem", color: "#8a8780", marginBottom: 12 }}>{user.email}</p>
+                  
+                  <div style={{ borderTop: "1px solid #2a2825", paddingTop: 10, marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <span style={{ fontSize: ".58rem", fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "#8a8780" }}>Free audits</span>
+                      <span style={{ fontSize: ".62rem", fontWeight: 700, color: atLimit ? "#e84c2b" : accent }}>
+                        {auditCount}/{FREE_LIMIT}
+                      </span>
+                    </div>
+                    <div style={{ width: "100%", height: 3, background: "#2a2825", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ height: "100%", background: atLimit ? "#e84c2b" : accent, width: `${Math.min((auditCount / FREE_LIMIT) * 100, 100)}%`, transition: "width .3s ease", borderRadius: 2 }} />
+                    </div>
+                    {atLimit && (
+                      <button
+                        onClick={() => { setShowPaywall(true); setShowProfile(false); }}
+                        style={{ width: "100%", marginTop: 8, padding: "7px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".58rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase" }}
+                      >
+                        Upgrade
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => { setShowFeedback(true); setShowProfile(false); }}
+                    style={{
+                      width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #2a2825", background: "transparent",
+                      color: "#8a8780", fontSize: ".6rem", fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif",
+                      letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 6,
+                    }}
+                  >
+                    Feedback
+                  </button>
                   <button
                     onClick={async () => { await supabase.auth.signOut(); setShowProfile(false); }}
                     style={{
@@ -1751,6 +1802,76 @@ Return JSON:
             <a href={data.company?.role_url || jobLink} target="_blank" rel="noopener noreferrer">
               {(data.company?.role || "").toUpperCase()}
             </a>
+          </div>
+        </div>
+      )}
+
+      {/* ─── FEEDBACK DIALOG ─── */}
+      {showFeedback && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)" }} onClick={() => { setShowFeedback(false); setFeedbackSent(false); }} />
+          <div style={{ position: "relative", background: "#1a1916", border: "1px solid #2a2825", borderRadius: 10, padding: "28px 24px", width: "min(400px, 90vw)", animation: "fadeUp .25s ease" }}>
+            <button onClick={() => { setShowFeedback(false); setFeedbackSent(false); }} style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem" }}>×</button>
+            {feedbackSent ? (
+              <div style={{ textAlign: "center", padding: "20px 0" }}>
+                <p style={{ fontSize: "1.2rem", marginBottom: 8 }}>✓</p>
+                <p style={{ fontSize: ".78rem", color: "#f0ede8", fontWeight: 600 }}>Thanks for your feedback</p>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: accent, marginBottom: 16 }}>Feedback</p>
+                <p style={{ fontSize: ".83rem", color: "#f0ede8", fontWeight: 500, marginBottom: 16, lineHeight: 1.5 }}>What would make this audit better?</p>
+                <textarea
+                  value={feedbackText}
+                  onChange={e => setFeedbackText(e.target.value)}
+                  placeholder="Your thoughts..."
+                  rows={4}
+                  style={{ width: "100%", padding: ".75rem 1rem", borderRadius: 8, border: "1px solid #2a2825", fontSize: ".78rem", fontFamily: "'Plus Jakarta Sans',sans-serif", background: "transparent", color: "#f0ede8", resize: "vertical", lineHeight: 1.6 }}
+                />
+                <button
+                  onClick={submitFeedback}
+                  disabled={!feedbackText.trim() || feedbackSending}
+                  style={{ width: "100%", marginTop: 12, padding: "10px", borderRadius: 8, border: "none", background: feedbackText.trim() ? accent : "#2a2825", color: feedbackText.trim() ? textOn(accent) : "#8a8780", fontSize: ".65rem", fontWeight: 700, cursor: feedbackText.trim() ? "pointer" : "not-allowed", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase", transition: "all .2s" }}
+                >
+                  {feedbackSending ? "Sending..." : "Send"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── PAYWALL MODAL ─── */}
+      {showPaywall && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)" }} onClick={() => setShowPaywall(false)} />
+          <div style={{ position: "relative", background: "#1a1916", border: "1px solid #2a2825", borderRadius: 10, padding: "32px 28px", width: "min(420px, 90vw)", animation: "fadeUp .25s ease" }}>
+            <button onClick={() => setShowPaywall(false)} style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem" }}>×</button>
+            <p style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: accent, marginBottom: 12 }}>Upgrade</p>
+            <h2 style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 800, fontSize: "1.4rem", color: "#f0ede8", lineHeight: 1.1, marginBottom: 8, letterSpacing: "-.02em" }}>
+              You've used your<br/><span style={{ color: accent }}>free audits.</span>
+            </h2>
+            <p style={{ fontSize: ".78rem", color: "#8a8780", lineHeight: 1.6, marginBottom: 24 }}>
+              Unlock unlimited audits and keep standing out.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+              <div style={{ padding: "16px", borderRadius: 8, border: `1px solid ${accent}`, background: "rgba(138,154,138,.06)", position: "relative" }}>
+                <span style={{ position: "absolute", top: -8, right: 12, fontSize: ".5rem", fontWeight: 700, background: accent, color: textOn(accent), padding: "2px 8px", borderRadius: 4, letterSpacing: ".06em", textTransform: "uppercase" }}>Popular</span>
+                <p style={{ fontSize: ".72rem", fontWeight: 700, color: "#f0ede8", marginBottom: 4 }}>Pro</p>
+                <p style={{ fontSize: ".65rem", color: "#8a8780" }}>Unlimited audits · Priority generation</p>
+                <button style={{ marginTop: 10, width: "100%", padding: "9px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".6rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase" }}>
+                  Coming Soon
+                </button>
+              </div>
+              <div style={{ padding: "16px", borderRadius: 8, border: "1px solid #2a2825" }}>
+                <p style={{ fontSize: ".72rem", fontWeight: 700, color: "#f0ede8", marginBottom: 4 }}>Credit Packs</p>
+                <p style={{ fontSize: ".65rem", color: "#8a8780" }}>Buy 5, 10, or 20 audits</p>
+                <button style={{ marginTop: 10, width: "100%", padding: "9px", borderRadius: 6, border: "1px solid #2a2825", background: "transparent", color: "#f0ede8", fontSize: ".6rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase" }}>
+                  Coming Soon
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
