@@ -1805,6 +1805,76 @@ Return JSON:
           </div>
         </div>
       )}
+
+      {/* ─── FEEDBACK DIALOG ─── */}
+      {showFeedback && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)" }} onClick={() => { setShowFeedback(false); setFeedbackSent(false); }} />
+          <div style={{ position: "relative", background: "#1a1916", border: "1px solid #2a2825", borderRadius: 10, padding: "28px 24px", width: "min(400px, 90vw)", animation: "fadeUp .25s ease" }}>
+            <button onClick={() => { setShowFeedback(false); setFeedbackSent(false); }} style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem" }}>×</button>
+            {feedbackSent ? (
+              <div style={{ textAlign: "center", padding: "20px 0" }}>
+                <p style={{ fontSize: "1.2rem", marginBottom: 8 }}>✓</p>
+                <p style={{ fontSize: ".78rem", color: "#f0ede8", fontWeight: 600 }}>Thanks for your feedback</p>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: accent, marginBottom: 16 }}>Feedback</p>
+                <p style={{ fontSize: ".83rem", color: "#f0ede8", fontWeight: 500, marginBottom: 16, lineHeight: 1.5 }}>What would make this audit better?</p>
+                <textarea
+                  value={feedbackText}
+                  onChange={e => setFeedbackText(e.target.value)}
+                  placeholder="Your thoughts..."
+                  rows={4}
+                  style={{ width: "100%", padding: ".75rem 1rem", borderRadius: 8, border: "1px solid #2a2825", fontSize: ".78rem", fontFamily: "'Plus Jakarta Sans',sans-serif", background: "transparent", color: "#f0ede8", resize: "vertical", lineHeight: 1.6 }}
+                />
+                <button
+                  onClick={submitFeedback}
+                  disabled={!feedbackText.trim() || feedbackSending}
+                  style={{ width: "100%", marginTop: 12, padding: "10px", borderRadius: 8, border: "none", background: feedbackText.trim() ? accent : "#2a2825", color: feedbackText.trim() ? textOn(accent) : "#8a8780", fontSize: ".65rem", fontWeight: 700, cursor: feedbackText.trim() ? "pointer" : "not-allowed", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase", transition: "all .2s" }}
+                >
+                  {feedbackSending ? "Sending..." : "Send"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── PAYWALL MODAL ─── */}
+      {showPaywall && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)" }} onClick={() => setShowPaywall(false)} />
+          <div style={{ position: "relative", background: "#1a1916", border: "1px solid #2a2825", borderRadius: 10, padding: "32px 28px", width: "min(420px, 90vw)", animation: "fadeUp .25s ease" }}>
+            <button onClick={() => setShowPaywall(false)} style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem" }}>×</button>
+            <p style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: accent, marginBottom: 12 }}>Upgrade</p>
+            <h2 style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 800, fontSize: "1.4rem", color: "#f0ede8", lineHeight: 1.1, marginBottom: 8, letterSpacing: "-.02em" }}>
+              You've used your<br/><span style={{ color: accent }}>free audits.</span>
+            </h2>
+            <p style={{ fontSize: ".78rem", color: "#8a8780", lineHeight: 1.6, marginBottom: 24 }}>
+              Unlock unlimited audits and keep standing out.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+              <div style={{ padding: "16px", borderRadius: 8, border: `1px solid ${accent}`, background: "rgba(138,154,138,.06)", position: "relative" }}>
+                <span style={{ position: "absolute", top: -8, right: 12, fontSize: ".5rem", fontWeight: 700, background: accent, color: textOn(accent), padding: "2px 8px", borderRadius: 4, letterSpacing: ".06em", textTransform: "uppercase" }}>Popular</span>
+                <p style={{ fontSize: ".72rem", fontWeight: 700, color: "#f0ede8", marginBottom: 4 }}>Pro</p>
+                <p style={{ fontSize: ".65rem", color: "#8a8780" }}>Unlimited audits · Priority generation</p>
+                <button style={{ marginTop: 10, width: "100%", padding: "9px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".6rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase" }}>
+                  Coming Soon
+                </button>
+              </div>
+              <div style={{ padding: "16px", borderRadius: 8, border: "1px solid #2a2825" }}>
+                <p style={{ fontSize: ".72rem", fontWeight: 700, color: "#f0ede8", marginBottom: 4 }}>Credit Packs</p>
+                <p style={{ fontSize: ".65rem", color: "#8a8780" }}>Buy 5, 10, or 20 audits</p>
+                <button style={{ marginTop: 10, width: "100%", padding: "9px", borderRadius: 6, border: "1px solid #2a2825", background: "transparent", color: "#f0ede8", fontSize: ".6rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase" }}>
+                  Coming Soon
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
