@@ -954,7 +954,7 @@ export default function App() {
     try {
       /* ══ Stage 1: Parse CV (Haiku — structured extraction, no reasoning needed) ══ */
       up(0, "active");
-      const cv = safeParse(extractText(await callClaude([{
+      const cv = safeParse(extractText(await callClaudeWithRetry([{
         role: "user",
         content: [
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: cvBase64 } },
