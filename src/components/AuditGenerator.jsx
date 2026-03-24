@@ -1093,7 +1093,7 @@ Return JSON:
 {"headline":"${roleCtx.about_title || "Why I'm the right PM"}","headline_accent":"max 6 words","stats":[3: {"value":"string","label":"SHORT LABEL"}],"columns":[3: {"skill":"2 WORDS UPPERCASE","proof":"Max 30 words. Ties skill to proposal."}]}`
         }], { system: SYS + ` 3 stats, 3 columns. Most relevant numbers for ${roleCtx.role_type || "role"}.`, max_tokens: 1500 }),
 
-        callClaude([{
+        callClaudeWithRetry([{
           role: "user",
           content: `Find 3 LinkedIn profiles at ${company.company} for hiring "${company.role}". VP/Director level + recruiters. Return JSON: [{"name":"string","title":"string","url":"linkedin URL","why":"1 sentence"}]`
         }], { system: SYS + " Real LinkedIn URLs from search.", model: HAIKU, max_tokens: 800, tools: WEB_SEARCH })
