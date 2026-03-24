@@ -1,0 +1,1 @@
+CREATE POLICY "Allow authenticated to read whitelist" ON public.whitelisted_emails FOR SELECT TO authenticated USING (true);
