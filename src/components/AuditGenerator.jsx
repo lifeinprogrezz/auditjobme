@@ -1082,7 +1082,7 @@ Return JSON: {"prototypes":[{"phase":1,"title":"Phase 1 — Name","description":
 
       const proposalBrief = (proposals.proposals || []).map(p => ({ phase: p.phase, title: p.title, problem: p.problem }));
       parallelCalls.push(
-        callClaude([{
+        callClaudeWithRetry([{
           role: "user",
           content: `Match candidate to proposals:
 CANDIDATE: ${JSON.stringify({ name: cv.name, achievements: cv.achievements?.slice(0,4), companies: cv.companies?.map(c => ({ name: c.name, role: c.role })) })}
