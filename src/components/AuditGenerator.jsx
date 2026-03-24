@@ -1025,7 +1025,7 @@ Return JSON with TWO top-level keys:
       up(2, "active");
       const personalCtx = personal ? `\nCandidate insight: "${personal}"` : "";
       const companyBrief = { company: company.company, product_desc: company.product_desc, competitors: company.competitors };
-      const diagnosis = safeParse(extractText(await callClaude([{
+      let diagnosis = safeParse(extractText(await callClaudeWithRetry([{
         role: "user",
         content: `Diagnose ${company.company}:
 COMPANY: ${JSON.stringify(companyBrief)}
