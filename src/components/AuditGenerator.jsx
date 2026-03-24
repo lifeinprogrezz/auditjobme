@@ -1091,7 +1091,7 @@ COMPANY: ${company.company}, ROLE: ${company.role}
 
 Return JSON:
 {"headline":"${roleCtx.about_title || "Why I'm the right PM"}","headline_accent":"max 6 words","stats":[3: {"value":"string","label":"SHORT LABEL"}],"columns":[3: {"skill":"2 WORDS UPPERCASE","proof":"Max 30 words. Ties skill to proposal."}]}`
-        }], { system: SYS + ` 3 stats, 3 columns. Most relevant numbers for ${roleCtx.role_type || "role"}.`, max_tokens: 1500 }),
+        }], { system: SYS + ` HEADLINE RULE: The headline field must be 12 words maximum. Write it as a punchy title, not a sentence. Good: "Why I'm the Right AE for EMEA Startup Growth". Bad: "You are positioned as a founder-credible bridge who speaks technical architecture and commercial velocity simultaneously". Never start with "You're" or "You are". 3 stats, 3 columns. Most relevant numbers for ${roleCtx.role_type || "role"}.`, max_tokens: 1500 }),
 
         callClaudeWithRetry([{
           role: "user",
