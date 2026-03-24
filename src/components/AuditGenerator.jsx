@@ -122,7 +122,7 @@ async function callClaude(messages, opts = {}) {
     },
     body: JSON.stringify({
       messages,
-      model: "claude-sonnet-4-20250514",
+      model: opts.model || SONNET,
       max_tokens: opts.max_tokens || 4096,
       ...(opts.system ? { system: opts.system } : {}),
       ...(opts.tools ? { tools: opts.tools } : {}),
