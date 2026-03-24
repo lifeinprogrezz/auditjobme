@@ -1038,7 +1038,7 @@ Return JSON:
 {"headline":"EXACTLY 2 lines separated by \\n. Line 1: key stat, MAX 7 words. Line 2: opportunity, MAX 7 words. 14 words max total.",
 "sub":"1 sentence, max 20 words",
 "findings":[3 items: {"number":"01","title":"max 8 words","evidence":"max 35 words","evidence_sources":[{"name":"string","url":"real https:// URL"}],"impact_type":"one of: ${(roleCtx.impact_types || ["REVENUE IMPACT","RETENTION IMPACT","GROWTH IMPACT"]).join(", ")}","impact":"max 25 words. MUST include specific number or percentage.","why_not_fixed":"max 35 words. They made the right call given X, Y is opportunity.","tag":"MAX 2 WORDS"}]}`
-      }], { system: SYS + ` 3 findings. ${roleCtx.diagnosis_tone || "Frame as opportunity."}. NEVER attack culture or leadership.`, max_tokens: 2500 }))) || { headline: "", findings: [] };
+      }], }], { system: SYS + ` CRITICAL OBJECTIVITY RULE: Findings must describe company or market problems observable from public data and user complaints. Never build findings around the candidate's specific background, skills, or industry experience. A good test: could any smart analyst identify this problem without knowing who the candidate is? If not, it is not a real finding. Never reference the candidate in diagnosis findings. 3 findings. ${roleCtx.diagnosis_tone || "Frame as opportunity."}. NEVER attack culture or leadership.`, max_tokens: 2500 }))) || { headline: "", findings: [] };))) || { headline: "", findings: [] };
       up(2, "done");
 
       /* ══ Stage 4: Proposals (Sonnet — needs reasoning + seniority awareness) ══ */
@@ -1055,7 +1055,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 {"headline":"2 lines with \\n. Line 1: max 5 words. Line 2: constraint, max 8 words.",
 "sub":"max 25 words",
 "proposals":[{"phase":1,"title":"max 8 words","problem":"max 25 words","solution":"max 25 words","how_it_works":"max 25 words","target_effort_impact":"Target: metric · Effort: level · Impact: level"}]}`
-      }], { system: SYS + ` 3 proposals. ${roleCtx.proposal_frame || "Product interventions"}. SENIORITY: "${company.role || ""}". Junior roles = "analysis I'd contribute". Senior = ambitious.`, max_tokens: 2500 }))) || { proposals: [] };
+      }], }], { system: SYS + ` 90-DAY ACTION PLAN RULE: Every proposal must describe a specific action the candidate would execute in their first 90 days. Use concrete verbs: launch, partner, build, deploy, pitch, create, host. NEVER use abstract language like: playbook, framework, system, engine, methodology, enablement, leverage, optimize. Proposals should read like 90-day plan entries, not consulting deliverables. 3 proposals. ${roleCtx.proposal_frame || "Product interventions"}. SENIORITY: "${company.role || ""}". Junior roles = "analysis I'd contribute". Senior = ambitious.`, max_tokens: 2500 }))) || { proposals: [] };))) || { proposals: [] };
       up(3, "done");
 
       /* ══ Stage 5: Prototypes (Haiku, conditional) + About (Sonnet) + Contacts (Haiku+search) — PARALLEL ══ */
@@ -1167,7 +1167,7 @@ Return JSON:
 {"headline":"EXACTLY 2 lines separated by \\n. Line 1: key stat, MAX 7 words. Line 2: opportunity, MAX 7 words.",
 "sub":"1 sentence, max 20 words",
 "findings":[3 items: {"number":"01","title":"max 8 words","evidence":"max 35 words","evidence_sources":[{"name":"string","url":"real https:// URL"}],"impact_type":"one of: ${(roleCtx.impact_types || ["REVENUE IMPACT","RETENTION IMPACT","GROWTH IMPACT"]).join(", ")}","impact":"max 25 words.","why_not_fixed":"max 35 words.","tag":"MAX 2 WORDS"}]}`
-              }], { system: SYS + ` 3 findings. ${roleCtx.diagnosis_tone || "Frame as opportunity."}.`, max_tokens: 2500 });
+              }], }], { system: SYS + ` CRITICAL OBJECTIVITY RULE: Findings must describe company or market problems observable from public data and user complaints. Never build findings around the candidate's specific background, skills, or industry experience. A good test: could any smart analyst identify this problem without knowing who the candidate is? If not, it is not a real finding. Never reference the candidate in diagnosis findings. 3 findings. ${roleCtx.diagnosis_tone || "Frame as opportunity."}.`, max_tokens: 2500 }););
               diagnosis = safeParse(extractText(retryDiag)) || diagnosis;
             }
             if (section === "proposals") {
@@ -1182,7 +1182,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 {"headline":"2 lines with \\n. Line 1: max 5 words. Line 2: constraint, max 8 words.",
 "sub":"max 25 words",
 "proposals":[{"phase":1,"title":"max 8 words","problem":"max 25 words","solution":"max 25 words","how_it_works":"max 25 words","target_effort_impact":"Target: metric · Effort: level · Impact: level"}]}`
-              }], { system: SYS + ` 3 proposals. ${roleCtx.proposal_frame || "Product interventions"}.`, max_tokens: 2500 });
+              }], }], { system: SYS + ` 90-DAY ACTION PLAN RULE: Every proposal must describe a specific action the candidate would execute in their first 90 days. Use concrete verbs: launch, partner, build, deploy, pitch, create, host. NEVER use abstract language like: playbook, framework, system, engine, methodology, enablement, leverage, optimize. Proposals should read like 90-day plan entries, not consulting deliverables. 3 proposals. ${roleCtx.proposal_frame || "Product interventions"}.`, max_tokens: 2500 }););
               proposals = safeParse(extractText(retryProps)) || proposals;
             }
           } catch (retryErr) {
