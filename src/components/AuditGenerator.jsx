@@ -1816,7 +1816,6 @@ Return JSON:
             <button onClick={() => { setShowFeedback(false); setFeedbackSent(false); }} style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem" }}>×</button>
             {feedbackSent ? (
               <div style={{ textAlign: "center", padding: "20px 0" }}>
-                <p style={{ fontSize: "1.2rem", marginBottom: 8 }}>✓</p>
                 <p style={{ fontSize: ".78rem", color: "#f0ede8", fontWeight: 600 }}>Thanks for your feedback</p>
               </div>
             ) : (
