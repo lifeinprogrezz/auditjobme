@@ -4,9 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 const STEPS = [
   { label: "Parsing your CV" },
-  { label: "Classifying role domain" },
   { label: "Researching the company" },
-  { label: "Sourcing pain points" },
   { label: "Building diagnosis" },
   { label: "Generating proposals" },
   { label: "Designing prototypes" },
