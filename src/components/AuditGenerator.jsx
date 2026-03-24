@@ -1044,7 +1044,7 @@ Return JSON:
       /* ══ Stage 4: Proposals (Sonnet — needs reasoning + seniority awareness) ══ */
       up(3, "active");
       const findingsBrief = (diagnosis.findings || []).map(f => ({ title: f.title, tag: f.tag, impact_type: f.impact_type }));
-      const proposals = safeParse(extractText(await callClaude([{
+      let proposals = safeParse(extractText(await callClaudeWithRetry([{
         role: "user",
         content: `Proposals for ${company.company}:
 FINDINGS: ${JSON.stringify(findingsBrief)}
