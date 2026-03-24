@@ -107,6 +107,9 @@ function validateOutput(data) {
 }
 
 /* ═══════════════════ API ═══════════════════ */
+const SONNET = "claude-sonnet-4-20250514";
+const HAIKU = "claude-haiku-4-5-20251001";
+
 async function callClaude(messages, opts = {}) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
