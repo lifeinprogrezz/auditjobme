@@ -1602,7 +1602,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
               <Anim delay={0.3}>
                 <div className="quote-block">
                   <div className="quote-label">FIELD SIGNAL</div>
-                  <p>{data.pains.key_quote}</p>
+                  <p>{(data.pains.key_quote || "").replace(/<cite[^>]*>/g, '').replace(/<\/cite>/g, '')}</p>
                   {data.pains.quote_source && (
                     <div className="quote-src">
                       Source: {data.pains.quote_url
