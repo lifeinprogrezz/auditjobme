@@ -887,8 +887,8 @@ export default function App() {
 
   // Timer for processing stage
   useEffect(() => {
-    if (stage !== "processing") { setElapsed(0); return; }
-    const t = setInterval(() => setElapsed(e => e + 1), 1000);
+    if (stage !== "processing") { setElapsed(0); elapsedRef.current = 0; return; }
+    const t = setInterval(() => setElapsed(e => { const n = e + 1; elapsedRef.current = n; return n; }), 1000);
     return () => clearInterval(t);
   }, [stage]);
 
