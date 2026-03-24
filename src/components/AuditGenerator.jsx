@@ -1098,6 +1098,8 @@ Return JSON:
 
       const contacts = safeParse(extractText(contactsRaw)) || [];
       up(6, "done");
+
+      const validated = validateOutput({ company, diagnosis, proposals, about });
       const finalData = { cv, company: validated.company, pains, diagnosis: validated.diagnosis, proposals: validated.proposals, prototypes, about: validated.about, contacts: Array.isArray(contacts) ? contacts : [], accent, roleCtx, showProtos };
       setData(finalData);
       setStage("hub");
