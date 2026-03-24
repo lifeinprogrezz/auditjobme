@@ -1298,12 +1298,43 @@ Return JSON:
               {showProfile && (
                 <div style={{
                   position: "absolute", top: "100%", right: 0, marginTop: 8, background: "#1a1916", border: "1px solid #2a2825",
-                  borderRadius: 8, padding: "12px 16px", minWidth: 200, zIndex: 200, animation: "fadeIn .15s ease",
+                  borderRadius: 8, padding: "12px 16px", minWidth: 220, zIndex: 200, animation: "fadeIn .15s ease",
                 }}>
                   <p style={{ fontSize: ".7rem", fontWeight: 600, color: "#f0ede8", marginBottom: 2 }}>
                     {user.user_metadata?.full_name || user.user_metadata?.name || "User"}
                   </p>
                   <p style={{ fontSize: ".6rem", color: "#8a8780", marginBottom: 12 }}>{user.email}</p>
+                  
+                  <div style={{ borderTop: "1px solid #2a2825", paddingTop: 10, marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <span style={{ fontSize: ".58rem", fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "#8a8780" }}>Free audits</span>
+                      <span style={{ fontSize: ".62rem", fontWeight: 700, color: atLimit ? "#e84c2b" : accent }}>
+                        {auditCount}/{FREE_LIMIT}
+                      </span>
+                    </div>
+                    <div style={{ width: "100%", height: 3, background: "#2a2825", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ height: "100%", background: atLimit ? "#e84c2b" : accent, width: `${Math.min((auditCount / FREE_LIMIT) * 100, 100)}%`, transition: "width .3s ease", borderRadius: 2 }} />
+                    </div>
+                    {atLimit && (
+                      <button
+                        onClick={() => { setShowPaywall(true); setShowProfile(false); }}
+                        style={{ width: "100%", marginTop: 8, padding: "7px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".58rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase" }}
+                      >
+                        Upgrade
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => { setShowFeedback(true); setShowProfile(false); }}
+                    style={{
+                      width: "100%", padding: "8px", borderRadius: 6, border: "1px solid #2a2825", background: "transparent",
+                      color: "#8a8780", fontSize: ".6rem", fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif",
+                      letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 6,
+                    }}
+                  >
+                    Feedback
+                  </button>
                   <button
                     onClick={async () => { await supabase.auth.signOut(); setShowProfile(false); }}
                     style={{
