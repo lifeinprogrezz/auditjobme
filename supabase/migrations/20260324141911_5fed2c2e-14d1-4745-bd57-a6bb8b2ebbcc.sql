@@ -1,0 +1,1 @@
+ALTER TABLE public.audits ADD COLUMN duration_seconds integer DEFAULT NULL;

@@ -21,6 +21,7 @@ export type Database = {
           audit_label: string | null
           company_name: string
           created_at: string
+          duration_seconds: number | null
           id: string
           is_published: boolean
           job_link: string | null
@@ -35,6 +36,7 @@ export type Database = {
           audit_label?: string | null
           company_name: string
           created_at?: string
+          duration_seconds?: number | null
           id?: string
           is_published?: boolean
           job_link?: string | null
@@ -49,6 +51,7 @@ export type Database = {
           audit_label?: string | null
           company_name?: string
           created_at?: string
+          duration_seconds?: number | null
           id?: string
           is_published?: boolean
           job_link?: string | null
