@@ -1384,8 +1384,8 @@ Return JSON:
               <button
                 onClick={() => { setShowFeedback(true); setShowHistory(false); }}
                 style={{
-                  flex: 1, padding: "7px", borderRadius: 6, border: `1px solid ${accent}`, background: "transparent",
-                  color: accent, fontSize: ".55rem", fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif",
+                  flex: 1, padding: "7px", borderRadius: 6, border: "1px solid #2a2825", background: "transparent",
+                  color: "#f0ede8", fontSize: ".55rem", fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif",
                   letterSpacing: ".06em", textTransform: "uppercase",
                 }}
               >
