@@ -887,6 +887,7 @@ export default function App() {
 
   const generate = async () => {
     if (!cvBase64 || !jobLink.trim()) return;
+    if (atLimit) { setShowPaywall(true); return; }
     setStage("processing");
     setStepStatus(STEPS.map(() => "pending"));
     setError(null);
