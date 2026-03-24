@@ -966,7 +966,7 @@ export default function App() {
       /* ══ Stage 2: Classifier (Haiku) + Company+Pains merged (Sonnet+search) — PARALLEL ══ */
       up(1, "active");
       const [roleCtxRaw, companyPainsRaw] = await Promise.all([
-        callClaude([{
+        callClaudeWithRetry([{
           role: "user",
           content: `Classify this role for a job audit tool.
 JOB: ${jobLink}
@@ -994,7 +994,7 @@ GLOBAL: Never profanity. Never attack internal culture. Always frame as opportun
 Return JSON: {"domain":"string","role_type":"string","audit_label":"Provocative specific title like 'Pipeline Conversion Audit'. NEVER generic like 'Market Analysis'.","diagnosis_frame":"string","diagnosis_tone":"string","pain_source":"string","field_signal_rule":"string","proposal_frame":"string","proposal_constraint":"string","impact_types":["3"],"about_title":"string","prototype_frame":"string"}`
         }], { system: SYS + " Match job to closest domain. Be specific.", model: HAIKU, max_tokens: 800, tools: WEB_SEARCH }),
 
-        callClaude([{
+        callClaudeWithRetry([{
           role: "user",
           content: `Research this company AND find real user/market complaints in one pass.
 JOB: ${jobLink}
