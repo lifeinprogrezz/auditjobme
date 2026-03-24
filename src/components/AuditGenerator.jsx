@@ -752,6 +752,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [protoTab, setProtoTab] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  const elapsedRef = useRef(0);
   const [avgDuration, setAvgDuration] = useState(120); // default ~2min
   const [showHistory, setShowHistory] = useState(false);
   const [pastAudits, setPastAudits] = useState([]);
@@ -886,8 +887,8 @@ export default function App() {
 
   // Timer for processing stage
   useEffect(() => {
-    if (stage !== "processing") { setElapsed(0); return; }
-    const t = setInterval(() => setElapsed(e => e + 1), 1000);
+    if (stage !== "processing") { setElapsed(0); elapsedRef.current = 0; return; }
+    const t = setInterval(() => setElapsed(e => { const n = e + 1; elapsedRef.current = n; return n; }), 1000);
     return () => clearInterval(t);
   }, [stage]);
 
@@ -1197,7 +1198,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 
       const validated = validateOutput({ company, diagnosis, proposals, about });
       const finalData = { cv, company: validated.company, pains, diagnosis: validated.diagnosis, proposals: validated.proposals, prototypes, about: validated.about, contacts: Array.isArray(contacts) ? contacts : [], accent, roleCtx, showProtos };
-      const finalElapsed = elapsed;
+      const finalElapsed = elapsedRef.current;
       setData(finalData);
       saveAudit(finalData, finalElapsed);
       setStage("hub");
