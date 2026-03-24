@@ -1068,7 +1068,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
       const parallelCalls = [];
       if (showProtos) {
         const proposalTitles = (proposals.proposals || []).map(p => ({ phase: p.phase, title: p.title }));
-        parallelCalls.push(callClaude([{
+        parallelCalls.push(callClaudeWithRetry([{
           role: "user",
           content: `Design 3 prototype concepts for ${company.company}:
 PROPOSALS: ${JSON.stringify(proposalTitles)}
