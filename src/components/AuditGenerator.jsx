@@ -854,6 +854,24 @@ export default function App() {
     return () => clearInterval(t);
   }, [stage]);
 
+  // Fetch average audit duration for dynamic progress bar
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: rows } = await supabase
+          .from("audits")
+          .select("duration_seconds")
+          .not("duration_seconds", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(20);
+        if (rows?.length >= 3) {
+          const avg = Math.round(rows.reduce((s, r) => s + r.duration_seconds, 0) / rows.length);
+          if (avg > 60 && avg < 600) setAvgDuration(avg);
+        }
+      } catch (_) {}
+    })();
+  }, []);
+
   // Audit data
   const [data, setData] = useState({
     cv: null, company: null, pains: null, diagnosis: null,
