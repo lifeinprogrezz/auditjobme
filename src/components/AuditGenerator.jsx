@@ -1121,11 +1121,79 @@ Return JSON:
       }
       if (showProtos) up(4, "done");
 
-      const about = safeParse(extractText(aboutRaw)) || { stats: [], columns: [] };
+      let about = safeParse(extractText(aboutRaw)) || { stats: [], columns: [] };
       up(5, "done");
 
-      const contacts = safeParse(extractText(contactsRaw)) || [];
+      let contacts = safeParse(extractText(contactsRaw)) || [];
       up(6, "done");
+
+      /* ══ Validation Gate: retry any section with missing critical data ══ */
+      const missingSections = validateSections({ company, diagnosis, proposals, about, contacts });
+      if (missingSections.length > 0) {
+        console.warn("Validation gate: missing sections, retrying:", missingSections);
+        for (const section of missingSections) {
+          try {
+            if (section === "about") {
+              const retryAbout = await callClaudeWithRetry([{
+                role: "user",
+                content: `Match candidate to proposals:
+CANDIDATE: ${JSON.stringify({ name: cv.name, achievements: cv.achievements?.slice(0,4), companies: cv.companies?.map(c => ({ name: c.name, role: c.role })) })}
+PROPOSALS: ${JSON.stringify((proposals.proposals || []).map(p => ({ phase: p.phase, title: p.title, problem: p.problem })))}
+COMPANY: ${company.company}, ROLE: ${company.role}
+
+Return JSON:
+{"headline":"${roleCtx.about_title || "Why I'm the right PM"}","headline_accent":"max 6 words","stats":[3: {"value":"string","label":"SHORT LABEL"}],"columns":[3: {"skill":"2 WORDS UPPERCASE","proof":"Max 30 words. Ties skill to proposal."}]}`
+              }], { system: SYS + ` 3 stats, 3 columns. Most relevant numbers for ${roleCtx.role_type || "role"}.`, max_tokens: 1500 });
+              about = safeParse(extractText(retryAbout)) || about;
+            }
+            if (section === "contacts") {
+              const retryContacts = await callClaudeWithRetry([{
+                role: "user",
+                content: `Find 3 LinkedIn profiles at ${company.company} for hiring "${company.role}". VP/Director level + recruiters. Return JSON: [{"name":"string","title":"string","url":"linkedin URL","why":"1 sentence"}]`
+              }], { system: SYS + " Real LinkedIn URLs from search.", model: HAIKU, max_tokens: 800, tools: WEB_SEARCH });
+              contacts = safeParse(extractText(retryContacts)) || contacts;
+            }
+            if (section === "diagnosis") {
+              const retryDiag = await callClaudeWithRetry([{
+                role: "user",
+                content: `Diagnose ${company.company}:
+COMPANY: ${JSON.stringify({ company: company.company, product_desc: company.product_desc, competitors: company.competitors })}
+PAINS: ${JSON.stringify(pains.pain_points?.slice(0,5))}
+DOMAIN: ${roleCtx.domain || "tech_product"}
+FRAME: ${roleCtx.diagnosis_frame || "product-layer gaps"}
+TONE: ${roleCtx.diagnosis_tone || "Frame as opportunity."}
+
+Return JSON:
+{"headline":"EXACTLY 2 lines separated by \\n. Line 1: key stat, MAX 7 words. Line 2: opportunity, MAX 7 words.",
+"sub":"1 sentence, max 20 words",
+"findings":[3 items: {"number":"01","title":"max 8 words","evidence":"max 35 words","evidence_sources":[{"name":"string","url":"real https:// URL"}],"impact_type":"one of: ${(roleCtx.impact_types || ["REVENUE IMPACT","RETENTION IMPACT","GROWTH IMPACT"]).join(", ")}","impact":"max 25 words.","why_not_fixed":"max 35 words.","tag":"MAX 2 WORDS"}]}`
+              }], { system: SYS + ` 3 findings. ${roleCtx.diagnosis_tone || "Frame as opportunity."}.`, max_tokens: 2500 });
+              diagnosis = safeParse(extractText(retryDiag)) || diagnosis;
+            }
+            if (section === "proposals") {
+              const retryProps = await callClaudeWithRetry([{
+                role: "user",
+                content: `Proposals for ${company.company}:
+FINDINGS: ${JSON.stringify((diagnosis.findings || []).map(f => ({ title: f.title, tag: f.tag, impact_type: f.impact_type })))}
+DOMAIN: ${roleCtx.domain || "tech_product"}
+ROLE: ${company.role || roleCtx.role_type || ""}
+
+3 phased ${roleCtx.proposal_frame || "product interventions"}. Return JSON:
+{"headline":"2 lines with \\n. Line 1: max 5 words. Line 2: constraint, max 8 words.",
+"sub":"max 25 words",
+"proposals":[{"phase":1,"title":"max 8 words","problem":"max 25 words","solution":"max 25 words","how_it_works":"max 25 words","target_effort_impact":"Target: metric · Effort: level · Impact: level"}]}`
+              }], { system: SYS + ` 3 proposals. ${roleCtx.proposal_frame || "Product interventions"}.`, max_tokens: 2500 });
+              proposals = safeParse(extractText(retryProps)) || proposals;
+            }
+          } catch (retryErr) {
+            console.warn(`Validation retry for ${section} failed:`, retryErr.message);
+          }
+        }
+        const stillMissing = validateSections({ company, diagnosis, proposals, about, contacts });
+        if (stillMissing.length > 0) {
+          console.warn("Some sections still incomplete after retries:", stillMissing);
+        }
+      }
 
       const validated = validateOutput({ company, diagnosis, proposals, about });
       const finalData = { cv, company: validated.company, pains, diagnosis: validated.diagnosis, proposals: validated.proposals, prototypes, about: validated.about, contacts: Array.isArray(contacts) ? contacts : [], accent, roleCtx, showProtos };
