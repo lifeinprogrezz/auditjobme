@@ -727,6 +727,12 @@ export default function App() {
   const [pastAudits, setPastAudits] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSending, setFeedbackSending] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const FREE_LIMIT = 2;
 
   // Get auth user
   const [user, setUser] = useState(null);
