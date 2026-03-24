@@ -1822,11 +1822,11 @@ Return JSON:
             ) : (
               <>
                 <p style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: accent, marginBottom: 16 }}>Feedback</p>
-                <p style={{ fontSize: ".83rem", color: "#f0ede8", fontWeight: 500, marginBottom: 16, lineHeight: 1.5 }}>What would make this audit better?</p>
+                <p style={{ fontSize: ".83rem", color: "#f0ede8", fontWeight: 500, marginBottom: 16, lineHeight: 1.5 }}>What should we improve?</p>
                 <textarea
                   value={feedbackText}
                   onChange={e => setFeedbackText(e.target.value)}
-                  placeholder="Your thoughts..."
+                  placeholder="A bug, a feature idea, anything."
                   rows={4}
                   style={{ width: "100%", padding: ".75rem 1rem", borderRadius: 8, border: "1px solid #2a2825", fontSize: ".78rem", fontFamily: "'Plus Jakarta Sans',sans-serif", background: "transparent", color: "#f0ede8", resize: "vertical", lineHeight: 1.6 }}
                 />
