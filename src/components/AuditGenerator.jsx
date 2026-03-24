@@ -1197,9 +1197,10 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 
       const validated = validateOutput({ company, diagnosis, proposals, about });
       const finalData = { cv, company: validated.company, pains, diagnosis: validated.diagnosis, proposals: validated.proposals, prototypes, about: validated.about, contacts: Array.isArray(contacts) ? contacts : [], accent, roleCtx, showProtos };
+      const finalElapsed = elapsed;
       setData(finalData);
+      saveAudit(finalData, finalElapsed);
       setStage("hub");
-      saveAudit(finalData, elapsed);
 
     } catch (err) {
       console.error(err);
