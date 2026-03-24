@@ -1167,7 +1167,7 @@ Return JSON:
 {"headline":"EXACTLY 2 lines separated by \\n. Line 1: key stat, MAX 7 words. Line 2: opportunity, MAX 7 words.",
 "sub":"1 sentence, max 20 words",
 "findings":[3 items: {"number":"01","title":"max 8 words","evidence":"max 35 words","evidence_sources":[{"name":"string","url":"real https:// URL"}],"impact_type":"one of: ${(roleCtx.impact_types || ["REVENUE IMPACT","RETENTION IMPACT","GROWTH IMPACT"]).join(", ")}","impact":"max 25 words.","why_not_fixed":"max 35 words.","tag":"MAX 2 WORDS"}]}`
-              }], }], { system: SYS + ` CRITICAL OBJECTIVITY RULE: Findings must describe company or market problems observable from public data and user complaints. Never build findings around the candidate's specific background, skills, or industry experience. A good test: could any smart analyst identify this problem without knowing who the candidate is? If not, it is not a real finding. Never reference the candidate in diagnosis findings. 3 findings. ${roleCtx.diagnosis_tone || "Frame as opportunity."}.`, max_tokens: 2500 }););
+              }], { system: SYS + ` CRITICAL OBJECTIVITY RULE: Findings must describe company or market problems observable from public data and user complaints. Never build findings around the candidate's specific background, skills, or industry experience. A good test: could any smart analyst identify this problem without knowing who the candidate is? If not, it is not a real finding. Never reference the candidate in diagnosis findings. 3 findings. ${roleCtx.diagnosis_tone || "Frame as opportunity."}.`, max_tokens: 2500 });
               diagnosis = safeParse(extractText(retryDiag)) || diagnosis;
             }
             if (section === "proposals") {
