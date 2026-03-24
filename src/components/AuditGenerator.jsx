@@ -832,6 +832,7 @@ export default function App() {
         pdf_path: pdfPath,
         slug,
         is_published: true,
+        duration_seconds: durationSecs || null,
       });
 
       // Set shareable URL
