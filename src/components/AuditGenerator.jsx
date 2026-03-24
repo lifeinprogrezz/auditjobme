@@ -4,9 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 const STEPS = [
   { label: "Parsing your CV" },
-  { label: "Classifying role domain" },
   { label: "Researching the company" },
-  { label: "Sourcing pain points" },
   { label: "Building diagnosis" },
   { label: "Generating proposals" },
   { label: "Designing prototypes" },
@@ -109,6 +107,9 @@ function validateOutput(data) {
 }
 
 /* ═══════════════════ API ═══════════════════ */
+const SONNET = "claude-sonnet-4-20250514";
+const HAIKU = "claude-haiku-4-5-20251001";
+
 async function callClaude(messages, opts = {}) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -121,7 +122,7 @@ async function callClaude(messages, opts = {}) {
     },
     body: JSON.stringify({
       messages,
-      model: "claude-sonnet-4-20250514",
+      model: opts.model || SONNET,
       max_tokens: opts.max_tokens || 4096,
       ...(opts.system ? { system: opts.system } : {}),
       ...(opts.tools ? { tools: opts.tools } : {}),
@@ -723,7 +724,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [protoTab, setProtoTab] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const [avgDuration, setAvgDuration] = useState(255); // default ~4min 15s
+  const [avgDuration, setAvgDuration] = useState(180); // default ~3min (optimized pipeline)
   const [showHistory, setShowHistory] = useState(false);
   const [pastAudits, setPastAudits] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -915,7 +916,7 @@ export default function App() {
     const SYS = "Return ONLY valid JSON. No markdown fences, no explanation, no preamble. Raw JSON only. NEVER use em-dashes (—) in any text. Use commas, periods, or semicolons instead.";
 
     try {
-      /* ══ Stage 1: Parse CV (solo) ══ */
+      /* ══ Stage 1: Parse CV (Haiku — structured extraction, no reasoning needed) ══ */
       up(0, "active");
       const cv = safeParse(extractText(await callClaude([{
         role: "user",
@@ -923,194 +924,49 @@ export default function App() {
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: cvBase64 } },
           { type: "text", text: `Extract from this CV as JSON: {"name":"string","current_role":"string","years_exp":number,"skills":["top 8"],"achievements":[{"metric":"string","context":"string"}],"education":"string","companies":[{"name":"string","role":"string","highlights":["string"]}],"summary":"2 sentence professional summary"}` }
         ],
-      }], { system: SYS }))) || { name: "Candidate", skills: [], achievements: [], companies: [] };
+      }], { system: SYS, model: HAIKU, max_tokens: 1500 }))) || { name: "Candidate", skills: [], achievements: [], companies: [] };
       up(0, "done");
 
-      /* ══ Stage 2: Classifier + Company (PARALLEL) ══ */
+      /* ══ Stage 2: Classifier (Haiku) + Company+Pains merged (Sonnet+search) — PARALLEL ══ */
       up(1, "active");
-      up(2, "active");
-      const [roleCtxRaw, companyRaw] = await Promise.all([
+      const [roleCtxRaw, companyPainsRaw] = await Promise.all([
         callClaude([{
           role: "user",
-          content: `Classify this role and provide domain-specific audit language.
-JOB POSTING: ${jobLink}
-CANDIDATE BACKGROUND: ${cv.summary || ""}, skills: ${(cv.skills||[]).join(", ")}
+          content: `Classify this role for a job audit tool.
+JOB: ${jobLink}
+CANDIDATE: ${cv.summary || ""}, skills: ${(cv.skills||[]).join(", ")}
 
-Use this domain reference to classify correctly:
+DOMAINS:
+tech_product|PM,Growth,UX|User complaints,product gaps|Reddit,G2,Trustpilot,ProductHunt|Product-layer gaps|Product interventions|REVENUE,RETENTION,GROWTH|Product demos|Why I'm the right PM|Direct product critique OK. NEVER attack team culture.
+marketing_brand|Brand Mgr,CMO,Marketing|Consumer sentiment,market share,positioning|Social listening,Euromonitor,Nielsen,ad libraries|Brand positioning weaknesses|Brand initiatives|MARKET SHARE,BRAND EQUITY,CONVERSION|Campaign simulators|Why I'm the right Brand Strategist|Frame as market opportunity, not marketing team failure.
+finance_corporate|FP&A,IB,Treasury|Margins,capital allocation,analyst concerns|SEC filings,earnings calls,Sacra,PitchBook|Financial performance gaps|Financial recommendations|MARGIN,SHAREHOLDER VALUE,CASH FLOW|Financial model simulators|Why I'm the right Financial Strategist|Factual analyst-level objectivity. Never blame management.
+consulting_strategy|Strategy,Corp Dev,CoS|Client industry challenges,competitive positioning|Annual reports,investor decks,industry reports|Client challenges firm can address|Strategic initiatives|COMPETITIVE,MARKET POSITION,STRATEGIC VALUE|Market analyzers|Why I'm the right Strategy Lead|Frame as market opportunity. NEVER critique internal culture. NEVER Glassdoor.
+sales_commercial|AE,VP Sales,RevOps|Pipeline friction,win rates,competitive displacement|G2,Gartner,Capterra,competitor pricing|Commercial opportunity gaps|Commercial plays|PIPELINE,WIN RATE,REVENUE|Deal analyzers|Why I'm the right Commercial Lead|Frame as untapped revenue. Never bash sales team.
+operations_supply_chain|Ops Mgr,Procurement,COO|External supply chain risks,logistics costs|Supply Chain Dive,industry reports,ESG reports|External risks creating opportunities|Operational improvements|COST,EFFICIENCY,RESILIENCE|Supply chain simulators|Why I'm the right Operations Lead|Frame as external market forces. Never blame ops team.
+hr_people|HR,Talent,DEI,L&D|Talent market trends,employer brand benchmarking|LinkedIn talent flow,Universum,Glassdoor aggregate ratings|Talent market challenges|People strategy initiatives|ATTRITION,EMPLOYER BRAND,CAPABILITY|Talent analyzers|Why I'm the right People Strategist|Frame as talent market opportunity. NEVER individual angry reviews or profanity.
+engineering_technical|EM,CTO,Staff Eng|Tech ecosystem trends,developer experience|GitHub,Stack Overflow,HackerNews,eng blogs|Technology trends creating opportunities|Technical improvements|VELOCITY,RELIABILITY,DEV EXPERIENCE|Code analyzers|Why I'm the right Engineering Lead|Frame as engineering opportunity with benchmarks. Never angry Glassdoor reviews.
+data_analytics|Data Scientist,BI Lead,ML Eng|Data maturity benchmarking|Job postings,eng blogs,industry maturity models|Data maturity gaps vs leaders|Data strategy initiatives|DECISION SPEED,DATA QUALITY,ADOPTION|Data quality tools|Why I'm the right Data Lead|Frame as maturity journey, not infrastructure criticism.
+entrepreneurship_venture|VC Analyst,Founder,EIR|Market sizing,competitive landscape,unit economics|Crunchbase,PitchBook,a16z,YC data|Market opportunity gaps|Venture strategy|MARKET OPPORTUNITY,UNIT ECONOMICS,FUNDRAISING|Market calculators|Why I'm the right Venture Strategist|Frame as market insight. Never criticize fund performance.
+real_estate_hospitality|RE Analyst,Hotel Mgmt|Market cycles,occupancy,competitive set|STR,CoStar,CBRE,TripAdvisor|Market conditions creating opportunities|Asset strategy|NOI,OCCUPANCY,ASSET VALUE|RevPAR simulators|Why I'm the right Asset Strategist|Frame as market cycle opportunity.
+healthcare_pharma|Pharma Commercial,MedTech PM|Regulatory pipeline,market access,payer dynamics|FDA,ClinicalTrials.gov,PubMed,healthcare press|Market access challenges|Commercial strategy|MARKET ACCESS,PATIENT REACH,REVENUE|Market access simulators|Why I'm the right Healthcare Strategist|Patient-centric framing only. Never internal compliance criticism.
+sustainability_impact|ESG Analyst,CSR Lead|Peer ESG benchmarking,regulatory readiness|CDP,MSCI,sustainability reports,SASB|ESG gaps vs peers and regulation|Sustainability improvements|ESG SCORE,REGULATORY RISK,STAKEHOLDER TRUST|ESG benchmark tools|Why I'm the right Sustainability Strategist|Constructive benchmarking only. NEVER greenwashing accusations.
 
-DOMAIN: tech_product
-ROLES: Product Manager, Growth Lead, UX Researcher, Product Designer
-RESEARCH: User complaints, product gaps, activation/retention metrics, competitor feature parity
-SOURCES: Reddit, G2, Trustpilot, App Store reviews, X/Twitter, ProductHunt, GitHub issues
-DIAGNOSIS: Product-layer gaps fixable without infrastructure changes
-TONE: Direct critique of the product from user perspective. Safe to be blunt about UX failures, missing features, broken flows. You are advocating for the user.
-FIELD_SIGNAL: Real user complaints from review sites. Quotes can be critical of the product. NEVER inflammatory about the team or company culture.
-PROPOSALS: Product interventions
-IMPACTS: REVENUE IMPACT, RETENTION IMPACT, GROWTH IMPACT
-PROTOTYPES: Interactive product feature demos, user flow simulators
-ABOUT: Why I'm the right PM
+FORMAT: domain|roles|research_focus|sources|diagnosis_frame|proposal_frame|impacts(3)|prototypes|about_title|tone_rule
 
-DOMAIN: marketing_brand
-ROLES: Brand Manager, Marketing Manager, CMO, Growth Marketing, Communications
-RESEARCH: Brand perception gaps, consumer sentiment, market share erosion, campaign effectiveness, positioning vs competitors
-SOURCES: Social listening (X, Instagram, TikTok comments), Euromonitor, Nielsen, Statista, ad libraries, consumer review sites, industry press
-DIAGNOSIS: Brand positioning weaknesses, audience misalignment, channel inefficiencies
-TONE: Critique brand strategy from consumer perspective. Frame as market opportunity, not marketing team failure. "The brand hasn't captured X segment yet" not "the marketing team failed."
-FIELD_SIGNAL: Consumer quotes about brand perception, analyst commentary on market position. NEVER internal employee complaints about the marketing department.
-PROPOSALS: Brand initiatives, campaign strategies, positioning shifts
-IMPACTS: MARKET SHARE IMPACT, BRAND EQUITY IMPACT, CONVERSION IMPACT
-PROTOTYPES: Campaign ROI simulator, audience segmentation tool, competitive positioning analyzer
-ABOUT: Why I'm the right Brand Strategist
+GLOBAL: Never profanity. Never attack internal culture. Always frame as opportunity. Field signal quotes must be professional.
 
-DOMAIN: finance_corporate
-ROLES: Financial Analyst, FP&A Manager, Corporate Finance, Investment Banking, Treasury
-RESEARCH: Margin compression, capital allocation inefficiency, working capital gaps, revenue mix risks, analyst concerns, debt structure
-SOURCES: SEC filings (10-K, 10-Q), earnings call transcripts, analyst reports, Sacra, PitchBook, Bloomberg, company investor relations pages
-DIAGNOSIS: Financial performance gaps, capital structure concerns, forecasting blind spots
-TONE: Factual financial analysis with analyst-level objectivity. Present data without judgment. "Margins compressed 200bps YoY" not "management is destroying margins." Frame as external market forces creating opportunities for better financial strategy.
-FIELD_SIGNAL: Analyst quotes from earnings calls, financial press commentary. NEVER employee complaints about finance leadership or compensation.
-PROPOSALS: Financial strategy recommendations, capital allocation shifts, pricing model changes
-IMPACTS: MARGIN IMPACT, SHAREHOLDER VALUE IMPACT, CASH FLOW IMPACT
-PROTOTYPES: Financial model simulator, scenario planning tool, valuation sensitivity analyzer
-ABOUT: Why I'm the right Financial Strategist
-
-DOMAIN: consulting_strategy
-ROLES: Strategy Consultant, Corporate Strategy, Business Development, Chief of Staff, Corporate Development
-RESEARCH: What challenges do this firm's CLIENTS face? Industry trends the firm must respond to. Competitive positioning vs rival firms on specific capabilities. New service areas emerging.
-SOURCES: Company annual reports, investor presentations, McKinsey/BCG/Bain industry reports, press releases, competitor announcements, Crunchbase, client industry publications
-DIAGNOSIS: Client industry challenges the firm can better address. Competitive capability gaps vs rival firms. Emerging market opportunities the firm should capture.
-TONE: Frame as market opportunity, NEVER internal dysfunction. "The consulting market is shifting toward X, creating an opportunity to lead" not "the firm's culture is broken." You are showing you understand where the industry is going and how to help, not diagnosing what is wrong inside.
-FIELD_SIGNAL: Industry analyst quotes, client-side trends, market research. NEVER Glassdoor reviews, employee complaints, or internal culture criticism. NEVER profanity or inflammatory language.
-PROPOSALS: Strategic initiatives, market repositioning, new capability development
-IMPACTS: COMPETITIVE IMPACT, MARKET POSITION IMPACT, STRATEGIC VALUE IMPACT
-PROTOTYPES: Market entry analyzer, competitive landscape mapper, strategic priority simulator
-ABOUT: Why I'm the right Strategy Lead
-
-DOMAIN: sales_commercial
-ROLES: Account Executive, Sales Manager, VP Sales, Business Development, Partnerships, Revenue Operations
-RESEARCH: Sales cycle friction from buyer perspective, competitive displacement patterns, pricing perception, pipeline bottlenecks, territory coverage gaps
-SOURCES: G2 comparisons, Gartner reviews, Capterra, LinkedIn Sales Navigator signals, company case studies, competitor pricing pages, buyer community forums
-DIAGNOSIS: Commercial opportunity gaps from the buyer's perspective. Where are deals being lost and why? What market segments are underserved?
-TONE: Frame as untapped revenue opportunity, not sales team failure. "Enterprise segment shows 40% lower win rates vs mid-market, suggesting untapped positioning opportunity" not "the sales team can't close enterprise deals."
-FIELD_SIGNAL: Buyer reviews comparing products, analyst commentary on competitive positioning. NEVER internal sales team complaints or Glassdoor reviews about sales culture.
-PROPOSALS: Commercial plays, GTM motions, sales enablement improvements
-IMPACTS: PIPELINE IMPACT, WIN RATE IMPACT, REVENUE IMPACT
-PROTOTYPES: Deal qualification analyzer, competitive battle card generator, pipeline health dashboard
-ABOUT: Why I'm the right Commercial Lead
-
-DOMAIN: operations_supply_chain
-ROLES: Operations Manager, Supply Chain Lead, Logistics, Procurement, COO, Process Improvement
-RESEARCH: External supply chain risks, logistics market constraints, raw material volatility, regulatory changes, geographic concentration risks, industry benchmarking
-SOURCES: Trade press (Supply Chain Dive, Logistics Management), import/export databases, industry reports, company sustainability/ESG reports, supplier disclosure filings
-DIAGNOSIS: External operational risks and market constraints creating optimization opportunities. Supply chain vulnerabilities from macro factors, not internal incompetence.
-TONE: Frame as external market forces creating operational opportunities. "Rising freight costs in Southeast Asia create an opportunity to optimize routing" not "operations team is wasting money on logistics." Present benchmarks showing opportunity vs industry average.
-FIELD_SIGNAL: Industry report quotes, trade press analysis, supply chain benchmarks. NEVER employee complaints about operations management or working conditions.
-PROPOSALS: Operational improvements, supply chain restructuring, process optimization
-IMPACTS: COST IMPACT, EFFICIENCY IMPACT, RESILIENCE IMPACT
-PROTOTYPES: Supply chain risk simulator, demand forecasting tool, cost optimization analyzer
-ABOUT: Why I'm the right Operations Lead
-
-DOMAIN: hr_people
-ROLES: HR Manager, People Operations, Talent Acquisition, CHRO, DEI Lead, Employer Brand, L&D
-RESEARCH: Talent market trends affecting the company, employer brand benchmarking vs competitors, industry skill gap analysis, workforce planning challenges from market forces
-SOURCES: LinkedIn talent flow data, industry salary surveys, employer brand rankings (Universum, Glassdoor Best Places), DEI industry benchmarks, talent market reports, Comparably
-DIAGNOSIS: Talent market challenges creating opportunities to strengthen employer brand and talent pipeline. External workforce trends the company can get ahead of.
-TONE: Frame as talent market opportunity, NEVER internal culture attack. "The AI talent market is tightening 30% YoY, creating an opportunity to differentiate the employer brand" not "employees hate working here." Present benchmarks showing where the company can improve vs best-in-class employers.
-FIELD_SIGNAL: Talent market data, employer brand rankings, industry workforce trends. If using Glassdoor, only aggregate ratings and trends, NEVER individual angry reviews. NEVER profanity or inflammatory quotes.
-PROPOSALS: People strategy initiatives, employer brand improvements, talent pipeline fixes
-IMPACTS: ATTRITION IMPACT, EMPLOYER BRAND IMPACT, CAPABILITY IMPACT
-PROTOTYPES: Employee sentiment analyzer, talent market mapper, employer brand audit tool
-ABOUT: Why I'm the right People Strategist
-
-DOMAIN: engineering_technical
-ROLES: Engineering Manager, CTO, VP Engineering, Staff Engineer, DevOps Lead, Data Engineering
-RESEARCH: Technology ecosystem trends, developer experience benchmarks, industry reliability standards, open source community health, competitive technical capabilities
-SOURCES: GitHub repos (issues, PRs, stars), Stack Overflow Developer Survey, HackerNews discussions, company engineering blogs, DORA metrics benchmarks, DevOps reports
-DIAGNOSIS: Technology trends creating engineering opportunities. Where can the team improve vs industry benchmarks? What emerging technologies should they adopt?
-TONE: Frame as engineering opportunity, not tech debt shame. "Industry DORA metrics show top performers deploy 46x more frequently, suggesting deployment pipeline optimization opportunity" not "their deployments are slow and broken." Engineers respect data-driven benchmarking.
-FIELD_SIGNAL: Engineering blog quotes, developer survey data, DORA benchmarks, tech community discussions. NEVER angry Glassdoor reviews from engineers or complaints about engineering management.
-PROPOSALS: Technical improvements, architecture changes, developer experience initiatives
-IMPACTS: VELOCITY IMPACT, RELIABILITY IMPACT, DEVELOPER EXPERIENCE IMPACT
-PROTOTYPES: Code quality analyzer, deployment risk simulator, architecture decision tool
-ABOUT: Why I'm the right Engineering Lead
-
-DOMAIN: data_analytics
-ROLES: Data Analyst, Data Scientist, Analytics Manager, BI Lead, ML Engineer
-RESEARCH: Data maturity benchmarking vs industry standards, analytics adoption trends, ML deployment challenges across industry, data governance evolution
-SOURCES: Company job postings (what tools they use), engineering blog, industry maturity models (Gartner, TDWI), conference talks by employees, GitHub repos
-DIAGNOSIS: Data maturity gaps benchmarked against industry leaders. Where can analytics capabilities be elevated to drive better decisions?
-TONE: Frame as maturity journey, not data infrastructure criticism. "Industry leaders achieve 3x faster insight-to-action cycles through embedded analytics" not "their data pipeline is a mess." Present as growth path.
-FIELD_SIGNAL: Industry benchmark data, analyst reports on data maturity, conference insights. NEVER internal complaints about data infrastructure or data team management.
-PROPOSALS: Data strategy initiatives, analytics infrastructure improvements, ML deployment fixes
-IMPACTS: DECISION SPEED IMPACT, DATA QUALITY IMPACT, ADOPTION IMPACT
-PROTOTYPES: Data quality analyzer, dashboard effectiveness tool, analytics maturity assessor
-ABOUT: Why I'm the right Data Lead
-
-DOMAIN: entrepreneurship_venture
-ROLES: Venture Capital Analyst, Startup Founder, EIR, Accelerator Manager, Innovation Lead
-RESEARCH: Market sizing gaps, competitive landscape blind spots, funding environment challenges, unit economics benchmarks, go-to-market readiness
-SOURCES: Crunchbase, PitchBook, a16z/Sequoia blogs, Y Combinator data, AngelList, Product Hunt launches, founder interviews
-DIAGNOSIS: Market opportunity gaps and competitive dynamics. For VC roles, focus on the fund's portfolio positioning and market thesis gaps. For startup roles, focus on product-market fit challenges.
-TONE: Frame as market insight, not fund/startup criticism. "Series A valuations in climate tech compressed 40%, creating a counter-cyclical entry opportunity" not "the fund missed the climate tech wave." Show you understand market dynamics.
-FIELD_SIGNAL: VC partner quotes, market data, founder community insights. NEVER criticism of fund performance or portfolio company failures.
-PROPOSALS: Venture strategy recommendations, GTM pivots, fundraising positioning
-IMPACTS: MARKET OPPORTUNITY IMPACT, UNIT ECONOMICS IMPACT, FUNDRAISING IMPACT
-PROTOTYPES: Market sizing calculator, competitive landscape mapper, unit economics simulator
-ABOUT: Why I'm the right Venture Strategist
-
-DOMAIN: real_estate_hospitality
-ROLES: Real Estate Analyst, Hotel Manager, Asset Management, Property Development
-RESEARCH: Market cycle positioning, occupancy/RevPAR trends, competitive set analysis, regulatory changes, demographic shifts, location economics
-SOURCES: STR reports, CoStar, CBRE research, local planning databases, TripAdvisor/Booking reviews (for hospitality), REIT filings
-DIAGNOSIS: Market conditions creating asset optimization opportunities. Where is the cycle headed and how should the portfolio respond?
-TONE: Frame as market cycle opportunity. "Urban office vacancy at 18% creates repositioning opportunity toward mixed-use conversion" not "the portfolio is underperforming." Present as strategic timing advantage.
-FIELD_SIGNAL: Market analyst quotes, CBRE/JLL research insights, guest reviews for hospitality. NEVER employee complaints about property management or working conditions.
-PROPOSALS: Asset strategy recommendations, revenue management improvements, portfolio optimization
-IMPACTS: NOI IMPACT, OCCUPANCY IMPACT, ASSET VALUE IMPACT
-PROTOTYPES: RevPAR simulator, market comp analyzer, portfolio stress test tool
-ABOUT: Why I'm the right Asset Strategist
-
-DOMAIN: healthcare_pharma
-ROLES: Healthcare Consultant, Pharma Commercial, MedTech PM, Hospital Operations
-RESEARCH: Patient outcome trends, regulatory pipeline developments, market access evolution, payer dynamics shifts, competitive therapy landscape changes
-SOURCES: FDA filings, ClinicalTrials.gov, PubMed, company pipeline disclosures, CMS data, healthcare trade press, patient advocacy forums
-DIAGNOSIS: Market access challenges and competitive therapy landscape shifts creating commercial opportunities. Focus on patient and payer dynamics, not internal R&D failures.
-TONE: Frame as patient outcome opportunity and market access strategy. "Biosimilar competition in oncology creates an opportunity to differentiate through real-world evidence" not "the pipeline is weak." Healthcare is sensitive, always patient-centric framing.
-FIELD_SIGNAL: Clinical data quotes, FDA commentary, payer analysis, patient advocacy insights. NEVER internal complaints about pharma culture, sales pressure, or compliance issues.
-PROPOSALS: Commercial strategy recommendations, market access initiatives, launch planning
-IMPACTS: MARKET ACCESS IMPACT, PATIENT REACH IMPACT, REVENUE IMPACT
-PROTOTYPES: Market access simulator, competitive therapy analyzer, launch readiness assessor
-ABOUT: Why I'm the right Healthcare Strategist
-
-DOMAIN: sustainability_impact
-ROLES: ESG Analyst, Sustainability Manager, Impact Investing, CSR Lead, Climate Strategy
-RESEARCH: Peer ESG benchmarking, regulatory readiness vs upcoming requirements, carbon footprint trajectories, stakeholder expectations evolution
-SOURCES: CDP disclosures, MSCI ESG ratings, company sustainability reports, SASB standards, climate NGO reports, ESG news coverage, peer company reports
-DIAGNOSIS: ESG positioning gaps vs peers and upcoming regulatory requirements. Where can the company get ahead of regulation and stakeholder expectations?
-TONE: Frame as regulatory and competitive opportunity, NEVER accusatory greenwashing. "Peers average 45% Scope 3 disclosure vs this company's 28%, creating a reporting leadership opportunity ahead of CSRD requirements" not "they are greenwashing." Constructive benchmarking only.
-FIELD_SIGNAL: ESG rating agency quotes, peer comparison data, regulatory timeline insights. NEVER activist accusations, greenwashing allegations, or environmental scandal quotes.
-PROPOSALS: Sustainability strategy improvements, ESG disclosure enhancements, impact measurement frameworks
-IMPACTS: ESG SCORE IMPACT, REGULATORY RISK IMPACT, STAKEHOLDER TRUST IMPACT
-PROTOTYPES: ESG benchmark tool, carbon footprint calculator, sustainability maturity assessor
-ABOUT: Why I'm the right Sustainability Strategist
-
-GLOBAL RULES (apply to ALL domains):
-1. NEVER include profanity or inflammatory language in any field, especially field_signal quotes
-2. NEVER directly attack the company's internal culture, leadership, or employees
-3. ALWAYS frame findings as opportunities the candidate can help capture, not failures to be ashamed of
-4. The tone should make the hiring manager think "this person understands our market" not "this person thinks we're broken"
-5. Field signal quotes must be professional. If the best available quote contains profanity, paraphrase it or find a different source.
-
-INSTRUCTIONS: Read the job posting. Match it to the CLOSEST domain above. If the role spans two domains, pick the primary one. Return JSON with these exact fields:
-{"domain":"string","role_type":"string","audit_label":"A provocative, specific audit title tied to the core finding. Examples: 'Transformation Execution Audit', 'Brand Perception Gap Analysis', 'Pipeline Conversion Audit'. NEVER generic labels like 'Market Opportunity Analysis' or 'Strategic Assessment'.","diagnosis_frame":"string","diagnosis_tone":"string describing how to frame findings for this specific role","pain_source":"string","field_signal_rule":"string describing what quotes are appropriate and what to avoid","proposal_frame":"string","proposal_constraint":"string","impact_types":["3 strings"],"about_title":"string","prototype_frame":"string"}`
-        }], { system: SYS + " Analyze the job posting URL and candidate background. Match to the closest domain from the reference table. Be specific to the actual role, not generic. The domain classification drives the entire audit language.", tools: WEB_SEARCH }),
+Return JSON: {"domain":"string","role_type":"string","audit_label":"Provocative specific title like 'Pipeline Conversion Audit'. NEVER generic like 'Market Analysis'.","diagnosis_frame":"string","diagnosis_tone":"string","pain_source":"string","field_signal_rule":"string","proposal_frame":"string","proposal_constraint":"string","impact_types":["3"],"about_title":"string","prototype_frame":"string"}`
+        }], { system: SYS + " Match job to closest domain. Be specific.", model: HAIKU, max_tokens: 800, tools: WEB_SEARCH }),
 
         callClaude([{
           role: "user",
-          content: `Research this job posting thoroughly: ${jobLink}
+          content: `Research this company AND find real user/market complaints in one pass.
+JOB: ${jobLink}
 
-Return JSON: {"company":"string","role":"string","role_url":"${jobLink}","company_desc":"1 sentence","product_desc":"1 sentence","competitors":["3 names"],"funding":"string","valuation":"string","team_size":"string","accent_color":"hex brand color","stats":[8 items: {"value":"Max 3 words. Numbers or short metrics like $200M, $9.3B, 82% YoY, 3.5M Users, 30B+, 137K Stars. Keep it scannable.","label":"max 3 words uppercase","delta":"max 5 words or empty","source_url":"REQUIRED — the URL where you found this stat. Every stat MUST have a source_url. Use the most authoritative source (company blog, press release, Sacra, TechCrunch, etc)."}]}`
-        }], { system: SYS + " Use web search for real data. Stats: exactly 8. CRITICAL: every stat MUST include a source_url. Values must be SHORT (max 3 words). Labels max 3 words. EVERY stat must be a meaningful metric relevant to the diagnosis or role. NEVER include filler stats like founding year, office count, or generic company facts. Prioritize: revenue, growth rate, market share, user/customer metrics, problem-specific data points.", tools: WEB_SEARCH })
+Return JSON with TWO top-level keys:
+{"company":{"company":"string","role":"string","role_url":"${jobLink}","company_desc":"1 sentence","product_desc":"1 sentence","competitors":["3 names"],"funding":"string","valuation":"string","team_size":"string","accent_color":"hex brand color","stats":[8 items: {"value":"Max 3 words","label":"max 3 words uppercase","delta":"max 5 words or empty","source_url":"REQUIRED real URL"}]},
+"pains":{"pain_points":[{"issue":"string","source_url":"real URL"}],"key_quote":"MAX 2 sentences under 40 words. Professional tone, no profanity.","quote_source":"source name","quote_url":"real URL"}}`
+        }], { system: SYS + " Use web search extensively. Stats: exactly 8, all with source_url. No filler stats. Also search for real user complaints, reviews, and market friction points for this company. Include real source URLs for everything.", max_tokens: 3000, tools: WEB_SEARCH })
       ]);
 
       const roleCtx = safeParse(extractText(roleCtxRaw)) || {
@@ -1122,99 +978,89 @@ Return JSON: {"company":"string","role":"string","role_url":"${jobLink}","compan
         impact_types: ["REVENUE IMPACT", "RETENTION IMPACT", "GROWTH IMPACT"],
         about_title: "Why I'm the right PM", prototype_frame: "Claude API product demos"
       };
+
+      const companyPains = safeParse(extractText(companyPainsRaw)) || {};
+      const company = companyPains.company || { company: "Company", role: "Role", stats: [], accent_color: "#8a9a8a" };
+      const pains = companyPains.pains || { pain_points: [], key_quote: "" };
+      const accent = safeAccent(company.accent_color) || "#8a9a8a";
       up(1, "done");
 
-      const company = safeParse(extractText(companyRaw)) || { company: "Company", role: "Role", stats: [], accent_color: "#8a9a8a" };
-      const accent = safeAccent(company.accent_color) || "#8a9a8a";
-      up(2, "done");
-
-      /* ══ Stage 3: Pain points (needs company + roleCtx) ══ */
-      up(3, "active");
-      const pains = safeParse(extractText(await callClaude([{
-        role: "user",
-        content: `For ${company.company} (${company.product_desc || ""}): Search ${roleCtx.pain_source || "Reddit, Trustpilot, G2, X/Twitter"} for real complaints and issues relevant to the ${roleCtx.role_type || company.role} role.
-
-FIELD SIGNAL RULE: ${roleCtx.field_signal_rule || "Real user complaints. Never inflammatory about team or culture."}
-
-Return JSON: {"pain_points":[{"issue":"string","source_url":"real URL"}],"key_quote":"MAX 2 sentences, under 40 words. Must follow the field signal rule above. NEVER include profanity or inflammatory language. If the best quote contains inappropriate language, paraphrase it professionally.","quote_source":"source name","quote_url":"real URL to the review"}`
-      }], { system: SYS + ` Search thoroughly. Focus on issues relevant to the ${roleCtx.domain || "tech_product"} domain. Include real source URLs. CRITICAL: Follow the field signal rule strictly. Never include profanity, never attack company culture or leadership directly.`, tools: WEB_SEARCH }))) || { pain_points: [], key_quote: "" };
-      up(3, "done");
-
-      /* ══ Stage 4: Diagnosis (needs pains) ══ */
-      up(4, "active");
-      const personalCtx = personal ? `\nCandidate's personal insight: "${personal}"` : "";
+      /* ══ Stage 3: Diagnosis (Sonnet — needs reasoning) ══ */
+      up(2, "active");
+      const personalCtx = personal ? `\nCandidate insight: "${personal}"` : "";
+      const companyBrief = { company: company.company, product_desc: company.product_desc, competitors: company.competitors };
       const diagnosis = safeParse(extractText(await callClaude([{
         role: "user",
-        content: `Based on this research about ${company.company}:
-PRODUCT: ${JSON.stringify(company)}
-PAIN POINTS: ${JSON.stringify(pains)}
+        content: `Diagnose ${company.company}:
+COMPANY: ${JSON.stringify(companyBrief)}
+PAINS: ${JSON.stringify(pains.pain_points?.slice(0,5))}
 DOMAIN: ${roleCtx.domain || "tech_product"}
-DIAGNOSIS FRAME: Look for ${roleCtx.diagnosis_frame || "product-layer gaps"}
-TONE: ${roleCtx.diagnosis_tone || "Frame findings as opportunities, not failures."}${personalCtx}
+FRAME: ${roleCtx.diagnosis_frame || "product-layer gaps"}
+TONE: ${roleCtx.diagnosis_tone || "Frame as opportunity."}${personalCtx}
 
-Generate a strategic diagnosis. Return JSON:
-{"headline":"EXACTLY 2 lines separated by \\n. Line 1: key stat or fact, MAX 7 words. Line 2: the implication framed as OPPORTUNITY, MAX 7 words. NEVER exceed 14 words total.",
+Return JSON:
+{"headline":"EXACTLY 2 lines separated by \\n. Line 1: key stat, MAX 7 words. Line 2: opportunity, MAX 7 words. 14 words max total.",
 "sub":"1 sentence, max 20 words",
-"findings":[{"number":"01","title":"max 8 words, framed as opportunity not attack","evidence":"max 2 sentences, max 35 words","evidence_sources":[{"name":"publication or report name","url":"MUST be a real clickable URL starting with https://. NEVER use vague sources like Expert Network Calls. Use company press releases, named reports, industry publications with real URLs."}],"impact_type":"one of: ${(roleCtx.impact_types || ["REVENUE IMPACT","RETENTION IMPACT","GROWTH IMPACT"]).join(", ")}","impact":"max 2 sentences, max 25 words","why_not_fixed":"max 2 sentences, max 35 words. Frame as: they made the right call given X, Y is opportunity.","tag":"MAX 2 WORDS"}]}`
-      }], { system: SYS + ` Generate exactly 3 findings. Focus on ${roleCtx.diagnosis_frame || "product-layer gaps"}. HARD word limits. CRITICAL TONE RULE: ${roleCtx.diagnosis_tone || "Frame as opportunity not failure."}. The hiring manager at this company will read this. Make them think "this person understands our market" not "this person thinks we are broken." NEVER attack internal culture, leadership, or employees.` }))) || { headline: "", findings: [] };
-      up(4, "done");
+"findings":[3 items: {"number":"01","title":"max 8 words","evidence":"max 35 words","evidence_sources":[{"name":"string","url":"real https:// URL"}],"impact_type":"one of: ${(roleCtx.impact_types || ["REVENUE IMPACT","RETENTION IMPACT","GROWTH IMPACT"]).join(", ")}","impact":"max 25 words. MUST include specific number or percentage.","why_not_fixed":"max 35 words. They made the right call given X, Y is opportunity.","tag":"MAX 2 WORDS"}]}`
+      }], { system: SYS + ` 3 findings. ${roleCtx.diagnosis_tone || "Frame as opportunity."}. NEVER attack culture or leadership.`, max_tokens: 2500 }))) || { headline: "", findings: [] };
+      up(2, "done");
 
-      /* ══ Stage 5: Proposals (needs diagnosis) ══ */
-      up(5, "active");
+      /* ══ Stage 4: Proposals (Sonnet — needs reasoning + seniority awareness) ══ */
+      up(3, "active");
+      const findingsBrief = (diagnosis.findings || []).map(f => ({ title: f.title, tag: f.tag, impact_type: f.impact_type }));
       const proposals = safeParse(extractText(await callClaude([{
         role: "user",
-        content: `Based on the diagnosis for ${company.company}:
-FINDINGS: ${JSON.stringify(diagnosis.findings)}
+        content: `Proposals for ${company.company}:
+FINDINGS: ${JSON.stringify(findingsBrief)}
 DOMAIN: ${roleCtx.domain || "tech_product"}
 ROLE: ${company.role || roleCtx.role_type || ""}
 
-Generate 3 phased ${roleCtx.proposal_frame || "product interventions"}. Return JSON:
-{"headline":"EXACTLY 2 lines separated by \\n. Line 1: max 5 words. Line 2: the constraint, max 8 words (e.g. ${roleCtx.proposal_constraint || "All product-layer. None require model work."}).",
-"sub":"max 2 sentences, max 25 words total. Include a framing line like 'These represent the strategic analysis I would bring to the team' for junior roles.",
-"proposals":[{"phase":1,"title":"max 8 words","problem":"2 sentences, max 25 words","solution":"2 sentences, max 25 words","how_it_works":"2 sentences, max 25 words","target_effort_impact":"Target: specific metric · Effort: level, brief detail · Impact: level, what it unlocks"}]}`
-      }], { system: SYS + ` EXACTLY 3 proposals. Focus on ${roleCtx.proposal_frame || "product interventions"}. HARD word limits. Be specific about mechanisms. SENIORITY RULE: The candidate is applying for "${company.role || roleCtx.role_type || ""}". For junior roles (Analyst, Associate, Coordinator, Junior, Intern), scale proposals to what someone at that level could realistically analyze and recommend, not what a C-suite executive would decide. Frame as "analysis and recommendations I'd contribute" not "company-wide transformation I'd launch." For senior roles (VP, Director, Head of, Partner, C-suite), ambitious proposals are appropriate.` }))) || { proposals: [] };
-      up(5, "done");
+3 phased ${roleCtx.proposal_frame || "product interventions"}. Return JSON:
+{"headline":"2 lines with \\n. Line 1: max 5 words. Line 2: constraint, max 8 words.",
+"sub":"max 25 words",
+"proposals":[{"phase":1,"title":"max 8 words","problem":"max 25 words","solution":"max 25 words","how_it_works":"max 25 words","target_effort_impact":"Target: metric · Effort: level · Impact: level"}]}`
+      }], { system: SYS + ` 3 proposals. ${roleCtx.proposal_frame || "Product interventions"}. SENIORITY: "${company.role || ""}". Junior roles = "analysis I'd contribute". Senior = ambitious.`, max_tokens: 2500 }))) || { proposals: [] };
+      up(3, "done");
 
-      /* ══ Stage 6: Prototypes (conditional) + About + Contacts (PARALLEL) ══ */
+      /* ══ Stage 5: Prototypes (Haiku, conditional) + About (Sonnet) + Contacts (Haiku+search) — PARALLEL ══ */
       const showProtos = PROTO_DOMAINS.includes(roleCtx.domain);
-      if (!showProtos) up(6, "done"); // skip prototype step immediately
-      if (showProtos) up(6, "active");
-      up(7, "active");
-      up(8, "active");
+      if (!showProtos) up(4, "done");
+      if (showProtos) up(4, "active");
+      up(5, "active");
+      up(6, "active");
 
       const parallelCalls = [];
       if (showProtos) {
+        const proposalTitles = (proposals.proposals || []).map(p => ({ phase: p.phase, title: p.title }));
         parallelCalls.push(callClaude([{
           role: "user",
-          content: `Based on these proposals for ${company.company}:
-${JSON.stringify(proposals.proposals)}
+          content: `Design 3 prototype concepts for ${company.company}:
+PROPOSALS: ${JSON.stringify(proposalTitles)}
 DOMAIN: ${roleCtx.domain || "tech_product"}
-PROTOTYPE APPROACH: ${roleCtx.prototype_frame || "Claude API product demos"}
 
-Design 3 working prototype concepts (one per proposal). Each will be a live Claude API demo. Return JSON:
-{"prototypes":[{"phase":1,"title":"Phase 1 — Prototype Name","description":"what this demo does in 1 sentence","input_label":"LABEL FOR INPUT FIELD","placeholder":"example input placeholder","button_label":"ACTION VERB →","hint":"1 sentence explaining what this would be in the real product","system_prompt":"Specific prompt for Claude API","fallback":"Hardcoded example output that demonstrates the concept if API fails"}]}`
-        }], { system: SYS + ` Design prototypes appropriate for the ${roleCtx.domain || "tech_product"} domain. System prompts should produce clear, structured output.` }));
+Return JSON: {"prototypes":[{"phase":1,"title":"Phase 1 — Name","description":"1 sentence","input_label":"LABEL","placeholder":"example","button_label":"VERB →","hint":"1 sentence","system_prompt":"prompt for Claude API","fallback":"example output"}]}`
+        }], { system: SYS + " Functional prototypes. Clear system prompts.", model: HAIKU, max_tokens: 2000 }));
       } else {
-        parallelCalls.push(Promise.resolve(null)); // placeholder
+        parallelCalls.push(Promise.resolve(null));
       }
 
+      const proposalBrief = (proposals.proposals || []).map(p => ({ phase: p.phase, title: p.title, problem: p.problem }));
       parallelCalls.push(
         callClaude([{
           role: "user",
-          content: `Match this candidate's profile to the proposals:
-CANDIDATE: ${JSON.stringify(cv)}
-PROPOSALS: ${JSON.stringify(proposals.proposals)}
+          content: `Match candidate to proposals:
+CANDIDATE: ${JSON.stringify({ name: cv.name, achievements: cv.achievements?.slice(0,4), companies: cv.companies?.map(c => ({ name: c.name, role: c.role })) })}
+PROPOSALS: ${JSON.stringify(proposalBrief)}
 COMPANY: ${company.company}, ROLE: ${company.role}
-DOMAIN: ${roleCtx.domain || "tech_product"}
 
 Return JSON:
-{"headline":"${roleCtx.about_title || "Why I'm the right PM"}","headline_accent":"for [specific gap from diagnosis, max 6 words]","stats":[{"value":"string","label":"SHORT UPPERCASE LABEL"}],"columns":[exactly 3: {"skill":"EXACTLY 2 WORDS UPPERCASE (e.g. GROWTH HACKING, PRICING DESIGN, COMMUNITY BUILDING)","proof":"Max 30 words. 1 proof point, which proposal it supports. Short sentences."}]}`
-        }], { system: SYS + ` Select exactly 3 stats and 3 skill columns. Stats should be the most relevant numbers from the candidate's background for THIS specific ${roleCtx.role_type || "role"}. Each column ties a specific skill to a specific proposal.` }),
+{"headline":"${roleCtx.about_title || "Why I'm the right PM"}","headline_accent":"max 6 words","stats":[3: {"value":"string","label":"SHORT LABEL"}],"columns":[3: {"skill":"2 WORDS UPPERCASE","proof":"Max 30 words. Ties skill to proposal."}]}`
+        }], { system: SYS + ` 3 stats, 3 columns. Most relevant numbers for ${roleCtx.role_type || "role"}.`, max_tokens: 1500 }),
 
         callClaude([{
           role: "user",
-          content: `Search for LinkedIn profiles of people at ${company.company} relevant for hiring the "${company.role}" role. Find VP/Director level people in the relevant department, plus recruiters. Return JSON array of 3: [{"name":"string","title":"string","url":"linkedin URL","why":"1 sentence"}]`
-        }], { system: SYS + " Use real LinkedIn URLs found in search results.", tools: WEB_SEARCH })
+          content: `Find 3 LinkedIn profiles at ${company.company} for hiring "${company.role}". VP/Director level + recruiters. Return JSON: [{"name":"string","title":"string","url":"linkedin URL","why":"1 sentence"}]`
+        }], { system: SYS + " Real LinkedIn URLs from search.", model: HAIKU, max_tokens: 800, tools: WEB_SEARCH })
       );
 
       const [protosRaw, aboutRaw, contactsRaw] = await Promise.all(parallelCalls);
@@ -1232,20 +1078,18 @@ Return JSON:
             placeholder: "e.g. a typical scenario...",
             button_label: "ANALYZE →",
             hint: "This would appear as a feature within the product.",
-            system_prompt: `You are an analysis tool for ${company.company}. The user is testing a concept called "${p.title}". Based on their input, provide a structured analysis with: 1) Current State, 2) Proposed Change, 3) Expected Impact. Be specific to ${company.company}. Respond in plain text with clear sections.`,
-            fallback: `[Demo] ${p.title}: This prototype would analyze your input and show how this intervention improves the specific metric targeted.`
+            system_prompt: `You are an analysis tool for ${company.company}. The user is testing "${p.title}". Provide: 1) Current State, 2) Proposed Change, 3) Expected Impact.`,
+            fallback: `[Demo] ${p.title}: This prototype would analyze your input and show impact.`
           }));
         }
       }
-      if (showProtos) up(6, "done");
+      if (showProtos) up(4, "done");
 
       const about = safeParse(extractText(aboutRaw)) || { stats: [], columns: [] };
-      up(7, "done");
+      up(5, "done");
 
       const contacts = safeParse(extractText(contactsRaw)) || [];
-      up(8, "done");
-
-      const validated = validateOutput({ company, diagnosis, proposals, about });
+      up(6, "done");
       const finalData = { cv, company: validated.company, pains, diagnosis: validated.diagnosis, proposals: validated.proposals, prototypes, about: validated.about, contacts: Array.isArray(contacts) ? contacts : [], accent, roleCtx, showProtos };
       setData(finalData);
       setStage("hub");
