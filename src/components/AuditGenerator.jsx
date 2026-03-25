@@ -1375,7 +1375,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                     </div>
                     {deviceExceeds && (
                       <p style={{ fontSize: ".52rem", color: "#8a8780", marginTop: 5, fontStyle: "italic", letterSpacing: ".02em" }}>
-                        Includes audits from another account
+                        Includes audits from another email
                       </p>
                     )}
                   </>
