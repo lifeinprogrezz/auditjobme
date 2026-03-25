@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import FingerprintJS from "@fingerprintjs/fingerprintjs";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 const STEPS = [
@@ -799,8 +800,21 @@ export default function App() {
       .then(({ data }) => setIsWhitelisted(!!data));
   }, [user]);
 
+  // Device fingerprinting for anti-abuse
+  const [deviceFp, setDeviceFp] = useState(null);
+  const [deviceAuditCount, setDeviceAuditCount] = useState(0);
+  useEffect(() => {
+    FingerprintJS.load().then(fp => fp.get()).then(result => {
+      setDeviceFp(result.visitorId);
+      // Check how many audits this device has generated across ALL accounts
+      supabase.rpc("count_audits_by_fingerprint", { p_fingerprint: result.visitorId })
+        .then(({ data }) => setDeviceAuditCount(data || 0));
+    }).catch(err => console.warn("Fingerprint init failed:", err));
+  }, []);
+
   const auditCount = pastAudits.length;
-  const atLimit = !isWhitelisted && auditCount >= FREE_LIMIT;
+  // Block if EITHER account limit OR device limit is reached
+  const atLimit = !isWhitelisted && (auditCount >= FREE_LIMIT || deviceAuditCount >= FREE_LIMIT);
 
   const submitFeedback = async () => {
     if (!feedbackText.trim() || !user) return;
