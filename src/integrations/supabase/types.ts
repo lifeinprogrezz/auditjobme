@@ -62,6 +62,38 @@ export type Database = {
         }
         Relationships: []
       }
+      device_fingerprints: {
+        Row: {
+          audit_id: string
+          created_at: string
+          fingerprint_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          audit_id: string
+          created_at?: string
+          fingerprint_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          audit_id?: string
+          created_at?: string
+          fingerprint_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_fingerprints_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedback: {
         Row: {
           created_at: string
@@ -136,6 +168,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      count_audits_by_fingerprint: {
+        Args: { p_fingerprint: string }
+        Returns: number
+      }
       generate_audit_slug: {
         Args: { p_company: string; p_user_id: string }
         Returns: string
