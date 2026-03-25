@@ -874,7 +874,7 @@ export default function App() {
       const pdfPath = uploadError ? null : fileName;
 
       // Save to audits table
-      await supabase.from("audits").insert({
+      const { data: auditRow } = await supabase.from("audits").insert({
         user_id: user.id,
         company_name: auditData.company?.company || "Unknown",
         role_name: auditData.company?.role || "",
@@ -886,7 +886,18 @@ export default function App() {
         slug,
         is_published: true,
         duration_seconds: durationSecs || null,
-      });
+      }).select("id").single();
+
+      // Record device fingerprint for anti-abuse tracking
+      if (auditRow?.id && deviceFp) {
+        await supabase.from("device_fingerprints").insert({
+          fingerprint_id: deviceFp,
+          user_id: user.id,
+          audit_id: auditRow.id,
+        });
+        // Update local device count
+        setDeviceAuditCount(prev => prev + 1);
+      }
 
       // Set shareable URL
       if (profile?.username) {
