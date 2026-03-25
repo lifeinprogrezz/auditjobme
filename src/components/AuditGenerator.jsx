@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import FingerprintJS from "@fingerprintjs/fingerprintjs";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 const STEPS = [
@@ -799,8 +800,21 @@ export default function App() {
       .then(({ data }) => setIsWhitelisted(!!data));
   }, [user]);
 
+  // Device fingerprinting for anti-abuse
+  const [deviceFp, setDeviceFp] = useState(null);
+  const [deviceAuditCount, setDeviceAuditCount] = useState(0);
+  useEffect(() => {
+    FingerprintJS.load().then(fp => fp.get()).then(result => {
+      setDeviceFp(result.visitorId);
+      // Check how many audits this device has generated across ALL accounts
+      supabase.rpc("count_audits_by_fingerprint", { p_fingerprint: result.visitorId })
+        .then(({ data }) => setDeviceAuditCount(data || 0));
+    }).catch(err => console.warn("Fingerprint init failed:", err));
+  }, []);
+
   const auditCount = pastAudits.length;
-  const atLimit = !isWhitelisted && auditCount >= FREE_LIMIT;
+  // Block if EITHER account limit OR device limit is reached
+  const atLimit = !isWhitelisted && (auditCount >= FREE_LIMIT || deviceAuditCount >= FREE_LIMIT);
 
   const submitFeedback = async () => {
     if (!feedbackText.trim() || !user) return;
@@ -860,7 +874,7 @@ export default function App() {
       const pdfPath = uploadError ? null : fileName;
 
       // Save to audits table
-      await supabase.from("audits").insert({
+      const { data: auditRow } = await supabase.from("audits").insert({
         user_id: user.id,
         company_name: auditData.company?.company || "Unknown",
         role_name: auditData.company?.role || "",
@@ -872,7 +886,18 @@ export default function App() {
         slug,
         is_published: true,
         duration_seconds: durationSecs || null,
-      });
+      }).select("id").single();
+
+      // Record device fingerprint for anti-abuse tracking
+      if (auditRow?.id && deviceFp) {
+        await supabase.from("device_fingerprints").insert({
+          fingerprint_id: deviceFp,
+          user_id: user.id,
+          audit_id: auditRow.id,
+        });
+        // Update local device count
+        setDeviceAuditCount(prev => prev + 1);
+      }
 
       // Set shareable URL
       if (profile?.username) {
