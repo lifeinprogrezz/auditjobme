@@ -1903,7 +1903,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
               {[
                 { priceId: "price_1TFAx3EGIsQV5qrb6RPI0x4s", name: "1 Audit", price: "€17.99", desc: "Single company audit", tag: null },
-                { priceId: "price_1TFAykEGIsQV5qrbA4Ooz0R5", name: "5 Audit Pack", price: "€71.99", desc: "€14.40 each · Save 20%", tag: "Popular" },
+                { priceId: "price_1TFAykEGIsQV5qrbA4Ooz0R5", name: "5 Audit Pack", price: "€69.99", desc: "€14.00 each · Save 22%", tag: "Popular" },
                 { priceId: "price_1TFAztEGIsQV5qrbxyzW2vXF", name: "10 Audit Pack", price: "€99.99", desc: "€10.00 each · Save 44%", tag: "Best value" },
               ].map(p => (
                 <div key={p.priceId} style={{ padding: "16px", borderRadius: 8, border: p.tag === "Best value" ? `1px solid ${accent}` : "1px solid #2a2825", background: p.tag === "Best value" ? "rgba(138,154,138,.06)" : "transparent", position: "relative" }}>
