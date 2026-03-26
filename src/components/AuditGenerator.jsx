@@ -759,7 +759,7 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [pastAudits, setPastAudits] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [showProfile, setShowProfile] = useState(false); // kept for compat
+  
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSending, setFeedbackSending] = useState(false);
@@ -1662,7 +1662,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
             <Anim delay={0.2}>
               <div className="hero-label">
                 <span className="hero-dot" />
-                {(data.roleCtx?.audit_label || "PRODUCT AUDIT").toUpperCase()} — MARCH 2026
+                {(data.roleCtx?.audit_label || "PRODUCT AUDIT").toUpperCase()} — {new Date().toLocaleString("en", { month: "long", year: "numeric" }).toUpperCase()}
               </div>
             </Anim>
             <Anim delay={0.4}>
@@ -1680,7 +1680,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
               <div className="hero-bottom">
                 <span className="scroll-label">SCROLL ↓</span>
                 <div className="hero-author">
-                  <strong>{data.cv?.name || "Roberto Quintero"}</strong>
+                  <strong>{data.cv?.name || "Author"}</strong>
                   <span>{data.roleCtx?.role_type || data.company?.role || "Growth & Product"}</span>
                 </div>
               </div>
@@ -1963,7 +1963,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                       try {
                         const { data, error } = await supabase.functions.invoke("create-payment", { body: { priceId: p.priceId } });
                         if (error) throw error;
-                        if (data?.url) window.open(data.url, "_blank");
+                        if (data?.url) window.location.href = data.url;
                       } catch (err) {
                         console.error("Payment error:", err);
                       } finally {
