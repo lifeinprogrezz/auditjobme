@@ -115,11 +115,15 @@ const HAIKU = "claude-haiku-4-5-20251001";
 async function callClaude(messages, opts = {}) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  // Use the user's session token for authenticated edge function calls
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData?.session?.access_token;
+  if (!accessToken) throw new Error("Not authenticated");
   const res = await fetch(`${supabaseUrl}/functions/v1/anthropic-proxy`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${supabaseKey}`,
+      "Authorization": `Bearer ${accessToken}`,
       "apikey": supabaseKey,
     },
     body: JSON.stringify({
@@ -675,7 +679,7 @@ function generatePDFHTML(data) {
 </div>
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-label"><span class="hero-dot"></span>${auditLabel} \u2014 MARCH 2026</div>
+  <div class="hero-label"><span class="hero-dot"></span>${auditLabel} \u2014 ${new Date().toLocaleString("en", { month: "long", year: "numeric" }).toUpperCase()}</div>
   <h1>${headlineHTML}</h1>
   <p class="hero-sub">${e(diagnosis?.sub)}</p>
   <div class="hero-bottom">
@@ -770,7 +774,6 @@ export default function App() {
   const FREE_LIMIT = 2;
   const resumeAfterPaymentRef = useRef(false);
 
-  // Get auth user from AuthProvider
   // Auth from context (AuthProvider)
   const { user } = useAuth();
 
