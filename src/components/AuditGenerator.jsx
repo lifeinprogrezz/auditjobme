@@ -766,6 +766,7 @@ export default function App() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [purchasedCredits, setPurchasedCredits] = useState(0);
   const [paymentLoading, setPaymentLoading] = useState(null); // priceId being purchased
+  const [showNudgeBanner, setShowNudgeBanner] = useState(false);
   const FREE_LIMIT = 2;
 
   // Get auth user
@@ -844,8 +845,10 @@ export default function App() {
 
   const auditCount = pastAudits.length;
   const totalLimit = FREE_LIMIT + purchasedCredits;
-  // Block if EITHER account limit OR device limit is reached (device limit only applies to free tier)
-  const atLimit = !isWhitelisted && (auditCount >= totalLimit || (purchasedCredits === 0 && deviceAuditCount >= FREE_LIMIT));
+  // Compute remaining credits considering device fingerprint for free tier
+  const freeUsed = purchasedCredits === 0 ? Math.max(auditCount, deviceAuditCount) : auditCount;
+  const remainingCredits = isWhitelisted ? Infinity : Math.max(0, totalLimit - freeUsed);
+  const atLimit = remainingCredits === 0;
 
   const submitFeedback = async () => {
     if (!feedbackText.trim() || !user) return;
@@ -1002,7 +1005,13 @@ export default function App() {
 
   const generate = async () => {
     if (!cvBase64 || !jobLink.trim()) return;
-    if (atLimit) { setShowPaywall(true); return; }
+    if (atLimit) {
+      // Save pending audit state for auto-generation after payment
+      localStorage.setItem("pendingAudit", JSON.stringify({ hasPending: true }));
+      setShowPaywall(true);
+      return;
+    }
+    setShowNudgeBanner(false);
     setStage("processing");
     setStepStatus(STEPS.map(() => "pending"));
     setError(null);
