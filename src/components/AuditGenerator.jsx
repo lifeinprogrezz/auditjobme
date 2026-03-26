@@ -1609,7 +1609,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                 <button className="hub-btn" style={{ background: accent, color: textOn(accent) }} onClick={() => downloadPDF(data)}>
                   Download PDF
                 </button>
-                <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)" }} onClick={() => setStage("results")}>
+                <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)" }} onClick={() => { if (shareUrl) { window.open(shareUrl, "_blank"); } else { setStage("results"); } }}>
                   View Interactive Audit
                 </button>
               </div>
