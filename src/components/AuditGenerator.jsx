@@ -180,10 +180,8 @@ function safeParse(text) {
 }
 
 /* ═══════════════════ CSS SYSTEM ═══════════════════ */
-function makeCSS(dark, accent = "#8a9a8a") {
-  const v = dark
-    ? { bg: "#0f0e0c", surface: "#1a1916", text: "#f0ede8", muted: "#8a8780", border: "#2a2825", heroBg: "#0f0e0c" }
-    : { bg: "#faf9f7", surface: "#ffffff", text: "#1a1a17", muted: "#7a7a72", border: "#e8e6e1", heroBg: "#1a1a17" };
+function makeCSS(accent = "#8a9a8a") {
+  const v = { bg: "#0f0e0c", surface: "#1a1916", text: "#f0ede8", muted: "#8a8780", border: "#2a2825", heroBg: "#0f0e0c" };
   return `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400;1,9..40,500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
     :root{--bg:${v.bg};--surface:${v.surface};--text:${v.text};--muted:${v.muted};--border:${v.border};--accent:${accent};--hero-bg:${v.heroBg}}
@@ -1335,7 +1333,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 
   return (
     <>
-      <style>{makeCSS(dark, accent)}</style>
+      <style>{makeCSS(accent)}</style>
 
       {/* ─── NAV ─── */}
       <div className="nav">
