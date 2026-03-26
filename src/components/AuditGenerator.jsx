@@ -814,6 +814,7 @@ export default function App() {
   }, [user]);
 
   // Verify payment on return from Stripe
+  const [paymentVerified, setPaymentVerified] = useState(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");
@@ -826,8 +827,10 @@ export default function App() {
           }
           // Clean URL
           window.history.replaceState({}, "", window.location.pathname);
+          setPaymentVerified(true);
         });
     } else if (payment === "canceled") {
+      localStorage.removeItem("pendingAudit");
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [user]);
