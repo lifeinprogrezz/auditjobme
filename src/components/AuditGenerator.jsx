@@ -802,21 +802,50 @@ export default function App() {
       .then(({ data }) => setIsWhitelisted(!!data));
   }, [user]);
 
+  // Load purchased credits
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("purchases").select("credits").eq("user_id", user.id)
+      .then(({ data }) => {
+        const total = (data || []).reduce((sum, p) => sum + (p.credits || 0), 0);
+        setPurchasedCredits(total);
+      });
+  }, [user]);
+
+  // Verify payment on return from Stripe
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+    const payment = params.get("payment");
+    if (payment === "success" && sessionId && user) {
+      supabase.functions.invoke("verify-payment", { body: { sessionId } })
+        .then(({ data }) => {
+          if (data?.success && !data?.already_recorded) {
+            setPurchasedCredits(prev => prev + (data.credits || 0));
+          }
+          // Clean URL
+          window.history.replaceState({}, "", window.location.pathname);
+        });
+    } else if (payment === "canceled") {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [user]);
+
   // Device fingerprinting for anti-abuse
   const [deviceFp, setDeviceFp] = useState(null);
   const [deviceAuditCount, setDeviceAuditCount] = useState(0);
   useEffect(() => {
     FingerprintJS.load().then(fp => fp.get()).then(result => {
       setDeviceFp(result.visitorId);
-      // Check how many audits this device has generated across ALL accounts
       supabase.rpc("count_audits_by_fingerprint", { p_fingerprint: result.visitorId })
         .then(({ data }) => setDeviceAuditCount(data || 0));
     }).catch(err => console.warn("Fingerprint init failed:", err));
   }, []);
 
   const auditCount = pastAudits.length;
-  // Block if EITHER account limit OR device limit is reached
-  const atLimit = !isWhitelisted && (auditCount >= FREE_LIMIT || deviceAuditCount >= FREE_LIMIT);
+  const totalLimit = FREE_LIMIT + purchasedCredits;
+  // Block if EITHER account limit OR device limit is reached (device limit only applies to free tier)
+  const atLimit = !isWhitelisted && (auditCount >= totalLimit || (purchasedCredits === 0 && deviceAuditCount >= FREE_LIMIT));
 
   const submitFeedback = async () => {
     if (!feedbackText.trim() || !user) return;
