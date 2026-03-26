@@ -971,12 +971,9 @@ export default function App() {
       }
 
       // Set shareable URL (always use production domain)
-      const baseUrl = "https://auditjob.me";
       if (profile?.username) {
+        const baseUrl = "https://auditjob.me";
         setShareUrl(`${baseUrl}/a/${profile.username}/${slug}`);
-      } else {
-        // Fallback: use user ID if username somehow missing
-        setShareUrl(`${baseUrl}/a/${user.id}/${slug}`);
       }
 
       loadHistory();
