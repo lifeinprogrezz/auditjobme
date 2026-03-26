@@ -769,6 +769,7 @@ export default function App() {
   const [paymentLoading, setPaymentLoading] = useState(null); // priceId being purchased
   const [showNudgeBanner, setShowNudgeBanner] = useState(false);
   const FREE_LIMIT = 2;
+  const resumeAfterPaymentRef = useRef(false);
 
   // Get auth user
   const [user, setUser] = useState(null);
@@ -804,15 +805,19 @@ export default function App() {
       .then(({ data }) => setIsWhitelisted(!!data));
   }, [user]);
 
+  const refreshPurchasedCredits = useCallback(async (userId) => {
+    if (!userId) return 0;
+    const { data } = await supabase.from("purchases").select("credits").eq("user_id", userId);
+    const total = (data || []).reduce((sum, p) => sum + (p.credits || 0), 0);
+    setPurchasedCredits(total);
+    return total;
+  }, []);
+
   // Load purchased credits
   useEffect(() => {
     if (!user) return;
-    supabase.from("purchases").select("credits").eq("user_id", user.id)
-      .then(({ data }) => {
-        const total = (data || []).reduce((sum, p) => sum + (p.credits || 0), 0);
-        setPurchasedCredits(total);
-      });
-  }, [user]);
+    refreshPurchasedCredits(user.id);
+  }, [user, refreshPurchasedCredits]);
 
   // Verify payment on return from Stripe
   const [paymentVerified, setPaymentVerified] = useState(false);
@@ -821,6 +826,8 @@ export default function App() {
     const sessionId = params.get("session_id");
     const payment = params.get("payment");
     if (payment === "success" && sessionId && user) {
+      setShowPaywall(false);
+      setStage("input");
       // Restore form data saved before Stripe redirect
       const savedCv = localStorage.getItem("pendingCvBase64");
       const savedJob = localStorage.getItem("pendingJobLink");
@@ -830,14 +837,10 @@ export default function App() {
       if (savedPersonal) setPersonal(savedPersonal);
 
       supabase.functions.invoke("verify-payment", { body: { sessionId } })
-        .then(({ data }) => {
+        .then(async ({ data }) => {
           if (data?.success) {
-            // Reload all purchased credits from DB to ensure accuracy
-            supabase.from("purchases").select("credits").eq("user_id", user.id)
-              .then(({ data: purchases }) => {
-                const total = (purchases || []).reduce((sum, p) => sum + (p.credits || 0), 0);
-                setPurchasedCredits(total);
-              });
+            resumeAfterPaymentRef.current = true;
+            await refreshPurchasedCredits(user.id);
           }
           // Clean URL
           window.history.replaceState({}, "", window.location.pathname);
@@ -995,10 +998,10 @@ export default function App() {
     const pending = localStorage.getItem("pendingAudit");
     if (pending && cvBase64 && jobLink.trim()) {
       autoGenTriggered.current = true;
-      localStorage.removeItem("pendingAudit");
+      setShowPaywall(false);
       // Small delay to let credits state settle
       setTimeout(() => generate(), 500);
-    } else {
+    } else if (!pending) {
       localStorage.removeItem("pendingAudit");
     }
   }, [paymentVerified, cvBase64, jobLink]);
@@ -1038,7 +1041,8 @@ export default function App() {
 
   const generate = async () => {
     if (!cvBase64 || !jobLink.trim()) return;
-    if (atLimit) {
+    const shouldBypassPaywall = resumeAfterPaymentRef.current;
+    if (atLimit && !shouldBypassPaywall) {
       // Save pending audit state AND form data for auto-generation after payment
       localStorage.setItem("pendingAudit", JSON.stringify({ hasPending: true }));
       localStorage.setItem("pendingCvBase64", cvBase64);
@@ -1047,6 +1051,7 @@ export default function App() {
       setShowPaywall(true);
       return;
     }
+    resumeAfterPaymentRef.current = false;
     setShowNudgeBanner(false);
     setStage("processing");
     setStepStatus(STEPS.map(() => "pending"));
@@ -1311,6 +1316,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
       setStage("hub");
       // Clear pending audit state since generation completed
       localStorage.removeItem("pendingAudit");
+      setPaymentVerified(false);
 
     } catch (err) {
       console.error(err);
@@ -1462,7 +1468,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
               })()}
               <button
                 onClick={() => { setShowPaywall(true); setShowHistory(false); }}
-                style={{ width: "100%", marginTop: 8, padding: "7px", borderRadius: 6, border: "none", background: atLimit ? accent : "transparent", color: atLimit ? textOn(accent) : accent, fontSize: ".55rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase", border: atLimit ? "none" : `1px solid ${accent}` }}
+                style={{ width: "100%", marginTop: 8, padding: "7px", borderRadius: 6, background: atLimit ? accent : "transparent", color: atLimit ? textOn(accent) : accent, fontSize: ".55rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase", border: atLimit ? "none" : `1px solid ${accent}` }}
               >
                 {atLimit ? (purchasedCredits > 0 ? "Buy more audits" : "Get more audits") : "Get more audits"}
               </button>
