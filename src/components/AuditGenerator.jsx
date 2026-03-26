@@ -821,17 +821,37 @@ export default function App() {
     const sessionId = params.get("session_id");
     const payment = params.get("payment");
     if (payment === "success" && sessionId && user) {
+      // Restore form data saved before Stripe redirect
+      const savedCv = localStorage.getItem("pendingCvBase64");
+      const savedJob = localStorage.getItem("pendingJobLink");
+      const savedPersonal = localStorage.getItem("pendingPersonal");
+      if (savedCv) setCvBase64(savedCv);
+      if (savedJob) setJobLink(savedJob);
+      if (savedPersonal) setPersonal(savedPersonal);
+
       supabase.functions.invoke("verify-payment", { body: { sessionId } })
         .then(({ data }) => {
-          if (data?.success && !data?.already_recorded) {
-            setPurchasedCredits(prev => prev + (data.credits || 0));
+          if (data?.success) {
+            // Reload all purchased credits from DB to ensure accuracy
+            supabase.from("purchases").select("credits").eq("user_id", user.id)
+              .then(({ data: purchases }) => {
+                const total = (purchases || []).reduce((sum, p) => sum + (p.credits || 0), 0);
+                setPurchasedCredits(total);
+              });
           }
           // Clean URL
           window.history.replaceState({}, "", window.location.pathname);
           setPaymentVerified(true);
+          // Clean up saved form data
+          localStorage.removeItem("pendingCvBase64");
+          localStorage.removeItem("pendingJobLink");
+          localStorage.removeItem("pendingPersonal");
         });
     } else if (payment === "canceled") {
       localStorage.removeItem("pendingAudit");
+      localStorage.removeItem("pendingCvBase64");
+      localStorage.removeItem("pendingJobLink");
+      localStorage.removeItem("pendingPersonal");
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [user]);
@@ -1019,8 +1039,11 @@ export default function App() {
   const generate = async () => {
     if (!cvBase64 || !jobLink.trim()) return;
     if (atLimit) {
-      // Save pending audit state for auto-generation after payment
+      // Save pending audit state AND form data for auto-generation after payment
       localStorage.setItem("pendingAudit", JSON.stringify({ hasPending: true }));
+      localStorage.setItem("pendingCvBase64", cvBase64);
+      localStorage.setItem("pendingJobLink", jobLink.trim());
+      if (personal.trim()) localStorage.setItem("pendingPersonal", personal.trim());
       setShowPaywall(true);
       return;
     }
