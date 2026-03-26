@@ -1970,7 +1970,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                       }
                     }}
                     disabled={paymentLoading === p.priceId}
-                    style={{ width: "100%", padding: "9px", borderRadius: 6, border: "none", background: p.tag === "Best value" ? accent : "#2a2825", color: p.tag === "Best value" ? textOn(accent) : "#f0ede8", fontSize: ".6rem", fontWeight: 700, cursor: paymentLoading === p.priceId ? "wait" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase", opacity: paymentLoading && paymentLoading !== p.priceId ? 0.5 : 1, transition: "all .2s" }}
+                    style={{ width: "100%", padding: "9px", borderRadius: 6, border: "none", background: p.highlight ? accent : "#2a2825", color: p.highlight ? textOn(accent) : "#f0ede8", fontSize: ".6rem", fontWeight: 700, cursor: paymentLoading === p.priceId ? "wait" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase", opacity: paymentLoading && paymentLoading !== p.priceId ? 0.5 : 1, transition: "all .2s" }}
                   >
                     {paymentLoading === p.priceId ? "Redirecting..." : "Buy now"}
                   </button>
