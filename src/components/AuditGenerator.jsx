@@ -1484,7 +1484,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                 Show them you<br/>
                 <span style={{ color: accent, fontStyle: "italic", fontWeight: 500, fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>already did the job.</span>
               </h1>
-              <p className="input-sub">While they send CVs, you send proof.</p>
+              <p className="input-sub">Send proof, not promises.</p>
             </Anim>
 
             {error && (
