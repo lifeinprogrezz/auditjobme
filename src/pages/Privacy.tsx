@@ -10,6 +10,9 @@ const Privacy = () => {
       margin: "0 auto",
       lineHeight: 1.8,
     }}>
+      <a onClick={() => window.history.back()} style={{ color: "#6b6860", fontSize: ".8rem", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", marginBottom: "1.5rem" }}>
+        ← Back
+      </a>
       <h1 style={{ color: "#e8e6e1", fontSize: "1.5rem", marginBottom: "2rem", letterSpacing: "-0.02em" }}>
         Privacy Policy
       </h1>
