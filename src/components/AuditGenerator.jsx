@@ -1668,12 +1668,12 @@ ROLE: ${company.role || roleCtx.role_type || ""}
               </div>
             </Anim>
             <Anim delay={0.4}>
-              <h1 dangerouslySetInnerHTML={{ __html: (() => {
+              <h1>{(() => {
                 const h = data.diagnosis?.headline || `Product Audit: ${data.company.company}`;
                 const lines = h.split('\n').filter(Boolean);
-                if (lines.length >= 2) return lines[0] + '<br/><span class="accent">' + lines.slice(1).join(' ') + '</span>';
+                if (lines.length >= 2) return <>{lines[0]}<br/><span className="accent">{lines.slice(1).join(' ')}</span></>;
                 return h;
-              })() }} />
+              })()}</h1>
             </Anim>
             <Anim delay={0.5}>
               <p className="hero-sub">{data.diagnosis?.sub || data.company.company_desc}</p>
@@ -1785,12 +1785,12 @@ ROLE: ${company.role || roleCtx.role_type || ""}
           <section className="section" id="proposals">
             <Anim><div className="sec-label">03 — PROPOSALS</div></Anim>
             <Anim delay={0.1}>
-              <div className="sec-h2" dangerouslySetInnerHTML={{ __html: (() => {
+              <div className="sec-h2">{(() => {
                 const h = data.proposals?.headline || `${data.proposals?.proposals?.length || 3} interventions.`;
                 const lines = h.split('\n').filter(Boolean);
-                if (lines.length >= 2) return lines[0] + '<br/><span class="accent">' + lines.slice(1).join(' ') + '</span>';
+                if (lines.length >= 2) return <>{lines[0]}<br/><span className="accent">{lines.slice(1).join(' ')}</span></>;
                 return h;
-              })() }} />
+              })()}</div>
               {data.proposals?.sub && <p className="sec-intro">{data.proposals.sub}</p>}
             </Anim>
             {(data.proposals?.proposals || []).map((p, i) => (
