@@ -19,15 +19,21 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseClient = createClient(
+  const supabaseAnon = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+  );
+
+  // Service role client for DB writes (bypasses RLS)
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
   );
 
   try {
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData } = await supabaseClient.auth.getUser(token);
+    const { data: userData } = await supabaseAnon.auth.getUser(token);
     const user = userData.user;
     if (!user) throw new Error("User not authenticated");
 
@@ -47,7 +53,7 @@ serve(async (req) => {
     }
 
     // Check if already recorded
-    const { data: existing } = await supabaseClient
+    const { data: existing } = await supabaseAdmin
       .from("purchases")
       .select("id")
       .eq("stripe_session_id", sessionId)
@@ -67,7 +73,7 @@ serve(async (req) => {
     const productId = lineItems.data[0]?.price?.product as string;
 
     // Record purchase
-    const { error: insertError } = await supabaseClient
+    const { error: insertError } = await supabaseAdmin
       .from("purchases")
       .insert({
         user_id: user.id,
