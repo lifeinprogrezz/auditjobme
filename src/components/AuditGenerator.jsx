@@ -1890,32 +1890,51 @@ ROLE: ${company.role || roleCtx.role_type || ""}
       {showPaywall && (
         <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)" }} onClick={() => setShowPaywall(false)} />
-          <div style={{ position: "relative", background: "#1a1916", border: "1px solid #2a2825", borderRadius: 10, padding: "32px 28px", width: "min(420px, 90vw)", animation: "fadeUp .25s ease" }}>
+          <div style={{ position: "relative", background: "#1a1916", border: "1px solid #2a2825", borderRadius: 10, padding: "32px 28px", width: "min(440px, 90vw)", animation: "fadeUp .25s ease" }}>
             <button onClick={() => setShowPaywall(false)} style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem" }}>×</button>
-            <p style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: accent, marginBottom: 12 }}>Upgrade</p>
+            <p style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: accent, marginBottom: 8 }}>Get more audits</p>
             <h2 style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 800, fontSize: "1.4rem", color: "#f0ede8", lineHeight: 1.1, marginBottom: 8, letterSpacing: "-.02em" }}>
               You've used your<br/><span style={{ color: accent }}>free audits.</span>
             </h2>
             <p style={{ fontSize: ".78rem", color: "#8a8780", lineHeight: 1.6, marginBottom: 24 }}>
-              Unlock unlimited audits and keep standing out.
+              Buy more audits and keep standing out.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-              <div style={{ padding: "16px", borderRadius: 8, border: `1px solid ${accent}`, background: "rgba(138,154,138,.06)", position: "relative" }}>
-                <span style={{ position: "absolute", top: -8, right: 12, fontSize: ".5rem", fontWeight: 700, background: accent, color: textOn(accent), padding: "2px 8px", borderRadius: 4, letterSpacing: ".06em", textTransform: "uppercase" }}>Popular</span>
-                <p style={{ fontSize: ".72rem", fontWeight: 700, color: "#f0ede8", marginBottom: 4 }}>Pro</p>
-                <p style={{ fontSize: ".65rem", color: "#8a8780" }}>Unlimited audits · Priority generation</p>
-                <button style={{ marginTop: 10, width: "100%", padding: "9px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".6rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase" }}>
-                  Coming Soon
-                </button>
-              </div>
-              <div style={{ padding: "16px", borderRadius: 8, border: "1px solid #2a2825" }}>
-                <p style={{ fontSize: ".72rem", fontWeight: 700, color: "#f0ede8", marginBottom: 4 }}>Credit Packs</p>
-                <p style={{ fontSize: ".65rem", color: "#8a8780" }}>Buy 5, 10, or 20 audits</p>
-                <button style={{ marginTop: 10, width: "100%", padding: "9px", borderRadius: 6, border: "1px solid #2a2825", background: "transparent", color: "#f0ede8", fontSize: ".6rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase" }}>
-                  Coming Soon
-                </button>
-              </div>
+              {[
+                { priceId: "price_1TFAx3EGIsQV5qrb6RPI0x4s", name: "1 Audit", price: "€17.99", desc: "Single company audit", tag: null },
+                { priceId: "price_1TFAykEGIsQV5qrbA4Ooz0R5", name: "5 Audit Pack", price: "€71.99", desc: "€14.40 each · Save 20%", tag: "Popular" },
+                { priceId: "price_1TFAztEGIsQV5qrbxyzW2vXF", name: "10 Audit Pack", price: "€99.99", desc: "€10.00 each · Save 44%", tag: "Best value" },
+              ].map(p => (
+                <div key={p.priceId} style={{ padding: "16px", borderRadius: 8, border: p.tag === "Best value" ? `1px solid ${accent}` : "1px solid #2a2825", background: p.tag === "Best value" ? "rgba(138,154,138,.06)" : "transparent", position: "relative" }}>
+                  {p.tag && (
+                    <span style={{ position: "absolute", top: -8, right: 12, fontSize: ".5rem", fontWeight: 700, background: p.tag === "Best value" ? accent : "#2a2825", color: p.tag === "Best value" ? textOn(accent) : "#f0ede8", padding: "2px 8px", borderRadius: 4, letterSpacing: ".06em", textTransform: "uppercase" }}>{p.tag}</span>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <p style={{ fontSize: ".72rem", fontWeight: 700, color: "#f0ede8" }}>{p.name}</p>
+                    <p style={{ fontSize: ".72rem", fontWeight: 700, color: accent }}>{p.price}</p>
+                  </div>
+                  <p style={{ fontSize: ".6rem", color: "#8a8780", marginBottom: 10 }}>{p.desc}</p>
+                  <button
+                    onClick={async () => {
+                      setPaymentLoading(p.priceId);
+                      try {
+                        const { data, error } = await supabase.functions.invoke("create-payment", { body: { priceId: p.priceId } });
+                        if (error) throw error;
+                        if (data?.url) window.open(data.url, "_blank");
+                      } catch (err) {
+                        console.error("Payment error:", err);
+                      } finally {
+                        setPaymentLoading(null);
+                      }
+                    }}
+                    disabled={paymentLoading === p.priceId}
+                    style={{ width: "100%", padding: "9px", borderRadius: 6, border: "none", background: p.tag === "Best value" ? accent : "#2a2825", color: p.tag === "Best value" ? textOn(accent) : "#f0ede8", fontSize: ".6rem", fontWeight: 700, cursor: paymentLoading === p.priceId ? "wait" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase", opacity: paymentLoading && paymentLoading !== p.priceId ? 0.5 : 1, transition: "all .2s" }}
+                  >
+                    {paymentLoading === p.priceId ? "Redirecting..." : "Buy now"}
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>
