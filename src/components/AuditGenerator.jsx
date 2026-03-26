@@ -1831,7 +1831,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
               </div>
             ) : (
               <>
-                <p style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: accent, marginBottom: 16, textAlign: "center" }}>Feedback</p>
+                <p style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: accent, marginBottom: 8, textAlign: "center" }}>Feedback</p>
                 <p style={{ fontSize: ".83rem", color: "#f0ede8", fontWeight: 500, marginBottom: 16, lineHeight: 1.5, textAlign: "center" }}>What should we improve?</p>
                 <textarea
                   value={feedbackText}
