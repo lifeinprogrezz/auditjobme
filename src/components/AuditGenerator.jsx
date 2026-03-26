@@ -817,11 +817,13 @@ export default function App() {
 
   // Verify payment on return from Stripe
   const [paymentVerified, setPaymentVerified] = useState(false);
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");
     const payment = params.get("payment");
     if (payment === "success" && sessionId && user) {
+      setVerifyingPayment(true);
       setShowPaywall(false);
       setStage("input");
       // Restore form data saved before Stripe redirect
@@ -840,6 +842,7 @@ export default function App() {
           }
           window.history.replaceState({}, "", window.location.pathname);
           setPaymentVerified(true);
+          setVerifyingPayment(false);
           localStorage.removeItem("pendingCvBase64");
           localStorage.removeItem("pendingJobLink");
           localStorage.removeItem("pendingPersonal");
@@ -847,6 +850,7 @@ export default function App() {
         .catch((err) => {
           console.error("Payment verification failed:", err);
           window.history.replaceState({}, "", window.location.pathname);
+          setVerifyingPayment(false);
         });
     } else if (payment === "canceled") {
       localStorage.removeItem("pendingAudit");
@@ -1569,11 +1573,11 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 
             <Anim delay={0.3}>
               <button
-                className={`gen-btn ${cvBase64 && jobLink.trim() ? "ready" : "disabled"}`}
+                className={`gen-btn ${cvBase64 && jobLink.trim() && !verifyingPayment ? "ready" : "disabled"}`}
                 onClick={generate}
-                disabled={!cvBase64 || !jobLink.trim()}
+                disabled={!cvBase64 || !jobLink.trim() || verifyingPayment}
               >
-                Generate Audit
+                {verifyingPayment ? "Verifying payment..." : "Generate Audit"}
               </button>
               <p className="gen-hint"><span style={{ color: "var(--muted)" }}>Built by </span><a href="https://x.com/lifeinprogrezz" target="_blank" rel="noopener noreferrer" style={{ color: accent, textDecoration: "none" }}>@lifeinprogrezz</a></p>
             </Anim>
