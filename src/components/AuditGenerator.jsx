@@ -1414,14 +1414,12 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                   </>
                 );
               })()}
-              {atLimit && (
-                <button
-                  onClick={() => { setShowPaywall(true); setShowHistory(false); }}
-                  style={{ width: "100%", marginTop: 8, padding: "7px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".55rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase" }}
-                >
-                  Upgrade
-                </button>
-              )}
+              <button
+                onClick={() => { setShowPaywall(true); setShowHistory(false); }}
+                style={{ width: "100%", marginTop: 8, padding: "7px", borderRadius: 6, border: "none", background: atLimit ? accent : "transparent", color: atLimit ? textOn(accent) : accent, fontSize: ".55rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase", border: atLimit ? "none" : `1px solid ${accent}` }}
+              >
+                {atLimit ? (purchasedCredits > 0 ? "Buy more audits" : "Get more audits") : "Get more audits"}
+              </button>
             </div>
             {/* Feedback + Sign Out */}
             <div style={{ display: "flex", gap: 6 }}>
