@@ -929,10 +929,10 @@ export default function App() {
       const blob = new Blob([pdfHtml], { type: "text/html" });
       const fileName = `${user.id}/${slug}.html`;
 
-      // Upload to storage
+      // Upload to storage (upsert to handle re-generations)
       const { error: uploadError } = await supabase.storage
         .from("audit-pdfs")
-        .upload(fileName, blob, { contentType: "text/html" });
+        .upload(fileName, blob, { contentType: "text/html", upsert: true });
 
       const pdfPath = uploadError ? null : fileName;
 
@@ -962,9 +962,13 @@ export default function App() {
         setDeviceAuditCount(prev => prev + 1);
       }
 
-      // Set shareable URL
+      // Set shareable URL (always use production domain)
+      const baseUrl = "https://auditjob.me";
       if (profile?.username) {
-        setShareUrl(`${window.location.origin}/a/${profile.username}/${slug}`);
+        setShareUrl(`${baseUrl}/a/${profile.username}/${slug}`);
+      } else {
+        // Fallback: use user ID if username somehow missing
+        setShareUrl(`${baseUrl}/a/${user.id}/${slug}`);
       }
 
       loadHistory();
