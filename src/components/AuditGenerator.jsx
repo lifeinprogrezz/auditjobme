@@ -1963,7 +1963,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                       try {
                         const { data, error } = await supabase.functions.invoke("create-payment", { body: { priceId: p.priceId } });
                         if (error) throw error;
-                        if (data?.url) window.location.href = data.url;
+                        if (data?.url) window.open(data.url, "_blank");
                       } catch (err) {
                         console.error("Payment error:", err);
                       } finally {
