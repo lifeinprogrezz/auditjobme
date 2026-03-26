@@ -25,6 +25,27 @@ function textOn(hex) {
   return (r*299 + g*587 + b*114) / 1000 > 150 ? "#0f0e0c" : "#f0ede8";
 }
 
+function slugifyPersonName(value) {
+  if (!value) return "";
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function getPublicAuditOwner(user, profile) {
+  return slugifyPersonName(
+    profile?.username ||
+    profile?.display_name ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    ""
+  );
+}
+
 /* Color safety: prevent accent colors invisible on dark background */
 function safeAccent(hex) {
   if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return "#8a9a8a";
@@ -896,17 +917,21 @@ export default function App() {
       .select("audit_data, slug")
       .eq("id", auditId)
       .single();
+
     if (data?.audit_data) {
       setData(data.audit_data);
       setStage("hub");
       setShowHistory(false);
-      // Rebuild shareUrl for loaded audit
+
       if (data.slug && user) {
-        const { data: profile } = await supabase.from("profiles").select("username").eq("id", user.id).maybeSingle();
-        if (profile?.username) {
-          const baseUrl = "https://auditjob.me";
-          setShareUrl(`${baseUrl}/a/${profile.username}/${data.slug}`);
-        }
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("username, display_name")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        const ownerSlug = getPublicAuditOwner(user, profile);
+        setShareUrl(ownerSlug ? `https://auditjob.me/a/${ownerSlug}/${data.slug}` : null);
       }
     }
   };
@@ -925,12 +950,13 @@ export default function App() {
       });
       const slug = slugData || (auditData.company?.company || "audit").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
 
-      // Get username
+      // Get public owner slug
       const { data: profile } = await supabase
         .from("profiles")
-        .select("username")
+        .select("username, display_name")
         .eq("id", user.id)
         .maybeSingle();
+      const ownerSlug = getPublicAuditOwner(user, profile);
 
       // Generate PDF HTML blob
       const pdfHtml = generatePDFHTML(auditData);
@@ -966,15 +992,11 @@ export default function App() {
           user_id: user.id,
           audit_id: auditRow.id,
         });
-        // Update local device count
         setDeviceAuditCount(prev => prev + 1);
       }
 
-      // Set shareable URL (always use production domain)
-      if (profile?.username) {
-        const baseUrl = "https://auditjob.me";
-        setShareUrl(`${baseUrl}/a/${profile.username}/${slug}`);
-      }
+      // Set shareable URL
+      setShareUrl(ownerSlug ? `https://auditjob.me/a/${ownerSlug}/${slug}` : null);
 
       loadHistory();
     } catch (err) {
