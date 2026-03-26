@@ -930,7 +930,7 @@ export default function App() {
         .from("profiles")
         .select("username")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       // Generate PDF HTML blob
       const pdfHtml = generatePDFHTML(auditData);
