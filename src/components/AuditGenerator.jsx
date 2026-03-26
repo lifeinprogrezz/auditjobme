@@ -1374,7 +1374,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                       <div style={{ height: "100%", background: atLimit ? "#e84c2b" : accent, width: `${Math.min((displayCount / FREE_LIMIT) * 100, 100)}%`, transition: "width .3s ease", borderRadius: 2 }} />
                     </div>
                     {deviceExceeds && (
-                      <p style={{ fontSize: ".52rem", color: "#8a8780", marginTop: 5, fontStyle: "italic", letterSpacing: ".02em" }}>
+                      <p style={{ fontSize: ".52rem", color: "#8a8780", marginTop: 5, letterSpacing: ".02em" }}>
                         Includes audits from another email
                       </p>
                     )}
