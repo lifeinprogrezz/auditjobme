@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/AuthProvider";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
@@ -772,16 +773,8 @@ export default function App() {
   const resumeAfterPaymentRef = useRef(false);
 
   // Get auth user from AuthProvider
-  const { user } = (await import("@/components/AuthProvider")).useAuth ? { user: null } : { user: null };
-  // Use local state synced with supabase auth (AuthProvider wraps higher)
-  const [userLocal, setUserLocal] = useState(null);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserLocal(data?.user || null));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      setUserLocal(session?.user || null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  // Auth from context (AuthProvider)
+  const { user } = useAuth();
 
   // Load audit history
   const loadHistory = async () => {
