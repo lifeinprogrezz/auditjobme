@@ -14,9 +14,8 @@ const h2Style: React.CSSProperties = {
 
 const Terms = () => {
   return (
+    <div style={{ minHeight: "100vh", background: "#000000" }}>
     <div style={{
-      minHeight: "100vh",
-      background: "#000000",
       color: "#c4c0b8",
       fontFamily: "'Plus Jakarta Sans', sans-serif",
       padding: "3rem 1.5rem",
@@ -83,6 +82,7 @@ const Terms = () => {
         <h2 style={h2Style}>10. Contact</h2>
         <p>Questions? Reach out at <a href="mailto:hello@lifeinprogrezz.com" style={{ color: "#c9a461" }}>hello@lifeinprogrezz.com</a>.</p>
       </section>
+    </div>
     </div>
   );
 };
