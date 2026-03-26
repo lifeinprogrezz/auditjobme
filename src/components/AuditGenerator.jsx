@@ -193,6 +193,7 @@ function makeCSS(dark, accent = "#8a9a8a") {
     @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
     .anim{opacity:0}.anim.vis{animation:fadeUp .6s ease forwards}
     .pulse{animation:pulse 1.5s ease-in-out infinite}
 
