@@ -838,13 +838,15 @@ export default function App() {
             resumeAfterPaymentRef.current = true;
             await refreshPurchasedCredits(user.id);
           }
-          // Clean URL
           window.history.replaceState({}, "", window.location.pathname);
           setPaymentVerified(true);
-          // Clean up saved form data
           localStorage.removeItem("pendingCvBase64");
           localStorage.removeItem("pendingJobLink");
           localStorage.removeItem("pendingPersonal");
+        })
+        .catch((err) => {
+          console.error("Payment verification failed:", err);
+          window.history.replaceState({}, "", window.location.pathname);
         });
     } else if (payment === "canceled") {
       localStorage.removeItem("pendingAudit");
@@ -1040,10 +1042,14 @@ export default function App() {
     const shouldBypassPaywall = resumeAfterPaymentRef.current;
     if (atLimit && !shouldBypassPaywall) {
       // Save pending audit state AND form data for auto-generation after payment
-      localStorage.setItem("pendingAudit", JSON.stringify({ hasPending: true }));
-      localStorage.setItem("pendingCvBase64", cvBase64);
-      localStorage.setItem("pendingJobLink", jobLink.trim());
-      if (personal.trim()) localStorage.setItem("pendingPersonal", personal.trim());
+      try {
+        localStorage.setItem("pendingAudit", JSON.stringify({ hasPending: true }));
+        localStorage.setItem("pendingCvBase64", cvBase64);
+        localStorage.setItem("pendingJobLink", jobLink.trim());
+        if (personal.trim()) localStorage.setItem("pendingPersonal", personal.trim());
+      } catch (e) {
+        console.warn("localStorage quota exceeded, form data won't persist across redirect");
+      }
       setShowPaywall(true);
       return;
     }
