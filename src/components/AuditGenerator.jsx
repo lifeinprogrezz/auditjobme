@@ -1943,13 +1943,13 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
               {[
-                { priceId: "price_1TFAx3EGIsQV5qrb6RPI0x4s", name: "1 Audit", price: "€17.99", desc: "Single company audit", tag: null },
-                { priceId: "price_1TFAykEGIsQV5qrbA4Ooz0R5", name: "5 Audit Pack", price: "€69.99", desc: "€14.00 each · Save 22%", tag: "Popular" },
-                { priceId: "price_1TFAztEGIsQV5qrbxyzW2vXF", name: "10 Audit Pack", price: "€99.99", desc: "€10.00 each · Save 44%", tag: "Best value" },
+                { priceId: "price_1TFAx3EGIsQV5qrb6RPI0x4s", name: "1 Audit", price: "€17.99", desc: "Single company audit", tag: null, highlight: false },
+                { priceId: "price_1TFAykEGIsQV5qrbA4Ooz0R5", name: "5 Audit Pack", price: "€69.99", desc: "€14.00 each · Save 22%", tag: "Popular", highlight: true },
+                { priceId: "price_1TFAztEGIsQV5qrbxyzW2vXF", name: "10 Audit Pack", price: "€99.99", desc: "€10.00 each · Save 44%", tag: null, highlight: false },
               ].map(p => (
-                <div key={p.priceId} style={{ padding: "16px", borderRadius: 8, border: p.tag === "Best value" ? `1px solid ${accent}` : "1px solid #2a2825", background: p.tag === "Best value" ? "rgba(138,154,138,.06)" : "transparent", position: "relative" }}>
+                <div key={p.priceId} style={{ padding: "16px", borderRadius: 8, border: p.highlight ? `1px solid ${accent}` : "1px solid #2a2825", background: p.highlight ? "rgba(138,154,138,.06)" : "transparent", position: "relative" }}>
                   {p.tag && (
-                    <span style={{ position: "absolute", top: -8, right: 12, fontSize: ".5rem", fontWeight: 700, background: p.tag === "Best value" ? accent : "#2a2825", color: p.tag === "Best value" ? textOn(accent) : "#f0ede8", padding: "2px 8px", borderRadius: 4, letterSpacing: ".06em", textTransform: "uppercase" }}>{p.tag}</span>
+                    <span style={{ position: "absolute", top: -8, right: 12, fontSize: ".5rem", fontWeight: 700, background: p.highlight ? accent : "#2a2825", color: p.highlight ? textOn(accent) : "#f0ede8", padding: "2px 8px", borderRadius: 4, letterSpacing: ".06em", textTransform: "uppercase" }}>{p.tag}</span>
                   )}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                     <p style={{ fontSize: ".72rem", fontWeight: 700, color: "#f0ede8" }}>{p.name}</p>
@@ -1970,7 +1970,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                       }
                     }}
                     disabled={paymentLoading === p.priceId}
-                    style={{ width: "100%", padding: "9px", borderRadius: 6, border: "none", background: p.tag === "Best value" ? accent : "#2a2825", color: p.tag === "Best value" ? textOn(accent) : "#f0ede8", fontSize: ".6rem", fontWeight: 700, cursor: paymentLoading === p.priceId ? "wait" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase", opacity: paymentLoading && paymentLoading !== p.priceId ? 0.5 : 1, transition: "all .2s" }}
+                    style={{ width: "100%", padding: "9px", borderRadius: 6, border: "none", background: p.highlight ? accent : "#2a2825", color: p.highlight ? textOn(accent) : "#f0ede8", fontSize: ".6rem", fontWeight: 700, cursor: paymentLoading === p.priceId ? "wait" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase", opacity: paymentLoading && paymentLoading !== p.priceId ? 0.5 : 1, transition: "all .2s" }}
                   >
                     {paymentLoading === p.priceId ? "Redirecting..." : "Buy now"}
                   </button>
