@@ -1484,7 +1484,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                 Show them you<br/>
                 <span style={{ color: accent, fontStyle: "italic", fontWeight: 500, fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>already did the job.</span>
               </h1>
-              <p className="input-sub">Upload. Paste. Stand out.</p>
+              <p className="input-sub">While they send CVs, you send proof.</p>
             </Anim>
 
             {error && (
@@ -1935,10 +1935,10 @@ ROLE: ${company.role || roleCtx.role_type || ""}
             <button onClick={() => setShowPaywall(false)} style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem" }}>×</button>
             <p style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: accent, marginBottom: 8 }}>Get more audits</p>
             <h2 style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 800, fontSize: "1.4rem", color: "#f0ede8", lineHeight: 1.1, marginBottom: 8, letterSpacing: "-.02em" }}>
-              You've used your<br/><span style={{ color: accent }}>free audits.</span>
+              You've seen what<br/><span style={{ color: accent }}>AuditJob can do.</span>
             </h2>
             <p style={{ fontSize: ".78rem", color: "#8a8780", lineHeight: 1.6, marginBottom: 24 }}>
-              Buy more audits and keep standing out.
+              Get more audits. Keep outperforming other candidates.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
