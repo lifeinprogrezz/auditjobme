@@ -929,10 +929,10 @@ export default function App() {
       const blob = new Blob([pdfHtml], { type: "text/html" });
       const fileName = `${user.id}/${slug}.html`;
 
-      // Upload to storage
+      // Upload to storage (upsert to handle re-generations)
       const { error: uploadError } = await supabase.storage
         .from("audit-pdfs")
-        .upload(fileName, blob, { contentType: "text/html" });
+        .upload(fileName, blob, { contentType: "text/html", upsert: true });
 
       const pdfPath = uploadError ? null : fileName;
 
