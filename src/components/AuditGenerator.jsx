@@ -114,26 +114,36 @@ const HAIKU = "claude-haiku-4-5-20251001";
 async function callClaude(messages, opts = {}) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const res = await fetch(`${supabaseUrl}/functions/v1/anthropic-proxy`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${supabaseKey}`,
-      "apikey": supabaseKey,
-    },
-    body: JSON.stringify({
-      messages,
-      model: opts.model || SONNET,
-      max_tokens: opts.max_tokens || 4096,
-      ...(opts.system ? { system: opts.system } : {}),
-      ...(opts.tools ? { tools: opts.tools } : {}),
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `API ${res.status}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 270000); // 4.5 min client timeout
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/anthropic-proxy`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseKey}`,
+        "apikey": supabaseKey,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        messages,
+        model: opts.model || SONNET,
+        max_tokens: opts.max_tokens || 4096,
+        ...(opts.system ? { system: opts.system } : {}),
+        ...(opts.tools ? { tools: opts.tools } : {}),
+      }),
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `API ${res.status}`);
+    }
+    return res.json();
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") throw new Error("Request timed out. Please try again.");
+    throw err;
   }
-  return res.json();
 }
 
 /* Retry wrapper: retries up to maxRetries times with delay between attempts */
