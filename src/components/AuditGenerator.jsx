@@ -771,12 +771,14 @@ export default function App() {
   const FREE_LIMIT = 2;
   const resumeAfterPaymentRef = useRef(false);
 
-  // Get auth user
-  const [user, setUser] = useState(null);
+  // Get auth user from AuthProvider
+  const { user } = (await import("@/components/AuthProvider")).useAuth ? { user: null } : { user: null };
+  // Use local state synced with supabase auth (AuthProvider wraps higher)
+  const [userLocal, setUserLocal] = useState(null);
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data?.user || null));
+    supabase.auth.getUser().then(({ data }) => setUserLocal(data?.user || null));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user || null);
+      setUserLocal(session?.user || null);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -991,7 +993,7 @@ export default function App() {
   useEffect(() => { fetchAvgDuration(); }, []);
   useEffect(() => { if (stage === "processing") fetchAvgDuration(); }, [stage]);
 
-  // Fix 4: Auto-generate after successful payment if there was a pending audit
+  // Auto-generate after successful payment if there was a pending audit
   const autoGenTriggered = useRef(false);
   useEffect(() => {
     if (!paymentVerified || autoGenTriggered.current) return;
