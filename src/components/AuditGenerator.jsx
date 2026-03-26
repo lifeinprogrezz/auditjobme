@@ -766,6 +766,7 @@ export default function App() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [purchasedCredits, setPurchasedCredits] = useState(0);
   const [paymentLoading, setPaymentLoading] = useState(null); // priceId being purchased
+  const [showNudgeBanner, setShowNudgeBanner] = useState(false);
   const FREE_LIMIT = 2;
 
   // Get auth user
@@ -813,6 +814,7 @@ export default function App() {
   }, [user]);
 
   // Verify payment on return from Stripe
+  const [paymentVerified, setPaymentVerified] = useState(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");
@@ -825,8 +827,10 @@ export default function App() {
           }
           // Clean URL
           window.history.replaceState({}, "", window.location.pathname);
+          setPaymentVerified(true);
         });
     } else if (payment === "canceled") {
+      localStorage.removeItem("pendingAudit");
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [user]);
@@ -844,8 +848,10 @@ export default function App() {
 
   const auditCount = pastAudits.length;
   const totalLimit = FREE_LIMIT + purchasedCredits;
-  // Block if EITHER account limit OR device limit is reached (device limit only applies to free tier)
-  const atLimit = !isWhitelisted && (auditCount >= totalLimit || (purchasedCredits === 0 && deviceAuditCount >= FREE_LIMIT));
+  // Compute remaining credits considering device fingerprint for free tier
+  const freeUsed = purchasedCredits === 0 ? Math.max(auditCount, deviceAuditCount) : auditCount;
+  const remainingCredits = isWhitelisted ? Infinity : Math.max(0, totalLimit - freeUsed);
+  const atLimit = remainingCredits === 0;
 
   const submitFeedback = async () => {
     if (!feedbackText.trim() || !user) return;
@@ -967,6 +973,21 @@ export default function App() {
   useEffect(() => { fetchAvgDuration(); }, []);
   useEffect(() => { if (stage === "processing") fetchAvgDuration(); }, [stage]);
 
+  // Fix 4: Auto-generate after successful payment if there was a pending audit
+  const autoGenTriggered = useRef(false);
+  useEffect(() => {
+    if (!paymentVerified || autoGenTriggered.current) return;
+    const pending = localStorage.getItem("pendingAudit");
+    if (pending && cvBase64 && jobLink.trim()) {
+      autoGenTriggered.current = true;
+      localStorage.removeItem("pendingAudit");
+      // Small delay to let credits state settle
+      setTimeout(() => generate(), 500);
+    } else {
+      localStorage.removeItem("pendingAudit");
+    }
+  }, [paymentVerified, cvBase64, jobLink]);
+
   // Audit data
   const [data, setData] = useState({
     cv: null, company: null, pains: null, diagnosis: null,
@@ -1002,7 +1023,13 @@ export default function App() {
 
   const generate = async () => {
     if (!cvBase64 || !jobLink.trim()) return;
-    if (atLimit) { setShowPaywall(true); return; }
+    if (atLimit) {
+      // Save pending audit state for auto-generation after payment
+      localStorage.setItem("pendingAudit", JSON.stringify({ hasPending: true }));
+      setShowPaywall(true);
+      return;
+    }
+    setShowNudgeBanner(false);
     setStage("processing");
     setStepStatus(STEPS.map(() => "pending"));
     setError(null);
@@ -1258,7 +1285,14 @@ ROLE: ${company.role || roleCtx.role_type || ""}
       const finalElapsed = elapsedRef.current;
       setData(finalData);
       saveAudit(finalData, finalElapsed);
+      // Show nudge banner only after the 2nd free audit (not paid, not 1st)
+      const currentAuditNumber = pastAudits.length + 1; // this audit being saved
+      if (currentAuditNumber === FREE_LIMIT && purchasedCredits === 0) {
+        setShowNudgeBanner(true);
+      }
       setStage("hub");
+      // Clear pending audit state since generation completed
+      localStorage.removeItem("pendingAudit");
 
     } catch (err) {
       console.error(err);
@@ -1390,9 +1424,8 @@ ROLE: ${company.role || roleCtx.role_type || ""}
           <div style={{ padding: "14px 20px", borderTop: "1px solid #2a2825" }}>
             {/* Audit counter — show usage vs total limit (free + purchased) */}
             <div style={{ marginBottom: 12 }}>
-              {(() => {
+            {(() => {
                 const displayCount = Math.max(auditCount, purchasedCredits === 0 ? deviceAuditCount : auditCount);
-                const deviceExceeds = deviceAuditCount > auditCount && !isWhitelisted && purchasedCredits === 0;
                 return (
                   <>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -1406,11 +1439,6 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                     <div style={{ width: "100%", height: 3, background: "#2a2825", borderRadius: 2, overflow: "hidden" }}>
                       <div style={{ height: "100%", background: atLimit ? "#e84c2b" : accent, width: `${Math.min((displayCount / totalLimit) * 100, 100)}%`, transition: "width .3s ease", borderRadius: 2 }} />
                     </div>
-                    {deviceExceeds && (
-                      <p style={{ fontSize: ".52rem", color: "#8a8780", marginTop: 5, letterSpacing: ".02em" }}>
-                        Includes audits from another email
-                      </p>
-                    )}
                   </>
                 );
               })()}
@@ -1558,7 +1586,22 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 
       {/* ─── HUB (Results Pre-Page) ─── */}
       {stage === "hub" && data.company && (
-        <div style={{ paddingTop: 48, minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ paddingTop: 48, minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+          {/* Fix 3: Nudge banner after 2nd free audit */}
+          {showNudgeBanner && (
+            <div style={{ width: "100%", maxWidth: 600, margin: "0 auto 0", padding: "14px 20px", background: "#1a1916", border: `1px solid ${accent}`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, animation: "fadeUp .3s ease" }}>
+              <p style={{ fontSize: ".75rem", color: "#f0ede8", lineHeight: 1.5, flex: 1 }}>
+                This was your last free audit. Loved it? <span style={{ color: accent, fontWeight: 600 }}>Unlock more to keep standing out.</span>
+              </p>
+              <button
+                onClick={() => { setShowPaywall(true); setShowNudgeBanner(false); }}
+                style={{ padding: "7px 16px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".58rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase", whiteSpace: "nowrap" }}
+              >
+                See plans
+              </button>
+              <button onClick={() => setShowNudgeBanner(false)} style={{ background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem", lineHeight: 1, padding: 0 }}>×</button>
+            </div>
+          )}
           <div className="hub">
             <Anim>
               <p style={{ fontSize: ".55rem", fontWeight: 500, letterSpacing: ".16em", textTransform: "uppercase", color: accent, marginBottom: 24 }}>
