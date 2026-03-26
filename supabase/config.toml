@@ -1,5 +1,1 @@
 project_id = "gehofquozipcubggldls"
-
-[functions.anthropic-proxy]
-verify_jwt = false
-wall_clock_limit_sec = 300
