@@ -764,6 +764,8 @@ export default function App() {
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [purchasedCredits, setPurchasedCredits] = useState(0);
+  const [paymentLoading, setPaymentLoading] = useState(null); // priceId being purchased
   const FREE_LIMIT = 2;
 
   // Get auth user
