@@ -24,13 +24,13 @@ const Terms = () => {
       margin: "0 auto",
       lineHeight: 1.8,
     }}>
-      <a onClick={() => window.history.back()} style={{ color: "#6b6860", fontSize: ".8rem", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", marginBottom: "1.5rem" }}>
+      <a onClick={() => window.history.back()} style={{ color: "#a09a90", fontSize: ".7rem", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", marginBottom: "2rem", padding: "6px 14px", border: "1px solid #2a2825", borderRadius: "6px", letterSpacing: ".04em", textTransform: "uppercase" as const, transition: "border-color .2s" }}>
         ← Back
       </a>
-      <h1 style={{ color: "#e8e6e1", fontSize: "1.5rem", marginBottom: "2rem", letterSpacing: "-0.02em" }}>
+      <h1 style={{ fontFamily: "'DM Sans', sans-serif", color: "#f0ede8", fontSize: "clamp(1.6rem, 4vw, 2.2rem)", fontWeight: 400, letterSpacing: "-0.03em", marginBottom: ".4rem" }}>
         Terms of Service
       </h1>
-      <p style={{ fontSize: ".85rem", color: "#8a8780", marginBottom: "2rem" }}>
+      <p style={{ fontSize: ".8rem", color: "#6b6860", marginBottom: "2.5rem" }}>
         Last updated: March 26, 2026
       </p>
 
