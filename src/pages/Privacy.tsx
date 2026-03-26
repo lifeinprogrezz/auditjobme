@@ -63,6 +63,7 @@ const Privacy = () => {
         <p>For any privacy-related questions, reach out to <a href="mailto:hello@lifeinprogrezz.com" style={{ color: "#c9a461" }}>hello@lifeinprogrezz.com</a>.</p>
       </section>
     </div>
+    </div>
   );
 };
 
