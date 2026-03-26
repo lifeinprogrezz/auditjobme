@@ -962,9 +962,13 @@ export default function App() {
         setDeviceAuditCount(prev => prev + 1);
       }
 
-      // Set shareable URL
+      // Set shareable URL (always use production domain)
+      const baseUrl = "https://auditjob.me";
       if (profile?.username) {
-        setShareUrl(`${window.location.origin}/a/${profile.username}/${slug}`);
+        setShareUrl(`${baseUrl}/a/${profile.username}/${slug}`);
+      } else {
+        // Fallback: use user ID if username somehow missing
+        setShareUrl(`${baseUrl}/a/${user.id}/${slug}`);
       }
 
       loadHistory();
