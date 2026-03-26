@@ -745,7 +745,7 @@ function downloadPDF(data) {
 /* ═══════════════════ MAIN APP ═══════════════════ */
 export default function App() {
   const [stage, setStage] = useState("input");
-  const dark = true;
+  
   const [cvFile, setCvFile] = useState(null);
   const [cvBase64, setCvBase64] = useState(null);
   const [jobLink, setJobLink] = useState("");
