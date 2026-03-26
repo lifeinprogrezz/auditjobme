@@ -1586,7 +1586,22 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 
       {/* ─── HUB (Results Pre-Page) ─── */}
       {stage === "hub" && data.company && (
-        <div style={{ paddingTop: 48, minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ paddingTop: 48, minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+          {/* Fix 3: Nudge banner after 2nd free audit */}
+          {showNudgeBanner && (
+            <div style={{ width: "100%", maxWidth: 600, margin: "0 auto 0", padding: "14px 20px", background: "#1a1916", border: `1px solid ${accent}`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, animation: "fadeUp .3s ease" }}>
+              <p style={{ fontSize: ".75rem", color: "#f0ede8", lineHeight: 1.5, flex: 1 }}>
+                This was your last free audit. Loved it? <span style={{ color: accent, fontWeight: 600 }}>Unlock more to keep standing out.</span>
+              </p>
+              <button
+                onClick={() => { setShowPaywall(true); setShowNudgeBanner(false); }}
+                style={{ padding: "7px 16px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".58rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase", whiteSpace: "nowrap" }}
+              >
+                See plans
+              </button>
+              <button onClick={() => setShowNudgeBanner(false)} style={{ background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem", lineHeight: 1, padding: 0 }}>×</button>
+            </div>
+          )}
           <div className="hub">
             <Anim>
               <p style={{ fontSize: ".55rem", fontWeight: 500, letterSpacing: ".16em", textTransform: "uppercase", color: accent, marginBottom: 24 }}>
