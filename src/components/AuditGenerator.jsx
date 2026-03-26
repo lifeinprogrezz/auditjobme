@@ -1945,7 +1945,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
               {[
                 { priceId: "price_1TFAx3EGIsQV5qrb6RPI0x4s", name: "1 Audit", price: "€17.99", desc: "Single company audit", tag: null, highlight: false },
                 { priceId: "price_1TFAykEGIsQV5qrbA4Ooz0R5", name: "5 Audit Pack", price: "€69.99", desc: "€14.00 each · Save 22%", tag: "Popular", highlight: true },
-                { priceId: "price_1TFAztEGIsQV5qrbxyzW2vXF", name: "10 Audit Pack", price: "€99.99", desc: "€10.00 each · Save 44%", tag: null, highlight: false },
+                { priceId: "price_1TFAztEGIsQV5qrbxyzW2vXF", name: "10 Audit Pack", price: "€99.99", desc: "€10.00 each", tag: null, highlight: false },
               ].map(p => (
                 <div key={p.priceId} style={{ padding: "16px", borderRadius: 8, border: p.highlight ? `1px solid ${accent}` : "1px solid #2a2825", background: p.highlight ? "rgba(138,154,138,.06)" : "transparent", position: "relative" }}>
                   {p.tag && (
