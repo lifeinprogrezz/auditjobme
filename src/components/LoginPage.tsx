@@ -80,6 +80,28 @@ export default function LoginPage() {
         {error && (
           <p style={{ color: "#e74c3c", fontSize: ".7rem", marginTop: "1rem" }}>{error}</p>
         )}
+
+        <div style={{
+          marginTop: "2rem",
+          display: "flex",
+          gap: "1rem",
+          justifyContent: "center",
+          fontSize: ".65rem",
+          letterSpacing: ".06em",
+          textTransform: "uppercase" as const,
+        }}>
+          <a href="/privacy" style={{ color: "#6b6860", textDecoration: "none", transition: "color .2s" }}
+            onMouseEnter={e => (e.target as HTMLElement).style.color = "#8a8780"}
+            onMouseLeave={e => (e.target as HTMLElement).style.color = "#6b6860"}>
+            Privacy
+          </a>
+          <span style={{ color: "#3a3835" }}>·</span>
+          <a href="/terms" style={{ color: "#6b6860", textDecoration: "none", transition: "color .2s" }}
+            onMouseEnter={e => (e.target as HTMLElement).style.color = "#8a8780"}
+            onMouseLeave={e => (e.target as HTMLElement).style.color = "#6b6860"}>
+            Terms
+          </a>
+        </div>
       </div>
     </div>
   );
