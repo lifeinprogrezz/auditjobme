@@ -1951,6 +1951,28 @@ ROLE: ${company.role || roleCtx.role_type || ""}
           </div>
         </div>
       )}
+
+      {/* ─── FIXED BOTTOM NUDGE BANNER ─── */}
+      {showNudgeBanner && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 200,
+          background: "#1a1916", borderTop: "1px solid #2a2825",
+          padding: "12px clamp(1rem, 4vw, 2rem)",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 16,
+          animation: "slideUp .3s ease-out",
+        }}>
+          <p style={{ fontSize: ".75rem", color: "#b0ada8", lineHeight: 1.5 }}>
+            2 free audits used. Want more? Audit packs start at <span style={{ color: "#f0ede8", fontWeight: 500 }}>€14/each</span>.
+          </p>
+          <button
+            onClick={() => { setShowPaywall(true); setShowNudgeBanner(false); }}
+            style={{ padding: "7px 18px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".58rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase", whiteSpace: "nowrap" }}
+          >
+            See plans
+          </button>
+          <button onClick={() => setShowNudgeBanner(false)} style={{ background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1.1rem", lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
     </>
   );
 }
