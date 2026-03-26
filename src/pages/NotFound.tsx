@@ -9,14 +9,22 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">404</h1>
-        <p className="mb-4 text-xl text-muted-foreground">Oops! Page not found</p>
-        <a href="/" className="text-primary underline hover:text-primary/90">
-          Return to Home
-        </a>
-      </div>
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column" as const,
+      alignItems: "center",
+      justifyContent: "center",
+      background: "#0f0e0c",
+      color: "#f0ede8",
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
+      gap: 12,
+    }}>
+      <p style={{ fontSize: "1.5rem", fontFamily: "'DM Sans', sans-serif", fontWeight: 800 }}>404</p>
+      <p style={{ fontSize: ".75rem", color: "#8a8780" }}>Page not found</p>
+      <a href="/" style={{ fontSize: ".65rem", color: "#8a9a8a", textDecoration: "none", fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase" as const, marginTop: 8 }}>
+        ← Back to home
+      </a>
     </div>
   );
 };
