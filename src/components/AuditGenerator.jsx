@@ -973,6 +973,21 @@ export default function App() {
   useEffect(() => { fetchAvgDuration(); }, []);
   useEffect(() => { if (stage === "processing") fetchAvgDuration(); }, [stage]);
 
+  // Fix 4: Auto-generate after successful payment if there was a pending audit
+  const autoGenTriggered = useRef(false);
+  useEffect(() => {
+    if (!paymentVerified || autoGenTriggered.current) return;
+    const pending = localStorage.getItem("pendingAudit");
+    if (pending && cvBase64 && jobLink.trim()) {
+      autoGenTriggered.current = true;
+      localStorage.removeItem("pendingAudit");
+      // Small delay to let credits state settle
+      setTimeout(() => generate(), 500);
+    } else {
+      localStorage.removeItem("pendingAudit");
+    }
+  }, [paymentVerified, cvBase64, jobLink]);
+
   // Audit data
   const [data, setData] = useState({
     cv: null, company: null, pains: null, diagnosis: null,
@@ -1270,7 +1285,14 @@ ROLE: ${company.role || roleCtx.role_type || ""}
       const finalElapsed = elapsedRef.current;
       setData(finalData);
       saveAudit(finalData, finalElapsed);
+      // Show nudge banner only after the 2nd free audit (not paid, not 1st)
+      const currentAuditNumber = pastAudits.length + 1; // this audit being saved
+      if (currentAuditNumber === FREE_LIMIT && purchasedCredits === 0) {
+        setShowNudgeBanner(true);
+      }
       setStage("hub");
+      // Clear pending audit state since generation completed
+      localStorage.removeItem("pendingAudit");
 
     } catch (err) {
       console.error(err);
