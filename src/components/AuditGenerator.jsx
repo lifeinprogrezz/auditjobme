@@ -893,13 +893,19 @@ export default function App() {
   const loadAudit = async (auditId) => {
     const { data } = await supabase
       .from("audits")
-      .select("audit_data")
+      .select("audit_data, slug")
       .eq("id", auditId)
       .single();
     if (data?.audit_data) {
       setData(data.audit_data);
       setStage("hub");
       setShowHistory(false);
+      // Rebuild shareUrl for loaded audit
+      if (data.slug && user) {
+        const { data: profile } = await supabase.from("profiles").select("username").eq("id", user.id).single();
+        const baseUrl = "https://auditjob.me";
+        setShareUrl(`${baseUrl}/a/${profile?.username || user.id}/${data.slug}`);
+      }
     }
   };
 
