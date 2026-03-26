@@ -652,7 +652,7 @@ function generatePDFHTML(data) {
   @media print{
     .pb{display:none!important}
     body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    @page{margin:0.6in 0.35in 0.35in 0.35in;size:A4}
+    @page{margin:0.4in 0.25in 0.25in 0.25in;size:A4}
     .hero{min-height:auto;padding:40px 2rem 2rem}
     .section,.about-section{padding:2rem}
     .section::before,.about-section::before{left:2rem;right:2rem}
@@ -1612,21 +1612,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                 <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)" }} onClick={() => setStage("results")}>
                   View Interactive Audit
                 </button>
-                {shareUrl && (
-                  <button
-                    className="hub-btn"
-                    style={{ background: "transparent", color: accent, border: `1px solid ${accent}` }}
-                    onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-                  >
-                    {copied ? "✓ Copied!" : "Copy Share Link"}
-                  </button>
-                )}
               </div>
-              {shareUrl && (
-                <p style={{ fontSize: ".62rem", color: "var(--muted)", marginTop: 8, wordBreak: "break-all" }}>
-                  🔗 <a href={shareUrl} target="_blank" rel="noopener noreferrer" style={{ color: accent, textDecoration: "none" }}>{shareUrl}</a>
-                </p>
-              )}
             </Anim>
             {data.contacts?.length > 0 && (
               <Anim delay={0.3}>
