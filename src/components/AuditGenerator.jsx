@@ -957,15 +957,9 @@ export default function App() {
   // Fetch average audit duration for dynamic progress bar — re-fetch each time processing starts
   const fetchAvgDuration = useCallback(async () => {
     try {
-      const { data: rows } = await supabase
-        .from("audits")
-        .select("duration_seconds")
-        .not("duration_seconds", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(20);
-      if (rows?.length >= 3) {
-        const avg = Math.round(rows.reduce((s, r) => s + r.duration_seconds, 0) / rows.length);
-        if (avg > 60 && avg < 600) setAvgDuration(avg);
+      const { data, error } = await supabase.rpc("get_global_avg_duration");
+      if (!error && data && data > 60 && data < 600) {
+        setAvgDuration(data);
       }
     } catch (_) {}
   }, []);

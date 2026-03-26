@@ -203,6 +203,7 @@ export type Database = {
         Args: { p_company: string; p_user_id: string }
         Returns: string
       }
+      get_global_avg_duration: { Args: never; Returns: number }
     }
     Enums: {
       [_ in never]: never
