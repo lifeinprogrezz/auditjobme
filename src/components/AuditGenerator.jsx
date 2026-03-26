@@ -902,9 +902,11 @@ export default function App() {
       setShowHistory(false);
       // Rebuild shareUrl for loaded audit
       if (data.slug && user) {
-        const { data: profile } = await supabase.from("profiles").select("username").eq("id", user.id).single();
-        const baseUrl = "https://auditjob.me";
-        setShareUrl(`${baseUrl}/a/${profile?.username || user.id}/${data.slug}`);
+        const { data: profile } = await supabase.from("profiles").select("username").eq("id", user.id).maybeSingle();
+        if (profile?.username) {
+          const baseUrl = "https://auditjob.me";
+          setShareUrl(`${baseUrl}/a/${profile.username}/${data.slug}`);
+        }
       }
     }
   };
@@ -928,7 +930,7 @@ export default function App() {
         .from("profiles")
         .select("username")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       // Generate PDF HTML blob
       const pdfHtml = generatePDFHTML(auditData);
@@ -969,12 +971,9 @@ export default function App() {
       }
 
       // Set shareable URL (always use production domain)
-      const baseUrl = "https://auditjob.me";
       if (profile?.username) {
+        const baseUrl = "https://auditjob.me";
         setShareUrl(`${baseUrl}/a/${profile.username}/${slug}`);
-      } else {
-        // Fallback: use user ID if username somehow missing
-        setShareUrl(`${baseUrl}/a/${user.id}/${slug}`);
       }
 
       loadHistory();
