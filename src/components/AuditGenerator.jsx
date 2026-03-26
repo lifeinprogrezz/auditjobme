@@ -1433,7 +1433,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                       onClick={e => e.stopPropagation()}
                       style={{ fontSize: ".55rem", color: safeAccent(a.accent_color) || "#8a8780", fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", textDecoration: "none" }}
                     >
-                      PDF ↗
+                      PDF
                     </a>
                   )}
                 </div>
@@ -1630,7 +1630,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                 </button>
                 {shareUrl && (
                   <button className="hub-btn" style={{ background: accent, color: textOn(accent), width: "100%" }} onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
-                    {copied ? "Link Copied ✓" : "Share Audit Link"}
+                    {copied ? "Link Copied" : "Share Audit Link"}
                   </button>
                 )}
               </div>
