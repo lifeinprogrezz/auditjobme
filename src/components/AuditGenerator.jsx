@@ -209,7 +209,7 @@ function makeCSS(dark, accent = "#8a9a8a") {
     .mode-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:.55rem;font-weight:500;cursor:pointer;color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase;transition:all .2s}
 
     /* HERO */
-    .hero{min-height:100vh;display:flex;flex-direction:column;justify-content:flex-end;padding:0 clamp(1.2rem,4vw,3rem) clamp(2rem,4vw,3rem);background:var(--hero-bg);color:${dark ? "#f0ede8" : "#f0ede8"};position:relative}
+    .hero{min-height:100vh;display:flex;flex-direction:column;justify-content:flex-end;padding:0 clamp(1.2rem,4vw,3rem) clamp(2rem,4vw,3rem);background:var(--hero-bg);color:#f0ede8;position:relative}
     .hero-label{font-size:.62rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8a8780;margin-bottom:1.2rem;display:flex;align-items:center;gap:.5rem}
     .hero-dot{width:8px;height:8px;background:var(--accent);display:inline-block}
     .hero h1{font-family:'DM Sans',sans-serif;font-weight:800;font-size:clamp(1.9rem,5.5vw,4.2rem);line-height:1.05;letter-spacing:-.03em;margin-bottom:.8rem;color:#f0ede8}
@@ -337,8 +337,8 @@ function makeCSS(dark, accent = "#8a9a8a") {
     /* PROCESSING */
     .proc-wrap{max-width:480px;margin:0 auto;padding:100px 24px}
     .step-row{display:flex;align-items:center;gap:1rem;padding:.9rem 1.2rem;border-radius:8px;border:1px solid var(--border);margin-bottom:.7rem;transition:all .3s}
-    .step-row.active{border-color:var(--accent);background:${dark ? "rgba(232,76,43,.08)" : "rgba(232,76,43,.05)"}}
-    .step-row.done{border-color:${dark ? "#2a3a2a" : "#bbf7d0"};background:${dark ? "rgba(22,163,74,.06)" : "#f0fdf4"}}
+    .step-row.active{border-color:var(--accent);background:rgba(232,76,43,.08)}
+    .step-row.done{border-color:#2a3a2a;background:rgba(22,163,74,.06)}
     .step-row.pending{opacity:.4}
     .step-icon{font-size:1.1rem;width:24px;text-align:center}
     .step-text{font-size:.83rem;font-weight:500}
@@ -1507,7 +1507,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
             </Anim>
 
             {error && (
-              <div style={{ padding: "12px 16px", borderRadius: 8, background: dark ? "rgba(220,38,38,.1)" : "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", marginBottom: 20, fontSize: ".8rem" }}>
+              <div style={{ padding: "12px 16px", borderRadius: 8, background: "rgba(220,38,38,.1)", border: "1px solid #fecaca", color: "#dc2626", marginBottom: 20, fontSize: ".8rem" }}>
                 ⚠ {error}
               </div>
             )}
