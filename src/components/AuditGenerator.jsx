@@ -347,7 +347,7 @@ function makeCSS(dark, accent = "#8a9a8a") {
     .hub{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;text-align:center;min-height:calc(100vh - 48px)}
     .hub-title{font-family:'DM Sans',sans-serif;font-weight:400;font-size:clamp(1.8rem,4vw,2.8rem);line-height:1.1;letter-spacing:-.04em;margin-bottom:.6rem;color:var(--text)}
     .hub-sub{font-size:.75rem;color:var(--muted);max-width:380px;margin:0 auto 2.5rem;line-height:1.5;letter-spacing:.02em}
-    .hub-actions{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap;margin-bottom:3rem}
+    .hub-actions{display:flex;flex-direction:column;gap:.8rem;align-items:center;margin-bottom:3rem;max-width:320px;margin-left:auto;margin-right:auto}
     .hub-btn{padding:11px 28px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;font-size:.68rem;cursor:pointer;transition:all .2s;border:none;letter-spacing:.1em;text-transform:uppercase}
     .hub-btn:hover{opacity:.85}
     .hub-contacts{max-width:600px;margin:0 auto;width:100%}
@@ -1606,12 +1606,17 @@ ROLE: ${company.role || roleCtx.role_type || ""}
             </Anim>
             <Anim delay={0.2}>
               <div className="hub-actions">
-                <button className="hub-btn" style={{ background: accent, color: textOn(accent) }} onClick={() => downloadPDF(data)}>
+                <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)", width: "100%" }} onClick={() => downloadPDF(data)}>
                   Download PDF
                 </button>
-                <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)" }} onClick={() => { if (shareUrl) { window.open(shareUrl, "_blank"); } else { setStage("results"); } }}>
+                <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)", width: "100%" }} onClick={() => { if (shareUrl) { window.open(shareUrl, "_blank"); } else { setStage("results"); } }}>
                   View Interactive Audit
                 </button>
+                {shareUrl && (
+                  <button className="hub-btn" style={{ background: accent, color: textOn(accent), width: "100%" }} onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
+                    {copied ? "Link Copied ✓" : "Share Audit Link"}
+                  </button>
+                )}
               </div>
             </Anim>
             {data.contacts?.length > 0 && (
