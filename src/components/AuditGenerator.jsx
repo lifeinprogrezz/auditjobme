@@ -1424,9 +1424,8 @@ ROLE: ${company.role || roleCtx.role_type || ""}
           <div style={{ padding: "14px 20px", borderTop: "1px solid #2a2825" }}>
             {/* Audit counter — show usage vs total limit (free + purchased) */}
             <div style={{ marginBottom: 12 }}>
-              {(() => {
+            {(() => {
                 const displayCount = Math.max(auditCount, purchasedCredits === 0 ? deviceAuditCount : auditCount);
-                const deviceExceeds = deviceAuditCount > auditCount && !isWhitelisted && purchasedCredits === 0;
                 return (
                   <>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -1440,11 +1439,6 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                     <div style={{ width: "100%", height: 3, background: "#2a2825", borderRadius: 2, overflow: "hidden" }}>
                       <div style={{ height: "100%", background: atLimit ? "#e84c2b" : accent, width: `${Math.min((displayCount / totalLimit) * 100, 100)}%`, transition: "width .3s ease", borderRadius: 2 }} />
                     </div>
-                    {deviceExceeds && (
-                      <p style={{ fontSize: ".52rem", color: "#8a8780", marginTop: 5, letterSpacing: ".02em" }}>
-                        Includes audits from another email
-                      </p>
-                    )}
                   </>
                 );
               })()}
