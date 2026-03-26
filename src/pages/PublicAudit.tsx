@@ -56,23 +56,34 @@ export default function PublicAudit() {
     async function load() {
       if (!username || !slug) { setError("Invalid link"); setLoading(false); return; }
 
-      // Look up profile by username
-      const { data: profile } = await supabase
+      const normalizedUsername = username
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+
+      const { data: profiles } = await supabase
         .from("profiles")
-        .select("id")
-        .eq("username", username)
-        .single();
+        .select("id, username, display_name, email");
+
+      const profile = profiles?.find((candidate: any) => {
+        const ownerSlug = (candidate.username || candidate.display_name || candidate.email?.split("@")[0] || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
+        return ownerSlug === normalizedUsername;
+      });
 
       if (!profile) { setError("User not found"); setLoading(false); return; }
 
-      // Look up audit by user_id + slug
       const { data: audit } = await supabase
         .from("audits")
         .select("audit_data, is_published")
         .eq("user_id", profile.id)
         .eq("slug", slug)
         .eq("is_published", true)
-        .single();
+        .maybeSingle();
 
       if (!audit) { setError("Audit not found or is private"); setLoading(false); return; }
 
