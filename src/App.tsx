@@ -8,6 +8,7 @@ import Index from "./pages/Index.tsx";
 import PublicAudit from "./pages/PublicAudit.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Privacy from "./pages/Privacy.tsx";
+import Terms from "./pages/Terms.tsx";
 
 const queryClient = new QueryClient();
 
