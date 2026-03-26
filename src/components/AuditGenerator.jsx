@@ -193,6 +193,7 @@ function makeCSS(dark, accent = "#8a9a8a") {
     @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
     .anim{opacity:0}.anim.vis{animation:fadeUp .6s ease forwards}
     .pulse{animation:pulse 1.5s ease-in-out infinite}
 
@@ -347,7 +348,7 @@ function makeCSS(dark, accent = "#8a9a8a") {
     .hub{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;text-align:center;min-height:calc(100vh - 48px)}
     .hub-title{font-family:'DM Sans',sans-serif;font-weight:400;font-size:clamp(1.8rem,4vw,2.8rem);line-height:1.1;letter-spacing:-.04em;margin-bottom:.6rem;color:var(--text)}
     .hub-sub{font-size:.75rem;color:var(--muted);max-width:380px;margin:0 auto 2.5rem;line-height:1.5;letter-spacing:.02em}
-    .hub-actions{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap;margin-bottom:3rem}
+    .hub-actions{display:flex;flex-direction:column;gap:.8rem;align-items:center;margin-bottom:3rem;max-width:320px;margin-left:auto;margin-right:auto}
     .hub-btn{padding:11px 28px;border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500;font-size:.68rem;cursor:pointer;transition:all .2s;border:none;letter-spacing:.1em;text-transform:uppercase}
     .hub-btn:hover{opacity:.85}
     .hub-contacts{max-width:600px;margin:0 auto;width:100%}
@@ -1581,21 +1582,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
       {/* ─── HUB (Results Pre-Page) ─── */}
       {stage === "hub" && data.company && (
         <div style={{ paddingTop: 48, minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-          {/* Fix 3: Nudge banner after 2nd free audit */}
-          {showNudgeBanner && (
-            <div style={{ width: "100%", maxWidth: 600, margin: "0 auto 0", padding: "14px 20px", background: "#1a1916", border: `1px solid ${accent}`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, animation: "fadeUp .3s ease" }}>
-              <p style={{ fontSize: ".75rem", color: "#f0ede8", lineHeight: 1.5, flex: 1 }}>
-                This was your last free audit. Loved it? <span style={{ color: accent, fontWeight: 600 }}>Unlock more to keep standing out.</span>
-              </p>
-              <button
-                onClick={() => { setShowPaywall(true); setShowNudgeBanner(false); }}
-                style={{ padding: "7px 16px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".58rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase", whiteSpace: "nowrap" }}
-              >
-                See plans
-              </button>
-              <button onClick={() => setShowNudgeBanner(false)} style={{ background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem", lineHeight: 1, padding: 0 }}>×</button>
-            </div>
-          )}
+          {/* Nudge banner - fixed bottom */}
           <div className="hub">
             <Anim>
               <p style={{ fontSize: ".55rem", fontWeight: 500, letterSpacing: ".16em", textTransform: "uppercase", color: accent, marginBottom: 24 }}>
@@ -1606,12 +1593,17 @@ ROLE: ${company.role || roleCtx.role_type || ""}
             </Anim>
             <Anim delay={0.2}>
               <div className="hub-actions">
-                <button className="hub-btn" style={{ background: accent, color: textOn(accent) }} onClick={() => downloadPDF(data)}>
+                <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)", width: "100%" }} onClick={() => downloadPDF(data)}>
                   Download PDF
                 </button>
-                <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)" }} onClick={() => { if (shareUrl) { window.open(shareUrl, "_blank"); } else { setStage("results"); } }}>
+                <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)", width: "100%" }} onClick={() => { if (shareUrl) { window.open(shareUrl, "_blank"); } else { setStage("results"); } }}>
                   View Interactive Audit
                 </button>
+                {shareUrl && (
+                  <button className="hub-btn" style={{ background: accent, color: textOn(accent), width: "100%" }} onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
+                    {copied ? "Link Copied ✓" : "Share Audit Link"}
+                  </button>
+                )}
               </div>
             </Anim>
             {data.contacts?.length > 0 && (
@@ -1958,6 +1950,28 @@ ROLE: ${company.role || roleCtx.role_type || ""}
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ─── FIXED BOTTOM NUDGE BANNER ─── */}
+      {showNudgeBanner && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 200,
+          background: "#1a1916", borderTop: "1px solid #2a2825",
+          padding: "12px clamp(1rem, 4vw, 2rem)",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 16,
+          animation: "slideUp .3s ease-out",
+        }}>
+          <p style={{ fontSize: ".75rem", color: "#b0ada8", lineHeight: 1.5 }}>
+            2 free audits used. Want more? Audit packs start at <span style={{ color: "#f0ede8", fontWeight: 500 }}>€14/each</span>.
+          </p>
+          <button
+            onClick={() => { setShowPaywall(true); setShowNudgeBanner(false); }}
+            style={{ padding: "7px 18px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".58rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase", whiteSpace: "nowrap" }}
+          >
+            See plans
+          </button>
+          <button onClick={() => setShowNudgeBanner(false)} style={{ background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1.1rem", lineHeight: 1, padding: "0 4px" }}>×</button>
         </div>
       )}
     </>
