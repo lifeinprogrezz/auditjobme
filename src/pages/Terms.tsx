@@ -83,6 +83,7 @@ const Terms = () => {
         <p>Questions? Reach out at <a href="mailto:hello@lifeinprogrezz.com" style={{ color: "#c9a461" }}>hello@lifeinprogrezz.com</a>.</p>
       </section>
     </div>
+    </div>
   );
 };
 
