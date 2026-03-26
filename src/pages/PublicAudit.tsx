@@ -29,6 +29,15 @@ function safeAccent(hex: string) {
   return hex;
 }
 
+function slugifyOwner(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function useInView(ref: any) {
   const [vis, setVis] = useState(false);
   useEffect(() => {
@@ -56,43 +65,60 @@ export default function PublicAudit() {
     async function load() {
       if (!username || !slug) { setError("Invalid link"); setLoading(false); return; }
 
-      // Try exact username match first
-      let { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("username", username)
-        .maybeSingle();
+      const requestedOwner = slugifyOwner(username);
 
-      // Fallback: match by slugified display_name
-      if (!profile) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, display_name");
+      const { data: matchingAudits, error: auditsError } = await supabase
+        .from("audits")
+        .select("user_id, audit_data")
+        .eq("slug", slug)
+        .eq("is_published", true);
 
-        profile = profiles?.find((p: any) => {
-          const slugified = (p.display_name || "")
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "");
-          return slugified === username;
-        }) || null;
+      if (auditsError) {
+        console.error("Public audit lookup failed while fetching audits", { slug, auditsError });
+        setError("Audit not found or is private");
+        setLoading(false);
+        return;
       }
 
-      if (!profile) { setError("User not found"); setLoading(false); return; }
+      if (!matchingAudits || matchingAudits.length === 0) {
+        setError("Audit not found or is private");
+        setLoading(false);
+        return;
+      }
 
-      const { data: audit } = await supabase
-        .from("audits")
-        .select("audit_data, is_published")
-        .eq("user_id", profile.id)
-        .eq("slug", slug)
-        .eq("is_published", true)
-        .maybeSingle();
+      if (matchingAudits.length === 1) {
+        setData(matchingAudits[0].audit_data);
+        setLoading(false);
+        return;
+      }
 
-      if (!audit) { setError("Audit not found or is private"); setLoading(false); return; }
+      const ownerIds = [...new Set(matchingAudits.map((audit: any) => audit.user_id).filter(Boolean))];
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, username, display_name, email")
+        .in("id", ownerIds);
 
-      setData(audit.audit_data);
+      if (profilesError) {
+        console.error("Public audit lookup failed while fetching profiles", { username, slug, profilesError });
+      }
+
+      const matchedProfile = profiles?.find((profile: any) => {
+        const ownerSlug = slugifyOwner(profile.username || profile.display_name || profile.email?.split("@")[0] || "");
+        return ownerSlug === requestedOwner;
+      });
+
+      const matchedAudit = matchedProfile
+        ? matchingAudits.find((audit: any) => audit.user_id === matchedProfile.id)
+        : null;
+
+      if (!matchedAudit) {
+        console.error("Public audit owner could not be resolved", { username, slug, ownerIds, profiles });
+        setError("User not found");
+        setLoading(false);
+        return;
+      }
+
+      setData(matchedAudit.audit_data);
       setLoading(false);
     }
     load();
