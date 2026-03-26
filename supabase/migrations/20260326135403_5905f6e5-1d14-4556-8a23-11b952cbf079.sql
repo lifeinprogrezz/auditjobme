@@ -1,0 +1,1 @@
+UPDATE public.profiles SET username = 'laia-gordo' WHERE id = '5c1012d5-0124-467a-b319-38b054e91bb2' AND username = 'aia-ord';
