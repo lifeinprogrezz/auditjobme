@@ -56,24 +56,29 @@ export default function PublicAudit() {
     async function load() {
       if (!username || !slug) { setError("Invalid link"); setLoading(false); return; }
 
-      const normalizedUsername = username
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase();
-
-      const { data: profiles } = await supabase
+      // Try exact username match first
+      let { data: profile } = await supabase
         .from("profiles")
-        .select("id, username, display_name, email");
+        .select("id")
+        .eq("username", username)
+        .maybeSingle();
 
-      const profile = profiles?.find((candidate: any) => {
-        const ownerSlug = (candidate.username || candidate.display_name || candidate.email?.split("@")[0] || "")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, "");
-        return ownerSlug === normalizedUsername;
-      });
+      // Fallback: match by slugified display_name
+      if (!profile) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, display_name");
+
+        profile = profiles?.find((p: any) => {
+          const slugified = (p.display_name || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+          return slugified === username;
+        }) || null;
+      }
 
       if (!profile) { setError("User not found"); setLoading(false); return; }
 
