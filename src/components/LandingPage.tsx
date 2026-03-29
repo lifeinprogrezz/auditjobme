@@ -355,16 +355,16 @@ export default function LandingPage() {
           textAlign: "center",
         }}
       >
-        <p style={{
+        <h2 style={{
           fontFamily: "'DM Sans', sans-serif",
-          fontWeight: 400,
-          fontSize: "21px",
-          letterSpacing: "-.01em",
+          fontWeight: 700,
+          fontSize: "clamp(1.6rem, 4vw, 2.4rem)",
+          letterSpacing: "-.02em",
           marginBottom: "24px",
-          color: "#6a6760",
+          color: "#f0ede8",
         }}>
           2 free audits. No catch.
-        </p>
+        </h2>
 
         <button
           onClick={handleGoogleLogin}
