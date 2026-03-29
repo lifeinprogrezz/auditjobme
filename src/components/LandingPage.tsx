@@ -345,7 +345,7 @@ export default function LandingPage() {
         {/* Example link */}
         <div style={{
           textAlign: "center",
-          padding: "40px 0 12px",
+          padding: "40px 0 4px",
         }}>
           <a
             href="https://auditjob.me/a/roberto-quintero/vercel-20"
