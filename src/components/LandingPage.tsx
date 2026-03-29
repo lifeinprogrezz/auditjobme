@@ -358,7 +358,7 @@ export default function LandingPage() {
         <h2 style={{
           fontFamily: "'DM Sans', sans-serif",
           fontWeight: 700,
-          fontSize: "clamp(1.6rem, 4vw, 2.4rem)",
+          fontSize: "clamp(1.3rem, 3vw, 1.8rem)",
           letterSpacing: "-.02em",
           marginBottom: "24px",
           color: "#f0ede8",
