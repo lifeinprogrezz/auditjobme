@@ -231,7 +231,7 @@ export default function LandingPage() {
 
       {/* SEPARATOR */}
       <div style={{ maxWidth: 1060, margin: "0 auto", padding: "0 1.5rem" }}>
-        <div style={{ height: 1, background: "#2a2825" }} />
+        <div style={{ height: 1, background: "#3a3835" }} />
       </div>
 
       {/* PRODUCT SHOWCASE — 5 screenshots */}
