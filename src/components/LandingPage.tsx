@@ -199,13 +199,16 @@ export default function LandingPage() {
         <p style={{
           fontSize: "16px",
           fontFamily: "'DM Sans', sans-serif",
-          color: "rgba(255,255,255,0.6)",
+          color: "rgba(255,255,255,0.45)",
           lineHeight: 1.7,
           maxWidth: 500,
           margin: "0 auto 1.4rem",
-          fontWeight: 500,
+          fontWeight: 300,
         }}>
-          Full company audit in 2 minutes. Research. Proposals. Contacts.
+          Full company audit in 2 minutes.{" "}
+          <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.75)" }}>
+            Research. Proposals. Contacts.
+          </span>
         </p>
 
         <button
