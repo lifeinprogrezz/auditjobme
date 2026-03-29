@@ -233,30 +233,52 @@ export default function LandingPage() {
       </section>
 
       {/* PROCESS STRIP */}
-      <div className="process-strip" style={{
+      <div style={{
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
-        gap: "1.4rem",
         padding: "48px 2rem 32px",
         fontFamily: "'DM Sans', sans-serif",
+        gap: "16px",
       }}>
-        {[
-          { num: "1", text: "Upload your CV" },
-          { num: "2", text: "Paste the job link" },
-          { num: "3", text: "Get your audit" },
-          { num: "4", text: "Share it" },
-        ].map((step, i, arr) => (
-          <div key={step.num} style={{ display: "flex", alignItems: "center", gap: "1.4rem" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-              <span style={{ fontSize: "11px", fontWeight: 700, color: ACCENT }}>{step.num}</span>
-              <span style={{ fontSize: "13px", fontWeight: 500, color: "rgba(255,255,255,0.45)" }}>{step.text}</span>
+        <p style={{
+          fontSize: "15px",
+          fontStyle: "italic",
+          fontWeight: 500,
+          color: "rgba(255,255,255,0.5)",
+          margin: 0,
+        }}>
+          How it works
+        </p>
+        <div className="process-strip" style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "2rem",
+        }}>
+          {[
+            { num: "1", text: "Upload your CV" },
+            { num: "2", text: "Paste the job link" },
+            { num: "3", text: "Get your audit" },
+            { num: "4", text: "Share it" },
+          ].map((step) => (
+            <div key={step.num} className="process-step" style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "4px",
+              cursor: "default",
+            }}>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: ACCENT }}>{step.num}</span>
+              <span className="process-step-text" style={{
+                fontSize: "15px",
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.45)",
+                transition: "color 0.2s ease",
+              }}>{step.text}</span>
             </div>
-            {i < arr.length - 1 && (
-              <span className="process-dot" style={{ fontSize: "14px", color: "rgba(255,255,255,0.2)" }}>·</span>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       <section style={{
@@ -507,6 +529,9 @@ export default function LandingPage() {
         .example-audit-link:hover {
           color: rgba(255,255,255,0.7) !important;
         }
+        .process-step:hover .process-step-text {
+          color: rgba(255,255,255,1) !important;
+        }
         .cta-button:hover {
           filter: brightness(0.9);
           box-shadow: 0 0 16px rgba(138,154,138,0.12);
@@ -515,9 +540,6 @@ export default function LandingPage() {
           .process-strip {
             flex-direction: column !important;
             gap: 8px !important;
-          }
-          .process-dot {
-            display: none;
           }
         }
         @media (max-width: 680px) {
