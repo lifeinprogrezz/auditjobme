@@ -270,9 +270,9 @@ export default function LandingPage() {
             background: "linear-gradient(90deg, transparent, rgba(138,154,138,0.3) 15%, rgba(138,154,138,0.3) 85%, transparent)",
           }} />
           {[
-            { num: "1", text: "Upload your CV" },
-            { num: "2", text: "Paste the job link" },
-            { num: "3", text: "Get your audit" },
+            { num: "1", text: "Upload CV" },
+            { num: "2", text: "Paste link" },
+            { num: "3", text: "Get audit" },
             { num: "4", text: "Share it" },
           ].map((step) => (
             <div key={step.num} className="process-step" style={{
@@ -312,8 +312,10 @@ export default function LandingPage() {
                 letterSpacing: ".08em",
               }}>{step.num}</span>
               <span className="process-step-text" style={{
-                fontSize: "14px",
-                fontWeight: 600,
+                fontSize: ".7rem",
+                fontWeight: 700,
+                letterSpacing: ".18em",
+                textTransform: "uppercase",
                 color: "rgba(255,255,255,0.4)",
                 transition: "color 0.2s ease",
                 textAlign: "center",
