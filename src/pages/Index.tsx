@@ -25,7 +25,7 @@ const Index = () => {
   }
 
   if (!user) {
-    return <LoginPage />;
+    return <LandingPage />;
   }
 
   return <AuditGenerator />;
