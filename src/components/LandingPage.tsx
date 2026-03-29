@@ -529,6 +529,9 @@ export default function LandingPage() {
         .example-audit-link:hover {
           color: rgba(255,255,255,0.7) !important;
         }
+        .process-step:hover .process-step-text {
+          color: rgba(255,255,255,1) !important;
+        }
         .cta-button:hover {
           filter: brightness(0.9);
           box-shadow: 0 0 16px rgba(138,154,138,0.12);
@@ -537,9 +540,6 @@ export default function LandingPage() {
           .process-strip {
             flex-direction: column !important;
             gap: 8px !important;
-          }
-          .process-dot {
-            display: none;
           }
         }
         @media (max-width: 680px) {
