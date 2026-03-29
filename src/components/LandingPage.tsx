@@ -459,7 +459,12 @@ export default function LandingPage() {
             margin-bottom: 3rem !important;
           }
         }
+        @keyframes lightbox-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
       `}</style>
+    </div>
     </div>
   );
 }
