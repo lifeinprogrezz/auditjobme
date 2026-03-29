@@ -124,6 +124,17 @@ export default function LandingPage() {
           {loading ? "One moment..." : "Get started with Google"}
         </button>
 
+        <p style={{
+          fontSize: ".72rem",
+          color: "#6a6760",
+          marginTop: "1rem",
+          lineHeight: 1.6,
+        }}>
+          We use your Google account only to sign you in and save your audits.
+          No emails are sent on your behalf. See our{" "}
+          <a href="/privacy" style={{ color: "#8a8780", textDecoration: "underline", textUnderlineOffset: "2px" }}>Privacy Policy</a>.
+        </p>
+
         {error && (
           <p style={{ color: "#e74c3c", fontSize: ".7rem", marginTop: "1rem" }}>{error}</p>
         )}
