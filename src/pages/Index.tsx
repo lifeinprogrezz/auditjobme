@@ -1,6 +1,6 @@
 import { useAuth } from "@/components/AuthProvider";
+import AuditGenerator from "@/components/AuditGenerator";
 import LandingPage from "@/components/LandingPage";
-import { Navigate } from "react-router-dom";
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -24,11 +24,11 @@ const Index = () => {
     );
   }
 
-  if (user) {
-    return <Navigate to="/app" replace />;
+  if (!user) {
+    return <LandingPage />;
   }
 
-  return <LandingPage />;
+  return <AuditGenerator />;
 };
 
 export default Index;

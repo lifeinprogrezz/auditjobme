@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/AuthProvider";
 import Index from "./pages/Index.tsx";
-import AppPage from "./pages/AppPage.tsx";
 import PublicAudit from "./pages/PublicAudit.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Privacy from "./pages/Privacy.tsx";
@@ -22,7 +21,6 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/app" element={<AppPage />} />
             <Route path="/a/:username/:slug" element={<PublicAudit />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
