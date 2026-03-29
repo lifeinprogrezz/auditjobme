@@ -12,7 +12,7 @@ const showcaseItems = [
   {
     num: "01",
     label: "RESEARCH",
-    desc: "Real company data. Sourced and verified.",
+    desc: "Every number sourced. Every competitor mapped.",
     img: auditResearch,
     alt: "Research stats grid showing company metrics and market data",
   },
