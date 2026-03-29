@@ -174,7 +174,7 @@ export default function LandingPage() {
           color: "#6a6760",
           lineHeight: 1.7,
           maxWidth: 500,
-          margin: "0 auto 3.6rem",
+          margin: "0 auto 2.2rem",
           fontWeight: 400,
         }}>
           Full company audit in 2 minutes. Research, proposals & contacts.
@@ -435,8 +435,8 @@ export default function LandingPage() {
           filter: brightness(1.05);
         }
         .cta-button:hover {
-          filter: brightness(1.15);
-          box-shadow: 0 0 24px rgba(138,154,138,0.25);
+          filter: brightness(0.9);
+          box-shadow: 0 0 20px rgba(138,154,138,0.15);
         }
         @media (max-width: 680px) {
           .showcase-panel {
