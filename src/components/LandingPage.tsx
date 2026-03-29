@@ -1,25 +1,34 @@
 import { useState, useRef, useEffect } from "react";
 import { lovable } from "@/integrations/lovable/index";
-import auditHero from "@/assets/audit-hero.png";
+import auditOpening from "@/assets/audit-opening.png";
 import auditResearch from "@/assets/audit-research.png";
+import auditHero from "@/assets/audit-hero.png";
 import auditProposals from "@/assets/audit-proposals.png";
+import auditAbout from "@/assets/audit-about.png";
 
 const ACCENT = "#8a9a8a";
 
 const showcaseItems = [
   {
+    num: "00",
+    label: "THE AUDIT",
+    desc: "This is what your application becomes.",
+    img: auditOpening,
+    alt: "Full audit output showing diagnosis headline, company name, and navigation",
+  },
+  {
     num: "01",
     label: "RESEARCH",
     desc: "Real company data. Sourced and verified.",
-    img: auditHero,
-    alt: "Audit hero showing company diagnosis headline and key findings",
+    img: auditResearch,
+    alt: "Research stats grid showing company metrics and market data",
   },
   {
     num: "02",
     label: "DIAGNOSIS",
     desc: "Problems identified. Impact quantified.",
-    img: auditResearch,
-    alt: "Research stats grid showing company metrics and market data",
+    img: auditHero,
+    alt: "Audit diagnosis showing key findings and impact analysis",
   },
   {
     num: "03",
@@ -28,12 +37,13 @@ const showcaseItems = [
     img: auditProposals,
     alt: "Phased proposal cards with strategic recommendations",
   },
-];
-
-const steps = [
-  { num: "01", title: "Upload your CV", desc: "Your background becomes the foundation." },
-  { num: "02", title: "Paste a job link", desc: "Any role, any company. Researched in real time." },
-  { num: "03", title: "Get your audit", desc: "Company research. Diagnosis. Proposals. Contacts. Live URL ready to share." },
+  {
+    num: "04",
+    label: "ABOUT",
+    desc: "Your fit. Backed by proof.",
+    img: auditAbout,
+    alt: "About section showing candidate fit and qualifications",
+  },
 ];
 
 export default function LandingPage() {
@@ -109,9 +119,9 @@ export default function LandingPage() {
           style={{
             padding: "0.45rem 1.1rem",
             borderRadius: 6,
-            border: "1px solid #2a2825",
+            border: "1px solid #5a5750",
             background: "transparent",
-            color: "#8a8780",
+            color: "#f0ede8",
             fontFamily: "'Plus Jakarta Sans', sans-serif",
             fontWeight: 500,
             fontSize: ".68rem",
@@ -125,7 +135,7 @@ export default function LandingPage() {
         </button>
       </nav>
 
-      {/* HERO — full viewport */}
+      {/* HERO */}
       <section style={{
         minHeight: "calc(100vh - 60px)",
         display: "flex",
@@ -135,13 +145,13 @@ export default function LandingPage() {
         padding: "0 2rem 6rem",
         textAlign: "center",
       }}>
-        <p className="hero-label" style={{
-          fontSize: ".6rem",
+        <p style={{
+          fontSize: "11px",
           fontWeight: 600,
-          letterSpacing: ".22em",
+          letterSpacing: ".2em",
           textTransform: "uppercase",
-          color: ACCENT,
-          marginBottom: "2.2rem",
+          color: "#6a6760",
+          marginBottom: "1rem",
         }}>
           Stop applying. Start auditing.
         </p>
@@ -167,13 +177,14 @@ export default function LandingPage() {
           margin: "0 auto 3.6rem",
           fontWeight: 400,
         }}>
-          Paste a job link. Upload your CV. Full company audit in 2 minutes.
+          Full company audit in 2 minutes. Research, proposals, and contacts included.
         </p>
 
         <button
           onClick={scrollToSignIn}
+          className="cta-button"
           style={{
-            padding: "0.9rem 2.6rem",
+            padding: "16px 40px",
             borderRadius: 6,
             border: "none",
             background: ACCENT,
@@ -183,14 +194,14 @@ export default function LandingPage() {
             fontSize: ".78rem",
             letterSpacing: ".04em",
             cursor: "pointer",
-            transition: "opacity .2s",
+            transition: "filter .2s, box-shadow .2s",
           }}
         >
           Start free
         </button>
       </section>
 
-      {/* PRODUCT SHOWCASE */}
+      {/* PRODUCT SHOWCASE — 5 screenshots */}
       <section style={{
         padding: "2rem 1.5rem 4rem",
         maxWidth: 1060,
@@ -203,45 +214,65 @@ export default function LandingPage() {
             ref={(el) => { showcaseRefs.current[i] = el; }}
             className="showcase-panel"
             style={{
-              marginBottom: i < showcaseItems.length - 1 ? "10rem" : "0",
-              textAlign: "center",
+              marginBottom: i < showcaseItems.length - 1 ? "5rem" : "0",
             }}
           >
-            {/* Label */}
-            <div style={{ marginBottom: "2.4rem" }}>
-              <p style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontWeight: 700,
-                fontSize: ".7rem",
-                letterSpacing: ".18em",
-                textTransform: "uppercase",
-                color: ACCENT,
-                marginBottom: ".5rem",
-              }}>
-                {item.num} {item.label}
-              </p>
-              <p style={{
-                fontSize: ".82rem",
-                color: "#5a5750",
-                fontWeight: 400,
-                lineHeight: 1.6,
-              }}>
-                {item.desc}
-              </p>
+            {/* Label with horizontal line */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "1.2rem",
+              marginBottom: "1.6rem",
+            }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: ".6rem", flexShrink: 0 }}>
+                <span style={{
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "24px",
+                  color: ACCENT,
+                  letterSpacing: "-.02em",
+                }}>
+                  {item.num}
+                </span>
+                <span style={{
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 700,
+                  fontSize: ".7rem",
+                  letterSpacing: ".18em",
+                  textTransform: "uppercase",
+                  color: "#f0ede8",
+                }}>
+                  {item.label}
+                </span>
+              </div>
+              <div style={{
+                flex: 1,
+                height: "1px",
+                background: "#2a2825",
+              }} />
             </div>
+            <p style={{
+              fontSize: ".82rem",
+              color: "#5a5750",
+              fontWeight: 400,
+              lineHeight: 1.6,
+              marginBottom: "1.4rem",
+            }}>
+              {item.desc}
+            </p>
 
             {/* Screenshot */}
             <div style={{
               perspective: "1200px",
               maxWidth: 960,
-              margin: "0 auto",
             }}>
-              <div style={{
+              <div className="showcase-img-wrapper" style={{
                 position: "relative",
                 borderRadius: 12,
                 overflow: "hidden",
                 transform: "rotateX(2deg)",
                 boxShadow: "0 30px 80px -20px rgba(138,154,138,0.08), 0 0 0 1px rgba(255,255,255,0.03)",
+                transition: "transform .3s ease, filter .3s ease",
               }}>
                 <img
                   src={item.img}
@@ -251,7 +282,7 @@ export default function LandingPage() {
                     display: "block",
                   }}
                 />
-                {/* Edge fade */}
+                {/* Edge fades */}
                 <div style={{
                   position: "absolute",
                   bottom: 0,
@@ -285,74 +316,28 @@ export default function LandingPage() {
         ))}
       </section>
 
-      {/* HOW IT WORKS */}
-      <section style={{
-        padding: "10rem 2.4rem 6rem",
-        maxWidth: 960,
-        margin: "0 auto",
-        width: "100%",
-      }}>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "0",
-          position: "relative",
-        }}>
-          {steps.map((step, i) => (
-            <div key={step.num} style={{
-              padding: "0 2rem",
-              borderLeft: i > 0 ? "1px solid #1e1d1a" : "none",
-            }}>
-              <span style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontWeight: 700,
-                fontSize: "1.4rem",
-                color: ACCENT,
-                letterSpacing: "-.02em",
-                display: "block",
-                marginBottom: ".8rem",
-              }}>
-                {step.num}
-              </span>
-              <p style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontWeight: 500,
-                fontSize: ".92rem",
-                color: "#f0ede8",
-                marginBottom: ".4rem",
-                letterSpacing: "-.01em",
-              }}>
-                {step.title}
-              </p>
-              <p style={{
-                fontSize: ".74rem",
-                color: "#5a5750",
-                lineHeight: 1.65,
-              }}>
-                {step.desc}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* SIGN IN */}
+      {/* SIGN IN — compact */}
       <section
         ref={signInRef}
         style={{
-          padding: "10rem 2rem 6rem",
+          padding: "4rem 2rem 3rem",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           textAlign: "center",
         }}
       >
+        {/* Process line */}
+        <p style={{ fontSize: "13px", color: "#5a5750", marginBottom: "16px" }}>
+          Upload your CV <span style={{ color: ACCENT }}>→</span> Paste a job link <span style={{ color: ACCENT }}>→</span> Get your audit
+        </p>
+
         <h2 style={{
           fontFamily: "'DM Sans', sans-serif",
           fontWeight: 400,
-          fontSize: "clamp(1rem, 2.5vw, 1.3rem)",
+          fontSize: "24px",
           letterSpacing: "-.02em",
-          marginBottom: ".6rem",
+          marginBottom: "8px",
           color: "#f0ede8",
         }}>
           Try it free. No card required.
@@ -360,7 +345,7 @@ export default function LandingPage() {
         <p style={{
           fontSize: ".78rem",
           color: "#5a5750",
-          marginBottom: "2.4rem",
+          marginBottom: "24px",
         }}>
           2 free audits to see the difference.
         </p>
@@ -402,7 +387,7 @@ export default function LandingPage() {
         <p style={{
           fontSize: ".62rem",
           color: "#4a4740",
-          marginTop: "1.2rem",
+          marginTop: "12px",
           lineHeight: 1.6,
         }}>
           We only use your Google account to sign you in.{" "}
@@ -416,7 +401,7 @@ export default function LandingPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        fontSize: ".65rem",
+        fontSize: "13px",
         color: "#9a9790",
       }}>
         <span>© {new Date().getFullYear()} auditjob.me</span>
@@ -434,7 +419,6 @@ export default function LandingPage() {
         </div>
       </noscript>
 
-      {/* Showcase scroll animation + mobile responsive */}
       <style>{`
         .showcase-panel {
           opacity: 0;
@@ -446,17 +430,17 @@ export default function LandingPage() {
           opacity: 1;
           transform: translateY(0) scale(1);
         }
+        .showcase-img-wrapper:hover {
+          transform: rotateX(2deg) scale(1.02) !important;
+          filter: brightness(1.05);
+        }
+        .cta-button:hover {
+          filter: brightness(1.15);
+          box-shadow: 0 0 24px rgba(138,154,138,0.25);
+        }
         @media (max-width: 680px) {
-          section > div[style*="grid-template-columns: repeat(3"] {
-            grid-template-columns: 1fr !important;
-          }
-          section > div[style*="grid-template-columns: repeat(3"] > div {
-            border-left: none !important;
-            border-bottom: 1px solid #1e1d1a;
-            padding: 1.5rem 0 !important;
-          }
-          section > div[style*="grid-template-columns: repeat(3"] > div:last-child {
-            border-bottom: none;
+          .showcase-panel {
+            margin-bottom: 3rem !important;
           }
         }
       `}</style>
