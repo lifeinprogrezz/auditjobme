@@ -232,14 +232,14 @@ export default function LandingPage() {
         </button>
       </section>
 
-      {/* PROCESS STRIP */}
+      {/* PROCESS STRIP — Timeline */}
       <div style={{
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        padding: "48px 2rem 32px",
+        padding: "56px 2rem 40px",
         fontFamily: "'DM Sans', sans-serif",
-        gap: "16px",
+        gap: "28px",
       }}>
         <h2 style={{
           fontFamily: "'DM Sans', sans-serif",
@@ -253,10 +253,22 @@ export default function LandingPage() {
         </h2>
         <div className="process-strip" style={{
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start",
           justifyContent: "center",
-          gap: "2rem",
+          position: "relative",
+          gap: 0,
+          maxWidth: 700,
+          width: "100%",
         }}>
+          {/* Timeline line */}
+          <div className="timeline-line" style={{
+            position: "absolute",
+            top: "10px",
+            left: "12.5%",
+            right: "12.5%",
+            height: "1px",
+            background: "linear-gradient(90deg, transparent, rgba(138,154,138,0.3) 15%, rgba(138,154,138,0.3) 85%, transparent)",
+          }} />
           {[
             { num: "1", text: "Upload your CV" },
             { num: "2", text: "Paste the job link" },
@@ -267,15 +279,44 @@ export default function LandingPage() {
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: "4px",
+              gap: "10px",
+              flex: 1,
               cursor: "default",
+              position: "relative",
+              zIndex: 1,
             }}>
-              <span style={{ fontSize: "12px", fontWeight: 700, color: ACCENT }}>{step.num}</span>
+              {/* Dot */}
+              <div className="timeline-dot" style={{
+                width: "20px",
+                height: "20px",
+                borderRadius: "50%",
+                background: "#0f0e0c",
+                border: "2px solid rgba(138,154,138,0.4)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "border-color 0.3s ease, box-shadow 0.3s ease",
+              }}>
+                <div style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: ACCENT,
+                  transition: "transform 0.3s ease",
+                }} />
+              </div>
+              <span style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: ACCENT,
+                letterSpacing: ".08em",
+              }}>{step.num}</span>
               <span className="process-step-text" style={{
-                fontSize: "15px",
+                fontSize: "14px",
                 fontWeight: 600,
-                color: "rgba(255,255,255,0.45)",
+                color: "rgba(255,255,255,0.4)",
                 transition: "color 0.2s ease",
+                textAlign: "center",
               }}>{step.text}</span>
             </div>
           ))}
@@ -533,6 +574,10 @@ export default function LandingPage() {
         .process-step:hover .process-step-text {
           color: rgba(255,255,255,1) !important;
         }
+        .process-step:hover .timeline-dot {
+          border-color: rgba(138,154,138,0.8) !important;
+          box-shadow: 0 0 12px rgba(138,154,138,0.25) !important;
+        }
         .cta-button:hover {
           filter: brightness(0.9);
           box-shadow: 0 0 16px rgba(138,154,138,0.12);
@@ -540,7 +585,10 @@ export default function LandingPage() {
         @media (max-width: 600px) {
           .process-strip {
             flex-direction: column !important;
-            gap: 8px !important;
+            gap: 20px !important;
+          }
+          .timeline-line {
+            display: none;
           }
         }
         @media (max-width: 680px) {
