@@ -9,7 +9,7 @@ export default function LandingPage() {
     setLoading(true);
     setError("");
     const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+      redirect_uri: window.location.origin + "/app",
     });
     if (error) {
       setError(error.message || "Login failed");

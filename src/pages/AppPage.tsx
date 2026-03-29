@@ -1,8 +1,7 @@
 import { useAuth } from "@/components/AuthProvider";
-import LandingPage from "@/components/LandingPage";
-import { Navigate } from "react-router-dom";
+import AuditGenerator from "@/components/AuditGenerator";
 
-const Index = () => {
+const AppPage = () => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -24,11 +23,12 @@ const Index = () => {
     );
   }
 
-  if (user) {
-    return <Navigate to="/app" replace />;
+  if (!user) {
+    window.location.href = "/";
+    return null;
   }
 
-  return <LandingPage />;
+  return <AuditGenerator />;
 };
 
-export default Index;
+export default AppPage;
