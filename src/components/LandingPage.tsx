@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { lovable } from "@/integrations/lovable/index";
+
+const ACCENT = "#8a9a8a";
 
 export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const signInRef = useRef<HTMLDivElement>(null);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -15,6 +18,10 @@ export default function LandingPage() {
       setError(error.message || "Login failed");
       setLoading(false);
     }
+  };
+
+  const scrollToSignIn = () => {
+    signInRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
@@ -49,9 +56,9 @@ export default function LandingPage() {
           style={{
             padding: "0.45rem 1.1rem",
             borderRadius: 6,
-            border: "1px solid #252320",
+            border: "1px solid #2a2825",
             background: "transparent",
-            color: "#6a6760",
+            color: "#8a8780",
             fontFamily: "'Plus Jakarta Sans', sans-serif",
             fontWeight: 500,
             fontSize: ".68rem",
@@ -66,13 +73,12 @@ export default function LandingPage() {
       </nav>
 
       {/* HERO */}
-      <main style={{
-        flex: 1,
+      <section style={{
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "0 2rem 4rem",
+        padding: "6rem 2rem 5rem",
         textAlign: "center",
       }}>
         <p style={{
@@ -81,7 +87,7 @@ export default function LandingPage() {
           letterSpacing: ".14em",
           textTransform: "uppercase" as const,
           color: "#8a8780",
-          marginBottom: ".6rem",
+          marginBottom: ".8rem",
         }}>
           Stop applying. Start auditing.
         </p>
@@ -100,13 +106,136 @@ export default function LandingPage() {
 
         <p style={{
           fontSize: ".82rem",
-          color: "#6a6760",
+          color: "#8a8780",
           lineHeight: 1.65,
-          maxWidth: 400,
-          margin: "0 auto 2.2rem",
+          maxWidth: 460,
+          margin: "0 auto 2.4rem",
         }}>
-          Paste a job link, upload your CV. Get a full company audit
-          with research, proposals, and prototypes ready to share.
+          Paste a job link. Upload your CV. Get a full company audit
+          with research, proposals, and decision-maker contacts in 2 minutes.
+        </p>
+
+        <button
+          onClick={scrollToSignIn}
+          style={{
+            padding: "0.75rem 2rem",
+            borderRadius: 6,
+            border: "none",
+            background: ACCENT,
+            color: "#0f0e0c",
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            fontWeight: 600,
+            fontSize: ".72rem",
+            letterSpacing: ".05em",
+            cursor: "pointer",
+            transition: "opacity .2s",
+          }}
+        >
+          Start free
+        </button>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section style={{
+        padding: "4rem 2.4rem",
+        maxWidth: 900,
+        margin: "0 auto",
+        width: "100%",
+      }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "2.5rem",
+        }}>
+          {[
+            { num: "01", title: "Upload your CV", desc: "Your background becomes the foundation." },
+            { num: "02", title: "Paste a job link", desc: "Any role, any company. Researched in real time." },
+            { num: "03", title: "Get your audit", desc: "Company research. Diagnosis. Proposals. Contacts. Live URL ready to share." },
+          ].map((step) => (
+            <div key={step.num}>
+              <span style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 700,
+                fontSize: ".72rem",
+                color: ACCENT,
+                letterSpacing: ".04em",
+                display: "block",
+                marginBottom: ".5rem",
+              }}>
+                {step.num}
+              </span>
+              <p style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 500,
+                fontSize: ".88rem",
+                color: "#f0ede8",
+                marginBottom: ".3rem",
+              }}>
+                {step.title}
+              </p>
+              <p style={{
+                fontSize: ".75rem",
+                color: "#6a6760",
+                lineHeight: 1.6,
+              }}>
+                {step.desc}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* AUDIT PREVIEW PLACEHOLDER */}
+      <section style={{
+        padding: "4rem 2.4rem",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+      }}>
+        <p style={{
+          fontSize: ".58rem",
+          fontWeight: 600,
+          letterSpacing: ".14em",
+          textTransform: "uppercase" as const,
+          color: "#8a8780",
+          marginBottom: "1.5rem",
+        }}>
+          What you get
+        </p>
+        <div style={{
+          maxWidth: 700,
+          width: "100%",
+          minHeight: 200,
+        }} />
+      </section>
+
+      {/* SIGN IN SECTION */}
+      <section
+        ref={signInRef}
+        style={{
+          padding: "4rem 2rem 5rem",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          textAlign: "center",
+        }}
+      >
+        <h2 style={{
+          fontFamily: "'DM Sans', sans-serif",
+          fontWeight: 400,
+          fontSize: "clamp(1.2rem, 3vw, 1.8rem)",
+          letterSpacing: "-.03em",
+          marginBottom: ".6rem",
+          color: "#f0ede8",
+        }}>
+          Try it free. No card required.
+        </h2>
+        <p style={{
+          fontSize: ".78rem",
+          color: "#8a8780",
+          marginBottom: "2rem",
+        }}>
+          2 free audits to see the difference.
         </p>
 
         <button
@@ -152,7 +281,7 @@ export default function LandingPage() {
           We only use your Google account to sign you in.{" "}
           <a href="/privacy" style={{ color: "#6a6760", textDecoration: "underline", textUnderlineOffset: "2px" }}>Privacy Policy</a>
         </p>
-      </main>
+      </section>
 
       {/* FOOTER */}
       <footer style={{
