@@ -25,6 +25,12 @@ export default function LandingPage() {
     signInRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const steps = [
+    { num: "01", title: "Upload your CV", desc: "Your background becomes the foundation." },
+    { num: "02", title: "Paste a job link", desc: "Any role, any company. Researched in real time." },
+    { num: "03", title: "Get your audit", desc: "Company research. Diagnosis. Proposals. Contacts. Live URL ready to share." },
+  ];
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -79,16 +85,16 @@ export default function LandingPage() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "6rem 2rem 5rem",
+        padding: "10rem 2rem 4rem",
         textAlign: "center",
       }}>
         <p style={{
-          fontSize: ".58rem",
-          fontWeight: 600,
-          letterSpacing: ".14em",
+          fontSize: ".52rem",
+          fontWeight: 500,
+          letterSpacing: ".18em",
           textTransform: "uppercase" as const,
-          color: "#8a8780",
-          marginBottom: ".8rem",
+          color: "#5a5750",
+          marginBottom: "1.8rem",
         }}>
           Stop applying. Start auditing.
         </p>
@@ -96,21 +102,21 @@ export default function LandingPage() {
         <h1 style={{
           fontFamily: "'DM Sans', sans-serif",
           fontWeight: 400,
-          fontSize: "clamp(1.8rem, 5vw, 3.2rem)",
-          lineHeight: 1.1,
-          letterSpacing: "-.045em",
-          marginBottom: "1.4rem",
-          maxWidth: 560,
+          fontSize: "clamp(2.6rem, 7vw, 4.8rem)",
+          lineHeight: 1.05,
+          letterSpacing: "-.05em",
+          marginBottom: "2.4rem",
+          maxWidth: 700,
         }}>
           Land the job before the interview
         </h1>
 
         <p style={{
-          fontSize: ".82rem",
-          color: "#8a8780",
-          lineHeight: 1.65,
-          maxWidth: 460,
-          margin: "0 auto 2.4rem",
+          fontSize: ".88rem",
+          color: "#7a7770",
+          lineHeight: 1.7,
+          maxWidth: 480,
+          margin: "0 auto 3.2rem",
         }}>
           Paste a job link. Upload your CV. Get a full company audit
           with research, proposals, and decision-maker contacts in 2 minutes.
@@ -119,15 +125,15 @@ export default function LandingPage() {
         <button
           onClick={scrollToSignIn}
           style={{
-            padding: "0.75rem 2rem",
+            padding: "0.9rem 2.6rem",
             borderRadius: 6,
             border: "none",
             background: ACCENT,
             color: "#0f0e0c",
             fontFamily: "'Plus Jakarta Sans', sans-serif",
             fontWeight: 600,
-            fontSize: ".72rem",
-            letterSpacing: ".05em",
+            fontSize: ".78rem",
+            letterSpacing: ".04em",
             cursor: "pointer",
             transition: "opacity .2s",
           }}
@@ -138,46 +144,47 @@ export default function LandingPage() {
 
       {/* HOW IT WORKS */}
       <section style={{
-        padding: "4rem 2.4rem",
-        maxWidth: 900,
+        padding: "8rem 2.4rem 6rem",
+        maxWidth: 960,
         margin: "0 auto",
         width: "100%",
       }}>
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "2.5rem",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "0",
+          position: "relative",
         }}>
-          {[
-            { num: "01", title: "Upload your CV", desc: "Your background becomes the foundation." },
-            { num: "02", title: "Paste a job link", desc: "Any role, any company. Researched in real time." },
-            { num: "03", title: "Get your audit", desc: "Company research. Diagnosis. Proposals. Contacts. Live URL ready to share." },
-          ].map((step) => (
-            <div key={step.num}>
+          {steps.map((step, i) => (
+            <div key={step.num} style={{
+              padding: "0 2rem",
+              borderLeft: i > 0 ? "1px solid #1e1d1a" : "none",
+            }}>
               <span style={{
                 fontFamily: "'DM Sans', sans-serif",
                 fontWeight: 700,
-                fontSize: ".72rem",
+                fontSize: "1.4rem",
                 color: ACCENT,
-                letterSpacing: ".04em",
+                letterSpacing: "-.02em",
                 display: "block",
-                marginBottom: ".5rem",
+                marginBottom: ".8rem",
               }}>
                 {step.num}
               </span>
               <p style={{
                 fontFamily: "'DM Sans', sans-serif",
                 fontWeight: 500,
-                fontSize: ".88rem",
+                fontSize: ".92rem",
                 color: "#f0ede8",
-                marginBottom: ".3rem",
+                marginBottom: ".4rem",
+                letterSpacing: "-.01em",
               }}>
                 {step.title}
               </p>
               <p style={{
-                fontSize: ".75rem",
-                color: "#6a6760",
-                lineHeight: 1.6,
+                fontSize: ".74rem",
+                color: "#5a5750",
+                lineHeight: 1.65,
               }}>
                 {step.desc}
               </p>
@@ -186,28 +193,28 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* AUDIT PREVIEW PLACEHOLDER */}
+      {/* AUDIT PREVIEW */}
       <section style={{
-        padding: "4rem 2.4rem",
+        padding: "6rem 2.4rem 4rem",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
       }}>
         <p style={{
-          fontSize: ".58rem",
-          fontWeight: 600,
-          letterSpacing: ".14em",
+          fontSize: ".52rem",
+          fontWeight: 500,
+          letterSpacing: ".18em",
           textTransform: "uppercase" as const,
-          color: "#8a8780",
-          marginBottom: "1.5rem",
+          color: "#5a5750",
+          marginBottom: "2.5rem",
         }}>
           What you get
         </p>
         <div style={{
-          maxWidth: 700,
+          maxWidth: 960,
           width: "100%",
           position: "relative",
-          borderRadius: 8,
+          borderRadius: 10,
           overflow: "hidden",
         }}>
           <img
@@ -216,7 +223,7 @@ export default function LandingPage() {
             style={{
               width: "100%",
               display: "block",
-              opacity: 0.8,
+              opacity: 0.85,
             }}
           />
           <div style={{
@@ -224,17 +231,17 @@ export default function LandingPage() {
             bottom: 0,
             left: 0,
             right: 0,
-            height: "40%",
+            height: "50%",
             background: "linear-gradient(to bottom, transparent, #0f0e0c)",
           }} />
           <p style={{
             position: "absolute",
-            bottom: "1.5rem",
+            bottom: "2rem",
             left: 0,
             right: 0,
             textAlign: "center",
-            fontSize: ".75rem",
-            color: "#8a8780",
+            fontSize: ".78rem",
+            color: "#9a9790",
             lineHeight: 1.6,
             zIndex: 1,
           }}>
@@ -247,7 +254,7 @@ export default function LandingPage() {
       <section
         ref={signInRef}
         style={{
-          padding: "4rem 2rem 5rem",
+          padding: "8rem 2rem 6rem",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -257,8 +264,8 @@ export default function LandingPage() {
         <h2 style={{
           fontFamily: "'DM Sans', sans-serif",
           fontWeight: 400,
-          fontSize: "clamp(1.2rem, 3vw, 1.8rem)",
-          letterSpacing: "-.03em",
+          fontSize: "clamp(1rem, 2.5vw, 1.3rem)",
+          letterSpacing: "-.02em",
           marginBottom: ".6rem",
           color: "#f0ede8",
         }}>
@@ -266,8 +273,8 @@ export default function LandingPage() {
         </h2>
         <p style={{
           fontSize: ".78rem",
-          color: "#8a8780",
-          marginBottom: "2rem",
+          color: "#5a5750",
+          marginBottom: "2.4rem",
         }}>
           2 free audits to see the difference.
         </p>
@@ -323,13 +330,13 @@ export default function LandingPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        fontSize: ".62rem",
-        color: "#6a6760",
+        fontSize: ".65rem",
+        color: "#7a7770",
       }}>
         <span>© {new Date().getFullYear()} auditjob.me</span>
         <div style={{ display: "flex", gap: "1.2rem" }}>
-          <a href="/privacy" style={{ color: "#6a6760", textDecoration: "none" }}>Privacy</a>
-          <a href="/terms" style={{ color: "#6a6760", textDecoration: "none" }}>Terms</a>
+          <a href="/privacy" style={{ color: "#7a7770", textDecoration: "none" }}>Privacy</a>
+          <a href="/terms" style={{ color: "#7a7770", textDecoration: "none" }}>Terms</a>
         </div>
       </footer>
 
@@ -340,6 +347,23 @@ export default function LandingPage() {
           <p><a href="/privacy">Privacy Policy</a> | <a href="/terms">Terms of Service</a></p>
         </div>
       </noscript>
+
+      {/* Mobile responsive overrides */}
+      <style>{`
+        @media (max-width: 680px) {
+          section > div[style*="grid-template-columns: repeat(3"] {
+            grid-template-columns: 1fr !important;
+          }
+          section > div[style*="grid-template-columns: repeat(3"] > div {
+            border-left: none !important;
+            border-bottom: 1px solid #1e1d1a;
+            padding: 1.5rem 0 !important;
+          }
+          section > div[style*="grid-template-columns: repeat(3"] > div:last-child {
+            border-bottom: none;
+          }
+        }
+      `}</style>
     </div>
   );
 }
