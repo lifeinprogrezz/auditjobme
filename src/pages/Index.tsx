@@ -1,6 +1,6 @@
 import { useAuth } from "@/components/AuthProvider";
 import AuditGenerator from "@/components/AuditGenerator";
-import LoginPage from "@/components/LoginPage";
+import LandingPage from "@/components/LandingPage";
 
 const Index = () => {
   const { user, loading } = useAuth();
