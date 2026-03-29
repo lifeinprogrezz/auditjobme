@@ -406,7 +406,7 @@ export default function LandingPage() {
           marginTop: "24px",
           lineHeight: 1.6,
         }}>
-          We only use your Google account to sign you in.{" "}
+          We only use your Google account to sign you in. No email access, no data sharing.{" "}
           <a href="/privacy" style={{ color: "#6a6760", textDecoration: "underline", textUnderlineOffset: "2px" }}>Privacy Policy</a>
         </p>
       </section>
