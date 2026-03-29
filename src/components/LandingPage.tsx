@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { lovable } from "@/integrations/lovable/index";
+import auditPreview from "@/assets/audit-preview.png";
 
 const ACCENT = "#8a9a8a";
 
