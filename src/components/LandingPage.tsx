@@ -356,14 +356,11 @@ export default function LandingPage() {
               fontFamily: "'DM Sans', sans-serif",
               fontSize: "14px",
               fontWeight: 500,
-              letterSpacing: ".12em",
-              textTransform: "uppercase",
-              color: "#8a9a8a",
-              textDecoration: "none",
-              padding: "10px 24px",
-              border: "1px solid rgba(138,154,138,0.3)",
-              borderRadius: "100px",
-              transition: "all .3s ease",
+              letterSpacing: ".08em",
+              color: "rgba(255,255,255,0.45)",
+              textDecoration: "underline",
+              textUnderlineOffset: "4px",
+              transition: "color .3s ease",
               display: "inline-block",
             }}
           >
@@ -479,8 +476,7 @@ export default function LandingPage() {
           filter: brightness(1.05);
         }
         .example-audit-link:hover {
-          color: #f0ede8 !important;
-          border-color: rgba(138,154,138,0.45) !important;
+          color: rgba(255,255,255,0.7) !important;
         }
         .cta-button:hover {
           filter: brightness(0.9);
