@@ -34,10 +34,10 @@ export default function LandingPage() {
         padding: "1.4rem 2.4rem",
       }}>
         <span style={{
-          fontFamily: "'DM Sans', sans-serif",
-          fontWeight: 400,
-          fontSize: ".95rem",
-          letterSpacing: "-.02em",
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          fontWeight: 500,
+          fontSize: ".82rem",
+          letterSpacing: ".04em",
           color: "#f0ede8",
         }}>
           auditjob.me
@@ -46,15 +46,15 @@ export default function LandingPage() {
           onClick={handleGoogleLogin}
           disabled={loading}
           style={{
-            padding: "0.5rem 1.2rem",
+            padding: "0.45rem 1.1rem",
             borderRadius: 6,
             border: "1px solid #252320",
             background: "transparent",
-            color: "#8a8780",
+            color: "#6a6760",
             fontFamily: "'Plus Jakarta Sans', sans-serif",
             fontWeight: 500,
             fontSize: ".68rem",
-            letterSpacing: ".06em",
+            letterSpacing: ".04em",
             cursor: loading ? "not-allowed" : "pointer",
             opacity: loading ? 0.5 : 1,
             transition: "opacity .2s",
@@ -64,7 +64,7 @@ export default function LandingPage() {
         </button>
       </nav>
 
-      {/* HERO — centered vertically in remaining space */}
+      {/* HERO */}
       <main style={{
         flex: 1,
         display: "flex",
@@ -75,12 +75,12 @@ export default function LandingPage() {
         textAlign: "center",
       }}>
         <p style={{
-          fontSize: ".6rem",
+          fontSize: ".58rem",
           fontWeight: 600,
           letterSpacing: ".14em",
           textTransform: "uppercase" as const,
-          color: "#4a4740",
-          marginBottom: "1.6rem",
+          color: "#8a8780",
+          marginBottom: ".6rem",
         }}>
           Stop applying. Start auditing.
         </p>
@@ -92,19 +92,20 @@ export default function LandingPage() {
           lineHeight: 1.1,
           letterSpacing: "-.045em",
           marginBottom: "1.4rem",
-          maxWidth: 580,
+          maxWidth: 560,
         }}>
-          Show them you've already done the work
+          Land the job before the interview
         </h1>
 
         <p style={{
           fontSize: ".82rem",
           color: "#6a6760",
           lineHeight: 1.65,
-          maxWidth: 420,
+          maxWidth: 400,
           margin: "0 auto 2.2rem",
         }}>
-          Paste a job link, upload your CV. Get a full company audit with research, proposals, and prototypes — ready to share.
+          Paste a job link, upload your CV. Get a full company audit
+          with research, proposals, and prototypes ready to share.
         </p>
 
         <button
@@ -143,12 +144,12 @@ export default function LandingPage() {
 
         <p style={{
           fontSize: ".62rem",
-          color: "#3a3730",
+          color: "#4a4740",
           marginTop: "1.2rem",
           lineHeight: 1.6,
         }}>
           We only use your Google account to sign you in.{" "}
-          <a href="/privacy" style={{ color: "#5a5750", textDecoration: "underline", textUnderlineOffset: "2px" }}>Privacy Policy</a>
+          <a href="/privacy" style={{ color: "#6a6760", textDecoration: "underline", textUnderlineOffset: "2px" }}>Privacy Policy</a>
         </p>
       </main>
 
@@ -158,17 +159,16 @@ export default function LandingPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        fontSize: ".6rem",
-        color: "#3a3730",
+        fontSize: ".62rem",
+        color: "#6a6760",
       }}>
         <span>© {new Date().getFullYear()} auditjob.me</span>
         <div style={{ display: "flex", gap: "1.2rem" }}>
-          <a href="/privacy" style={{ color: "#4a4740", textDecoration: "none" }}>Privacy</a>
-          <a href="/terms" style={{ color: "#4a4740", textDecoration: "none" }}>Terms</a>
+          <a href="/privacy" style={{ color: "#6a6760", textDecoration: "none" }}>Privacy</a>
+          <a href="/terms" style={{ color: "#6a6760", textDecoration: "none" }}>Terms</a>
         </div>
       </footer>
 
-      {/* noscript for Google crawlers */}
       <noscript>
         <div style={{ padding: "2rem", color: "#f0ede8", background: "#0f0e0c" }}>
           <h1>auditjob.me</h1>
