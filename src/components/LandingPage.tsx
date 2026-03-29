@@ -155,7 +155,7 @@ export default function LandingPage() {
           fontSize: "clamp(2.8rem, 8vw, 5.2rem)",
           lineHeight: 1.0,
           letterSpacing: "-.045em",
-          marginBottom: "2rem",
+          marginBottom: "12px",
           maxWidth: 780,
           color: "#f0ede8",
         }}>
@@ -163,12 +163,12 @@ export default function LandingPage() {
         </h1>
 
         <p style={{
-          fontSize: ".92rem",
-          color: "#6a6760",
+          fontSize: "16px",
+          color: "rgba(255,255,255,0.6)",
           lineHeight: 1.7,
           maxWidth: 500,
           margin: "0 auto 2.2rem",
-          fontWeight: 400,
+          fontWeight: 500,
         }}>
           Full company audit in 2 minutes. Research. Proposals. Contacts.
         </p>
