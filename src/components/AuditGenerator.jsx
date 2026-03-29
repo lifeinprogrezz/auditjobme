@@ -1381,7 +1381,10 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 
       {/* ─── NAV ─── */}
       <div className="nav">
-        <span className="nav-title" style={{ cursor: stage === "results" ? "pointer" : "default" }} onClick={() => stage === "results" && scrollTo("hero")}>
+        <span className="nav-title" style={{ cursor: "pointer" }} onClick={() => {
+          if (stage === "results") scrollTo("hero");
+          else window.location.href = "/";
+        }}>
           {(stage === "results" || stage === "hub") ? `${data.company?.company || ""} ${data.roleCtx?.audit_label || "Product Audit"}` : "auditjob.me"}
         </span>
         {stage === "results" && (
