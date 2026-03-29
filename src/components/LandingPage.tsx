@@ -229,6 +229,11 @@ export default function LandingPage() {
         </button>
       </section>
 
+      {/* SEPARATOR */}
+      <div style={{ maxWidth: 1060, margin: "0 auto", padding: "0 1.5rem" }}>
+        <div style={{ height: 1, background: "#2a2825" }} />
+      </div>
+
       {/* PRODUCT SHOWCASE — 5 screenshots */}
       <section style={{
         padding: "2rem 1.5rem 4rem",
