@@ -19,7 +19,7 @@ const showcaseItems = [
   {
     num: "02",
     label: "DIAGNOSIS",
-    desc: "Problems identified. Impact quantified.",
+    desc: "What's broken. Why it matters. Why nobody fixed it.",
     img: auditHero,
     alt: "Audit diagnosis showing key findings and impact analysis",
   },
