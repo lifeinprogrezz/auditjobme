@@ -215,7 +215,7 @@ export default function LandingPage() {
               display: "flex",
               alignItems: "center",
               gap: "1.2rem",
-              marginBottom: "1.6rem",
+              marginBottom: "8px",
             }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: ".6rem", flexShrink: 0 }}>
                 <span style={{
@@ -245,9 +245,9 @@ export default function LandingPage() {
               }} />
             </div>
             <p style={{
-              fontSize: ".82rem",
-              color: "#5a5750",
-              fontWeight: 400,
+              fontSize: "15px",
+              color: "rgba(255,255,255,0.5)",
+              fontWeight: 500,
               lineHeight: 1.6,
               marginBottom: "1.4rem",
             }}>
