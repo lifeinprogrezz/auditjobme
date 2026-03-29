@@ -574,6 +574,10 @@ export default function LandingPage() {
         .process-step:hover .process-step-text {
           color: rgba(255,255,255,1) !important;
         }
+        .process-step:hover .timeline-dot {
+          border-color: rgba(138,154,138,0.8) !important;
+          box-shadow: 0 0 12px rgba(138,154,138,0.25) !important;
+        }
         .cta-button:hover {
           filter: brightness(0.9);
           box-shadow: 0 0 16px rgba(138,154,138,0.12);
@@ -581,7 +585,10 @@ export default function LandingPage() {
         @media (max-width: 600px) {
           .process-strip {
             flex-direction: column !important;
-            gap: 8px !important;
+            gap: 20px !important;
+          }
+          .timeline-line {
+            display: none;
           }
         }
         @media (max-width: 680px) {
