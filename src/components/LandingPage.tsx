@@ -245,6 +245,8 @@ export default function LandingPage() {
               }} />
             </div>
             <p style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontStyle: "italic",
               fontSize: "15px",
               color: "rgba(255,255,255,0.5)",
               fontWeight: 500,
