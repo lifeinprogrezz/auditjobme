@@ -436,7 +436,7 @@ export default function LandingPage() {
         }
         .cta-button:hover {
           filter: brightness(0.9);
-          box-shadow: 0 0 20px rgba(138,154,138,0.15);
+          box-shadow: 0 0 12px rgba(138,154,138,0.08);
         }
         @media (max-width: 680px) {
           .showcase-panel {
