@@ -34,10 +34,11 @@ export default function LandingPage() {
         padding: "1.4rem 2.4rem",
       }}>
         <span style={{
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          fontFamily: "'DM Sans', sans-serif",
           fontWeight: 500,
-          fontSize: ".82rem",
-          letterSpacing: ".04em",
+          fontSize: ".65rem",
+          letterSpacing: ".1em",
+          textTransform: "uppercase" as const,
           color: "#f0ede8",
         }}>
           auditjob.me
