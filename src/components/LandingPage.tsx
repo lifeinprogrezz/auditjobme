@@ -8,6 +8,8 @@ import auditAbout from "@/assets/audit-about.png";
 
 const ACCENT = "#8a9a8a";
 
+const EXAMPLE_LINK = "https://auditjob.me/a/oberto-uintero1/vercel";
+
 const showcaseItems = [
   {
     num: "01",
@@ -15,6 +17,7 @@ const showcaseItems = [
     desc: "Every number sourced. Every competitor mapped.",
     img: auditResearch,
     alt: "Research stats grid showing company metrics and market data",
+    link: EXAMPLE_LINK,
   },
   {
     num: "02",
@@ -22,6 +25,7 @@ const showcaseItems = [
     desc: "What's broken. Why it matters. Why nobody fixed it.",
     img: auditHero,
     alt: "Audit diagnosis showing key findings and impact analysis",
+    link: EXAMPLE_LINK,
   },
   {
     num: "03",
@@ -29,13 +33,15 @@ const showcaseItems = [
     desc: "Three moves. Problem, solution, execution.",
     img: auditProposals,
     alt: "Phased proposal cards with strategic recommendations",
+    link: EXAMPLE_LINK,
   },
   {
     num: "04",
     label: "ABOUT",
-    desc: "Why you. Not just what you did, but why it matters here.",
+    desc: "Who built this. Not just what they did, but why it matters here.",
     img: auditAbout,
     alt: "About section showing candidate fit and qualifications",
+    link: null,
   },
 ];
 
@@ -107,8 +113,7 @@ export default function LandingPage() {
           auditjob.me
         </span>
         <button
-          onClick={handleGoogleLogin}
-          disabled={loading}
+          onClick={scrollToSignIn}
           style={{
             padding: "0.45rem 1.1rem",
             borderRadius: 6,
@@ -119,12 +124,11 @@ export default function LandingPage() {
             fontWeight: 500,
             fontSize: ".68rem",
             letterSpacing: ".04em",
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.5 : 1,
+            cursor: "pointer",
             transition: "opacity .2s",
           }}
         >
-          {loading ? "..." : "Sign in"}
+          Sign in
         </button>
       </nav>
 
@@ -163,14 +167,14 @@ export default function LandingPage() {
         </h1>
 
         <p style={{
-          fontSize: ".92rem",
+          fontSize: ".95rem",
           color: "#6a6760",
           lineHeight: 1.7,
-          maxWidth: 500,
+          maxWidth: 560,
           margin: "0 auto 2.2rem",
           fontWeight: 400,
         }}>
-          Full company audit in 2 minutes. Research. Proposals. Contacts.
+          Upload your CV and a job link — get a full strategic audit with research, proposals, and decision-maker contacts in 2 minutes.
         </p>
 
         <button
@@ -244,6 +248,16 @@ export default function LandingPage() {
                 background: "#2a2825",
               }} />
             </div>
+            {/* Example label */}
+            <p style={{
+              fontSize: "11px",
+              color: "#4a4740",
+              letterSpacing: ".08em",
+              marginBottom: "0.6rem",
+              fontStyle: "italic",
+            }}>
+              (Example audit output)
+            </p>
             <p style={{
               fontSize: ".82rem",
               color: "#5a5750",
@@ -305,6 +319,40 @@ export default function LandingPage() {
                 }} />
               </div>
             </div>
+
+            {/* View full example link */}
+            {item.link && (
+              <a
+                href={item.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="example-link"
+                style={{
+                  display: "inline-block",
+                  marginTop: "1rem",
+                  fontSize: "12px",
+                  color: ACCENT,
+                  textDecoration: "none",
+                  letterSpacing: ".04em",
+                  fontWeight: 500,
+                  transition: "opacity .2s",
+                }}
+              >
+                View full example →
+              </a>
+            )}
+
+            {/* Social proof for About section */}
+            {item.num === "04" && (
+              <p style={{
+                fontSize: "12px",
+                color: "#5a5750",
+                marginTop: "0.8rem",
+                lineHeight: 1.6,
+              }}>
+                Built during an MBA at ESADE Business School. 500+ audits generated.
+              </p>
+            )}
           </div>
         ))}
       </section>
@@ -371,7 +419,7 @@ export default function LandingPage() {
           marginTop: "24px",
           lineHeight: 1.6,
         }}>
-          We only use your Google account to sign you in.{" "}
+          We only use your Google account to sign you in. No email access, no data sharing.{" "}
           <a href="/privacy" style={{ color: "#6a6760", textDecoration: "underline", textUnderlineOffset: "2px" }}>Privacy Policy</a>
         </p>
       </section>
@@ -383,12 +431,12 @@ export default function LandingPage() {
         alignItems: "center",
         justifyContent: "space-between",
         fontSize: "11px",
-        color: "#9a9790",
+        color: "#b0ada8",
       }}>
         <span>© {new Date().getFullYear()} auditjob.me</span>
         <div style={{ display: "flex", gap: "1.2rem" }}>
-          <a href="/privacy" style={{ color: "#9a9790", textDecoration: "none" }}>Privacy</a>
-          <a href="/terms" style={{ color: "#9a9790", textDecoration: "none" }}>Terms</a>
+          <a href="/privacy" style={{ color: "#b0ada8", textDecoration: "none" }}>Privacy</a>
+          <a href="/terms" style={{ color: "#b0ada8", textDecoration: "none" }}>Terms</a>
         </div>
       </footer>
 
@@ -419,9 +467,17 @@ export default function LandingPage() {
           filter: brightness(0.9);
           box-shadow: 0 0 16px rgba(138,154,138,0.12);
         }
+        .example-link:hover {
+          opacity: 0.7;
+        }
         @media (max-width: 680px) {
           .showcase-panel {
             margin-bottom: 3rem !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .showcase-bottom-fade {
+            height: 20% !important;
           }
         }
       `}</style>
