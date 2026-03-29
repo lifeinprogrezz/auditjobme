@@ -342,6 +342,28 @@ export default function LandingPage() {
             </div>
           </div>
         ))}
+        {/* Example link */}
+        <div style={{
+          textAlign: "center",
+          padding: "32px 0",
+        }}>
+          <a
+            href="https://auditjob.me/a/roberto-quintero/vercel-20"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="example-audit-link"
+            style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontStyle: "italic",
+              fontSize: "15px",
+              color: "rgba(255,255,255,0.5)",
+              textDecoration: "none",
+              transition: "opacity .2s",
+            }}
+          >
+            See a full audit example
+          </a>
+        </div>
       </section>
 
       {/* SIGN IN — compact */}
