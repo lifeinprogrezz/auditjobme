@@ -605,10 +605,21 @@ export default function LandingPage() {
         @media (max-width: 600px) {
           .process-strip {
             flex-direction: column !important;
-            gap: 20px !important;
+            align-items: center !important;
+            gap: 24px !important;
           }
           .timeline-line {
-            display: none;
+            top: 10px !important;
+            bottom: 10px !important;
+            left: 50% !important;
+            right: auto !important;
+            width: 1px !important;
+            height: auto !important;
+            background: linear-gradient(180deg, transparent, rgba(138,154,138,0.3) 15%, rgba(138,154,138,0.3) 85%, transparent) !important;
+          }
+          .process-step {
+            flex-direction: row !important;
+            gap: 12px !important;
           }
         }
         @media (max-width: 680px) {
