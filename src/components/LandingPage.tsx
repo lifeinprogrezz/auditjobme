@@ -345,7 +345,7 @@ export default function LandingPage() {
         {/* Example link */}
         <div style={{
           textAlign: "center",
-          padding: "32px 0",
+          padding: "32px 0 12px",
         }}>
           <a
             href="https://auditjob.me/a/roberto-quintero/vercel-20"
@@ -354,11 +354,12 @@ export default function LandingPage() {
             className="example-audit-link"
             style={{
               fontFamily: "'DM Sans', sans-serif",
-              fontStyle: "italic",
-              fontSize: "15px",
-              color: "rgba(255,255,255,0.5)",
-              textDecoration: "none",
-              transition: "opacity .2s",
+              fontSize: "16px",
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.7)",
+              textDecoration: "underline",
+              textUnderlineOffset: "4px",
+              transition: "color .2s",
             }}
           >
             See a full audit example
@@ -473,7 +474,7 @@ export default function LandingPage() {
           filter: brightness(1.05);
         }
         .example-audit-link:hover {
-          color: rgba(255,255,255,0.8) !important;
+          color: rgba(255,255,255,1) !important;
         }
         .cta-button:hover {
           filter: brightness(0.9);
