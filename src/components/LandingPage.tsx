@@ -202,7 +202,7 @@ export default function LandingPage() {
           color: "rgba(255,255,255,0.6)",
           lineHeight: 1.7,
           maxWidth: 500,
-          margin: "0 auto 2.2rem",
+          margin: "0 auto 1.4rem",
           fontWeight: 500,
         }}>
           Full company audit in 2 minutes. Research. Proposals. Contacts.
