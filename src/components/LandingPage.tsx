@@ -472,6 +472,9 @@ export default function LandingPage() {
           transform: rotateX(2deg) scale(1.02) !important;
           filter: brightness(1.05);
         }
+        .example-audit-link:hover {
+          color: rgba(255,255,255,0.8) !important;
+        }
         .cta-button:hover {
           filter: brightness(0.9);
           box-shadow: 0 0 16px rgba(138,154,138,0.12);
