@@ -164,6 +164,7 @@ export default function LandingPage() {
 
         <p style={{
           fontSize: "16px",
+          fontFamily: "'DM Sans', sans-serif",
           color: "rgba(255,255,255,0.6)",
           lineHeight: 1.7,
           maxWidth: 500,
