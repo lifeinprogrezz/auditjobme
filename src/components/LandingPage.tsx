@@ -214,20 +214,20 @@ export default function LandingPage() {
             {/* Label with horizontal line */}
             <div style={{
               display: "flex",
-              alignItems: "center",
+              alignItems: "baseline",
               gap: "1.2rem",
               marginBottom: "8px",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: ".6rem", flexShrink: 0 }}>
-                <span style={{
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: 700,
-                  fontSize: "24px",
-                  color: ACCENT,
-                  letterSpacing: "-.02em",
-                }}>
-                  {item.num}
-                </span>
+              <span style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 700,
+                fontSize: "24px",
+                color: ACCENT,
+                letterSpacing: "-.02em",
+              }}>
+                {item.num}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "1.2rem", flex: 1 }}>
                 <span style={{
                   fontFamily: "'DM Sans', sans-serif",
                   fontWeight: 700,
@@ -235,15 +235,16 @@ export default function LandingPage() {
                   letterSpacing: ".18em",
                   textTransform: "uppercase",
                   color: "#f0ede8",
+                  flexShrink: 0,
                 }}>
                   {item.label}
                 </span>
+                <div style={{
+                  flex: 1,
+                  height: "1px",
+                  background: "#2a2825",
+                }} />
               </div>
-              <div style={{
-                flex: 1,
-                height: "1px",
-                background: "#2a2825",
-              }} />
             </div>
             <p style={{
               fontFamily: "'DM Sans', sans-serif",
