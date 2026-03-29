@@ -371,7 +371,7 @@ export default function LandingPage() {
       <section
         ref={signInRef}
         style={{
-          padding: "4rem 2rem 3rem",
+          padding: "2rem 2rem 3rem",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
