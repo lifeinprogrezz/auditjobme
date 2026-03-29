@@ -325,6 +325,24 @@ export default function LandingPage() {
         </div>
       </div>
 
+      {/* EXAMPLE AUDIT label */}
+      <div style={{
+        textAlign: "center",
+        marginTop: "64px",
+        marginBottom: "32px",
+      }}>
+        <span style={{
+          fontFamily: "'DM Sans', sans-serif",
+          fontWeight: 700,
+          fontSize: ".7rem",
+          letterSpacing: ".18em",
+          textTransform: "uppercase",
+          color: "rgba(255,255,255,0.45)",
+        }}>
+          Example Audit
+        </span>
+      </div>
+
       <section style={{
         padding: "2rem 1.5rem 4rem",
         maxWidth: 1060,
