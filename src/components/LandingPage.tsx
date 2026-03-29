@@ -503,6 +503,15 @@ export default function LandingPage() {
           filter: brightness(0.9);
           box-shadow: 0 0 16px rgba(138,154,138,0.12);
         }
+        @media (max-width: 600px) {
+          .process-strip {
+            flex-direction: column !important;
+            gap: 8px !important;
+          }
+          .process-strip span[style*="opacity"] {
+            display: none;
+          }
+        }
         @media (max-width: 680px) {
           .showcase-panel {
             margin-bottom: 3rem !important;
