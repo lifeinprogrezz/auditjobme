@@ -42,6 +42,7 @@ const showcaseItems = [
 export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const signInRef = useRef<HTMLDivElement>(null);
   const showcaseRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -79,6 +80,39 @@ export default function LandingPage() {
   };
 
   return (
+    <div style={{
+      minHeight: "100vh",
+    }}>
+      {/* LIGHTBOX */}
+      {lightboxImg && (
+        <div
+          onClick={() => setLightboxImg(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(0,0,0,0.92)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "zoom-out",
+            padding: "2rem",
+            animation: "lightbox-in .2s ease",
+          }}
+        >
+          <img
+            src={lightboxImg}
+            alt="Full screenshot"
+            style={{
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              borderRadius: 8,
+              boxShadow: "0 0 60px rgba(0,0,0,0.5)",
+              objectFit: "contain",
+            }}
+          />
+        </div>
+      )}
     <div style={{
       minHeight: "100vh",
       background: "#0f0e0c",
@@ -256,14 +290,18 @@ export default function LandingPage() {
               perspective: "1200px",
               maxWidth: 960,
             }}>
-              <div className="showcase-img-wrapper" style={{
-                position: "relative",
-                borderRadius: 12,
-                overflow: "hidden",
-                transform: "rotateX(2deg)",
-                boxShadow: "0 30px 80px -20px rgba(138,154,138,0.08), 0 0 0 1px rgba(255,255,255,0.03)",
-                transition: "transform .3s ease, filter .3s ease",
-              }}>
+              <div
+                className="showcase-img-wrapper"
+                onClick={() => setLightboxImg(item.img)}
+                style={{
+                  position: "relative",
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  transform: "rotateX(2deg)",
+                  boxShadow: "0 30px 80px -20px rgba(138,154,138,0.08), 0 0 0 1px rgba(255,255,255,0.03)",
+                  transition: "transform .3s ease, filter .3s ease",
+                  cursor: "zoom-in",
+                }}>
                 <img
                   src={item.img}
                   alt={item.alt}
