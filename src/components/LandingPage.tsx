@@ -166,24 +166,18 @@ export default function LandingPage() {
           maxWidth: 780,
           color: "#f0ede8",
         }}>
-          Land the job before the interview
+          The application nobody ignores
         </h1>
 
         <p style={{
-          fontSize: ".88rem",
+          fontSize: ".92rem",
           color: "#6a6760",
           lineHeight: 1.7,
           maxWidth: 500,
           margin: "0 auto 2.2rem",
           fontWeight: 400,
-          letterSpacing: ".01em",
         }}>
-          Full company audit in 2 minutes.{" "}
-          <span style={{ color: ACCENT, fontWeight: 500 }}>Research</span>
-          <span style={{ color: "#4a4740", margin: "0 .3rem" }}>·</span>
-          <span style={{ color: ACCENT, fontWeight: 500 }}>Proposals</span>
-          <span style={{ color: "#4a4740", margin: "0 .3rem" }}>·</span>
-          <span style={{ color: ACCENT, fontWeight: 500 }}>Contacts</span>
+          Full company audit in 2 minutes. Research. Proposals. Contacts.
         </p>
 
         <button
