@@ -368,7 +368,7 @@ export default function LandingPage() {
         <p style={{
           fontSize: ".62rem",
           color: "#4a4740",
-          marginTop: "12px",
+          marginTop: "24px",
           lineHeight: 1.6,
         }}>
           We only use your Google account to sign you in.{" "}
@@ -382,7 +382,7 @@ export default function LandingPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        fontSize: "13px",
+        fontSize: "11px",
         color: "#9a9790",
       }}>
         <span>© {new Date().getFullYear()} auditjob.me</span>
