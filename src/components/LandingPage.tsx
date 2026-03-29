@@ -33,7 +33,7 @@ const showcaseItems = [
   {
     num: "04",
     label: "ABOUT",
-    desc: "Your fit. Backed by proof.",
+    desc: "Why you. Not just what you did, but why it matters here.",
     img: auditAbout,
     alt: "About section showing candidate fit and qualifications",
   },
