@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { lovable } from "@/integrations/lovable/index";
+import auditPreview from "@/assets/audit-preview.png";
 
 const ACCENT = "#8a9a8a";
 
@@ -205,8 +206,41 @@ export default function LandingPage() {
         <div style={{
           maxWidth: 700,
           width: "100%",
-          minHeight: 200,
-        }} />
+          position: "relative",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}>
+          <img
+            src={auditPreview}
+            alt="Example audit output showing company research, competitive analysis, and field signals"
+            style={{
+              width: "100%",
+              display: "block",
+              opacity: 0.8,
+            }}
+          />
+          <div style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: "40%",
+            background: "linear-gradient(to bottom, transparent, #0f0e0c)",
+          }} />
+          <p style={{
+            position: "absolute",
+            bottom: "1.5rem",
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            fontSize: ".75rem",
+            color: "#8a8780",
+            lineHeight: 1.6,
+            zIndex: 1,
+          }}>
+            Real audit. Real research. Ready in 2 minutes.
+          </p>
+        </div>
       </section>
 
       {/* SIGN IN SECTION */}
