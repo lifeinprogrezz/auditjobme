@@ -177,7 +177,7 @@ export default function LandingPage() {
           margin: "0 auto 3.6rem",
           fontWeight: 400,
         }}>
-          Full company audit in 2 minutes. Research, proposals, and contacts included.
+          Full company audit in 2 minutes. Research, proposals, and contacts.
         </p>
 
         <button
