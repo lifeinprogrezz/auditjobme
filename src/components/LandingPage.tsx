@@ -198,7 +198,7 @@ export default function LandingPage() {
       {/* PRODUCT SHOWCASE — 5 screenshots */}
       <section style={{
         padding: "2rem 1.5rem 4rem",
-        maxWidth: 1060,
+        maxWidth: 1280,
         margin: "0 auto",
         width: "100%",
       }}>
