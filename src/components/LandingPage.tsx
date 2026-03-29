@@ -232,7 +232,25 @@ export default function LandingPage() {
         </button>
       </section>
 
-      {/* PRODUCT SHOWCASE — 5 screenshots */}
+      {/* PROCESS STRIP */}
+      <div className="process-strip" style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "1.2rem",
+        padding: "48px 2rem 32px",
+        fontFamily: "'DM Sans', sans-serif",
+        fontWeight: 600,
+        fontSize: "14px",
+        color: "rgba(255,255,255,0.4)",
+      }}>
+        <span>Upload your CV</span>
+        <span style={{ fontSize: "12px", opacity: 0.5 }}>→</span>
+        <span>Paste the job link</span>
+        <span style={{ fontSize: "12px", opacity: 0.5 }}>→</span>
+        <span>Get your audit</span>
+      </div>
+
       <section style={{
         padding: "2rem 1.5rem 4rem",
         maxWidth: 1060,
