@@ -1,13 +1,63 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { lovable } from "@/integrations/lovable/index";
-import auditPreview from "@/assets/audit-preview.png";
+import auditHero from "@/assets/audit-hero.png";
+import auditResearch from "@/assets/audit-research.png";
+import auditProposals from "@/assets/audit-proposals.png";
 
 const ACCENT = "#8a9a8a";
+
+const showcaseItems = [
+  {
+    num: "01",
+    label: "RESEARCH",
+    desc: "Real company data. Sourced and verified.",
+    img: auditHero,
+    alt: "Audit hero showing company diagnosis headline and key findings",
+  },
+  {
+    num: "02",
+    label: "DIAGNOSIS",
+    desc: "Problems identified. Impact quantified.",
+    img: auditResearch,
+    alt: "Research stats grid showing company metrics and market data",
+  },
+  {
+    num: "03",
+    label: "PROPOSALS",
+    desc: "Strategic solutions. Phased and actionable.",
+    img: auditProposals,
+    alt: "Phased proposal cards with strategic recommendations",
+  },
+];
+
+const steps = [
+  { num: "01", title: "Upload your CV", desc: "Your background becomes the foundation." },
+  { num: "02", title: "Paste a job link", desc: "Any role, any company. Researched in real time." },
+  { num: "03", title: "Get your audit", desc: "Company research. Diagnosis. Proposals. Contacts. Live URL ready to share." },
+];
 
 export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const signInRef = useRef<HTMLDivElement>(null);
+  const showcaseRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("showcase-visible");
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+    showcaseRefs.current.forEach((ref) => {
+      if (ref) observer.observe(ref);
+    });
+    return () => observer.disconnect();
+  }, []);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -25,12 +75,6 @@ export default function LandingPage() {
     signInRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const steps = [
-    { num: "01", title: "Upload your CV", desc: "Your background becomes the foundation." },
-    { num: "02", title: "Paste a job link", desc: "Any role, any company. Researched in real time." },
-    { num: "03", title: "Get your audit", desc: "Company research. Diagnosis. Proposals. Contacts. Live URL ready to share." },
-  ];
-
   return (
     <div style={{
       minHeight: "100vh",
@@ -46,13 +90,15 @@ export default function LandingPage() {
         alignItems: "center",
         justifyContent: "space-between",
         padding: "1.4rem 2.4rem",
+        position: "relative",
+        zIndex: 10,
       }}>
         <span style={{
           fontFamily: "'DM Sans', sans-serif",
           fontWeight: 500,
           fontSize: ".65rem",
           letterSpacing: ".1em",
-          textTransform: "uppercase" as const,
+          textTransform: "uppercase",
           color: "#f0ede8",
         }}>
           auditjob.me
@@ -79,47 +125,49 @@ export default function LandingPage() {
         </button>
       </nav>
 
-      {/* HERO */}
+      {/* HERO — full viewport */}
       <section style={{
+        minHeight: "calc(100vh - 60px)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "10rem 2rem 4rem",
+        padding: "0 2rem 6rem",
         textAlign: "center",
       }}>
-        <p style={{
-          fontSize: ".52rem",
-          fontWeight: 500,
-          letterSpacing: ".18em",
-          textTransform: "uppercase" as const,
-          color: "#5a5750",
-          marginBottom: "1.8rem",
+        <p className="hero-label" style={{
+          fontSize: ".6rem",
+          fontWeight: 600,
+          letterSpacing: ".22em",
+          textTransform: "uppercase",
+          color: ACCENT,
+          marginBottom: "2.2rem",
         }}>
           Stop applying. Start auditing.
         </p>
 
         <h1 style={{
           fontFamily: "'DM Sans', sans-serif",
-          fontWeight: 400,
-          fontSize: "clamp(2.6rem, 7vw, 4.8rem)",
-          lineHeight: 1.05,
-          letterSpacing: "-.05em",
-          marginBottom: "2.4rem",
-          maxWidth: 700,
+          fontWeight: 800,
+          fontSize: "clamp(2.8rem, 8vw, 5.2rem)",
+          lineHeight: 1.0,
+          letterSpacing: "-.045em",
+          marginBottom: "2rem",
+          maxWidth: 780,
+          color: "#f0ede8",
         }}>
           Land the job before the interview
         </h1>
 
         <p style={{
-          fontSize: ".88rem",
-          color: "#7a7770",
+          fontSize: ".92rem",
+          color: "#6a6760",
           lineHeight: 1.7,
-          maxWidth: 480,
-          margin: "0 auto 3.2rem",
+          maxWidth: 500,
+          margin: "0 auto 3.6rem",
+          fontWeight: 400,
         }}>
-          Paste a job link. Upload your CV. Get a full company audit
-          with research, proposals, and decision-maker contacts in 2 minutes.
+          Paste a job link. Upload your CV. Full company audit in 2 minutes.
         </p>
 
         <button
@@ -142,9 +190,104 @@ export default function LandingPage() {
         </button>
       </section>
 
+      {/* PRODUCT SHOWCASE */}
+      <section style={{
+        padding: "2rem 1.5rem 4rem",
+        maxWidth: 1060,
+        margin: "0 auto",
+        width: "100%",
+      }}>
+        {showcaseItems.map((item, i) => (
+          <div
+            key={item.num}
+            ref={(el) => { showcaseRefs.current[i] = el; }}
+            className="showcase-panel"
+            style={{
+              marginBottom: i < showcaseItems.length - 1 ? "10rem" : "0",
+              textAlign: "center",
+            }}
+          >
+            {/* Label */}
+            <div style={{ marginBottom: "2.4rem" }}>
+              <p style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 700,
+                fontSize: ".7rem",
+                letterSpacing: ".18em",
+                textTransform: "uppercase",
+                color: ACCENT,
+                marginBottom: ".5rem",
+              }}>
+                {item.num} {item.label}
+              </p>
+              <p style={{
+                fontSize: ".82rem",
+                color: "#5a5750",
+                fontWeight: 400,
+                lineHeight: 1.6,
+              }}>
+                {item.desc}
+              </p>
+            </div>
+
+            {/* Screenshot */}
+            <div style={{
+              perspective: "1200px",
+              maxWidth: 960,
+              margin: "0 auto",
+            }}>
+              <div style={{
+                position: "relative",
+                borderRadius: 12,
+                overflow: "hidden",
+                transform: "rotateX(2deg)",
+                boxShadow: "0 30px 80px -20px rgba(138,154,138,0.08), 0 0 0 1px rgba(255,255,255,0.03)",
+              }}>
+                <img
+                  src={item.img}
+                  alt={item.alt}
+                  style={{
+                    width: "100%",
+                    display: "block",
+                  }}
+                />
+                {/* Edge fade */}
+                <div style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: "35%",
+                  background: "linear-gradient(to bottom, transparent, #0f0e0c)",
+                  pointerEvents: "none",
+                }} />
+                <div style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  width: "8%",
+                  background: "linear-gradient(to right, #0f0e0c, transparent)",
+                  pointerEvents: "none",
+                }} />
+                <div style={{
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  width: "8%",
+                  background: "linear-gradient(to left, #0f0e0c, transparent)",
+                  pointerEvents: "none",
+                }} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </section>
+
       {/* HOW IT WORKS */}
       <section style={{
-        padding: "8rem 2.4rem 6rem",
+        padding: "10rem 2.4rem 6rem",
         maxWidth: 960,
         margin: "0 auto",
         width: "100%",
@@ -193,68 +336,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* AUDIT PREVIEW */}
-      <section style={{
-        padding: "6rem 2.4rem 4rem",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-      }}>
-        <p style={{
-          fontSize: ".52rem",
-          fontWeight: 500,
-          letterSpacing: ".18em",
-          textTransform: "uppercase" as const,
-          color: "#5a5750",
-          marginBottom: "2.5rem",
-        }}>
-          What you get
-        </p>
-        <div style={{
-          maxWidth: 960,
-          width: "100%",
-          position: "relative",
-          borderRadius: 10,
-          overflow: "hidden",
-        }}>
-          <img
-            src={auditPreview}
-            alt="Example audit output showing company research, competitive analysis, and field signals"
-            style={{
-              width: "100%",
-              display: "block",
-              opacity: 0.85,
-            }}
-          />
-          <div style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: "50%",
-            background: "linear-gradient(to bottom, transparent, #0f0e0c)",
-          }} />
-          <p style={{
-            position: "absolute",
-            bottom: "2rem",
-            left: 0,
-            right: 0,
-            textAlign: "center",
-            fontSize: ".78rem",
-            color: "#9a9790",
-            lineHeight: 1.6,
-            zIndex: 1,
-          }}>
-            Real audit. Real research. Ready in 2 minutes.
-          </p>
-        </div>
-      </section>
-
-      {/* SIGN IN SECTION */}
+      {/* SIGN IN */}
       <section
         ref={signInRef}
         style={{
-          padding: "8rem 2rem 6rem",
+          padding: "10rem 2rem 6rem",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -331,12 +417,12 @@ export default function LandingPage() {
         alignItems: "center",
         justifyContent: "space-between",
         fontSize: ".65rem",
-        color: "#7a7770",
+        color: "#9a9790",
       }}>
         <span>© {new Date().getFullYear()} auditjob.me</span>
         <div style={{ display: "flex", gap: "1.2rem" }}>
-          <a href="/privacy" style={{ color: "#7a7770", textDecoration: "none" }}>Privacy</a>
-          <a href="/terms" style={{ color: "#7a7770", textDecoration: "none" }}>Terms</a>
+          <a href="/privacy" style={{ color: "#9a9790", textDecoration: "none" }}>Privacy</a>
+          <a href="/terms" style={{ color: "#9a9790", textDecoration: "none" }}>Terms</a>
         </div>
       </footer>
 
@@ -348,8 +434,18 @@ export default function LandingPage() {
         </div>
       </noscript>
 
-      {/* Mobile responsive overrides */}
+      {/* Showcase scroll animation + mobile responsive */}
       <style>{`
+        .showcase-panel {
+          opacity: 0;
+          transform: translateY(40px) scale(0.95);
+          transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                      transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .showcase-visible {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
         @media (max-width: 680px) {
           section > div[style*="grid-template-columns: repeat(3"] {
             grid-template-columns: 1fr !important;
