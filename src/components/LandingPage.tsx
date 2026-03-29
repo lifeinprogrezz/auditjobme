@@ -239,11 +239,6 @@ export default function LandingPage() {
                   {item.label}
                 </span>
               </div>
-              <div style={{
-                flex: 1,
-                height: "1px",
-                background: "#2a2825",
-              }} />
             </div>
             <p style={{
               fontFamily: "'DM Sans', sans-serif",
