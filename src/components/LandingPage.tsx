@@ -218,7 +218,7 @@ export default function LandingPage() {
               gap: "1.2rem",
               marginBottom: "8px",
             }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: ".6rem", flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: ".6rem", flexShrink: 0 }}>
                 <span style={{
                   fontFamily: "'DM Sans', sans-serif",
                   fontWeight: 700,
