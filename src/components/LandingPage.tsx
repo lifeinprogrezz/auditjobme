@@ -166,7 +166,7 @@ export default function LandingPage() {
           maxWidth: 780,
           color: "#f0ede8",
         }}>
-          The application nobody ignores
+          Land the job before the interview
         </h1>
 
         <p style={{
