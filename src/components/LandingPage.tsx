@@ -241,16 +241,16 @@ export default function LandingPage() {
         fontFamily: "'DM Sans', sans-serif",
         gap: "28px",
       }}>
-        <h2 style={{
+        <span style={{
           fontFamily: "'DM Sans', sans-serif",
           fontWeight: 700,
-          fontSize: "clamp(1.3rem, 3vw, 1.8rem)",
-          letterSpacing: "-.02em",
-          margin: 0,
-          color: "#f0ede8",
+          fontSize: ".7rem",
+          letterSpacing: ".18em",
+          textTransform: "uppercase",
+          color: "rgba(255,255,255,0.45)",
         }}>
           How it works
-        </h2>
+        </span>
         <div className="process-strip" style={{
           display: "flex",
           alignItems: "flex-start",
