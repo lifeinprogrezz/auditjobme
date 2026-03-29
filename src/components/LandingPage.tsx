@@ -153,7 +153,7 @@ export default function LandingPage() {
           color: "#6a6760",
           marginBottom: "1rem",
         }}>
-          Stop applying. Start auditing.
+          Stop sending CVs. Start auditing.
         </p>
 
         <h1 style={{
