@@ -197,7 +197,7 @@ export default function LandingPage() {
             transition: "filter .2s, box-shadow .2s",
           }}
         >
-          Build your first audit
+          Get your audit
         </button>
       </section>
 
