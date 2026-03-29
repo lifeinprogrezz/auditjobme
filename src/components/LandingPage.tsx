@@ -10,13 +10,6 @@ const ACCENT = "#8a9a8a";
 
 const showcaseItems = [
   {
-    num: "00",
-    label: "THE AUDIT",
-    desc: "This is what your application becomes.",
-    img: auditOpening,
-    alt: "Full audit output showing diagnosis headline, company name, and navigation",
-  },
-  {
     num: "01",
     label: "RESEARCH",
     desc: "Real company data. Sourced and verified.",
