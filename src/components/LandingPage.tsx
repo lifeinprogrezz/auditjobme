@@ -474,7 +474,7 @@ export default function LandingPage() {
           filter: brightness(1.05);
         }
         .example-audit-link:hover {
-          color: rgba(255,255,255,0.8) !important;
+          color: rgba(255,255,255,1) !important;
         }
         .cta-button:hover {
           filter: brightness(0.9);
