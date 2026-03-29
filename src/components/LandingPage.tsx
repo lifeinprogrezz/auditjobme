@@ -343,6 +343,7 @@ export default function LandingPage() {
         </span>
       </div>
 
+      <section style={{
         padding: "2rem 1.5rem 4rem",
         maxWidth: 1060,
         margin: "0 auto",
