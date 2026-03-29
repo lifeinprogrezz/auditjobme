@@ -360,7 +360,7 @@ export default function LandingPage() {
           fontWeight: 700,
           fontSize: "clamp(1.3rem, 3vw, 1.8rem)",
           letterSpacing: "-.02em",
-          marginBottom: "24px",
+          marginBottom: "14px",
           color: "#f0ede8",
         }}>
           2 free audits. No catch.
