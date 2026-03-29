@@ -320,27 +320,15 @@ export default function LandingPage() {
           textAlign: "center",
         }}
       >
-        {/* Process line */}
-        <p style={{ fontSize: "13px", color: "#5a5750", marginBottom: "16px" }}>
-          Upload your CV <span style={{ color: ACCENT }}>→</span> Paste a job link <span style={{ color: ACCENT }}>→</span> Get your audit
-        </p>
-
-        <h2 style={{
+        <p style={{
           fontFamily: "'DM Sans', sans-serif",
           fontWeight: 400,
-          fontSize: "24px",
-          letterSpacing: "-.02em",
-          marginBottom: "8px",
-          color: "#f0ede8",
-        }}>
-          Try it free. No card required.
-        </h2>
-        <p style={{
-          fontSize: ".78rem",
-          color: "#5a5750",
+          fontSize: "21px",
+          letterSpacing: "-.01em",
           marginBottom: "24px",
+          color: "#6a6760",
         }}>
-          2 free audits to see the difference.
+          2 free audits. No catch.
         </p>
 
         <button
