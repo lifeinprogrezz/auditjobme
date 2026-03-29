@@ -26,7 +26,7 @@ const showcaseItems = [
   {
     num: "03",
     label: "PROPOSALS",
-    desc: "Strategic solutions. Phased and actionable.",
+    desc: "Three moves. Problem, solution, execution.",
     img: auditProposals,
     alt: "Phased proposal cards with strategic recommendations",
   },
