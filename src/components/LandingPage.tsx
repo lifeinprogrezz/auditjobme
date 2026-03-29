@@ -516,7 +516,7 @@ export default function LandingPage() {
             flex-direction: column !important;
             gap: 8px !important;
           }
-          .process-strip span[style*="opacity"] {
+          .process-dot {
             display: none;
           }
         }
