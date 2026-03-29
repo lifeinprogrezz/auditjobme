@@ -241,15 +241,16 @@ export default function LandingPage() {
         fontFamily: "'DM Sans', sans-serif",
         gap: "16px",
       }}>
-        <p style={{
-          fontSize: "15px",
-          fontStyle: "italic",
-          fontWeight: 500,
-          color: "rgba(255,255,255,0.5)",
+        <h2 style={{
+          fontFamily: "'DM Sans', sans-serif",
+          fontWeight: 700,
+          fontSize: "clamp(1.3rem, 3vw, 1.8rem)",
+          letterSpacing: "-.02em",
           margin: 0,
+          color: "#f0ede8",
         }}>
           How it works
-        </p>
+        </h2>
         <div className="process-strip" style={{
           display: "flex",
           alignItems: "center",
