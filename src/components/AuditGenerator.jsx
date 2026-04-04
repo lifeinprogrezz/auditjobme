@@ -1928,6 +1928,12 @@ ROLE: ${company.role || roleCtx.role_type || ""}
             <a href={data.company?.role_url || jobLink} target="_blank" rel="noopener noreferrer">
               {(data.company?.role || "").toUpperCase()}
             </a>
+            <div style={{ marginTop: "12px", fontSize: ".5rem", fontWeight: 400, letterSpacing: ".08em", opacity: 0.5 }}>
+              MADE WITH{" "}
+              <a href="https://auditjob.me" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+                AUDITJOB.ME
+              </a>
+            </div>
           </div>
         </div>
       )}
