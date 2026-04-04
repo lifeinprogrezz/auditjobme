@@ -741,6 +741,7 @@ ${aboutHTML}
 <!-- FOOTER -->
 <div class="footer">
   BUILT FOR ${e(company?.company).toUpperCase()} \u2014 APPLYING FOR <a href="${company?.role_url||''}">${e(company?.role).toUpperCase()}</a>
+  <div style="margin-top:12px;font-size:.5rem;font-weight:400;letter-spacing:.08em;opacity:.5">MADE WITH AUDITJOB.ME</div>
 </div>
 </body></html>`;
   return html;
@@ -1927,6 +1928,12 @@ ROLE: ${company.role || roleCtx.role_type || ""}
             <a href={data.company?.role_url || jobLink} target="_blank" rel="noopener noreferrer">
               {(data.company?.role || "").toUpperCase()}
             </a>
+            <div style={{ marginTop: "12px", fontSize: ".5rem", fontWeight: 400, letterSpacing: ".08em", opacity: 0.5 }}>
+              MADE WITH{" "}
+              <a href="https://auditjob.me" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+                AUDITJOB.ME
+              </a>
+            </div>
           </div>
         </div>
       )}
