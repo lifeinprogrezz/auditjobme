@@ -1,8 +1,7 @@
-<!-- SNAPSHOT MIRROR — canonical lives in the planning repo
-     (lifeinprogrezz/auditjobme-careerops-planning : PRODUCT.md). This copy rides along so a
-     mobile/cloud session opening ONLY this web-app repo has the product map without needing the
-     planning repo checked out. It can drift; for the source of truth, open the planning repo.
-     Snapshot as of 2026-05-31. -->
+<!-- SNAPSHOT MIRROR — canonical lives in the planning repo (PRODUCT.md). Carried here so a
+     mobile/cloud session opening only this repo has the product map without checking out the
+     planning repo. Can drift; refresh with ./sync-mirrors.sh from the planning repo
+     (last sync = this file's git history). -->
 
 # auditjob.me — The Public Product (Foundation)
 
