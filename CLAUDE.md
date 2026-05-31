@@ -22,8 +22,9 @@ scoring/audit calls (proxied server-side, never shipped to the browser).
 | 2 | `lifeinprogrezz/career-ops-rober` | The engine (Node CLI: sourcing, scoring, digests). The capability behind this shell. |
 | 3 | `lifeinprogrezz/auditjobme` | **This repo** — the web shell. |
 
-For "what should I build next," read **`PRODUCT.md` in repo 1** — it's written to be the
-phone-drivable map of the whole merge.
+For "what should I build next," read **`PRODUCT.md`** — a snapshot mirror lives **in this repo**
+(so you have it on mobile without checking out the planning repo); the canonical copy is in repo 1.
+It's written to be the phone-drivable map of the whole merge.
 
 ## Stack
 
