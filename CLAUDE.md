@@ -62,3 +62,34 @@ phone-drivable map of the whole merge.
 - **Status** (per PRODUCT.md): today this is a display + auth + marketing shell plus the
   bring-your-own-provider connection prototype. **Not built yet:** the sourcing/scoring engine
   behind it, dashboards, profile ingestion. The engine lives in repo 2.
+
+## Shipping / deploy
+
+- **This app ships via [Lovable](https://lovable.dev), not Vercel/Netlify.** There's no
+  `vercel.json` or CI workflow — the repo is git-synced with Lovable, and Lovable hosts the built
+  site. `.lovable/plan.md` is Lovable's working task-plan for the current change. Expect occasional
+  **Lovable-origin commits**: `git pull` before you start, and reconcile before large refactors.
+- **The backend (Supabase) deploys separately from the frontend:**
+  - DB schema = SQL in `supabase/migrations/`; project ref is in `supabase/config.toml`
+    (`gehofquozipcubggldls`). After a schema change, **regenerate
+    `src/integrations/supabase/types.ts`** — it's generated, not hand-written.
+  - Edge functions in `supabase/functions/` deploy to Supabase. Their **secrets live in Supabase
+    function env, never in this repo:** `ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`,
+    `SUPABASE_SERVICE_ROLE_KEY` (+ `SUPABASE_URL` / `SUPABASE_ANON_KEY`). Set them via the Supabase
+    dashboard or `supabase secrets set` — not via this repo's `.env`.
+
+## AI calls — the bring-your-own-compute rule (don't break the economics)
+
+This is the keystone of the product. Get it wrong and "free" stops being survivable.
+
+- **The model: the user's OWN provider key pays for their AI calls.** `src/pages/ConnectProvider.tsx`
+  (the current build front) calls Anthropic/OpenAI **directly from the browser** with the user's key
+  (`anthropic-dangerous-direct-browser-access`), held in component state, never uploaded. The
+  effort → model-tier map lives there (`claude-haiku-4-5` / `claude-sonnet-4-6` / `claude-opus-4-8`).
+- **`supabase/functions/anthropic-proxy` burns OUR `ANTHROPIC_API_KEY`** (it authenticates the user,
+  but the call is on our dime). ConnectProvider's own header calls this *"the cost trap we're
+  escaping."* **Do NOT route new bring-your-own features through `anthropic-proxy`** — it contradicts
+  the free model. Treat it as legacy / our-key-only (e.g. a future paid/managed tier), not the default.
+- **Production direction** (not built yet): store the user's key **encrypted in Supabase** so
+  background digest/audit jobs can run while they're away — replacing the prototype's state-only,
+  never-persisted key. Build toward that, not toward the proxy.
