@@ -145,7 +145,7 @@ part holds the line.
                           ┌─────────────────────────────────────────┐
                           │  auditjob.me SPA  (Vite + React, exists)  │
                           │  sign-in · onboarding · dashboard/digest  │
-                          │  fire-audit · effort selector · account   │
+                          │  fire-audit · tracker · account           │
                           └───────────────┬───────────────────────────┘
                                           │ reads / writes
                                           ▼
@@ -177,7 +177,7 @@ part holds the line.
 **Components**
 1. **auditjob.me SPA** *(exists)* — the entire front end: sign-in, onboarding,
    the dashboard where the daily digest lives, the fire-an-audit action, the
-   effort selector, account/settings.
+   application tracker, account/settings.
 2. **Supabase** *(exists)* — system of record. Row-Level Security (RLS) enforces
    tenancy. Shared tables (`companies`, `roles`) + per-user tables (`profiles`,
    `user_role_scores`, `audits`, `linkedin_data`, `applications`, and an
