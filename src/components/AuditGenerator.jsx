@@ -789,12 +789,7 @@ export default function App() {
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
-  const [showPaywall, setShowPaywall] = useState(false);
-  const [purchasedCredits, setPurchasedCredits] = useState(0);
-  const [paymentLoading, setPaymentLoading] = useState(null); // priceId being purchased
-  const [showNudgeBanner, setShowNudgeBanner] = useState(false);
   const FREE_LIMIT = 2;
-  const resumeAfterPaymentRef = useRef(false);
 
   // Auth from context (AuthProvider)
   const { user } = useAuth();
@@ -823,65 +818,6 @@ export default function App() {
       .then(({ data }) => setIsWhitelisted(!!data));
   }, [user]);
 
-  const refreshPurchasedCredits = useCallback(async (userId) => {
-    if (!userId) return 0;
-    const { data } = await supabase.from("purchases").select("credits").eq("user_id", userId);
-    const total = (data || []).reduce((sum, p) => sum + (p.credits || 0), 0);
-    setPurchasedCredits(total);
-    return total;
-  }, []);
-
-  // Load purchased credits
-  useEffect(() => {
-    if (!user) return;
-    refreshPurchasedCredits(user.id);
-  }, [user, refreshPurchasedCredits]);
-
-  // Verify payment on return from Stripe
-  const [paymentVerified, setPaymentVerified] = useState(false);
-  const [verifyingPayment, setVerifyingPayment] = useState(false);
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get("session_id");
-    const payment = params.get("payment");
-    if (payment === "success" && sessionId && user) {
-      setVerifyingPayment(true);
-      setShowPaywall(false);
-      setStage("input");
-      // Restore form data saved before Stripe redirect
-      const savedCv = localStorage.getItem("pendingCvBase64");
-      const savedJob = localStorage.getItem("pendingJobLink");
-      const savedPersonal = localStorage.getItem("pendingPersonal");
-      if (savedCv) setCvBase64(savedCv);
-      if (savedJob) setJobLink(savedJob);
-      if (savedPersonal) setPersonal(savedPersonal);
-
-      supabase.functions.invoke("verify-payment", { body: { sessionId } })
-        .then(async ({ data }) => {
-          if (data?.success) {
-            resumeAfterPaymentRef.current = true;
-            await refreshPurchasedCredits(user.id);
-          }
-          window.history.replaceState({}, "", window.location.pathname);
-          setPaymentVerified(true);
-          setVerifyingPayment(false);
-          localStorage.removeItem("pendingCvBase64");
-          localStorage.removeItem("pendingJobLink");
-          localStorage.removeItem("pendingPersonal");
-        })
-        .catch((err) => {
-          console.error("Payment verification failed:", err);
-          window.history.replaceState({}, "", window.location.pathname);
-          setVerifyingPayment(false);
-        });
-    } else if (payment === "canceled") {
-      localStorage.removeItem("pendingAudit");
-      localStorage.removeItem("pendingCvBase64");
-      localStorage.removeItem("pendingJobLink");
-      localStorage.removeItem("pendingPersonal");
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, [user]);
 
   // Device fingerprinting for anti-abuse
   const [deviceFp, setDeviceFp] = useState(null);
@@ -895,9 +831,9 @@ export default function App() {
   }, []);
 
   const auditCount = pastAudits.length;
-  const totalLimit = FREE_LIMIT + purchasedCredits;
+  const totalLimit = FREE_LIMIT;
   // Compute remaining credits considering device fingerprint for free tier
-  const freeUsed = purchasedCredits === 0 ? Math.max(auditCount, deviceAuditCount) : auditCount;
+  const freeUsed = Math.max(auditCount, deviceAuditCount);
   const remainingCredits = isWhitelisted ? Infinity : Math.max(0, totalLimit - freeUsed);
   const atLimit = remainingCredits === 0;
 
@@ -1025,21 +961,6 @@ export default function App() {
   useEffect(() => { fetchAvgDuration(); }, []);
   useEffect(() => { if (stage === "processing") fetchAvgDuration(); }, [stage]);
 
-  // Auto-generate after successful payment if there was a pending audit
-  const autoGenTriggered = useRef(false);
-  useEffect(() => {
-    if (!paymentVerified || autoGenTriggered.current) return;
-    const pending = localStorage.getItem("pendingAudit");
-    if (pending && cvBase64 && jobLink.trim()) {
-      autoGenTriggered.current = true;
-      setShowPaywall(false);
-      // Small delay to let credits state settle
-      setTimeout(() => generate(), 500);
-    } else if (!pending) {
-      localStorage.removeItem("pendingAudit");
-    }
-  }, [paymentVerified, cvBase64, jobLink]);
-
   // Audit data
   const [data, setData] = useState({
     cv: null, company: null, pains: null, diagnosis: null,
@@ -1075,22 +996,7 @@ export default function App() {
 
   const generate = async () => {
     if (!cvBase64 || !jobLink.trim()) return;
-    const shouldBypassPaywall = resumeAfterPaymentRef.current;
-    if (atLimit && !shouldBypassPaywall) {
-      // Save pending audit state AND form data for auto-generation after payment
-      try {
-        localStorage.setItem("pendingAudit", JSON.stringify({ hasPending: true }));
-        localStorage.setItem("pendingCvBase64", cvBase64);
-        localStorage.setItem("pendingJobLink", jobLink.trim());
-        if (personal.trim()) localStorage.setItem("pendingPersonal", personal.trim());
-      } catch (e) {
-        console.warn("localStorage quota exceeded, form data won't persist across redirect");
-      }
-      setShowPaywall(true);
-      return;
-    }
-    resumeAfterPaymentRef.current = false;
-    setShowNudgeBanner(false);
+    if (atLimit) return;
     setStage("processing");
     setStepStatus(STEPS.map(() => "pending"));
     setError(null);
@@ -1346,15 +1252,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
       const finalElapsed = elapsedRef.current;
       setData(finalData);
       saveAudit(finalData, finalElapsed);
-      // Show nudge banner only after the 2nd free audit (not paid, not 1st)
-      const currentAuditNumber = pastAudits.length + 1; // this audit being saved
-      if (currentAuditNumber === FREE_LIMIT && purchasedCredits === 0) {
-        setShowNudgeBanner(true);
-      }
       setStage("hub");
-      // Clear pending audit state since generation completed
-      localStorage.removeItem("pendingAudit");
-      setPaymentVerified(false);
 
     } catch (err) {
       console.error(err);
@@ -1484,32 +1382,22 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 
           {/* Footer: Counter + Feedback + Sign Out */}
           <div style={{ padding: "14px 20px", borderTop: "1px solid #2a2825" }}>
-            {/* Audit counter — show usage vs total limit (free + purchased) */}
+            {/* Audit counter — free audits usage */}
             <div style={{ marginBottom: 12 }}>
-            {(() => {
-                const displayCount = Math.max(auditCount, purchasedCredits === 0 ? deviceAuditCount : auditCount);
-                return (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                      <span style={{ fontSize: ".55rem", fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "#8a8780" }}>
-                        {purchasedCredits > 0 ? "Audits" : "Free audits"}
-                      </span>
-                      <span style={{ fontSize: ".6rem", fontWeight: 700, color: atLimit ? "#e84c2b" : accent }}>
-                        {displayCount}/{totalLimit}
-                      </span>
-                    </div>
-                    <div style={{ width: "100%", height: 3, background: "#2a2825", borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ height: "100%", background: atLimit ? "#e84c2b" : accent, width: `${Math.min((displayCount / totalLimit) * 100, 100)}%`, transition: "width .3s ease", borderRadius: 2 }} />
-                    </div>
-                  </>
-                );
-              })()}
-              <button
-                onClick={() => { setShowPaywall(true); setShowHistory(false); }}
-                style={{ width: "100%", marginTop: 8, padding: "7px", borderRadius: 6, background: atLimit ? accent : "transparent", color: atLimit ? textOn(accent) : accent, fontSize: ".55rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase", border: atLimit ? "none" : `1px solid ${accent}` }}
-              >
-                {atLimit ? (purchasedCredits > 0 ? "Buy more audits" : "Get more audits") : "Get more audits"}
-              </button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: ".55rem", fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "#8a8780" }}>
+                  Free audits
+                </span>
+                <span style={{ fontSize: ".6rem", fontWeight: 700, color: atLimit ? "#e84c2b" : accent }}>
+                  {freeUsed}/{totalLimit}
+                </span>
+              </div>
+              <div style={{ width: "100%", height: 3, background: "#2a2825", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{ height: "100%", background: atLimit ? "#e84c2b" : accent, width: `${Math.min((freeUsed / totalLimit) * 100, 100)}%`, transition: "width .3s ease", borderRadius: 2 }} />
+              </div>
+              {atLimit && (
+                <p style={{ marginTop: 8, fontSize: ".55rem", color: "#8a8780", letterSpacing: ".04em" }}>Free limit reached</p>
+              )}
             </div>
             {/* Feedback + Sign Out */}
             <div style={{ display: "flex", gap: 6 }}>
@@ -1605,11 +1493,11 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 
             <Anim delay={0.3}>
               <button
-                className={`gen-btn ${cvBase64 && jobLink.trim() && !verifyingPayment ? "ready" : "disabled"}`}
+                className={`gen-btn ${cvBase64 && jobLink.trim() ? "ready" : "disabled"}`}
                 onClick={generate}
-                disabled={!cvBase64 || !jobLink.trim() || verifyingPayment}
+                disabled={!cvBase64 || !jobLink.trim()}
               >
-                {verifyingPayment ? "Verifying payment..." : "Generate Audit"}
+                Generate Audit
               </button>
               <p className="gen-hint"><span style={{ color: "var(--muted)" }}>Built by </span><a href="https://x.com/lifeinprogrezz" target="_blank" rel="noopener noreferrer" style={{ color: accent, textDecoration: "none" }}>@lifeinprogrezz</a></p>
             </Anim>
@@ -1972,81 +1860,6 @@ ROLE: ${company.role || roleCtx.role_type || ""}
         </div>
       )}
 
-      {/* ─── PAYWALL MODAL ─── */}
-      {showPaywall && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)" }} onClick={() => setShowPaywall(false)} />
-          <div style={{ position: "relative", background: "#1a1916", border: "1px solid #2a2825", borderRadius: 10, padding: "32px 28px", width: "min(440px, 90vw)", animation: "fadeUp .25s ease" }}>
-            <button onClick={() => setShowPaywall(false)} style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1rem" }}>×</button>
-            <p style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: accent, marginBottom: 8 }}>Get more audits</p>
-            <h2 style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 800, fontSize: "1.4rem", color: "#f0ede8", lineHeight: 1.1, marginBottom: 8, letterSpacing: "-.02em" }}>
-              You've seen what<br/><span style={{ color: accent }}>AuditJob can do.</span>
-            </h2>
-            <p style={{ fontSize: ".78rem", color: "#8a8780", lineHeight: 1.6, marginBottom: 24 }}>
-              Get more audits. Keep outperforming other candidates.
-            </p>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-              {[
-                { priceId: "price_1TFAx3EGIsQV5qrb6RPI0x4s", name: "1 Audit", price: "€17.99", desc: "Single company audit", tag: null, highlight: false },
-                { priceId: "price_1TFAykEGIsQV5qrbA4Ooz0R5", name: "5 Audit Pack", price: "€69.99", desc: "€14.00 each · Save 22%", tag: "Popular", highlight: true },
-                { priceId: "price_1TFAztEGIsQV5qrbxyzW2vXF", name: "10 Audit Pack", price: "€99.99", desc: "€10.00 each", tag: null, highlight: false },
-              ].map(p => (
-                <div key={p.priceId} style={{ padding: "16px", borderRadius: 8, border: p.highlight ? `1px solid ${accent}` : "1px solid #2a2825", background: p.highlight ? "rgba(138,154,138,.06)" : "transparent", position: "relative" }}>
-                  {p.tag && (
-                    <span style={{ position: "absolute", top: -8, right: 12, fontSize: ".5rem", fontWeight: 700, background: p.highlight ? accent : "#2a2825", color: p.highlight ? textOn(accent) : "#f0ede8", padding: "2px 8px", borderRadius: 4, letterSpacing: ".06em", textTransform: "uppercase" }}>{p.tag}</span>
-                  )}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                    <p style={{ fontSize: ".72rem", fontWeight: 700, color: "#f0ede8" }}>{p.name}</p>
-                    <p style={{ fontSize: ".72rem", fontWeight: 700, color: accent }}>{p.price}</p>
-                  </div>
-                  <p style={{ fontSize: ".6rem", color: "#8a8780", marginBottom: 10 }}>{p.desc}</p>
-                  <button
-                    onClick={async () => {
-                      setPaymentLoading(p.priceId);
-                      try {
-                        const { data, error } = await supabase.functions.invoke("create-payment", { body: { priceId: p.priceId } });
-                        if (error) throw error;
-                        if (data?.url) window.open(data.url, "_blank");
-                      } catch (err) {
-                        console.error("Payment error:", err);
-                      } finally {
-                        setPaymentLoading(null);
-                      }
-                    }}
-                    disabled={paymentLoading === p.priceId}
-                    style={{ width: "100%", padding: "9px", borderRadius: 6, border: "none", background: p.highlight ? accent : "#2a2825", color: p.highlight ? textOn(accent) : "#f0ede8", fontSize: ".6rem", fontWeight: 700, cursor: paymentLoading === p.priceId ? "wait" : "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".1em", textTransform: "uppercase", opacity: paymentLoading && paymentLoading !== p.priceId ? 0.5 : 1, transition: "all .2s" }}
-                  >
-                    {paymentLoading === p.priceId ? "Redirecting..." : "Buy now"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── FIXED BOTTOM NUDGE BANNER ─── */}
-      {showNudgeBanner && (
-        <div style={{
-          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 200,
-          background: "#1a1916", borderTop: "1px solid #2a2825",
-          padding: "12px clamp(1rem, 4vw, 2rem)",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 16,
-          animation: "slideUp .3s ease-out",
-        }}>
-          <p style={{ fontSize: ".75rem", color: "#b0ada8", lineHeight: 1.5 }}>
-            2 free audits used. Want more? Audit packs start at <span style={{ color: "#f0ede8", fontWeight: 500 }}>€14/each</span>.
-          </p>
-          <button
-            onClick={() => { setShowPaywall(true); setShowNudgeBanner(false); }}
-            style={{ padding: "7px 18px", borderRadius: 6, border: "none", background: accent, color: textOn(accent), fontSize: ".58rem", fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif", letterSpacing: ".08em", textTransform: "uppercase", whiteSpace: "nowrap" }}
-          >
-            See plans
-          </button>
-          <button onClick={() => setShowNudgeBanner(false)} style={{ background: "none", border: "none", color: "#8a8780", cursor: "pointer", fontSize: "1.1rem", lineHeight: 1, padding: "0 4px" }}>×</button>
-        </div>
-      )}
     </>
   );
 }
