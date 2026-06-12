@@ -18,7 +18,8 @@ context via GitHub Issues.
 
 ## Economics — sponsored compute (v1)
 Free-cohort AI calls run server-side via the `anthropic-proxy` edge function on OUR
-capped key, **Haiku only**. Enforcement lives in edge functions + DB (per-user $
+capped key, **Haiku only** (target state — the legacy AuditGenerator pipeline still
+calls Sonnet; migrate it when the caps land). Enforcement lives in edge functions + DB (per-user $
 allowance, global monthly kill-switch, device-fingerprint guard) — NEVER in the client
 (this repo is public; client checks are decoration). `src/pages/ConnectProvider.tsx` is
 the PARKED future bring-your-own-key tier: not routed, don't extend it.

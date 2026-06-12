@@ -30,7 +30,7 @@ const Terms = () => {
         Terms of Service
       </h1>
       <p style={{ fontSize: ".8rem", color: "#6b6860", marginBottom: "2.5rem" }}>
-        Last updated: March 26, 2026
+        Last updated: June 13, 2026
       </p>
 
       <section style={sectionStyle}>
