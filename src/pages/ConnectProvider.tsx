@@ -1,25 +1,13 @@
 import { useState } from "react";
 
 /**
- * BYO-provider connection — VALIDATE-FIRST PROTOTYPE.
+ * PARKED — BYO-provider connection (future power-user tier). NOT ROUTED.
  *
- * Proves the economic keystone of the public product (see PRODUCT.md in the
- * planning repo): the app is free because per-user LLM compute runs on the
- * USER's own provider account, not ours.
- *
- * What this screen validates:
- *   1. A user can connect their own provider key (Claude / ChatGPT).
- *   2. A real call runs on THEIR key (effort → model tier mapping).
- *   3. The onboarding friction is tolerable for a non-technical PM.
- *   4. The privacy story: the key goes browser → provider directly and never
- *      touches auditjob.me's servers.
- *
- * Prototype scope (intentionally minimal):
- *   - Client-side fetch (not the anthropic-proxy edge function — that one burns
- *     OUR key, which is the cost trap we're escaping).
- *   - Key held in component state only, never persisted, never uploaded.
- *     Production will store it encrypted in Supabase so background digest/audit
- *     jobs can run while the user is away.
+ * v1 runs on sponsored compute (see the v1 design spec, §7): free-cohort AI calls
+ * go through the server-side anthropic-proxy on our capped key. This screen is the
+ * validated prototype for the LATER bring-your-own-key tier: provider picker,
+ * key field, effort→model-tier mapping, browser-direct test call (key never
+ * uploaded). Do not route, link, or extend it for v1 features.
  */
 
 // Effort → model tier, per provider. Intentionally editable — tune as models ship.
