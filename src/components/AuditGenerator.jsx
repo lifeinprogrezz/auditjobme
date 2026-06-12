@@ -217,7 +217,6 @@ function makeCSS(accent = "#8a9a8a") {
     @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
     .anim{opacity:0}.anim.vis{animation:fadeUp .6s ease forwards}
     .pulse{animation:pulse 1.5s ease-in-out infinite}
 
@@ -817,7 +816,6 @@ export default function App() {
     supabase.from("whitelisted_emails").select("id").eq("email", user.email).maybeSingle()
       .then(({ data }) => setIsWhitelisted(!!data));
   }, [user]);
-
 
   // Device fingerprinting for anti-abuse
   const [deviceFp, setDeviceFp] = useState(null);
@@ -1493,12 +1491,15 @@ ROLE: ${company.role || roleCtx.role_type || ""}
 
             <Anim delay={0.3}>
               <button
-                className={`gen-btn ${cvBase64 && jobLink.trim() ? "ready" : "disabled"}`}
+                className={`gen-btn ${cvBase64 && jobLink.trim() && !atLimit ? "ready" : "disabled"}`}
                 onClick={generate}
-                disabled={!cvBase64 || !jobLink.trim()}
+                disabled={!cvBase64 || !jobLink.trim() || atLimit}
               >
                 Generate Audit
               </button>
+              {atLimit && (
+                <p className="gen-hint"><span style={{ color: "var(--muted)" }}>Free limit reached</span></p>
+              )}
               <p className="gen-hint"><span style={{ color: "var(--muted)" }}>Built by </span><a href="https://x.com/lifeinprogrezz" target="_blank" rel="noopener noreferrer" style={{ color: accent, textDecoration: "none" }}>@lifeinprogrezz</a></p>
             </Anim>
           </div>
@@ -1537,7 +1538,6 @@ ROLE: ${company.role || roleCtx.role_type || ""}
       {/* ─── HUB (Results Pre-Page) ─── */}
       {stage === "hub" && data.company && (
         <div style={{ paddingTop: 48, minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-          {/* Nudge banner - fixed bottom */}
           <div className="hub">
             <Anim>
               <p style={{ fontSize: ".55rem", fontWeight: 500, letterSpacing: ".16em", textTransform: "uppercase", color: accent, marginBottom: 24 }}>
