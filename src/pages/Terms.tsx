@@ -49,8 +49,8 @@ const Terms = () => {
       </section>
 
       <section style={sectionStyle}>
-        <h2 style={h2Style}>4. Free & paid usage</h2>
-        <p>Each user receives 2 free audit generations. Additional audits can be purchased in packs. All purchases are final and non-refundable unless required by applicable law.</p>
+        <h2 style={h2Style}>4. Free usage</h2>
+        <p>auditjob.me is currently free to use, with fair-use limits per user. We may change these limits at any time to keep the service sustainable.</p>
       </section>
 
       <section style={sectionStyle}>
