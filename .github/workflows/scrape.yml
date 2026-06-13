@@ -1,0 +1,33 @@
+name: Scrape jobs
+
+# Daily refresh of the shared `jobs` pool (scripts/scrape.mjs).
+#
+# ACTIVATION (one-time, by Rober): add two repo secrets under
+# Settings -> Secrets and variables -> Actions:
+#   SUPABASE_URL               = https://roaervdsjejksaeseeov.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY  = Supabase dashboard -> Project Settings -> API -> service_role key
+# Until both exist, scrape.mjs dry-runs (fetch + log, no DB write), so this workflow is safe to land now.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily, 06:00 UTC
+  workflow_dispatch: {} # manual trigger from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Scrape into the jobs pool
+        run: node scripts/scrape.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
