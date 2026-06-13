@@ -1,0 +1,16 @@
+# gitleaks config for the auditjobme CI secrets-scan.
+# Extends the default ruleset, then allowlists the ONE by-design exception:
+# the committed .env holds only the Supabase publishable/anon key (role=anon),
+# which is public by design — RLS is the security model (v1 spec §2). The
+# git-history audit (tools/plan2-exposure-audit.sh in the planning repo)
+# confirmed no service-role key has ever been committed.
+title = "auditjobme gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Publishable/anon Supabase key is public by design (RLS-gated); lives only in .env."
+paths = [
+  '''^\.env$''',
+]

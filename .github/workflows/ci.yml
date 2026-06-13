@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: lint · typecheck · test · build · smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+
+      # Pre-existing Lovable lint debt (no-explicit-any, tailwind require()). Non-blocking
+      # until cleaned up, then flip to required. Tracked as a follow-up task.
+      - name: Lint (non-blocking)
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # AI calls are mocked in tests — no live Anthropic key in CI (spec §6).
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      # Smoke-walk the public surface of the canonical path against a local preview
+      # (no Vercel preview / no auth wall needed). continue-on-error during bootstrap;
+      # flip to required once proven stable, and extend to the full auth'd path later.
+      - name: Smoke E2E (public surface)
+        continue-on-error: true
+        run: |
+          npx playwright install --with-deps chromium
+          npm run preview -- --port 8080 --strictPort &
+          for i in $(seq 1 30); do curl -sf http://localhost:8080 >/dev/null && break; sleep 1; done
+          node scripts/verify-smoke.mjs http://localhost:8080
+
+  secrets-scan:
+    name: secrets-scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
