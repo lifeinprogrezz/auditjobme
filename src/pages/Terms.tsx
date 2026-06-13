@@ -59,8 +59,8 @@ const Terms = () => {
       </section>
 
       <section style={sectionStyle}>
-        <h2 style={h2Style}>6. Published audits</h2>
-        <p>Audits are published with shareable URLs by default. You understand that anyone with the link can view a published audit.</p>
+        <h2 style={h2Style}>6. Privacy of your audits</h2>
+        <p>Your audits are private by default. Publishing a shareable link is an explicit action you choose, per audit. When you publish one, anyone with that link can view that audit and your public display name and username (never your email). You can keep audits private and never publish them.</p>
       </section>
 
       <section style={sectionStyle}>

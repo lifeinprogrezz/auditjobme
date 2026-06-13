@@ -94,8 +94,8 @@ export default function PublicAudit() {
 
       const ownerIds = [...new Set(matchingAudits.map((audit: any) => audit.user_id).filter(Boolean))];
       const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, username, display_name, email")
+        .from("public_profiles")
+        .select("id, username, display_name")
         .in("id", ownerIds);
 
       if (profilesError) {
@@ -103,7 +103,7 @@ export default function PublicAudit() {
       }
 
       const matchedProfile = profiles?.find((profile: any) => {
-        const ownerSlug = slugifyOwner(profile.username || profile.display_name || profile.email?.split("@")[0] || "");
+        const ownerSlug = slugifyOwner(profile.username || profile.display_name || "");
         return ownerSlug === requestedOwner;
       });
 
