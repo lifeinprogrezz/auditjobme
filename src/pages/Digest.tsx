@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
+import { useNavigate } from "react-router-dom";
 import { scoreJob, RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
 
 const BG = "#0f0e0c";
@@ -51,6 +52,7 @@ const byScore = (a: JobRow, b: JobRow) => (b.score ?? -1) - (a.score ?? -1);
 
 export default function Digest() {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [scoring, setScoring] = useState(false);
@@ -254,6 +256,12 @@ export default function Digest() {
                     style={{ marginTop: ".5rem", fontSize: ".55rem", fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", padding: ".25rem .5rem", borderRadius: 6, border: `1px solid ${applied.has(j.id) ? ACCENT : BORDER}`, background: applied.has(j.id) ? ACCENT : "transparent", color: applied.has(j.id) ? "#0f0e0c" : MUTED, cursor: applied.has(j.id) ? "default" : "pointer", whiteSpace: "nowrap" }}
                   >
                     {applied.has(j.id) ? "Applied" : "Mark applied"}
+                  </button>
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/audit?job=${encodeURIComponent(j.url)}`); }}
+                    style={{ marginTop: ".4rem", display: "block", marginLeft: "auto", fontSize: ".55rem", fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", padding: ".25rem .5rem", borderRadius: 6, border: `1px solid ${BORDER}`, background: "transparent", color: ACCENT, cursor: "pointer", whiteSpace: "nowrap" }}
+                  >
+                    Audit this
                   </button>
                 </div>
               </a>

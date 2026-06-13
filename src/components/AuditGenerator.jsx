@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
@@ -131,6 +132,13 @@ export default function App() {
 
   // Auth from context (AuthProvider)
   const { user } = useAuth();
+
+  // Deep-link prefill: /audit?job=<url> (e.g. from a digest role card) fills the job link.
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const job = searchParams.get("job");
+    if (job) setJobLink(job);
+  }, [searchParams]);
 
   // Load audit history
   const loadHistory = async () => {
