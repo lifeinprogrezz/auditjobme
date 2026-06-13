@@ -50,7 +50,7 @@ interface JobRow {
 const byScore = (a: JobRow, b: JobRow) => (b.score ?? -1) - (a.score ?? -1);
 
 export default function Digest() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [scoring, setScoring] = useState(false);
@@ -147,6 +147,14 @@ export default function Digest() {
   return (
     <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: "'Plus Jakarta Sans', sans-serif", padding: "3rem 1.5rem" }}>
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: ".75rem" }}>
+          <button
+            onClick={async () => { await signOut(); window.location.href = "/"; }}
+            style={{ background: "transparent", border: "none", color: MUTED, fontFamily: "inherit", fontSize: ".64rem", fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", cursor: "pointer" }}
+          >
+            Sign out
+          </button>
+        </div>
         <h1 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 400, fontSize: "clamp(1.7rem, 4vw, 2.6rem)", letterSpacing: "-.03em", marginBottom: ".5rem" }}>
           Your roles.
         </h1>
