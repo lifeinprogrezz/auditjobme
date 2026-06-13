@@ -118,28 +118,52 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          citizenship: string | null
           created_at: string
+          cv_text: string | null
           display_name: string | null
           email: string | null
+          eu_work_authorized: boolean | null
           id: string
+          languages: string[] | null
+          onboarded_at: string | null
+          open_to_remote: boolean | null
+          target_cities: string[] | null
+          target_seniority: string | null
           updated_at: string
           username: string | null
         }
         Insert: {
           avatar_url?: string | null
+          citizenship?: string | null
           created_at?: string
+          cv_text?: string | null
           display_name?: string | null
           email?: string | null
+          eu_work_authorized?: boolean | null
           id: string
+          languages?: string[] | null
+          onboarded_at?: string | null
+          open_to_remote?: boolean | null
+          target_cities?: string[] | null
+          target_seniority?: string | null
           updated_at?: string
           username?: string | null
         }
         Update: {
           avatar_url?: string | null
+          citizenship?: string | null
           created_at?: string
+          cv_text?: string | null
           display_name?: string | null
           email?: string | null
+          eu_work_authorized?: boolean | null
           id?: string
+          languages?: string[] | null
+          onboarded_at?: string | null
+          open_to_remote?: boolean | null
+          target_cities?: string[] | null
+          target_seniority?: string | null
           updated_at?: string
           username?: string | null
         }
