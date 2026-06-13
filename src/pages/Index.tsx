@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
-import AuditGenerator from "@/components/AuditGenerator";
 import LandingPage from "@/components/LandingPage";
 import Onboarding from "@/components/Onboarding";
+import Digest from "@/pages/Digest";
 
 const LoadingScreen = () => (
   <div style={{
@@ -49,7 +49,7 @@ const Index = () => {
   if (!user) return <LandingPage />;
   if (onboarded === null) return <LoadingScreen />; // fetching profile
   if (!onboarded) return <Onboarding onComplete={() => setOnboarded(true)} />;
-  return <AuditGenerator />;
+  return <Digest />;
 };
 
 export default Index;

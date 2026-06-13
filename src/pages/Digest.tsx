@@ -107,7 +107,8 @@ export default function Digest() {
           Your roles.
         </h1>
         <p style={{ fontSize: ".8rem", color: MUTED, lineHeight: 1.7, marginBottom: "1.5rem" }}>
-          Product Manager roles across Europe, scored against your profile. Highest match first.
+          Product Manager roles across Europe, scored against your profile. Highest match first.{" "}
+          <a href="/audit" style={{ color: ACCENT, textDecoration: "underline", textUnderlineOffset: "2px" }}>Build a company audit</a>.
         </p>
 
         {scoring && (
