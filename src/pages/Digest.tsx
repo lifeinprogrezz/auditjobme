@@ -70,7 +70,7 @@ export default function Digest() {
         .select("target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, cv_text")
         .eq("id", user.id)
         .maybeSingle();
-      const unscored = merged.filter((j) => j.score == null).slice(0, 12);
+      const unscored = merged.filter((j) => j.score == null).slice(0, 40);
       if (!profile || unscored.length === 0 || !active) return;
       setScoring(true);
       for (const j of unscored) {
