@@ -115,6 +115,54 @@ export type Database = {
         }
         Relationships: []
       }
+      jobs: {
+        Row: {
+          company: string
+          created_at: string
+          first_seen_at: string
+          id: string
+          is_live: boolean
+          jd_text: string | null
+          location: string | null
+          posted_at: string | null
+          remote: boolean
+          seniority: string | null
+          source: string | null
+          title: string
+          url: string
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          first_seen_at?: string
+          id?: string
+          is_live?: boolean
+          jd_text?: string | null
+          location?: string | null
+          posted_at?: string | null
+          remote?: boolean
+          seniority?: string | null
+          source?: string | null
+          title: string
+          url: string
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          first_seen_at?: string
+          id?: string
+          is_live?: boolean
+          jd_text?: string | null
+          location?: string | null
+          posted_at?: string | null
+          remote?: boolean
+          seniority?: string | null
+          source?: string | null
+          title?: string
+          url?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -195,6 +243,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      scores: {
+        Row: {
+          id: string
+          job_id: string
+          rubric_version: string
+          score: number | null
+          scored_at: string
+          signals: Json | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          job_id: string
+          rubric_version?: string
+          score?: number | null
+          scored_at?: string
+          signals?: Json | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          job_id?: string
+          rubric_version?: string
+          score?: number | null
+          scored_at?: string
+          signals?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scores_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whitelisted_emails: {
         Row: {
