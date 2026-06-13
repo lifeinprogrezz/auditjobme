@@ -6,28 +6,21 @@
  * Filters: Product roles, Europe only (drops design/eng + clearly-US roles). `--sql` emits a
  * seed INSERT (no jd_text) for admin-tooling seeding before the cron is live.
  *
- * Extensible: add tokens to the *_BOARDS arrays; add more ATS fetchers as the pool grows.
+ * Extensible: add tokens to scripts/boards.json; add more ATS fetchers as the pool grows.
  */
 import { createClient } from "@supabase/supabase-js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
-const GREENHOUSE_BOARDS = [
-  { company: "Wallapop", token: "wallapop" },
-  { company: "Amplemarket", token: "amplemarket" },
-  { company: "GoCardless", token: "gocardless" },
-  { company: "Monzo", token: "monzo" },
-  { company: "Contentful", token: "contentful" },
-  { company: "Typeform", token: "typeform" },
-  { company: "SumUp", token: "sumup" },
-  { company: "N26", token: "n26" },
-  { company: "Celonis", token: "celonis" },
-];
-const LEVER_BOARDS = [{ company: "FINN", token: "finn" }];
-const ASHBY_BOARDS = [
-  { company: "Duvo", token: "duvo" },
-  { company: "Preply", token: "preply" },
-  { company: "LemFi", token: "lemfi" },
-  { company: "Linear", token: "linear" },
-];
+// Board tokens live in boards.json (verified Greenhouse/Lever/Ashby public APIs, sourced from the
+// career-ops portals.yml). Dead boards fail non-fatally below; add/curate tokens there, not here.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const BOARDS = JSON.parse(readFileSync(join(__dirname, "boards.json"), "utf8"));
+const GREENHOUSE_BOARDS = BOARDS.greenhouse;
+const LEVER_BOARDS = BOARDS.lever;
+const ASHBY_BOARDS = BOARDS.ashby;
+const fetchOpts = () => ({ signal: AbortSignal.timeout(20000) }); // fresh signal per call
 
 const PM_RE =
   /\b(product manager|product owner|head of product|group product|principal product|lead product|founding product|director of product|vp,? product|product lead)\b/i;
@@ -51,7 +44,7 @@ function stripHtml(s) {
 }
 
 async function fetchGreenhouse(b) {
-  const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${b.token}/jobs?content=true`);
+  const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${b.token}/jobs?content=true`, fetchOpts());
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   return (data.jobs || [])
@@ -69,7 +62,7 @@ async function fetchGreenhouse(b) {
 }
 
 async function fetchLever(b) {
-  const res = await fetch(`https://api.lever.co/v0/postings/${b.token}?mode=json`);
+  const res = await fetch(`https://api.lever.co/v0/postings/${b.token}?mode=json`, fetchOpts());
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   return (Array.isArray(data) ? data : [])
@@ -87,7 +80,7 @@ async function fetchLever(b) {
 }
 
 async function fetchAshby(b) {
-  const res = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${b.token}`);
+  const res = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${b.token}`, fetchOpts());
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   return (data.jobs || [])
@@ -118,15 +111,21 @@ async function main() {
   ];
 
   let all = [];
-  for (const s of SOURCES) {
-    try {
-      const jobs = await s.run();
-      console.error(`${s.company}: ${jobs.length} EU PM role(s)`);
-      all = all.concat(jobs);
-    } catch (e) {
-      console.error(`${s.company} failed: ${e.message}`);
+  const CONCURRENCY = 8;
+  let idx = 0;
+  async function worker() {
+    while (idx < SOURCES.length) {
+      const s = SOURCES[idx++];
+      try {
+        const jobs = await s.run();
+        if (jobs.length) console.error(`${s.company}: ${jobs.length} EU PM role(s)`);
+        all.push(...jobs);
+      } catch (e) {
+        console.error(`${s.company} failed: ${e.message}`);
+      }
     }
   }
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   const seen = new Set();
   all = all.filter((j) => (seen.has(j.url) ? false : seen.add(j.url)));
   console.error(`Total: ${all.length} EU PM roles.`);
