@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
+import { scoreJob, RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
 
 const BG = "#0f0e0c";
 const TEXT = "#f0ede8";
@@ -18,38 +19,85 @@ interface JobRow {
   remote: boolean;
   source: string | null;
   seniority: string | null;
+  jd_text: string | null;
   score: number | null;
+  reason: string | null;
 }
+
+const byScore = (a: JobRow, b: JobRow) => (b.score ?? -1) - (a.score ?? -1);
 
 export default function Digest() {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scoring, setScoring] = useState(false);
 
   useEffect(() => {
+    let active = true;
     async function load() {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
       const { data: jobsData } = await supabase
         .from("jobs")
-        .select("id, company, title, url, location, remote, source, seniority")
+        .select("id, company, title, url, location, remote, source, seniority, jd_text")
         .eq("is_live", true);
+      const { data: scoresData } = await supabase
+        .from("scores")
+        .select("job_id, score, signals")
+        .eq("user_id", user.id)
+        .eq("rubric_version", RUBRIC_VERSION);
 
-      const scoreByJob: Record<string, number | null> = {};
-      if (user) {
-        const { data: scoresData } = await supabase
-          .from("scores")
-          .select("job_id, score")
-          .eq("user_id", user.id);
-        (scoresData ?? []).forEach((s) => {
-          scoreByJob[s.job_id] = s.score;
-        });
-      }
-
-      const merged: JobRow[] = (jobsData ?? []).map((j) => ({ ...j, score: scoreByJob[j.id] ?? null }));
-      merged.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+      const scoreByJob: Record<string, { score: number | null; reason: string | null }> = {};
+      (scoresData ?? []).forEach((s) => {
+        const sig = s.signals as { reason?: string } | null;
+        scoreByJob[s.job_id] = { score: s.score, reason: sig?.reason ?? null };
+      });
+      const merged: JobRow[] = (jobsData ?? []).map((j) => ({
+        ...j,
+        score: scoreByJob[j.id]?.score ?? null,
+        reason: scoreByJob[j.id]?.reason ?? null,
+      }));
+      merged.sort(byScore);
+      if (!active) return;
       setJobs(merged);
       setLoading(false);
+
+      // Score any unscored roles against the profile (capped; cached after the first pass).
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, cv_text")
+        .eq("id", user.id)
+        .maybeSingle();
+      const unscored = merged.filter((j) => j.score == null).slice(0, 12);
+      if (!profile || unscored.length === 0 || !active) return;
+      setScoring(true);
+      for (const j of unscored) {
+        if (!active) return;
+        const result = await scoreJob(profile as ScoreableProfile, j);
+        if (!result || !active) continue;
+        await supabase.from("scores").upsert(
+          {
+            user_id: user.id,
+            job_id: j.id,
+            score: result.score,
+            rubric_version: RUBRIC_VERSION,
+            signals: { reason: result.reason },
+          },
+          { onConflict: "user_id,job_id,rubric_version" },
+        );
+        if (!active) return;
+        setJobs((prev) =>
+          prev.map((x) => (x.id === j.id ? { ...x, score: result.score, reason: result.reason } : x)).sort(byScore),
+        );
+      }
+      if (active) setScoring(false);
     }
     load();
+    return () => {
+      active = false;
+    };
   }, [user]);
 
   return (
@@ -58,9 +106,15 @@ export default function Digest() {
         <h1 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 400, fontSize: "clamp(1.7rem, 4vw, 2.6rem)", letterSpacing: "-.03em", marginBottom: ".5rem" }}>
           Your roles.
         </h1>
-        <p style={{ fontSize: ".8rem", color: MUTED, lineHeight: 1.7, marginBottom: "2rem" }}>
-          Product Manager roles across Europe. Scoring them against your profile is the next piece we're building, so they're unranked for now.
+        <p style={{ fontSize: ".8rem", color: MUTED, lineHeight: 1.7, marginBottom: "1.5rem" }}>
+          Product Manager roles across Europe, scored against your profile. Highest match first.
         </p>
+
+        {scoring && (
+          <div style={{ fontSize: ".7rem", color: ACCENT, marginBottom: "1.2rem", letterSpacing: ".04em" }}>
+            Scoring roles against your profile...
+          </div>
+        )}
 
         {loading ? (
           <p style={{ fontSize: ".75rem", color: MUTED }}>Loading roles...</p>
@@ -76,7 +130,7 @@ export default function Digest() {
                 rel="noopener noreferrer"
                 style={{
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "flex-start",
                   justifyContent: "space-between",
                   gap: "1rem",
                   padding: "1rem 1.2rem",
@@ -85,7 +139,6 @@ export default function Digest() {
                   background: SURFACE,
                   textDecoration: "none",
                   color: TEXT,
-                  transition: "border-color .15s",
                 }}
               >
                 <div style={{ minWidth: 0 }}>
@@ -102,9 +155,14 @@ export default function Digest() {
                     {j.location || (j.remote ? "Remote" : "Location unknown")}
                     {j.remote && j.location ? " · Remote-friendly" : ""}
                   </div>
+                  {j.reason && (
+                    <div style={{ fontSize: ".7rem", color: MUTED, marginTop: ".5rem", lineHeight: 1.5, fontStyle: "italic" }}>
+                      {j.reason}
+                    </div>
+                  )}
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 800, fontSize: "1.1rem", color: j.score != null ? ACCENT : MUTED }}>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 800, fontSize: "1.2rem", color: j.score != null ? ACCENT : MUTED }}>
                     {j.score != null ? j.score.toFixed(1) : "—"}
                   </div>
                   <div style={{ fontSize: ".58rem", color: MUTED, letterSpacing: ".06em", textTransform: "uppercase" }}>
