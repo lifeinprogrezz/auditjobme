@@ -2,9 +2,10 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
-import { textOn, safeAccent } from "./audit/utils.js";
+import { textOn, safeAccent, slugifyPersonName, getPublicAuditOwner, validateOutput } from "./audit/utils.js";
 import { makeCSS } from "./audit/styles.js";
 import { generatePDFHTML, downloadPDF } from "./audit/pdfHtml.js";
+import { SONNET, HAIKU, callClaude, callClaudeWithRetry, validateSections, extractText, safeParse } from "./audit/api.js";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 const STEPS = [
@@ -21,163 +22,6 @@ const WEB_SEARCH = [{ type: "web_search_20250305", name: "web_search" }];
 
 /* Domains that get interactive prototypes */
 const PROTO_DOMAINS = ["tech_product", "engineering_technical", "data_analytics"];
-
-function slugifyPersonName(value) {
-  if (!value) return "";
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function getPublicAuditOwner(user, profile) {
-  return slugifyPersonName(
-    profile?.username ||
-    profile?.display_name ||
-    user?.user_metadata?.full_name ||
-    user?.user_metadata?.name ||
-    user?.email?.split("@")[0] ||
-    ""
-  );
-}
-
-/* Post-processing: fix common LLM output issues */
-function validateOutput(data) {
-  const trim = (s, max) => {
-    if (!s || typeof s !== "string") return s || "";
-    const words = s.split(/\s+/);
-    if (words.length <= max) return s;
-    const cut = words.slice(0, max).join(" ");
-    const lastDot = cut.lastIndexOf(".");
-    return lastDot > cut.length * 0.5 ? cut.slice(0, lastDot + 1) : cut + ".";
-  };
-  const fixHex = h => /^#[0-9a-fA-F]{6}$/.test(h) ? h : "#8a9a8a";
-
-  // Company stats
-  if (data.company?.stats) {
-    data.company.stats = data.company.stats.map(s => ({
-      ...s,
-      value: trim(s.value, 3),
-      label: trim(s.label, 3),
-      delta: trim(s.delta, 5),
-      source_url: (s.source_url && s.source_url.startsWith("http")) ? s.source_url : ""
-    }));
-  }
-  if (data.company?.accent_color) data.company.accent_color = fixHex(data.company.accent_color);
-
-  // Diagnosis findings
-  if (data.diagnosis?.findings) {
-    data.diagnosis.findings = data.diagnosis.findings.map(f => ({
-      ...f,
-      title: trim(f.title, 8),
-      evidence: trim(f.evidence, 40),
-      impact: trim(f.impact, 30),
-      why_not_fixed: trim(f.why_not_fixed, 40),
-      tag: trim(f.tag, 2),
-      evidence_sources: (f.evidence_sources || []).filter(s => s.url && s.url.startsWith("http"))
-    }));
-  }
-
-  // Proposals
-  if (data.proposals?.proposals) {
-    data.proposals.proposals = data.proposals.proposals.map(p => ({
-      ...p,
-      title: trim(p.title, 8),
-      problem: trim(p.problem, 30),
-      solution: trim(p.solution, 30),
-      how_it_works: trim(p.how_it_works, 30),
-      target_effort_impact: trim(p.target_effort_impact, 30)
-    }));
-  }
-
-  // About columns
-  if (data.about?.columns) {
-    data.about.columns = data.about.columns.map(c => ({
-      ...c,
-      skill: trim(c.skill, 2),
-      proof: trim(c.proof, 35)
-    }));
-  }
-
-  return data;
-}
-
-/* ═══════════════════ API ═══════════════════ */
-const SONNET = "claude-sonnet-4-20250514";
-const HAIKU = "claude-haiku-4-5-20251001";
-
-async function callClaude(messages, opts = {}) {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  // Use the user's session token for authenticated edge function calls
-  const { data: sessionData } = await supabase.auth.getSession();
-  const accessToken = sessionData?.session?.access_token;
-  if (!accessToken) throw new Error("Not authenticated");
-  const res = await fetch(`${supabaseUrl}/functions/v1/anthropic-proxy`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${accessToken}`,
-      "apikey": supabaseKey,
-    },
-    body: JSON.stringify({
-      messages,
-      model: opts.model || SONNET,
-      max_tokens: opts.max_tokens || 4096,
-      ...(opts.system ? { system: opts.system } : {}),
-      ...(opts.tools ? { tools: opts.tools } : {}),
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `API ${res.status}`);
-  }
-  return res.json();
-}
-
-/* Retry wrapper: retries up to maxRetries times with delay between attempts */
-async function callClaudeWithRetry(messages, opts = {}, maxRetries = 3, delayMs = 2000) {
-  let lastError;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await callClaude(messages, opts);
-    } catch (err) {
-      lastError = err;
-      console.warn(`API call attempt ${attempt}/${maxRetries} failed:`, err.message);
-      if (attempt < maxRetries) {
-        await new Promise(r => setTimeout(r, delayMs));
-      }
-    }
-  }
-  throw lastError;
-}
-
-/* Validation gate: checks that all critical sections have real data */
-function validateSections({ company, diagnosis, proposals, about, contacts }) {
-  const missing = [];
-  if (!company?.stats?.length) missing.push("company_stats");
-  if (!diagnosis?.findings?.length) missing.push("diagnosis");
-  if (!proposals?.proposals?.length) missing.push("proposals");
-  if (!about?.columns?.length && !about?.stats?.length) missing.push("about");
-  if (!Array.isArray(contacts) || contacts.length === 0) missing.push("contacts");
-  return missing;
-}
-
-function extractText(d) {
-  return (d?.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
-}
-
-function safeParse(text) {
-  try {
-    return JSON.parse(text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
-  } catch {
-    const m = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    if (m) try { return JSON.parse(m[0]); } catch {}
-    return null;
-  }
-}
 
 /* ═══════════════════ INTERSECTION OBSERVER ═══════════════════ */
 function useInView(ref) {
