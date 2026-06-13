@@ -12,6 +12,7 @@ jobs:
   build-test:
     name: lint · typecheck · test · build · smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,11 +39,17 @@ jobs:
       # flip to required once proven stable, and extend to the full auth'd path later.
       - name: Smoke E2E (public surface)
         continue-on-error: true
+        timeout-minutes: 5
         run: |
           npx playwright install --with-deps chromium
-          npm run preview -- --port 8080 --strictPort &
+          # Redirect the preview server's stdio to a file so it doesn't hold the step's
+          # pipe open (otherwise bash waits on the backgrounded server forever — hung the
+          # run under Node 24). Capture its PID and kill it once the smoke check is done.
+          npm run preview -- --port 8080 --strictPort > /tmp/preview.log 2>&1 &
+          PREVIEW_PID=$!
           for i in $(seq 1 30); do curl -sf http://localhost:8080 >/dev/null && break; sleep 1; done
           node scripts/verify-smoke.mjs http://localhost:8080
+          kill "$PREVIEW_PID" 2>/dev/null || true
 
   secrets-scan:
     name: secrets-scan (gitleaks)
