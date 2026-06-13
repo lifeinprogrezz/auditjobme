@@ -120,6 +120,8 @@ export default function Digest() {
           Product Manager roles across Europe, scored against your profile. Highest match first.{" "}
           <a href="/tracker" style={{ color: ACCENT, textDecoration: "underline", textUnderlineOffset: "2px" }}>Your applications</a>
           {" · "}
+          <a href="/profile" style={{ color: ACCENT, textDecoration: "underline", textUnderlineOffset: "2px" }}>Edit profile</a>
+          {" · "}
           <a href="/audit" style={{ color: ACCENT, textDecoration: "underline", textUnderlineOffset: "2px" }}>Build a company audit</a>.
         </p>
 
