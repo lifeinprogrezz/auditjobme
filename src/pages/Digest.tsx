@@ -31,6 +31,7 @@ export default function Digest() {
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [scoring, setScoring] = useState(false);
+  const [applied, setApplied] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let active = true;
@@ -63,6 +64,9 @@ export default function Digest() {
       if (!active) return;
       setJobs(merged);
       setLoading(false);
+
+      const { data: appsData } = await supabase.from("applications").select("job_id").eq("user_id", user.id);
+      if (active) setApplied(new Set((appsData ?? []).map((a) => a.job_id)));
 
       // Score any unscored roles against the profile (capped; cached after the first pass).
       const { data: profile } = await supabase
@@ -100,6 +104,12 @@ export default function Digest() {
     };
   }, [user]);
 
+  const markApplied = async (jobId: string) => {
+    if (!user) return;
+    setApplied((prev) => new Set(prev).add(jobId));
+    await supabase.from("applications").upsert({ user_id: user.id, job_id: jobId }, { onConflict: "user_id,job_id" });
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: "'Plus Jakarta Sans', sans-serif", padding: "3rem 1.5rem" }}>
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
@@ -108,6 +118,8 @@ export default function Digest() {
         </h1>
         <p style={{ fontSize: ".8rem", color: MUTED, lineHeight: 1.7, marginBottom: "1.5rem" }}>
           Product Manager roles across Europe, scored against your profile. Highest match first.{" "}
+          <a href="/tracker" style={{ color: ACCENT, textDecoration: "underline", textUnderlineOffset: "2px" }}>Your applications</a>
+          {" · "}
           <a href="/audit" style={{ color: ACCENT, textDecoration: "underline", textUnderlineOffset: "2px" }}>Build a company audit</a>.
         </p>
 
@@ -169,6 +181,13 @@ export default function Digest() {
                   <div style={{ fontSize: ".58rem", color: MUTED, letterSpacing: ".06em", textTransform: "uppercase" }}>
                     {j.score != null ? "match" : "view"}
                   </div>
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); markApplied(j.id); }}
+                    disabled={applied.has(j.id)}
+                    style={{ marginTop: ".5rem", fontSize: ".55rem", fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", padding: ".25rem .5rem", borderRadius: 6, border: `1px solid ${applied.has(j.id) ? ACCENT : BORDER}`, background: applied.has(j.id) ? ACCENT : "transparent", color: applied.has(j.id) ? "#0f0e0c" : MUTED, cursor: applied.has(j.id) ? "default" : "pointer", whiteSpace: "nowrap" }}
+                  >
+                    {applied.has(j.id) ? "Applied" : "Mark applied"}
+                  </button>
                 </div>
               </a>
             ))}
