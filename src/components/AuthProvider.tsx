@@ -16,6 +16,7 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+// eslint-disable-next-line react-refresh/only-export-components -- context hook intentionally colocated with its provider
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: ReactNode }) {

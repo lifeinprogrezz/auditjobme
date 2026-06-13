@@ -16,15 +16,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
       - run: npm ci
 
-      # Pre-existing Lovable lint debt (no-explicit-any, tailwind require()). Non-blocking
-      # until cleaned up, then flip to required. Tracked as a follow-up task.
-      - name: Lint (non-blocking)
+      - name: Lint
         run: npm run lint
-        continue-on-error: true
 
       - name: Typecheck
         run: npm run typecheck
