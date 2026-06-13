@@ -12,6 +12,7 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { isPM, isEU, inferSeniority, stripHtml } from "./job-filters.mjs";
 
 // Board tokens live in boards.json (verified Greenhouse/Lever/Ashby public APIs, sourced from the
 // career-ops portals.yml). Dead boards fail non-fatally below; add/curate tokens there, not here.
@@ -22,26 +23,6 @@ const LEVER_BOARDS = BOARDS.lever;
 const ASHBY_BOARDS = BOARDS.ashby;
 const fetchOpts = () => ({ signal: AbortSignal.timeout(20000) }); // fresh signal per call
 
-const PM_RE =
-  /\b(product manager|product owner|head of product|group product|principal product|lead product|founding product|director of product|vp,? product|product lead)\b/i;
-const NEG_RE = /designer|product design|\bengineer(ing)?\b|data scien|\banalyst\b|marketing manager/i;
-const EU_RE =
-  /europe|emea|united kingdom|\buk\b|ireland|spain|germany|france|netherlands|portugal|sweden|denmark|finland|norway|poland|italy|belgium|austria|switzerland|bulgaria|romania|czech|greece|estonia|lithuania|barcelona|london|berlin|madrid|amsterdam|paris|dublin|munich|lisbon|stockholm|copenhagen|helsinki|oslo|sofia|milan|rome|warsaw|zurich|vienna|brussels|cardiff|manchester|valencia/i;
-
-const isPM = (title) => PM_RE.test(title || "") && !NEG_RE.test(title || "");
-const isEU = (location) => !location || EU_RE.test(location);
-
-function inferSeniority(title) {
-  const t = (title || "").toLowerCase();
-  if (/founding/.test(t)) return "founding";
-  if (/principal|lead|head|director|\bvp\b|group/.test(t)) return "lead";
-  if (/senior|\bsr\b/.test(t)) return "senior";
-  if (/associate|\bapm\b|junior/.test(t)) return "apm";
-  return "pm";
-}
-function stripHtml(s) {
-  return (s || "").replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/g, " ").replace(/\s+/g, " ").trim();
-}
 
 async function fetchGreenhouse(b) {
   const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${b.token}/jobs?content=true`, fetchOpts());

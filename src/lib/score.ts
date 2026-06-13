@@ -55,7 +55,15 @@ export async function scoreJob(
   });
   if (error || !data) return null;
 
-  const text: string = data?.content?.[0]?.text ?? "";
+  return parseScoreResponse(data?.content?.[0]?.text ?? "");
+}
+
+/**
+ * Pull the {score, reason} out of the model's raw text and clamp it to a sane range:
+ * grabs the first {...} block, coerces score into [0, 5], and returns null on any
+ * missing-JSON / malformed / non-numeric response. Exported for unit testing.
+ */
+export function parseScoreResponse(text: string): { score: number; reason: string } | null {
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) return null;
   try {
