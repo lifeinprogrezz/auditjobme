@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build-test:
-    name: lint · typecheck · test · build · smoke
+    name: lint · typecheck · test · build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,22 +34,12 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Smoke-walk the public surface of the canonical path against a local preview
-      # (no Vercel preview / no auth wall needed). continue-on-error during bootstrap;
-      # flip to required once proven stable, and extend to the full auth'd path later.
-      - name: Smoke E2E (public surface)
-        continue-on-error: true
-        timeout-minutes: 5
-        run: |
-          npx playwright install --with-deps chromium
-          # Redirect the preview server's stdio to a file so it doesn't hold the step's
-          # pipe open (otherwise bash waits on the backgrounded server forever — hung the
-          # run under Node 24). Capture its PID and kill it once the smoke check is done.
-          npm run preview -- --port 8080 --strictPort > /tmp/preview.log 2>&1 &
-          PREVIEW_PID=$!
-          for i in $(seq 1 30); do curl -sf http://localhost:8080 >/dev/null && break; sleep 1; done
-          node scripts/verify-smoke.mjs http://localhost:8080
-          kill "$PREVIEW_PID" 2>/dev/null || true
+      # Smoke E2E (public surface) is intentionally NOT a CI step. It needs a ~167 MB
+      # Playwright/Chromium download every push (no browser cache), which blew a 5-min
+      # budget and added no signal the blocking steps above don't already give. The same
+      # checks run locally on demand via the /verify skill (scripts/verify-smoke.mjs).
+      # To bring it back to CI, first add actions/cache on ~/.cache/ms-playwright so the
+      # browser download is paid once, not per push.
 
   secrets-scan:
     name: secrets-scan (gitleaks)
