@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { lovable } from "@/integrations/lovable/index";
+import { supabase } from "@/integrations/supabase/client";
 import auditOpening from "@/assets/audit-opening.png";
 import auditResearch from "@/assets/audit-research.png";
 import auditHero from "@/assets/audit-hero.png";
@@ -66,8 +66,9 @@ export default function LandingPage() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError("");
-    const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
     });
     if (error) {
       setError(error.message || "Login failed");
