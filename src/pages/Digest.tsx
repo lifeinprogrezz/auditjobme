@@ -10,6 +10,29 @@ const ACCENT = "#8a9a8a";
 const BORDER = "#2a2825";
 const SURFACE = "#1a1916";
 
+const FILTER_LEVELS: { value: string | null; label: string }[] = [
+  { value: null, label: "All levels" },
+  { value: "apm", label: "Associate" },
+  { value: "pm", label: "Product Manager" },
+  { value: "senior", label: "Senior" },
+  { value: "lead", label: "Lead" },
+  { value: "founding", label: "Founding" },
+];
+
+const pillStyle = (active: boolean): React.CSSProperties => ({
+  padding: ".4rem .7rem",
+  borderRadius: 999,
+  border: `1px solid ${active ? ACCENT : BORDER}`,
+  background: active ? ACCENT : "transparent",
+  color: active ? "#0f0e0c" : MUTED,
+  fontFamily: "inherit",
+  fontSize: ".66rem",
+  fontWeight: 700,
+  letterSpacing: ".04em",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+});
+
 interface JobRow {
   id: string;
   company: string;
@@ -32,6 +55,9 @@ export default function Digest() {
   const [loading, setLoading] = useState(true);
   const [scoring, setScoring] = useState(false);
   const [applied, setApplied] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
+  const [level, setLevel] = useState<string | null>(null);
+  const [remoteOnly, setRemoteOnly] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -110,6 +136,14 @@ export default function Digest() {
     await supabase.from("applications").upsert({ user_id: user.id, job_id: jobId }, { onConflict: "user_id,job_id" });
   };
 
+  const q = query.trim().toLowerCase();
+  const visible = jobs.filter((j) => {
+    if (level && j.seniority !== level) return false;
+    if (remoteOnly && !j.remote) return false;
+    if (q && !`${j.company} ${j.title} ${j.location ?? ""}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
   return (
     <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: "'Plus Jakarta Sans', sans-serif", padding: "3rem 1.5rem" }}>
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
@@ -136,8 +170,31 @@ export default function Digest() {
         ) : jobs.length === 0 ? (
           <p style={{ fontSize: ".8rem", color: MUTED }}>No roles in the pool yet. The daily scrape will fill this in.</p>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: ".8rem" }}>
-            {jobs.map((j) => (
+          <>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: ".5rem", alignItems: "center", marginBottom: "1rem" }}>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filter by company, role, or location..."
+                style={{ flex: "1 1 220px", minWidth: 0, padding: ".55rem .7rem", borderRadius: 8, border: `1px solid ${BORDER}`, background: SURFACE, color: TEXT, fontFamily: "inherit", fontSize: ".75rem" }}
+              />
+              <button onClick={() => setRemoteOnly((v) => !v)} style={pillStyle(remoteOnly)}>Remote only</button>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: ".4rem", marginBottom: ".9rem" }}>
+              {FILTER_LEVELS.map((o) => (
+                <button key={o.label} onClick={() => setLevel(o.value)} style={pillStyle(level === o.value)}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: ".66rem", color: MUTED, marginBottom: "1.1rem", letterSpacing: ".04em" }}>
+              Showing {visible.length} of {jobs.length} roles{visible.length === 0 ? " — try clearing filters" : ""}
+            </div>
+            {visible.length === 0 ? (
+              <p style={{ fontSize: ".8rem", color: MUTED }}>No roles match these filters.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: ".8rem" }}>
+                {visible.map((j) => (
               <a
                 key={j.id}
                 href={j.url}
@@ -192,8 +249,10 @@ export default function Digest() {
                   </button>
                 </div>
               </a>
-            ))}
-          </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
