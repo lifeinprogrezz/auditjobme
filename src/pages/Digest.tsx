@@ -258,6 +258,12 @@ export default function Digest() {
                     {applied.has(j.id) ? "Applied" : "Mark applied"}
                   </button>
                   <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/apply?job=${encodeURIComponent(j.url)}`); }}
+                    style={{ marginTop: ".4rem", display: "block", marginLeft: "auto", fontSize: ".55rem", fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", padding: ".25rem .5rem", borderRadius: 6, border: `1px solid ${ACCENT}`, background: ACCENT, color: "#0f0e0c", cursor: "pointer", whiteSpace: "nowrap" }}
+                  >
+                    Prep application
+                  </button>
+                  <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/audit?job=${encodeURIComponent(j.url)}`); }}
                     style={{ marginTop: ".4rem", display: "block", marginLeft: "auto", fontSize: ".55rem", fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", padding: ".25rem .5rem", borderRadius: 6, border: `1px solid ${BORDER}`, background: "transparent", color: ACCENT, cursor: "pointer", whiteSpace: "nowrap" }}
                   >

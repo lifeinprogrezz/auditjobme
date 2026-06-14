@@ -13,6 +13,7 @@ import Digest from "./pages/Digest.tsx";
 import AuditGenerator from "@/components/AuditGenerator";
 import Tracker from "./pages/Tracker.tsx";
 import Profile from "./pages/Profile.tsx";
+import Apply from "./pages/Apply.tsx";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/terms" element={<Terms />} />
             <Route path="/digest" element={<Digest />} />
             <Route path="/audit" element={<AuditGenerator />} />
+            <Route path="/apply" element={<Apply />} />
             <Route path="/tracker" element={<Tracker />} />
             <Route path="/profile" element={<Profile />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
