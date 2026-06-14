@@ -707,15 +707,16 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                     {new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </span>
                   {a.pdf_path && (
-                    <a
-                      href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/audit-pdfs/${a.pdf_path}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={e => e.stopPropagation()}
-                      style={{ fontSize: ".55rem", color: safeAccent(a.accent_color) || "#8a8780", fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", textDecoration: "none" }}
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const { data } = await supabase.storage.from("audit-pdfs").createSignedUrl(a.pdf_path, 3600);
+                        if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+                      }}
+                      style={{ fontSize: ".55rem", color: safeAccent(a.accent_color) || "#8a8780", fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", textDecoration: "none", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}
                     >
                       PDF
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>
