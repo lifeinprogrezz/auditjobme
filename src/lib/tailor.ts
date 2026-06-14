@@ -5,13 +5,11 @@
 // it is rendered verbatim from the user's cv_text in cvHtml.ts. That is the trust rule.
 //
 // Both calls go through the anthropic-proxy edge function (our key, Haiku), authenticated
-// with the user's session token — exactly like the audit's callClaude.
+// with the user's session token. The proxy enforces the spend caps and meters usage
+// server-side — the client just passes `kind` for attribution.
 import { supabase } from "@/integrations/supabase/client";
-import { recordUsage } from "@/lib/usage";
 
 export const HAIKU = "claude-haiku-4-5-20251001";
-
-type ProxyUsage = { input_tokens?: number; output_tokens?: number };
 
 export type TailorInput = {
   role: string;
@@ -24,10 +22,7 @@ export type CoverJson = { greeting: string; p1: string; p2: string; p3: string; 
 
 type ProxyMessage = { role: "user" | "assistant"; content: string };
 
-async function callProxy(
-  messages: ProxyMessage[],
-  maxTokens: number,
-): Promise<{ text: string; usage?: ProxyUsage }> {
+async function callProxy(messages: ProxyMessage[], maxTokens: number, kind: "cv" | "letter"): Promise<string> {
   const url = import.meta.env.VITE_SUPABASE_URL as string;
   const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
   const { data: sessionData } = await supabase.auth.getSession();
@@ -40,19 +35,18 @@ async function callProxy(
       Authorization: `Bearer ${accessToken}`,
       apikey: key,
     },
-    body: JSON.stringify({ messages, model: HAIKU, max_tokens: maxTokens }),
+    body: JSON.stringify({ messages, model: HAIKU, max_tokens: maxTokens, kind }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `anthropic-proxy ${res.status}`);
   }
   const data = await res.json();
-  const text = ((data?.content as { type: string; text: string }[]) || [])
+  return ((data?.content as { type: string; text: string }[]) || [])
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("\n")
     .trim();
-  return { text, usage: data?.usage as ProxyUsage | undefined };
 }
 
 /** Belt-and-suspenders no-em-dash guardrail on LLM output (the prompt also forbids them). */
@@ -116,14 +110,12 @@ Return JSON now:`;
 // ── LLM calls ─────────────────────────────────────────────────────────────────
 
 export async function tailorSummary(input: TailorInput): Promise<string> {
-  const { text, usage } = await callProxy([{ role: "user", content: buildSummaryPrompt(input) }], 500);
-  await recordUsage({ kind: "cv", model: HAIKU, inputTokens: usage?.input_tokens, outputTokens: usage?.output_tokens });
+  const text = await callProxy([{ role: "user", content: buildSummaryPrompt(input) }], 500, "cv");
   return noEmDash(text);
 }
 
 export async function tailorCover(input: TailorInput, candidateName: string): Promise<CoverJson> {
-  const { text: raw, usage } = await callProxy([{ role: "user", content: buildCoverPrompt(input, candidateName) }], 800);
-  await recordUsage({ kind: "letter", model: HAIKU, inputTokens: usage?.input_tokens, outputTokens: usage?.output_tokens });
+  const raw = await callProxy([{ role: "user", content: buildCoverPrompt(input, candidateName) }], 800, "letter");
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("Cover letter did not return JSON");
   const parsed = JSON.parse(match[0]) as CoverJson;
