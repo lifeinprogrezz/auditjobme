@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
-import { extractPdfText } from "@/lib/pdfText";
 
 const SENIORITY_OPTIONS = [
   { value: "apm", label: "Associate / APM" },
@@ -77,6 +76,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
     setPdfError("");
     setPdfReading(true);
     try {
+      const { extractPdfText } = await import("@/lib/pdfText"); // lazy: keeps pdfjs out of the initial bundle
       const text = await extractPdfText(file);
       setCvText(text);
     } catch (err) {
