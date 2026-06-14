@@ -22,6 +22,7 @@ export async function callClaude(messages, opts = {}) {
       messages,
       model: opts.model || SONNET,
       max_tokens: opts.max_tokens || 4096,
+      kind: opts.kind || "audit",
       ...(opts.system ? { system: opts.system } : {}),
       ...(opts.tools ? { tools: opts.tools } : {}),
     }),

@@ -47,6 +47,7 @@ export async function scoreJob(
 
   const { data, error } = await supabase.functions.invoke("anthropic-proxy", {
     body: {
+      kind: "score",
       model: "claude-haiku-4-5-20251001",
       max_tokens: 300,
       system: SYSTEM,
