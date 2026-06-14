@@ -31,3 +31,6 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Optional: residential/rotating proxy for the datacenter-IP-blocked sources
+          # (startupmap, Meta). Unset = those two fetch direct (and get blocked from CI).
+          SCRAPE_PROXY_URL: ${{ secrets.SCRAPE_PROXY_URL }}

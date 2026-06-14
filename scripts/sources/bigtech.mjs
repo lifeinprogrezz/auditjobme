@@ -17,6 +17,7 @@
  * The orchestrator (scrape.mjs) spreads these into SOURCES.
  */
 import { isPM, isEU, inferSeniority, stripHtml } from "../job-filters.mjs";
+import { pfetch } from "./_proxy.mjs";
 
 const TIMEOUT_MS = 20000;
 const fetchOpts = (extra = {}) => ({ signal: AbortSignal.timeout(TIMEOUT_MS), ...extra }); // fresh signal per call
@@ -136,7 +137,7 @@ async function fetchMeta(company) {
     fb_api_caller_class: "RelayModern",
     variables: JSON.stringify({ search_input: { q: "product manager" } }),
   });
-  const res = await fetch(
+  const res = await pfetch(
     "https://www.metacareers.com/graphql",
     fetchOpts({
       method: "POST",

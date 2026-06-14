@@ -30,6 +30,7 @@
  * Greenhouse/Lever/Ashby boards. `run()` returns the filtered EU-PM array.
  */
 import { isPM, isEU, inferSeniority, stripHtml } from "../job-filters.mjs";
+import { pfetch } from "./_proxy.mjs";
 
 const TIMEOUT_MS = 20_000;
 const fetchOpts = (extra = {}) => ({ signal: AbortSignal.timeout(TIMEOUT_MS), ...extra });
@@ -266,8 +267,8 @@ function extractArray(payload, keyHint) {
 async function fetchStartupmap() {
   const headers = { "User-Agent": "career-ops/1.0 (+lifeinprogrezz personal)" };
   const [cosRes, jobsRes] = await Promise.all([
-    fetch(`${STARTUPMAP_BASE}/api/startups`, fetchOpts({ headers })),
-    fetch(`${STARTUPMAP_BASE}/api/jobs`, fetchOpts({ headers })),
+    pfetch(`${STARTUPMAP_BASE}/api/startups`, fetchOpts({ headers })),
+    pfetch(`${STARTUPMAP_BASE}/api/jobs`, fetchOpts({ headers })),
   ]);
   if (!cosRes.ok) throw new Error(`startups HTTP ${cosRes.status}`);
   if (!jobsRes.ok) throw new Error(`jobs HTTP ${jobsRes.status}`);
