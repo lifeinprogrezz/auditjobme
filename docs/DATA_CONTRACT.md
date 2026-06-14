@@ -58,10 +58,11 @@
   timestamps. Cap-1 rule: one non-terminal application per (user, company) — enforced at
   write time in the edge function, surfaced in the digest query.
 
-**artifacts** — generated audit / tailored CV / letter.
-- `id` (pk) · `user_id` · `job_id` · `kind` (audit | cv | letter) · `storage_path` ·
-  `visibility` (private | public — DEFAULT private) · `public_slug` (nullable, unique;
-  minted only on explicit publish) · `model` · `cost_usd` · timestamps.
+**artifacts** — generated audit / tailored CV / letter. **Live 2026-06-14** (migration `20260614190000_create_artifacts_table.sql`).
+- `id` (pk) · `user_id` · `job_id` · `kind` (cv | letter | audit) · `content` (jsonb — the
+  generated summary text + cover JSON + the `cv_text` snapshot used; PDFs render client-side
+  on demand, not stored) · `visibility` (private | public — DEFAULT private) · `public_slug`
+  (nullable, unique) · `model` · timestamps. RLS: owner-only (no CV/letter publish flow in v1).
 
 **usage_events** — every sponsored AI call.
 - `id` · `user_id` · `kind` (score | audit | cv | letter) · `model` · `input_tokens` ·
