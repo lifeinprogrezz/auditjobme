@@ -10,7 +10,16 @@ title = "auditjobme gitleaks config"
 useDefault = true
 
 [allowlist]
-description = "Publishable/anon Supabase key is public by design (RLS-gated); lives only in .env."
+description = "Public-by-design Supabase anon keys (RLS-gated): our own in .env, plus one third-party board's key inlined in the scraper."
 paths = [
   '''^\.env$''',
+]
+regexes = [
+  # Scaling Europe (scalingeurope.co.uk) job-board's Supabase publishable/anon
+  # key — project yaionvwehtkrqgtjzdqn, role=anon, exp 2036. Public by design
+  # (shipped in that site's own browser bundle), used read-only to call their
+  # public /rest/v1/jobs board. NOT our project and NOT a secret; decoded +
+  # documented at scripts/sources/vc-startupmap.mjs:42-48. gitleaks' generic
+  # `jwt` rule can't see role=anon inside the token, so allowlist it explicitly.
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhaW9udndlaHRrcnFndGp6ZHFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTE4MjAsImV4cCI6MjA4OTA4NzgyMH0\.1FahdfqyoL9k0OEMk8Z2ig3Hkhc78GpORax0uRoKvOY''',
 ]
