@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
+import { extractPdfText } from "@/lib/pdfText";
 
 const SENIORITY_OPTIONS = [
   { value: "apm", label: "Associate / APM" },
@@ -65,9 +66,27 @@ export default function Profile() {
   const [euAuthorized, setEuAuthorized] = useState(false);
   const [languages, setLanguages] = useState<string[]>(["English"]);
   const [cvText, setCvText] = useState("");
+  const [pdfReading, setPdfReading] = useState(false);
+  const [pdfError, setPdfError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+
+  const handlePdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    setPdfError("");
+    setPdfReading(true);
+    try {
+      const text = await extractPdfText(file);
+      setCvText(text);
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : "Could not read that PDF.");
+    } finally {
+      setPdfReading(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -194,13 +213,18 @@ export default function Profile() {
             <div style={{ marginBottom: "2rem" }}>
               <label style={labelStyle}>Your CV</label>
               <p style={{ fontSize: ".72rem", color: MUTED, marginBottom: ".7rem", lineHeight: 1.6 }}>
-                Paste the text of your curriculum vitae. We use it to match roles. We never rewrite it.
+                Upload a PDF and we'll pull the text out, or paste it in. We use it to match roles. We never rewrite it.
               </p>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: ".5rem", marginBottom: ".7rem", padding: ".55rem .9rem", borderRadius: 8, border: `1px solid ${BORDER}`, background: "transparent", color: TEXT, fontSize: ".72rem", fontWeight: 600, cursor: pdfReading ? "wait" : "pointer" }}>
+                {pdfReading ? "Reading PDF..." : "Upload PDF"}
+                <input type="file" accept="application/pdf" onChange={handlePdf} disabled={pdfReading} style={{ display: "none" }} />
+              </label>
+              {pdfError && <p style={{ color: "#e07a5f", fontSize: ".72rem", marginBottom: ".7rem" }}>{pdfError}</p>}
               <textarea
                 value={cvText}
                 onChange={(e) => setCvText(e.target.value)}
                 rows={8}
-                placeholder="Paste your CV text here..."
+                placeholder="Paste your CV text here, or upload a PDF above..."
                 style={{ width: "100%", padding: ".8rem", borderRadius: 8, border: `1px solid ${BORDER}`, background: "#1a1916", color: TEXT, fontFamily: "inherit", fontSize: ".8rem", lineHeight: 1.6, resize: "vertical" }}
               />
             </div>
