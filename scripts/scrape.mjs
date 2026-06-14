@@ -13,6 +13,9 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { isPM, isEU, inferSeniority, stripHtml } from "./job-filters.mjs";
+import { sources as atsExtraSources } from "./sources/ats-extra.mjs";
+import { sources as bigtechSources } from "./sources/bigtech.mjs";
+import { sources as vcSources } from "./sources/vc-startupmap.mjs";
 
 // Board tokens live in boards.json (verified Greenhouse/Lever/Ashby public APIs, sourced from the
 // career-ops portals.yml). Dead boards fail non-fatally below; add/curate tokens there, not here.
@@ -89,6 +92,9 @@ async function main() {
     ...GREENHOUSE_BOARDS.map((b) => ({ company: b.company, run: () => fetchGreenhouse(b) })),
     ...LEVER_BOARDS.map((b) => ({ company: b.company, run: () => fetchLever(b) })),
     ...ASHBY_BOARDS.map((b) => ({ company: b.company, run: () => fetchAshby(b) })),
+    ...atsExtraSources,
+    ...bigtechSources,
+    ...vcSources,
   ];
 
   let all = [];
