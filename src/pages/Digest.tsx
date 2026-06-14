@@ -56,6 +56,7 @@ export default function Digest() {
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [scoring, setScoring] = useState(false);
+  const [profile, setProfile] = useState<ScoreableProfile | null>(null);
   const [applied, setApplied] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [level, setLevel] = useState<string | null>(null);
@@ -102,6 +103,7 @@ export default function Digest() {
         .select("target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, cv_text")
         .eq("id", user.id)
         .maybeSingle();
+      if (active && profile) setProfile(profile as ScoreableProfile);
       const unscored = merged.filter((j) => j.score == null).slice(0, 40);
       if (!profile || unscored.length === 0 || !active) return;
       setScoring(true);
@@ -137,6 +139,33 @@ export default function Digest() {
     setApplied((prev) => new Set(prev).add(jobId));
     await supabase.from("applications").upsert({ user_id: user.id, job_id: jobId }, { onConflict: "user_id,job_id" });
   };
+
+  const scoreMore = async () => {
+    if (!user || !profile || scoring) return;
+    const unscored = jobs.filter((j) => j.score == null).slice(0, 40);
+    if (unscored.length === 0) return;
+    setScoring(true);
+    for (const j of unscored) {
+      const result = await scoreJob(profile, j);
+      if (!result) continue;
+      await supabase.from("scores").upsert(
+        {
+          user_id: user.id,
+          job_id: j.id,
+          score: result.score,
+          rubric_version: RUBRIC_VERSION,
+          signals: { reason: result.reason },
+        },
+        { onConflict: "user_id,job_id,rubric_version" },
+      );
+      setJobs((prev) =>
+        prev.map((x) => (x.id === j.id ? { ...x, score: result.score, reason: result.reason } : x)).sort(byScore),
+      );
+    }
+    setScoring(false);
+  };
+
+  const remaining = jobs.filter((j) => j.score == null).length;
 
   const q = query.trim().toLowerCase();
   const visible = jobs.filter((j) => {
@@ -272,6 +301,13 @@ export default function Digest() {
                 </div>
               </a>
                 ))}
+              </div>
+            )}
+            {profile && remaining > 0 && !scoring && (
+              <div style={{ display: "flex", justifyContent: "center", marginTop: "1.4rem" }}>
+                <button onClick={scoreMore} style={pillStyle(false)}>
+                  Score {Math.min(40, remaining)} more
+                </button>
               </div>
             )}
           </>
