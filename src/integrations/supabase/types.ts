@@ -146,6 +146,36 @@ export type Database = {
         }
         Relationships: []
       }
+      company_requests: {
+        Row: {
+          careers_url: string | null
+          company_name: string
+          created_at: string
+          id: string
+          note: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          careers_url?: string | null
+          company_name: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          careers_url?: string | null
+          company_name?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       device_fingerprints: {
         Row: {
           audit_id: string
@@ -365,6 +395,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      usage_events: {
+        Row: {
+          cost_usd: number | null
+          created_at: string
+          id: string
+          input_tokens: number | null
+          kind: string
+          model: string | null
+          output_tokens: number | null
+          user_id: string
+        }
+        Insert: {
+          cost_usd?: number | null
+          created_at?: string
+          id?: string
+          input_tokens?: number | null
+          kind: string
+          model?: string | null
+          output_tokens?: number | null
+          user_id: string
+        }
+        Update: {
+          cost_usd?: number | null
+          created_at?: string
+          id?: string
+          input_tokens?: number | null
+          kind?: string
+          model?: string | null
+          output_tokens?: number | null
+          user_id?: string
+        }
+        Relationships: []
       }
       whitelisted_emails: {
         Row: {
