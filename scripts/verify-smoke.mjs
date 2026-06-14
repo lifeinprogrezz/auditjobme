@@ -115,11 +115,28 @@ if (E2E_EMAIL && E2E_PW && SUPA_URL && ANON) {
       console.log(`  FAIL  ${name.padEnd(24)} (onboarding=${onboarding}, landingGone=${landingGone})`);
       failed++;
     }
+    // Apply bundle: fetch a real job (authenticated) and assert /apply renders its bundle.
+    const jr = await fetch(`${SUPA_URL}/rest/v1/jobs?select=url&limit=1`, {
+      headers: { apikey: ANON, Authorization: `Bearer ${session.access_token}` },
+    });
+    const jrows = await jr.json().catch(() => []);
+    if (Array.isArray(jrows) && jrows[0]?.url) {
+      await apage.goto(BASE + "/apply?job=" + encodeURIComponent(jrows[0].url), { waitUntil: "networkidle", timeout: 20000 });
+      await apage.waitForTimeout(1500);
+      const abody = (await apage.content()).toLowerCase();
+      if (abody.includes("apply bundle")) {
+        console.log(`  PASS  ${"authed: apply bundle".padEnd(24)} (/apply renders the bundle for a real role)`);
+      } else {
+        console.log(`  FAIL  ${"authed: apply bundle".padEnd(24)} (/apply did not render the bundle)`);
+        failed++;
+      }
+    } else {
+      console.log(`  WARN  ${"authed: apply bundle".padEnd(24)} (no job in pool to test /apply) [soft]`);
+    }
     await ctx.close();
-    // CANONICAL-PATH TODO (need a test user with completed onboarding + seeded scores):
-    //  - digest table renders for the seeded test user
-    //  - role page renders the apply bundle
-    //  - tracker reflects a manual "applied" mark
+    // The CV/letter GENERATION itself (verbatim body + no em-dashes) is covered by unit tests
+    // (src/lib/tailor.test.ts), not exercised here — that would cost a live Haiku call per run.
+    // CANONICAL-PATH TODO: digest table + tracker for a seeded, fully-onboarded test user.
   } catch (e) {
     console.log(`  FAIL  ${name.padEnd(24)} (${e.message})`);
     failed++;
