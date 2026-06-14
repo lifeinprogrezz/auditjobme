@@ -92,11 +92,11 @@ built and working:
   waiting for an engine behind it.
 
 ### The three repositories
-| # | Path | GitHub remote | Role |
+| # | Layout | GitHub remote | Role |
 |---|------|---------------|------|
-| 1 | `…/Coding/Auditjobme&careerops/` | `lifeinprogrezz/auditjobme-careerops-planning` | Planning / coordination + the phone/GitHub surface. **This file lives here.** `career-ops/` is nested inside. |
-| 2 | `…/Auditjobme&careerops/career-ops/` | `lifeinprogrezz/career-ops-rober` | The engine (Node CLI, pinned fork). |
-| 3 | `…/Coding/auditjobme/` *(sibling)* | `lifeinprogrezz/auditjobme` | The public web product (Vite + Supabase). |
+| 1 | planning repo | `lifeinprogrezz/auditjobme-careerops-planning` | Planning / coordination + the phone/GitHub surface. **This file lives here.** `career-ops/` is nested inside. |
+| 2 | nested under #1 | `lifeinprogrezz/career-ops-rober` | The engine (Node CLI, pinned fork). |
+| 3 | standalone | `lifeinprogrezz/auditjobme` | The public web product (Vite + Supabase). |
 
 ### The strategic reframe (worth saying out loud)
 Earlier planning had this backwards: it treated "integration" as `career-ops`
