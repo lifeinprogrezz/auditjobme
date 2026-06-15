@@ -150,6 +150,18 @@ export default function Profile() {
     setSaved(true);
   };
 
+  if (!user) {
+    return (
+      <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: "'Plus Jakarta Sans', sans-serif", padding: "3rem 1.5rem" }}>
+        <div style={{ maxWidth: 640, margin: "0 auto" }}>
+          <p style={{ fontSize: ".85rem", color: MUTED }}>
+            Please <a href="/" style={{ color: ACCENT, textDecoration: "underline", textUnderlineOffset: "2px" }}>sign in</a> to edit your profile.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: "'Plus Jakarta Sans', sans-serif", padding: "3rem 1.5rem" }}>
       <div style={{ maxWidth: 640, margin: "0 auto" }}>

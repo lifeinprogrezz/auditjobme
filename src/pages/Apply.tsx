@@ -46,6 +46,8 @@ export default function Apply() {
 
   useEffect(() => {
     let active = true;
+    setError("");
+    setBusy(null);
     async function load() {
       if (!user) {
         setLoading(false);

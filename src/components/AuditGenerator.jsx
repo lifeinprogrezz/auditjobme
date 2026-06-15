@@ -619,6 +619,22 @@ ROLE: ${company.role || roleCtx.role_type || ""}
   const ABOUT_NUM = showProtos ? "05" : "04";
   const PROTO_NUM = "04";
 
+  if (!user) {
+    return (
+      <>
+        <style>{makeCSS(accent)}</style>
+        <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "'Plus Jakarta Sans', sans-serif", padding: "3rem 1.5rem" }}>
+          <div style={{ maxWidth: 640, margin: "0 auto" }}>
+            <a href="/digest" style={{ color: accent, textDecoration: "underline", textUnderlineOffset: "2px", fontSize: ".68rem", textTransform: "uppercase", letterSpacing: ".06em" }}>← Back to your roles</a>
+            <p style={{ marginTop: "1.5rem", fontSize: ".85rem", color: "var(--muted)" }}>
+              Please <a href="/" style={{ color: accent, textDecoration: "underline", textUnderlineOffset: "2px" }}>sign in</a> to build a company audit.
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <style>{makeCSS(accent)}</style>
@@ -758,7 +774,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                 Feedback
               </button>
               <button
-                onClick={async () => { await supabase.auth.signOut(); setShowHistory(false); }}
+                onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
                 style={{
                   flex: 1, padding: "7px", borderRadius: 6, border: "1px solid #2a2825", background: "transparent",
                   color: "#f0ede8", fontSize: ".55rem", fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans',sans-serif",

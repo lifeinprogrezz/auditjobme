@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { useNavigate } from "react-router-dom";
+import { toast } from "@/components/ui/sonner";
 import { scoreJob, RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
 
 const BG = "#0f0e0c";
@@ -137,7 +138,15 @@ export default function Digest() {
   const markApplied = async (jobId: string) => {
     if (!user) return;
     setApplied((prev) => new Set(prev).add(jobId));
-    await supabase.from("applications").upsert({ user_id: user.id, job_id: jobId }, { onConflict: "user_id,job_id" });
+    const { error } = await supabase.from("applications").upsert({ user_id: user.id, job_id: jobId }, { onConflict: "user_id,job_id" });
+    if (error) {
+      setApplied((prev) => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
+      toast.error("Couldn't mark as applied. Please try again.");
+    }
   };
 
   const scoreMore = async () => {
