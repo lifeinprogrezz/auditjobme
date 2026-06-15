@@ -115,6 +115,13 @@ async function main() {
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   const seen = new Set();
   all = all.filter((j) => (seen.has(j.url) ? false : seen.add(j.url)));
+  // Drop rows missing a required NOT NULL field. Some scraped sources (e.g. startupmap)
+  // occasionally yield a role with no parseable company, which would make the whole
+  // batch upsert violate the jobs.company NOT NULL constraint and fail the run.
+  const beforeRequired = all.length;
+  all = all.filter((j) => j.company && j.title && j.url);
+  const dropped = beforeRequired - all.length;
+  if (dropped) console.error(`Dropped ${dropped} role(s) missing company/title/url.`);
   console.error(`Total: ${all.length} EU PM roles.`);
 
   if (process.argv.includes("--sql")) {
