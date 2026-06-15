@@ -10,6 +10,11 @@ const corsHeaders = {
 const MONTHLY_KILL_SWITCH_USD = 54; // global monthly cap (~EUR 50)
 const PER_USER_DAILY_USD = 1.0;     // one account can't drain the monthly pool in a day
 const ALLOWED_KINDS = ['score', 'audit', 'cv', 'letter'];
+const MAX_TOKENS_CEILING = 8192;    // hard ceiling: a caller can't request a huge, costly generation
+// priceUsd only knows haiku vs sonnet rates, so an unlisted (e.g. pricier) model would be
+// under-metered and could outrun the caps — accept only the two the product actually uses.
+const ALLOWED_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-4-20250514'];
+const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 
 /** USD cost from token counts, by model family. */
 function priceUsd(model: string, inTok: number, outTok: number): number {
@@ -42,34 +47,45 @@ Deno.serve(async (req) => {
 
     const { messages, model, max_tokens, system, tools, kind } = await req.json();
     if (!messages || !Array.isArray(messages)) return json({ error: 'messages array is required' }, 400);
+    if (model && !ALLOWED_MODELS.includes(model)) return json({ error: 'Unsupported model' }, 400);
 
     // Service-role client for the GLOBAL cap check + authoritative metering (bypasses RLS).
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    // --- Cost guardrails. Fail OPEN on a query error so a DB hiccup never blocks generation. ---
-    try {
-      const now = new Date();
-      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+    // --- Cost guardrails. ---
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
 
-      const { data: monthRows } = await admin.from('usage_events').select('cost_usd').gte('created_at', monthStart);
+    // GLOBAL monthly kill-switch — fails CLOSED: if usage can't be read, pause sponsored
+    // compute rather than open the spend gate (a DB outage must not uncap us).
+    try {
+      const { data: monthRows, error: monthErr } = await admin.from('usage_events').select('cost_usd').gte('created_at', monthStart);
+      if (monthErr) throw monthErr;
       const monthTotal = (monthRows ?? []).reduce((s: number, r: { cost_usd: number | null }) => s + Number(r.cost_usd || 0), 0);
       if (monthTotal >= MONTHLY_KILL_SWITCH_USD) {
         return json({ error: 'The monthly free-compute limit has been reached. It resets at the start of next month.' }, 429);
       }
+    } catch (e) {
+      console.error('global cap check failed — blocking call (fail-closed):', e);
+      return json({ error: 'Compute is temporarily paused. Please try again shortly.' }, 503);
+    }
 
+    // PER-USER daily cap — fails OPEN: one user's transient read error shouldn't lock them
+    // out, since the global kill-switch above is the hard backstop on total spend.
+    try {
       const { data: dayRows } = await admin.from('usage_events').select('cost_usd').eq('user_id', user.id).gte('created_at', dayStart);
       const dayTotal = (dayRows ?? []).reduce((s: number, r: { cost_usd: number | null }) => s + Number(r.cost_usd || 0), 0);
       if (dayTotal >= PER_USER_DAILY_USD) {
         return json({ error: 'You have reached your daily limit. Please try again tomorrow.' }, 429);
       }
     } catch (e) {
-      console.warn('usage cap check failed, allowing call:', e);
+      console.warn('per-user cap check failed, allowing call:', e);
     }
 
     const body: Record<string, unknown> = {
-      model: model || 'claude-sonnet-4-20250514',
-      max_tokens: max_tokens || 4096,
+      model: model || DEFAULT_MODEL,
+      max_tokens: Math.min(Number(max_tokens) || 4096, MAX_TOKENS_CEILING),
       messages,
     };
     if (system) body.system = system;
