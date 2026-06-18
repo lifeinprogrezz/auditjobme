@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /* ═══════════════════ API ═══════════════════ */
-export const SONNET = "claude-sonnet-4-20250514";
+export const SONNET = "claude-sonnet-4-6";
 export const HAIKU = "claude-haiku-4-5-20251001";
 
 export async function callClaude(messages, opts = {}) {
