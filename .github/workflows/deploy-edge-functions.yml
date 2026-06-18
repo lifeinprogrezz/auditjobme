@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      PROJECT_REF: gehofquozipcubggldls   # public ref (also in supabase/config.toml)
+      PROJECT_REF: roaervdsjejksaeseeov   # prod backend — matches frontend VITE_SUPABASE_URL (config.toml's ref is stale)
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
