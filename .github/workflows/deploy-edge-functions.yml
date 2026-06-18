@@ -1,0 +1,31 @@
+name: Deploy Supabase Edge Functions
+
+# Mirrors the Vercel git-auto-deploy for the frontend: any push to main that
+# touches an edge function ships it to prod. Push once, both surfaces deploy.
+# Requires repo secret SUPABASE_ACCESS_TOKEN (a Supabase personal access token).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch: {}   # manual trigger for testing / re-deploys
+
+concurrency:
+  group: deploy-edge-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: gehofquozipcubggldls   # public ref (also in supabase/config.toml)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      # verify_jwt stays ON (default) — the proxy expects the user's Bearer JWT.
+      # Add more functions here (or switch to `supabase functions deploy`) as they appear.
+      - name: Deploy anthropic-proxy to production
+        run: supabase functions deploy anthropic-proxy --project-ref "$PROJECT_REF"
