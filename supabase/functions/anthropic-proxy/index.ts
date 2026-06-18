@@ -13,8 +13,8 @@ const ALLOWED_KINDS = ['score', 'audit', 'cv', 'letter'];
 const MAX_TOKENS_CEILING = 8192;    // hard ceiling: a caller can't request a huge, costly generation
 // priceUsd only knows haiku vs sonnet rates, so an unlisted (e.g. pricier) model would be
 // under-metered and could outrun the caps — accept only the two the product actually uses.
-const ALLOWED_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-4-20250514'];
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+const ALLOWED_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-4-6'];
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
 /** USD cost from token counts, by model family. */
 function priceUsd(model: string, inTok: number, outTok: number): number {
