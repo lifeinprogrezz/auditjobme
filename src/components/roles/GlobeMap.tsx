@@ -34,6 +34,12 @@ type MapTheme = {
   waterColor?: string;
   /** Optional darkening of place/country label text. */
   labelColor?: string;
+  /**
+   * City-zoom detail boost (Rober 7-05, the startupmap-reference vividness ask):
+   * land takes a value step, parks turn green, neighborhood labels switch on —
+   * all zoom-gated ≥~z10 so the locked globe/Europe identity is untouched.
+   */
+  cityDetail?: { land: string; park: string; label: string };
 };
 
 // Dark = the approved ink & graphite palette (7-05); light = paper (Positron).
@@ -47,6 +53,7 @@ const THEMES: Record<"dark" | "light", MapTheme> = {
     ],
     hill: { shadow: "#01050a", highlight: "#38434c", accent: "#0d161d", exaggeration: 0.7 },
     border: { color: "#7f95a3", opacity: 0.22, width: 0.6 },
+    cityDetail: { land: "#101a22", park: "#13251e", label: "#8fa1ab" },
   },
   light: {
     styleUrl: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
@@ -65,6 +72,7 @@ const THEMES: Record<"dark" | "light", MapTheme> = {
     baseTint: "#eff2f4",
     atmosphere: 1,
     waterColor: "#aec3d2",
+    cityDetail: { land: "#e3e9ed", park: "#cde1d0", label: "#3c4750" },
     labelColor: "#4e5f6a",
   },
 };
@@ -272,6 +280,42 @@ function styleAtmosphere(map: maplibregl.Map, theme: MapTheme): void {
     } as maplibregl.SkySpecification);
   } catch {
     /* sky is decoration */
+  }
+}
+
+function boostCityDetail(map: maplibregl.Map, theme: MapTheme): void {
+  const cd = theme.cityDetail;
+  if (!cd) return;
+  const zoomed = (lo: string, hi: string) =>
+    ["interpolate", ["linear"], ["zoom"], 9.5, lo, 11.5, hi] as unknown as string;
+  try {
+    for (const l of map.getStyle().layers) {
+      // Land value step at city zoom: darker ground makes the (light) street
+      // network read as a network — the startupmap contrast lesson at z12+.
+      if (l.type === "background" && theme.baseTint) {
+        try {
+          map.setPaintProperty(l.id, "background-color", zoomed(theme.baseTint, cd.land));
+        } catch { /* decoration */ }
+      }
+      // Parks / green landcover: always tinted (faint at globe zoom anyway),
+      // fully green at city zoom.
+      if (l.type === "fill" && /park|wood|grass|landcover|cemet|golf|garden|pitch/i.test(l.id)) {
+        try {
+          map.setPaintProperty(l.id, "fill-color", cd.park);
+        } catch { /* some fills reject repaint */ }
+      }
+      // Neighborhood names (Gràcia, Eixample, Poblenou…): darken and pull in a
+      // touch earlier so the logo-cloud zoom already shows where you are.
+      if (l.type === "symbol" && /suburb|neighbourhood|neighborhood|quarter|hamlet/i.test(l.id)) {
+        try {
+          map.setPaintProperty(l.id, "text-color", cd.label);
+          map.setPaintProperty(l.id, "text-halo-width", 1.2);
+          map.setLayerZoomRange(l.id, 10.4, 24);
+        } catch { /* label classes vary per style */ }
+      }
+    }
+  } catch {
+    /* detail boost is decoration */
   }
 }
 
@@ -708,6 +752,7 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
         const theme = THEMES[themeRef.current];
         styleAtmosphere(map, theme);
         boostBorders(map, theme);
+        boostCityDetail(map, theme);
         addTerrain(map, theme);
         try {
           addRolesLayers(map, featureCollection(jobsRef.current));
@@ -792,6 +837,7 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
       }
       styleAtmosphere(map, theme);
       boostBorders(map, theme);
+      boostCityDetail(map, theme);
       addTerrain(map, theme);
       try {
         addRolesLayers(map, featureCollection(jobsRef.current));
