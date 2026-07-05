@@ -44,11 +44,17 @@ export default function RolesMap() {
   // ALL visible roles (other bubbles stay clickable) while only the PANEL narrows.
   // Company (logo click) wins over city (cluster click); each clears the other.
   const [cityFilter, setCityFilter] = useState<string | null>(null);
-  const [companyFilter, setCompanyFilter] = useState<string | null>(null);
+  // Company filter carries the CITY of the clicked pin, so the panel shows the
+  // same roles the pin counted (a pin is per company-city — Revolut Barcelona = 3,
+  // not all 13 Revolut roles across Europe).
+  const [companyFilter, setCompanyFilter] = useState<{ co: string; city: string | null } | null>(null);
 
   const visible = useMemo(() => filterJobs(jobs, filters), [jobs, filters]);
   const panelJobs = useMemo(() => {
-    if (companyFilter) return visible.filter((j) => j.company === companyFilter);
+    if (companyFilter)
+      return visible.filter(
+        (j) => j.company === companyFilter.co && (companyFilter.city == null || j.city === companyFilter.city),
+      );
     if (cityFilter) return visible.filter((j) => j.city === cityFilter);
     return visible;
   }, [visible, cityFilter, companyFilter]);
@@ -95,8 +101,8 @@ export default function RolesMap() {
         scored={scored}
         focusLngLats={focusLngLats}
         light={light}
-        onCompanyClick={(company) => {
-          setCompanyFilter(company);
+        onCompanyClick={(company, city) => {
+          setCompanyFilter({ co: company, city });
           setCityFilter(null);
           setDetailJob(null);
           setPanelHidden(false);
@@ -121,7 +127,7 @@ export default function RolesMap() {
           jobs={panelJobs}
           allJobs={jobs}
           cityFilter={cityFilter}
-          companyFilter={companyFilter}
+          companyFilter={companyFilter?.co ?? null}
           onClearCity={() => setCityFilter(null)}
           onClearCompany={() => setCompanyFilter(null)}
           scored={scored}

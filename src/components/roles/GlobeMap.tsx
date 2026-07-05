@@ -14,8 +14,9 @@ export type GlobeMapProps = {
   focusLngLats: [number, number][] | null;
   /** Full light identity (paper basemap + light layer palette). Default dark ink. */
   light?: boolean;
-  /** Company-logo click → filter the panel to that company's roles. */
-  onCompanyClick?: (company: string) => void;
+  /** Company-logo click → filter the panel to that company's roles IN THAT CITY
+   *  (the pin is per company-city, so the panel count must match the pin count). */
+  onCompanyClick?: (company: string, city: string | null) => void;
   /** Single-city cluster click → filter the panel to that city (null never sent). */
   onCityClick?: (city: string) => void;
 };
@@ -722,9 +723,10 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyC
         const pin = props as unknown as PinProps;
         el = buildPin(pin);
         const co = String(pin.co);
+        const cty = pin.city ? String(pin.city) : null;
         el.addEventListener("click", (e) => {
           e.stopPropagation();
-          onCompanyClickRef.current?.(co);
+          onCompanyClickRef.current?.(co, cty);
         });
       }
       el.dataset.sig = sig;
