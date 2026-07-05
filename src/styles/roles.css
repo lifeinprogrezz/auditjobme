@@ -86,7 +86,10 @@
 .roles-theme .maplibregl-ctrl-group button + button { border-top: 1px solid var(--hair) !important; }
 /* maplibre ships its glyphs as background-image SVGs (fixed grey via filter) —
  * swap them for text glyphs so the ink is currentColor, like the chevron SVG. */
-.roles-theme .maplibregl-ctrl-icon { background-image: none !important; display: grid; place-items: center; width: 100%; height: 100%; }
+/* Selector must out-rank maplibre's `.maplibregl-ctrl button .maplibregl-ctrl-icon`
+ * (0,2,1) — at lower specificity its display:block wins and the glyph paints
+ * at the block's top-left (the "decentered +/-" Rober caught on 7-05). */
+.roles-theme .maplibregl-ctrl button .maplibregl-ctrl-icon { background-image: none !important; display: grid; place-items: center; width: 100%; height: 100%; }
 .roles-theme .maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon::before { content: "+"; font-size: 22px; font-weight: 500; line-height: 1; }
 .roles-theme .maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon::before { content: "−"; font-size: 22px; font-weight: 500; line-height: 1; }
 
