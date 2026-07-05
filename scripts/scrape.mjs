@@ -82,6 +82,77 @@ async function fetchAshby(b) {
     .filter((j) => j.url && isEU(j.location));
 }
 
+// Workable — POST with JSON body, nextPage cursor pagination (page size fixed
+// server-side). List endpoint carries NO description (same as ats-extra note).
+async function fetchWorkable(b) {
+  const all = [];
+  let token = null;
+  for (let page = 0; page < 20; page++) {
+    const res = await fetch(`https://apply.workable.com/api/v3/accounts/${b.token}/jobs`, {
+      ...fetchOpts(),
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(token ? { token } : {}),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    for (const j of data.results || []) {
+      const loc = j.location || {};
+      const location = j.remote
+        ? "Remote"
+        : [loc.city, loc.region, loc.country].filter(Boolean).join(", ") || null;
+      all.push({
+        company: b.company, title: j.title || "",
+        url: j.shortcode ? `https://apply.workable.com/${b.token}/j/${j.shortcode}/` : "",
+        location,
+        remote: !!j.remote || /remote/i.test(location || "") || /remote/i.test(j.title || ""),
+        source: "workable", posted_at: j.published || null,
+        jd_text: null, seniority: inferSeniority(j.title),
+      });
+    }
+    token = data.nextPage;
+    if (!token) break;
+  }
+  return all.filter((j) => j.url && isPM(j.title) && isEU(j.location));
+}
+
+// SmartRecruiters — paginated GET, offset until totalFound exhausted. List
+// endpoint carries NO description.
+async function fetchSmartRecruiters(b) {
+  const all = [];
+  let offset = 0;
+  let total = Infinity;
+  for (let page = 0; page < 20 && offset < total; page++) {
+    const res = await fetch(
+      `https://api.smartrecruiters.com/v1/companies/${b.token}/postings?limit=100&offset=${offset}`,
+      fetchOpts(),
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    total = data.totalFound || 0;
+    for (const j of data.content || []) {
+      const slug = (j.company || {}).identifier || b.token;
+      const location =
+        (j.location || {}).fullLocation ||
+        ((j.location || {}).city ? `${j.location.city}, ${j.location.country || ""}` : null);
+      all.push({
+        company: b.company, title: j.name || "",
+        url: `https://jobs.smartrecruiters.com/${slug}/${j.id}`,
+        location,
+        remote: (j.location || {}).remote === true || /remote/i.test(location || "") || /remote/i.test(j.name || ""),
+        source: "smartrecruiters", posted_at: j.releasedDate || null,
+        jd_text: null, seniority: inferSeniority(j.name),
+      });
+    }
+    offset += 100;
+  }
+  return all.filter((j) => j.url && isPM(j.title) && isEU(j.location));
+}
+
+// Board classes eligible for the vanished-role retirement diff below. Only rows
+// whose board was scanned SUCCESSFULLY this run may be retired.
+const BOARD_KINDS = ["greenhouse", "lever", "ashby", "workable", "smartrecruiters"];
+
 async function main() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -89,15 +160,18 @@ async function main() {
   if (dry) console.error("[dry-run] no SUPABASE_SERVICE_ROLE_KEY set; fetching + logging only, no DB write.");
 
   const SOURCES = [
-    ...GREENHOUSE_BOARDS.map((b) => ({ company: b.company, run: () => fetchGreenhouse(b) })),
-    ...LEVER_BOARDS.map((b) => ({ company: b.company, run: () => fetchLever(b) })),
-    ...ASHBY_BOARDS.map((b) => ({ company: b.company, run: () => fetchAshby(b) })),
+    ...GREENHOUSE_BOARDS.map((b) => ({ company: b.company, kind: "greenhouse", run: () => fetchGreenhouse(b) })),
+    ...LEVER_BOARDS.map((b) => ({ company: b.company, kind: "lever", run: () => fetchLever(b) })),
+    ...ASHBY_BOARDS.map((b) => ({ company: b.company, kind: "ashby", run: () => fetchAshby(b) })),
+    ...(BOARDS.workable || []).map((b) => ({ company: b.company, kind: "workable", run: () => fetchWorkable(b) })),
+    ...(BOARDS.smartrecruiters || []).map((b) => ({ company: b.company, kind: "smartrecruiters", run: () => fetchSmartRecruiters(b) })),
     ...atsExtraSources,
     ...bigtechSources,
     ...vcSources,
   ];
 
   let all = [];
+  const scannedOk = new Set(); // "Company::kind" of board scans that succeeded
   const CONCURRENCY = 8;
   let idx = 0;
   async function worker() {
@@ -105,6 +179,7 @@ async function main() {
       const s = SOURCES[idx++];
       try {
         const jobs = await s.run();
+        if (s.kind) scannedOk.add(`${s.company}::${s.kind}`);
         if (jobs.length) console.error(`${s.company}: ${jobs.length} EU PM role(s)`);
         all.push(...jobs);
       } catch (e) {
@@ -138,12 +213,43 @@ async function main() {
   }
 
   const supabase = createClient(url, key);
-  const { error } = await supabase.from("jobs").upsert(all, { onConflict: "url" });
-  if (error) {
-    console.error("Upsert failed:", error.message);
-    process.exit(1);
+  for (let i = 0; i < all.length; i += 500) {
+    const { error } = await supabase.from("jobs").upsert(all.slice(i, i + 500), { onConflict: "url" });
+    if (error) {
+      console.error("Upsert failed:", error.message);
+      process.exit(1);
+    }
   }
   console.error(`Upserted ${all.length} jobs to the pool.`);
+
+  // Board-diff liveness: a live row whose board class we scanned successfully this
+  // run, but whose url no longer appears in the scan, has vanished from the board
+  // -> retire it (is_live=false). Rows from non-board sources are never touched.
+  const currentUrls = new Set(all.map((j) => j.url));
+  const liveRows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from("jobs").select("url, company, source")
+      .eq("is_live", true).in("source", BOARD_KINDS)
+      .range(from, from + 999);
+    if (error) { console.error("Liveness select failed:", error.message); break; }
+    liveRows.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  const vanished = liveRows
+    .filter((r) => scannedOk.has(`${r.company}::${r.source}`) && !currentUrls.has(r.url))
+    .map((r) => r.url);
+  for (let i = 0; i < vanished.length; i += 200) {
+    const { error } = await supabase
+      .from("jobs").update({ is_live: false }).in("url", vanished.slice(i, i + 200));
+    if (error) console.error("Retire update failed:", error.message);
+  }
+  console.error(`Retired ${vanished.length} vanished role(s).`);
+
+  // Link new rows to the companies dimension (name-based, server-side function).
+  const { data: linked, error: linkErr } = await supabase.rpc("link_jobs_to_companies");
+  if (linkErr) console.error("link_jobs_to_companies failed:", linkErr.message);
+  else console.error(`Linked ${linked} job(s) to companies.`);
 }
 
 main();

@@ -1,1485 +1,2677 @@
 {
-  "_comment": "Verified Greenhouse/Lever/Ashby public-API boards, sourced from the career-ops portals.yml (LIVE-verified). Dead boards fail non-fatally in scrape.mjs.",
-  "greenhouse": [
-    {
-      "company": "Adyen",
-      "token": "adyen"
-    },
-    {
-      "company": "Airbnb",
-      "token": "airbnb"
-    },
-    {
-      "company": "Airtable",
-      "token": "airtable"
-    },
-    {
-      "company": "Algolia",
-      "token": "algolia"
-    },
-    {
-      "company": "Alma",
-      "token": "alma31"
-    },
-    {
-      "company": "Alpineeagle",
-      "token": "alpineeagle"
-    },
-    {
-      "company": "Amplemarket",
-      "token": "amplemarket"
-    },
-    {
-      "company": "Amplitude",
-      "token": "amplitude"
-    },
-    {
-      "company": "Anthropic",
-      "token": "anthropic"
-    },
-    {
-      "company": "Arxroboticsgmbh",
-      "token": "arxroboticsgmbh"
-    },
-    {
-      "company": "Asana",
-      "token": "asana"
-    },
-    {
-      "company": "Bird",
-      "token": "bird"
-    },
-    {
-      "company": "Bitpanda",
-      "token": "bitpanda"
-    },
-    {
-      "company": "Blackforestlabs",
-      "token": "blackforestlabs"
-    },
-    {
-      "company": "Bloomreach",
-      "token": "bloomreach"
-    },
-    {
-      "company": "Bolt",
-      "token": "boltv2"
-    },
-    {
-      "company": "Box",
-      "token": "boxinc"
-    },
-    {
-      "company": "Brex",
-      "token": "brex"
-    },
-    {
-      "company": "Cabify",
-      "token": "cabify"
-    },
-    {
-      "company": "Carbonchain",
-      "token": "carbonchain"
-    },
-    {
-      "company": "Caronsale",
-      "token": "caronsale"
-    },
-    {
-      "company": "Catawiki",
-      "token": "catawiki"
-    },
-    {
-      "company": "Celonis",
-      "token": "celonis"
-    },
-    {
-      "company": "Charles",
-      "token": "charles"
-    },
-    {
-      "company": "Clickhouse",
-      "token": "clickhouse"
-    },
-    {
-      "company": "Cloudflare",
-      "token": "cloudflare"
-    },
-    {
-      "company": "Contentful",
-      "token": "contentful"
-    },
-    {
-      "company": "Cresta",
-      "token": "cresta"
-    },
-    {
-      "company": "Databricks",
-      "token": "databricks"
-    },
-    {
-      "company": "Datadog",
-      "token": "datadog"
-    },
-    {
-      "company": "Dataiku",
-      "token": "dataiku"
-    },
-    {
-      "company": "Discord",
-      "token": "discord"
-    },
-    {
-      "company": "Doctolib",
-      "token": "doctolib"
-    },
-    {
-      "company": "Dropbox",
-      "token": "dropbox"
-    },
-    {
-      "company": "Elastic",
-      "token": "elastic"
-    },
-    {
-      "company": "Enginy",
-      "token": "enginy"
-    },
-    {
-      "company": "Exeinspa",
-      "token": "exeinspa"
-    },
-    {
-      "company": "Figma",
-      "token": "figma"
-    },
-    {
-      "company": "Fractile",
-      "token": "fractile"
-    },
-    {
-      "company": "Getyourguide",
-      "token": "getyourguide"
-    },
-    {
-      "company": "Gitlab",
-      "token": "gitlab"
-    },
-    {
-      "company": "Gocardless",
-      "token": "gocardless"
-    },
-    {
-      "company": "Grafanalabs",
-      "token": "grafanalabs"
-    },
-    {
-      "company": "Graphcore",
-      "token": "graphcore"
-    },
-    {
-      "company": "Guardsquare",
-      "token": "guardsquare"
-    },
-    {
-      "company": "Hellofresh",
-      "token": "hellofresh"
-    },
-    {
-      "company": "HubSpot",
-      "token": "hubspotjobs"
-    },
-    {
-      "company": "Humanrightswatch",
-      "token": "humanrightswatch"
-    },
-    {
-      "company": "Intercom",
-      "token": "intercom"
-    },
-    {
-      "company": "Ketryx",
-      "token": "ketryx"
-    },
-    {
-      "company": "Mediasmart",
-      "token": "mediasmart"
-    },
-    {
-      "company": "Mentimeter",
-      "token": "mentimeter"
-    },
-    {
-      "company": "Mews",
-      "token": "mewssystems"
-    },
-    {
-      "company": "Miro",
-      "token": "realtimeboardglobal"
-    },
-    {
-      "company": "Mongodb",
-      "token": "mongodb"
-    },
-    {
-      "company": "Monzo",
-      "token": "monzo"
-    },
-    {
-      "company": "N26",
-      "token": "n26"
-    },
-    {
-      "company": "Nuitee",
-      "token": "nuitee"
-    },
-    {
-      "company": "Openup",
-      "token": "openup"
-    },
-    {
-      "company": "Pagerduty",
-      "token": "pagerduty"
-    },
-    {
-      "company": "Parloa",
-      "token": "parloa"
-    },
-    {
-      "company": "Payhawk",
-      "token": "payhawkio"
-    },
-    {
-      "company": "Pinterest",
-      "token": "pinterest"
-    },
-    {
-      "company": "Polyai",
-      "token": "polyai"
-    },
-    {
-      "company": "Powerdot",
-      "token": "powerdot"
-    },
-    {
-      "company": "Prolific",
-      "token": "prolific"
-    },
-    {
-      "company": "Qphox",
-      "token": "qphox"
-    },
-    {
-      "company": "Raisin",
-      "token": "raisin"
-    },
-    {
-      "company": "Reddit",
-      "token": "reddit"
-    },
-    {
-      "company": "Remote",
-      "token": "remote"
-    },
-    {
-      "company": "Robinhood",
-      "token": "robinhood"
-    },
-    {
-      "company": "Scale AI",
-      "token": "scaleai"
-    },
-    {
-      "company": "Skyscanner",
-      "token": "skyscanner"
-    },
-    {
-      "company": "Smartlyio",
-      "token": "smartlyio"
-    },
-    {
-      "company": "Solaris",
-      "token": "solarisbank"
-    },
-    {
-      "company": "Sourcegraph",
-      "token": "sourcegraph91"
-    },
-    {
-      "company": "Stripe",
-      "token": "stripe"
-    },
-    {
-      "company": "Sumup",
-      "token": "sumup"
-    },
-    {
-      "company": "Tide",
-      "token": "tide"
-    },
-    {
-      "company": "Topsort",
-      "token": "topsort"
-    },
-    {
-      "company": "Trade Republic",
-      "token": "traderepublicbank"
-    },
-    {
-      "company": "Trustpilot",
-      "token": "trustpilot"
-    },
-    {
-      "company": "Twilio",
-      "token": "twilio"
-    },
-    {
-      "company": "Typeform",
-      "token": "typeform"
-    },
-    {
-      "company": "Vercel",
-      "token": "vercel"
-    },
-    {
-      "company": "Wallapop",
-      "token": "wallapop"
-    },
-    {
-      "company": "Webflow",
-      "token": "webflow"
-    },
-    {
-      "company": "Yondrgroup",
-      "token": "yondrgroup"
-    }
-  ],
-  "lever": [
-    {
-      "company": "32Co",
-      "token": "32Co"
-    },
-    {
-      "company": "Actian",
-      "token": "actian"
-    },
-    {
-      "company": "Aircall",
-      "token": "aircall"
-    },
-    {
-      "company": "Alice Bob",
-      "token": "alice-bob"
-    },
-    {
-      "company": "Anybotics",
-      "token": "anybotics"
-    },
-    {
-      "company": "Appfollow",
-      "token": "appfollow"
-    },
-    {
-      "company": "BeemEnergy",
-      "token": "BeemEnergy"
-    },
-    {
-      "company": "Blablacar",
-      "token": "blablacar"
-    },
-    {
-      "company": "C12qe",
-      "token": "c12qe"
-    },
-    {
-      "company": "Contentsquare",
-      "token": "contentsquare"
-    },
-    {
-      "company": "CordTechnologies",
-      "token": "CordTechnologies"
-    },
-    {
-      "company": "Ethenalabs",
-      "token": "ethenalabs"
-    },
-    {
-      "company": "Finn",
-      "token": "finn"
-    },
-    {
-      "company": "Fresha",
-      "token": "fresha"
-    },
-    {
-      "company": "Grand",
-      "token": "grand"
-    },
-    {
-      "company": "Gravisrobotics",
-      "token": "gravisrobotics"
-    },
-    {
-      "company": "Healx",
-      "token": "healx"
-    },
-    {
-      "company": "Hypersonica Prod",
-      "token": "hypersonica-prod"
-    },
-    {
-      "company": "Intropic",
-      "token": "intropic"
-    },
-    {
-      "company": "Jobandtalent",
-      "token": "jobandtalent"
-    },
-    {
-      "company": "Kitmanlabs",
-      "token": "kitmanlabs"
-    },
-    {
-      "company": "Kraken",
-      "token": "kraken123"
-    },
-    {
-      "company": "Ledger",
-      "token": "ledger"
-    },
-    {
-      "company": "Matillion",
-      "token": "matillion"
-    },
-    {
-      "company": "Mistral AI",
-      "token": "mistral"
-    },
-    {
-      "company": "Moonpig",
-      "token": "moonpig"
-    },
-    {
-      "company": "Odaseva",
-      "token": "odaseva"
-    },
-    {
-      "company": "Oddin",
-      "token": "oddin"
-    },
-    {
-      "company": "Onit",
-      "token": "onit"
-    },
-    {
-      "company": "Outsight",
-      "token": "outsight"
-    },
-    {
-      "company": "Pigment",
-      "token": "pigment"
-    },
-    {
-      "company": "Pipedrive",
-      "token": "pipedrive"
-    },
-    {
-      "company": "Playplay",
-      "token": "playplay"
-    },
-    {
-      "company": "Qonto",
-      "token": "qonto"
-    },
-    {
-      "company": "Rivr",
-      "token": "rivr"
-    },
-    {
-      "company": "Skello",
-      "token": "skello"
-    },
-    {
-      "company": "Spotify",
-      "token": "spotify"
-    },
-    {
-      "company": "Tinybird",
-      "token": "tinybird"
-    },
-    {
-      "company": "Unlikely",
-      "token": "unlikely"
-    },
-    {
-      "company": "Veo",
-      "token": "veo"
-    },
-    {
-      "company": "Vestiaire Collective",
-      "token": "vestiairecollective"
-    },
-    {
-      "company": "Worldover",
-      "token": "worldover"
-    },
-    {
-      "company": "Yuno",
-      "token": "yuno"
-    },
-    {
-      "company": "Zeneducate",
-      "token": "zeneducate"
-    }
-  ],
-  "ashby": [
-    {
-      "company": "Abacum",
-      "token": "abacum"
-    },
-    {
-      "company": "Abound",
-      "token": "Abound"
-    },
-    {
-      "company": "Accurx",
-      "token": "accurx"
-    },
-    {
-      "company": "Adaptive Ml",
-      "token": "adaptive-ml"
-    },
-    {
-      "company": "Adaptyv",
-      "token": "adaptyv"
-    },
-    {
-      "company": "Aibidia",
-      "token": "aibidia"
-    },
-    {
-      "company": "Airweave",
-      "token": "airweave"
-    },
-    {
-      "company": "Alan",
-      "token": "alan"
-    },
-    {
-      "company": "Aleph Alpha",
-      "token": "alephalpha"
-    },
-    {
-      "company": "Alpic",
-      "token": "alpic"
-    },
-    {
-      "company": "Altura",
-      "token": "altura"
-    },
-    {
-      "company": "Ami",
-      "token": "ami"
-    },
-    {
-      "company": "Anima",
-      "token": "Anima"
-    },
-    {
-      "company": "Apify",
-      "token": "apify"
-    },
-    {
-      "company": "Aspora",
-      "token": "Aspora"
-    },
-    {
-      "company": "Attio",
-      "token": "attio"
-    },
-    {
-      "company": "Avelios Medical",
-      "token": "avelios-medical"
-    },
-    {
-      "company": "Axelera",
-      "token": "axelera"
-    },
-    {
-      "company": "Backmarket",
-      "token": "backmarket"
-    },
-    {
-      "company": "Birdie",
-      "token": "birdie"
-    },
-    {
-      "company": "Bitstack",
-      "token": "bitstack"
-    },
-    {
-      "company": "Browserbase",
-      "token": "browserbase"
-    },
-    {
-      "company": "Capchase",
-      "token": "capchase"
-    },
-    {
-      "company": "Capimoney",
-      "token": "capimoney"
-    },
-    {
-      "company": "Caribou",
-      "token": "caribou"
-    },
-    {
-      "company": "Carwow",
-      "token": "Carwow"
-    },
-    {
-      "company": "Centreforeffectivealtruism",
-      "token": "centreforeffectivealtruism"
-    },
-    {
-      "company": "Chattermill",
-      "token": "chattermill"
-    },
-    {
-      "company": "Checkly",
-      "token": "checkly"
-    },
-    {
-      "company": "Checkout.com",
-      "token": "checkout"
-    },
-    {
-      "company": "Choco",
-      "token": "choco"
-    },
-    {
-      "company": "Circuithub",
-      "token": "circuithub"
-    },
-    {
-      "company": "Codat",
-      "token": "codat"
-    },
-    {
-      "company": "Cognition",
-      "token": "cognition"
-    },
-    {
-      "company": "Cohere",
-      "token": "cohere"
-    },
-    {
-      "company": "Conduct",
-      "token": "conduct"
-    },
-    {
-      "company": "Confluent",
-      "token": "confluent"
-    },
-    {
-      "company": "Contentoo",
-      "token": "contentoo"
-    },
-    {
-      "company": "Conveo",
-      "token": "conveo"
-    },
-    {
-      "company": "Corti",
-      "token": "corti"
-    },
-    {
-      "company": "Cradlebio",
-      "token": "cradlebio"
-    },
-    {
-      "company": "Creem",
-      "token": "creem"
-    },
-    {
-      "company": "Cursor",
-      "token": "cursor"
-    },
-    {
-      "company": "Cuspai",
-      "token": "cuspai"
-    },
-    {
-      "company": "Dash0",
-      "token": "dash0"
-    },
-    {
-      "company": "Decagon",
-      "token": "decagon"
-    },
-    {
-      "company": "Deel",
-      "token": "deel"
-    },
-    {
-      "company": "Deepjudge",
-      "token": "deepjudge"
-    },
-    {
-      "company": "DeepL",
-      "token": "DeepL"
-    },
-    {
-      "company": "Definelycareers",
-      "token": "definelycareers"
-    },
-    {
-      "company": "Delfa",
-      "token": "delfa"
-    },
-    {
-      "company": "Deligo",
-      "token": "deligo"
-    },
-    {
-      "company": "Deliveroo",
-      "token": "deliveroo"
-    },
-    {
-      "company": "Dex",
-      "token": "dex"
-    },
-    {
-      "company": "Dotfile",
-      "token": "dotfile"
-    },
-    {
-      "company": "Duffel",
-      "token": "duffel"
-    },
-    {
-      "company": "Duna",
-      "token": "duna"
-    },
-    {
-      "company": "Dune",
-      "token": "dune"
-    },
-    {
-      "company": "Dust",
-      "token": "dust"
-    },
-    {
-      "company": "Duvo",
-      "token": "duvo"
-    },
-    {
-      "company": "Edgetier.com",
-      "token": "edgetier"
-    },
-    {
-      "company": "Elevenlabs",
-      "token": "elevenlabs"
-    },
-    {
-      "company": "Elliptic",
-      "token": "elliptic"
-    },
-    {
-      "company": "Elyos",
-      "token": "elyos"
-    },
-    {
-      "company": "Endra",
-      "token": "endra"
-    },
-    {
-      "company": "Enode",
-      "token": "enode"
-    },
-    {
-      "company": "Escape",
-      "token": "escape"
-    },
-    {
-      "company": "Eye Security",
-      "token": "eye-security"
-    },
-    {
-      "company": "Faculty",
-      "token": "faculty"
-    },
-    {
-      "company": "Farseer",
-      "token": "farseer"
-    },
-    {
-      "company": "Filigran",
-      "token": "filigran"
-    },
-    {
-      "company": "Finary",
-      "token": "finary"
-    },
-    {
-      "company": "Flagright.com",
-      "token": "flagright"
-    },
-    {
-      "company": "Flankai",
-      "token": "flankai"
-    },
-    {
-      "company": "Fleek",
-      "token": "fleek"
-    },
-    {
-      "company": "Fonio",
-      "token": "Fonio"
-    },
-    {
-      "company": "Fonoa",
-      "token": "fonoa"
-    },
-    {
-      "company": "Formance",
-      "token": "formance"
-    },
-    {
-      "company": "Fyxer",
-      "token": "fyxer"
-    },
-    {
-      "company": "Get Ivy",
-      "token": "get-ivy"
-    },
-    {
-      "company": "Getscope",
-      "token": "getscope"
-    },
-    {
-      "company": "Gooddata",
-      "token": "gooddata"
-    },
-    {
-      "company": "Granola",
-      "token": "granola"
-    },
-    {
-      "company": "Griffin",
-      "token": "griffin"
-    },
-    {
-      "company": "Happl",
-      "token": "happl"
-    },
-    {
-      "company": "Harvey",
-      "token": "harvey"
-    },
-    {
-      "company": "Hawk",
-      "token": "hawk"
-    },
-    {
-      "company": "Hcompany",
-      "token": "hcompany"
-    },
-    {
-      "company": "Healthtech 1",
-      "token": "Healthtech-1"
-    },
-    {
-      "company": "Herondata",
-      "token": "herondata"
-    },
-    {
-      "company": "Hiya",
-      "token": "hiya"
-    },
-    {
-      "company": "Hook",
-      "token": "hook"
-    },
-    {
-      "company": "Hoxhunt",
-      "token": "hoxhunt"
-    },
-    {
-      "company": "Humaans",
-      "token": "humaans"
-    },
-    {
-      "company": "Hyperexponential",
-      "token": "hyperexponential"
-    },
-    {
-      "company": "Inkeep",
-      "token": "inkeep"
-    },
-    {
-      "company": "Invert",
-      "token": "invert"
-    },
-    {
-      "company": "Jupus",
-      "token": "jupus"
-    },
-    {
-      "company": "Katana",
-      "token": "katana"
-    },
-    {
-      "company": "Kittl",
-      "token": "kittl"
-    },
-    {
-      "company": "Knowunity",
-      "token": "knowunity"
-    },
-    {
-      "company": "Kognity",
-      "token": "kognity"
-    },
-    {
-      "company": "Kombo",
-      "token": "Kombo"
-    },
-    {
-      "company": "Kota",
-      "token": "kota"
-    },
-    {
-      "company": "Lago",
-      "token": "lago"
-    },
-    {
-      "company": "Lakera.ai",
-      "token": "lakera"
-    },
-    {
-      "company": "Langdock",
-      "token": "langdock"
-    },
-    {
-      "company": "Langfuse",
-      "token": "langfuse"
-    },
-    {
-      "company": "Lassie",
-      "token": "lassie"
-    },
-    {
-      "company": "Lawhive",
-      "token": "lawhive"
-    },
-    {
-      "company": "Legora",
-      "token": "legora"
-    },
-    {
-      "company": "Lemfi",
-      "token": "lemfi"
-    },
-    {
-      "company": "Lemon Markets",
-      "token": "lemon-markets"
-    },
-    {
-      "company": "Lendable",
-      "token": "lendable"
-    },
-    {
-      "company": "Lexroom",
-      "token": "lexroom"
-    },
-    {
-      "company": "Light Inc",
-      "token": "light-inc"
-    },
-    {
-      "company": "Lightdash",
-      "token": "Lightdash"
-    },
-    {
-      "company": "Limbic",
-      "token": "limbic"
-    },
-    {
-      "company": "Lindushealth",
-      "token": "lindus"
-    },
-    {
-      "company": "Lindushealth",
-      "token": "lindushealth"
-    },
-    {
-      "company": "Linear",
-      "token": "linear"
-    },
-    {
-      "company": "Lio",
-      "token": "lio"
-    },
-    {
-      "company": "Liveflow",
-      "token": "liveflow"
-    },
-    {
-      "company": "Lovable",
-      "token": "lovable"
-    },
-    {
-      "company": "Lucis",
-      "token": "lucis"
-    },
-    {
-      "company": "Maihem",
-      "token": "maihem"
-    },
-    {
-      "company": "Marshmallow",
-      "token": "marshmallow"
-    },
-    {
-      "company": "Mazedesign",
-      "token": "mazedesign"
-    },
-    {
-      "company": "Metaview",
-      "token": "metaview"
-    },
-    {
-      "company": "Mimica",
-      "token": "mimica"
-    },
-    {
-      "company": "Mindpeak",
-      "token": "mindpeak"
-    },
-    {
-      "company": "Modal",
-      "token": "modal"
-    },
-    {
-      "company": "Mollie",
-      "token": "mollie"
-    },
-    {
-      "company": "Monumental",
-      "token": "monumental"
-    },
-    {
-      "company": "Morpho",
-      "token": "morpho"
-    },
-    {
-      "company": "MotherDuck",
-      "token": "MotherDuck"
-    },
-    {
-      "company": "Multiverse",
-      "token": "multiverse"
-    },
-    {
-      "company": "MyTomorrows",
-      "token": "myTomorrows"
-    },
-    {
-      "company": "N8n",
-      "token": "n8n"
-    },
-    {
-      "company": "Nabla",
-      "token": "nabla"
-    },
-    {
-      "company": "Neko Health",
-      "token": "neko-health"
-    },
-    {
-      "company": "Nelly",
-      "token": "nelly"
-    },
-    {
-      "company": "Neuralconcept",
-      "token": "neuralconcept"
-    },
-    {
-      "company": "Nivoda",
-      "token": "Nivoda"
-    },
-    {
-      "company": "Nory",
-      "token": "nory"
-    },
-    {
-      "company": "Notion",
-      "token": "notion"
-    },
-    {
-      "company": "Omnea",
-      "token": "omnea"
-    },
-    {
-      "company": "Ona",
-      "token": "ona"
-    },
-    {
-      "company": "Opal OS",
-      "token": "Opal-OS"
-    },
-    {
-      "company": "Openai",
-      "token": "openai"
-    },
-    {
-      "company": "Orbem",
-      "token": "orbem"
-    },
-    {
-      "company": "Orbital",
-      "token": "orbital"
-    },
-    {
-      "company": "Ostrom",
-      "token": "Ostrom"
-    },
-    {
-      "company": "Pandektes",
-      "token": "pandektes"
-    },
-    {
-      "company": "Payrails",
-      "token": "payrails"
-    },
-    {
-      "company": "Pear VC",
-      "token": "Pear-VC"
-    },
-    {
-      "company": "Peec",
-      "token": "peec"
-    },
-    {
-      "company": "Pennylane",
-      "token": "pennylane"
-    },
-    {
-      "company": "Perk",
-      "token": "perk"
-    },
-    {
-      "company": "Permutive",
-      "token": "permutive"
-    },
-    {
-      "company": "Perplexity",
-      "token": "perplexity"
-    },
-    {
-      "company": "Photoroom",
-      "token": "photoroom"
-    },
-    {
-      "company": "Pivot",
-      "token": "Pivot"
-    },
-    {
-      "company": "Plaid",
-      "token": "plaid"
-    },
-    {
-      "company": "Pleo",
-      "token": "pleo"
-    },
-    {
-      "company": "Pliant",
-      "token": "pliant"
-    },
-    {
-      "company": "Poolside",
-      "token": "poolside"
-    },
-    {
-      "company": "Posthog",
-      "token": "posthog"
-    },
-    {
-      "company": "Powerus",
-      "token": "powerus"
-    },
-    {
-      "company": "Praxipal",
-      "token": "praxipal"
-    },
-    {
-      "company": "Preply",
-      "token": "preply"
-    },
-    {
-      "company": "Primer.io",
-      "token": "primer"
-    },
-    {
-      "company": "Prior Labs",
-      "token": "prior-labs"
-    },
-    {
-      "company": "Prosper Ai",
-      "token": "prosper-ai"
-    },
-    {
-      "company": "Protex AI",
-      "token": "Protex"
-    },
-    {
-      "company": "Proxima Fusion",
-      "token": "proxima-fusion"
-    },
-    {
-      "company": "Raycast",
-      "token": "raycast"
-    },
-    {
-      "company": "Redpine",
-      "token": "redpine"
-    },
-    {
-      "company": "Reflectionai",
-      "token": "reflectionai"
-    },
-    {
-      "company": "Remberg",
-      "token": "remberg"
-    },
-    {
-      "company": "Reonic",
-      "token": "reonic"
-    },
-    {
-      "company": "Replit",
-      "token": "replit"
-    },
-    {
-      "company": "Rerun",
-      "token": "rerun"
-    },
-    {
-      "company": "Revenuecat",
-      "token": "revenuecat"
-    },
-    {
-      "company": "Robco",
-      "token": "robco"
-    },
-    {
-      "company": "Roompricegenie",
-      "token": "roompricegenie"
-    },
-    {
-      "company": "Rossum.ai",
-      "token": "rossum"
-    },
-    {
-      "company": "Salonkee",
-      "token": "salonkee"
-    },
-    {
-      "company": "Sana Roles",
-      "token": "sana-roles"
-    },
-    {
-      "company": "Satispay",
-      "token": "satispay"
-    },
-    {
-      "company": "Saturn",
-      "token": "saturn"
-    },
-    {
-      "company": "Scan Com",
-      "token": "scan-com"
-    },
-    {
-      "company": "Scarlet",
-      "token": "scarlet"
-    },
-    {
-      "company": "Sensmore",
-      "token": "sensmore"
-    },
-    {
-      "company": "Seyna",
-      "token": "seyna"
-    },
-    {
-      "company": "Shook",
-      "token": "shook"
-    },
-    {
-      "company": "Sierra",
-      "token": "sierra"
-    },
-    {
-      "company": "Sifflet",
-      "token": "sifflet"
-    },
-    {
-      "company": "Sintra",
-      "token": "sintra"
-    },
-    {
-      "company": "Snowflake",
-      "token": "snowflake"
-    },
-    {
-      "company": "Sona",
-      "token": "sona"
-    },
-    {
-      "company": "Sorare",
-      "token": "sorare"
-    },
-    {
-      "company": "Sosafe",
-      "token": "sosafe"
-    },
-    {
-      "company": "Stacks",
-      "token": "stacks"
-    },
-    {
-      "company": "Strala Ai",
-      "token": "strala-ai"
-    },
-    {
-      "company": "Subsets",
-      "token": "subsets"
-    },
-    {
-      "company": "Supabase",
-      "token": "supabase"
-    },
-    {
-      "company": "Swap",
-      "token": "swap"
-    },
-    {
-      "company": "Sylvera",
-      "token": "sylvera"
-    },
-    {
-      "company": "Synthesia",
-      "token": "synthesia"
-    },
-    {
-      "company": "Synthflow",
-      "token": "synthflow"
-    },
-    {
-      "company": "Tacto",
-      "token": "tacto"
-    },
-    {
-      "company": "Taktile",
-      "token": "taktile"
-    },
-    {
-      "company": "Tandem Health",
-      "token": "tandem-health"
-    },
-    {
-      "company": "Tebi",
-      "token": "tebi"
-    },
-    {
-      "company": "Teero",
-      "token": "teero"
-    },
-    {
-      "company": "Tesslcareers",
-      "token": "tesslcareers"
-    },
-    {
-      "company": "The Exploration Company",
-      "token": "the-exploration-company"
-    },
-    {
-      "company": "Tortus",
-      "token": "tortus"
-    },
-    {
-      "company": "Tracebit",
-      "token": "tracebit"
-    },
-    {
-      "company": "Tractable",
-      "token": "tractable"
-    },
-    {
-      "company": "Trawa",
-      "token": "trawa"
-    },
-    {
-      "company": "Triggerdev",
-      "token": "triggerdev"
-    },
-    {
-      "company": "Upvest",
-      "token": "upvest"
-    },
-    {
-      "company": "Vertice",
-      "token": "vertice"
-    },
-    {
-      "company": "Vocca",
-      "token": "vocca"
-    },
-    {
-      "company": "Voicemod",
-      "token": "voicemod"
-    },
-    {
-      "company": "Voize",
-      "token": "voize"
-    },
-    {
-      "company": "Wayflyer",
-      "token": "wayflyer"
-    },
-    {
-      "company": "Wordsmith",
-      "token": "wordsmith"
-    },
-    {
-      "company": "Xapien",
-      "token": "xapien"
-    },
-    {
-      "company": "Xyz Reality",
-      "token": "xyz-reality"
-    },
-    {
-      "company": "Yepoda",
-      "token": "yepoda"
-    },
-    {
-      "company": "Zapier",
-      "token": "zapier"
-    },
-    {
-      "company": "Zefir",
-      "token": "zefir"
-    },
-    {
-      "company": "Zeno",
-      "token": "zeno"
-    },
-    {
-      "company": "Zoe",
-      "token": "zoe"
-    }
-  ]
+ "_comment": "Greenhouse/Lever/Ashby/Workable/SmartRecruiters public-API boards, generated from career-ops portals.yml + startupmap_discovered.yml by app-seed-export.mjs. Dead boards fail non-fatally in scrape.mjs.",
+ "greenhouse": [
+  {
+   "company": "Vercel",
+   "token": "vercel"
+  },
+  {
+   "company": "N26",
+   "token": "n26"
+  },
+  {
+   "company": "Trade Republic",
+   "token": "traderepublicbank"
+  },
+  {
+   "company": "SumUp",
+   "token": "sumup"
+  },
+  {
+   "company": "HelloFresh",
+   "token": "hellofresh"
+  },
+  {
+   "company": "GetYourGuide",
+   "token": "getyourguide"
+  },
+  {
+   "company": "Amplemarket",
+   "token": "amplemarket"
+  },
+  {
+   "company": "Intercom",
+   "token": "intercom"
+  },
+  {
+   "company": "Contentful",
+   "token": "contentful"
+  },
+  {
+   "company": "Celonis",
+   "token": "celonis"
+  },
+  {
+   "company": "PolyAI",
+   "token": "polyai"
+  },
+  {
+   "company": "Parloa",
+   "token": "parloa"
+  },
+  {
+   "company": "Ketryx",
+   "token": "ketryx"
+  },
+  {
+   "company": "Monzo",
+   "token": "monzo"
+  },
+  {
+   "company": "Graphcore",
+   "token": "graphcore"
+  },
+  {
+   "company": "Gocardless",
+   "token": "gocardless"
+  },
+  {
+   "company": "Caronsale",
+   "token": "caronsale"
+  },
+  {
+   "company": "Stripe",
+   "token": "stripe"
+  },
+  {
+   "company": "Datadog",
+   "token": "datadog"
+  },
+  {
+   "company": "Scale AI",
+   "token": "scaleai"
+  },
+  {
+   "company": "Figma",
+   "token": "figma"
+  },
+  {
+   "company": "Pinterest",
+   "token": "pinterest"
+  },
+  {
+   "company": "Twilio",
+   "token": "twilio"
+  },
+  {
+   "company": "Reddit",
+   "token": "reddit"
+  },
+  {
+   "company": "Cloudflare",
+   "token": "cloudflare"
+  },
+  {
+   "company": "Box",
+   "token": "boxinc"
+  },
+  {
+   "company": "Asana",
+   "token": "asana"
+  },
+  {
+   "company": "Robinhood",
+   "token": "robinhood"
+  },
+  {
+   "company": "HubSpot",
+   "token": "hubspotjobs"
+  },
+  {
+   "company": "Discord",
+   "token": "discord"
+  },
+  {
+   "company": "Dropbox",
+   "token": "dropbox"
+  },
+  {
+   "company": "Adyen",
+   "token": "adyen"
+  },
+  {
+   "company": "Doctolib",
+   "token": "doctolib"
+  },
+  {
+   "company": "Tide",
+   "token": "tide"
+  },
+  {
+   "company": "Catawiki",
+   "token": "catawiki"
+  },
+  {
+   "company": "Bird",
+   "token": "bird"
+  },
+  {
+   "company": "Algolia",
+   "token": "algolia"
+  },
+  {
+   "company": "Cabify",
+   "token": "cabify"
+  },
+  {
+   "company": "Typeform",
+   "token": "typeform"
+  },
+  {
+   "company": "Wallapop",
+   "token": "wallapop"
+  },
+  {
+   "company": "Brex",
+   "token": "brex"
+  },
+  {
+   "company": "Databricks",
+   "token": "databricks"
+  },
+  {
+   "company": "PagerDuty",
+   "token": "pagerduty"
+  },
+  {
+   "company": "Anthropic",
+   "token": "anthropic"
+  },
+  {
+   "company": "Cresta",
+   "token": "cresta"
+  },
+  {
+   "company": "Airtable",
+   "token": "airtable"
+  },
+  {
+   "company": "Webflow",
+   "token": "webflow"
+  },
+  {
+   "company": "Sourcegraph",
+   "token": "sourcegraph91"
+  },
+  {
+   "company": "Dataiku",
+   "token": "dataiku"
+  },
+  {
+   "company": "Mediasmart",
+   "token": "mediasmart"
+  },
+  {
+   "company": "Nuitee",
+   "token": "nuitee"
+  },
+  {
+   "company": "Prolific",
+   "token": "prolific"
+  },
+  {
+   "company": "Humanrightswatch",
+   "token": "humanrightswatch"
+  },
+  {
+   "company": "Alma31",
+   "token": "alma31"
+  },
+  {
+   "company": "Blackforestlabs",
+   "token": "blackforestlabs"
+  },
+  {
+   "company": "Carbonchain",
+   "token": "carbonchain"
+  },
+  {
+   "company": "Enginy",
+   "token": "enginy"
+  },
+  {
+   "company": "Guardsquare",
+   "token": "guardsquare"
+  },
+  {
+   "company": "Mentimeter",
+   "token": "mentimeter"
+  },
+  {
+   "company": "Powerdot",
+   "token": "powerdot"
+  },
+  {
+   "company": "Qphox",
+   "token": "qphox"
+  },
+  {
+   "company": "Smartlyio",
+   "token": "smartlyio"
+  },
+  {
+   "company": "Yondrgroup",
+   "token": "yondrgroup"
+  },
+  {
+   "company": "Alpineeagle",
+   "token": "alpineeagle"
+  },
+  {
+   "company": "Charles",
+   "token": "charles"
+  },
+  {
+   "company": "Arxroboticsgmbh",
+   "token": "arxroboticsgmbh"
+  },
+  {
+   "company": "Fractile",
+   "token": "fractile"
+  },
+  {
+   "company": "Grafanalabs",
+   "token": "grafanalabs"
+  },
+  {
+   "company": "Bloomreach",
+   "token": "bloomreach"
+  },
+  {
+   "company": "Topsort",
+   "token": "topsort"
+  },
+  {
+   "company": "Airbnb",
+   "token": "airbnb"
+  },
+  {
+   "company": "Bolt",
+   "token": "boltv2"
+  },
+  {
+   "company": "Skyscanner",
+   "token": "skyscanner"
+  },
+  {
+   "company": "Trustpilot",
+   "token": "trustpilot"
+  },
+  {
+   "company": "Bitpanda",
+   "token": "bitpanda"
+  },
+  {
+   "company": "Payhawk",
+   "token": "payhawkio"
+  },
+  {
+   "company": "Raisin",
+   "token": "raisin"
+  },
+  {
+   "company": "Solaris",
+   "token": "solarisbank"
+  },
+  {
+   "company": "Mews",
+   "token": "mewssystems"
+  },
+  {
+   "company": "MongoDB",
+   "token": "mongodb"
+  },
+  {
+   "company": "Elastic",
+   "token": "elastic"
+  },
+  {
+   "company": "GitLab",
+   "token": "gitlab"
+  },
+  {
+   "company": "Remote",
+   "token": "remote"
+  },
+  {
+   "company": "Amplitude",
+   "token": "amplitude"
+  },
+  {
+   "company": "Miro",
+   "token": "realtimeboardglobal"
+  },
+  {
+   "company": "Clickhouse",
+   "token": "clickhouse"
+  },
+  {
+   "company": "Exeinspa",
+   "token": "exeinspa"
+  },
+  {
+   "company": "Datacamp",
+   "token": "datacamp"
+  },
+  {
+   "company": "Amenitiz",
+   "token": "amenitiz"
+  },
+  {
+   "company": "Ada",
+   "token": "ada18"
+  },
+  {
+   "company": "League",
+   "token": "leagueinc"
+  },
+  {
+   "company": "D2L",
+   "token": "d2l"
+  },
+  {
+   "company": "Visier",
+   "token": "visiersolutionsinc"
+  },
+  {
+   "company": "Coveo",
+   "token": "coveoen"
+  },
+  {
+   "company": "StackAdapt",
+   "token": "stackadapt"
+  },
+  {
+   "company": "Submer",
+   "token": "submer"
+  },
+  {
+   "company": "Appinio",
+   "token": "appinio"
+  },
+  {
+   "company": "Hive",
+   "token": "hive"
+  },
+  {
+   "company": "Planradar",
+   "token": "planradar"
+  },
+  {
+   "company": "Gropyus",
+   "token": "gropyus"
+  },
+  {
+   "company": "Fourthline",
+   "token": "fourthline"
+  },
+  {
+   "company": "Riskledger",
+   "token": "riskledger"
+  },
+  {
+   "company": "Physicsx",
+   "token": "physicsx"
+  },
+  {
+   "company": "Workwize",
+   "token": "workwize"
+  },
+  {
+   "company": "Toogoodtogo",
+   "token": "toogoodtogo"
+  },
+  {
+   "company": "Grover",
+   "token": "grover"
+  },
+  {
+   "company": "Struck",
+   "token": "struck"
+  },
+  {
+   "company": "Zero",
+   "token": "zero"
+  },
+  {
+   "company": "Isaraerospace",
+   "token": "isaraerospace"
+  },
+  {
+   "company": "Truelayer",
+   "token": "truelayer"
+  },
+  {
+   "company": "Spektr",
+   "token": "spektr"
+  },
+  {
+   "company": "Riverlane",
+   "token": "riverlane"
+  },
+  {
+   "company": "Marvelfusion",
+   "token": "marvelfusion"
+  },
+  {
+   "company": "Superchat",
+   "token": "superchat"
+  },
+  {
+   "company": "Buynomics",
+   "token": "buynomics"
+  },
+  {
+   "company": "Octave",
+   "token": "octave"
+  },
+  {
+   "company": "Tomorrow",
+   "token": "tomorrow"
+  },
+  {
+   "company": "Usergems",
+   "token": "usergems"
+  },
+  {
+   "company": "Vay",
+   "token": "vay"
+  },
+  {
+   "company": "Dexory",
+   "token": "dexory"
+  },
+  {
+   "company": "Fetch",
+   "token": "fetch"
+  },
+  {
+   "company": "Flohealth",
+   "token": "flohealth"
+  },
+  {
+   "company": "Gensyn",
+   "token": "gensyn"
+  },
+  {
+   "company": "Ibanfirst",
+   "token": "ibanfirst"
+  },
+  {
+   "company": "Leapwork",
+   "token": "leapwork"
+  },
+  {
+   "company": "Ledgy",
+   "token": "ledgy"
+  },
+  {
+   "company": "Isomorphiclabs",
+   "token": "isomorphiclabs"
+  },
+  {
+   "company": "Prophero",
+   "token": "prophero"
+  },
+  {
+   "company": "Archbee",
+   "token": "ipfabric"
+  },
+  {
+   "company": "Auterion",
+   "token": "embed"
+  },
+  {
+   "company": "Blockbrain",
+   "token": "blockbrain"
+  }
+ ],
+ "lever": [
+  {
+   "company": "Spotify",
+   "token": "spotify"
+  },
+  {
+   "company": "Qonto",
+   "token": "qonto"
+  },
+  {
+   "company": "Mistral AI",
+   "token": "mistral"
+  },
+  {
+   "company": "Pigment",
+   "token": "pigment"
+  },
+  {
+   "company": "Yuno",
+   "token": "yuno"
+  },
+  {
+   "company": "Aircall",
+   "token": "aircall"
+  },
+  {
+   "company": "JobandTalent",
+   "token": "jobandtalent"
+  },
+  {
+   "company": "Ethenalabs",
+   "token": "ethenalabs"
+  },
+  {
+   "company": "Finn",
+   "token": "finn"
+  },
+  {
+   "company": "Fresha",
+   "token": "fresha"
+  },
+  {
+   "company": "Oddin",
+   "token": "oddin"
+  },
+  {
+   "company": "Outsight",
+   "token": "outsight"
+  },
+  {
+   "company": "Actian",
+   "token": "actian"
+  },
+  {
+   "company": "Zeneducate",
+   "token": "zeneducate"
+  },
+  {
+   "company": "Alice Bob",
+   "token": "alice-bob"
+  },
+  {
+   "company": "Anybotics",
+   "token": "anybotics"
+  },
+  {
+   "company": "Onit",
+   "token": "onit"
+  },
+  {
+   "company": "BeemEnergy",
+   "token": "BeemEnergy"
+  },
+  {
+   "company": "C12qe",
+   "token": "c12qe"
+  },
+  {
+   "company": "CordTechnologies",
+   "token": "CordTechnologies"
+  },
+  {
+   "company": "Grand",
+   "token": "grand"
+  },
+  {
+   "company": "Gravisrobotics",
+   "token": "gravisrobotics"
+  },
+  {
+   "company": "Healx",
+   "token": "healx"
+  },
+  {
+   "company": "Hypersonica Prod",
+   "token": "hypersonica-prod"
+  },
+  {
+   "company": "Intropic",
+   "token": "intropic"
+  },
+  {
+   "company": "Kitmanlabs",
+   "token": "kitmanlabs"
+  },
+  {
+   "company": "Matillion",
+   "token": "matillion"
+  },
+  {
+   "company": "Odaseva",
+   "token": "odaseva"
+  },
+  {
+   "company": "Playplay",
+   "token": "playplay"
+  },
+  {
+   "company": "Skello",
+   "token": "skello"
+  },
+  {
+   "company": "Unlikely",
+   "token": "unlikely"
+  },
+  {
+   "company": "Veo",
+   "token": "veo"
+  },
+  {
+   "company": "Worldover",
+   "token": "worldover"
+  },
+  {
+   "company": "Appfollow",
+   "token": "appfollow"
+  },
+  {
+   "company": "Rivr",
+   "token": "rivr"
+  },
+  {
+   "company": "Tinybird",
+   "token": "tinybird"
+  },
+  {
+   "company": "BlaBlaCar",
+   "token": "blablacar"
+  },
+  {
+   "company": "Vestiaire Collective",
+   "token": "vestiairecollective"
+  },
+  {
+   "company": "Moonpig",
+   "token": "moonpig"
+  },
+  {
+   "company": "Ledger",
+   "token": "ledger"
+  },
+  {
+   "company": "Contentsquare",
+   "token": "contentsquare"
+  },
+  {
+   "company": "Pipedrive",
+   "token": "pipedrive"
+  },
+  {
+   "company": "Kraken123",
+   "token": "kraken123"
+  },
+  {
+   "company": "32Co",
+   "token": "32Co"
+  },
+  {
+   "company": "Impossiblecloud",
+   "token": "impossiblecloud"
+  },
+  {
+   "company": "Dioxycle",
+   "token": "Dioxycle"
+  },
+  {
+   "company": "Swordhealth",
+   "token": "swordhealth"
+  },
+  {
+   "company": "PointClickCare",
+   "token": "pointclickcare"
+  },
+  {
+   "company": "Wave",
+   "token": "waveapps"
+  },
+  {
+   "company": "Wattpad",
+   "token": "wattpad"
+  },
+  {
+   "company": "Waabi",
+   "token": "waabi"
+  },
+  {
+   "company": "Vivenu",
+   "token": "vivenu"
+  },
+  {
+   "company": "Inkitt",
+   "token": "inkitt"
+  },
+  {
+   "company": "Gearset",
+   "token": "gearset"
+  },
+  {
+   "company": "Superside",
+   "token": "superside"
+  },
+  {
+   "company": "Agicap",
+   "token": "agicap"
+  },
+  {
+   "company": "Source",
+   "token": "source"
+  },
+  {
+   "company": "Lodgify",
+   "token": "lodgify"
+  },
+  {
+   "company": "Insify",
+   "token": "insify"
+  },
+  {
+   "company": "Mytos",
+   "token": "mytos"
+  },
+  {
+   "company": "Plenti",
+   "token": "plenti"
+  },
+  {
+   "company": "Plexus",
+   "token": "plexus"
+  },
+  {
+   "company": "Tryriot",
+   "token": "tryriot"
+  },
+  {
+   "company": "Level Zero Health",
+   "token": "level-zero-health"
+  },
+  {
+   "company": "Moneyboxapp",
+   "token": "moneyboxapp"
+  },
+  {
+   "company": "Ampeco Global",
+   "token": "ampeco-global"
+  },
+  {
+   "company": "AELER Technologies",
+   "token": "aeler"
+  },
+  {
+   "company": "Agave Games",
+   "token": "agavegames"
+  },
+  {
+   "company": "Agreena",
+   "token": "agreena"
+  },
+  {
+   "company": "Easol",
+   "token": "easol"
+  },
+  {
+   "company": "Hyperscience",
+   "token": "hyperscience"
+  },
+  {
+   "company": "Kovalee",
+   "token": "kovalee"
+  },
+  {
+   "company": "Lifen",
+   "token": "lifen"
+  },
+  {
+   "company": "Taptap Send",
+   "token": "taptapsend"
+  },
+  {
+   "company": "Orasio",
+   "token": "orasio"
+  },
+  {
+   "company": "Quantinuum",
+   "token": "quantinuum"
+  }
+ ],
+ "ashby": [
+  {
+   "company": "DeepL",
+   "token": "DeepL"
+  },
+  {
+   "company": "Photoroom",
+   "token": "photoroom"
+  },
+  {
+   "company": "PostHog",
+   "token": "posthog"
+  },
+  {
+   "company": "Poolside",
+   "token": "poolside"
+  },
+  {
+   "company": "Raycast",
+   "token": "raycast"
+  },
+  {
+   "company": "Synthesia",
+   "token": "synthesia"
+  },
+  {
+   "company": "Legora",
+   "token": "legora"
+  },
+  {
+   "company": "Faculty",
+   "token": "faculty"
+  },
+  {
+   "company": "HappyRobot",
+   "token": "happyrobot.ai"
+  },
+  {
+   "company": "Fyxer",
+   "token": "fyxer"
+  },
+  {
+   "company": "Nelly",
+   "token": "nelly"
+  },
+  {
+   "company": "Kota",
+   "token": "kota"
+  },
+  {
+   "company": "Zoe",
+   "token": "zoe"
+  },
+  {
+   "company": "N8n",
+   "token": "n8n"
+  },
+  {
+   "company": "Notion",
+   "token": "notion"
+  },
+  {
+   "company": "Lawhive",
+   "token": "lawhive"
+  },
+  {
+   "company": "Tracebit",
+   "token": "tracebit"
+  },
+  {
+   "company": "Lindushealth",
+   "token": "lindus"
+  },
+  {
+   "company": "Hyperexponential",
+   "token": "hyperexponential"
+  },
+  {
+   "company": "Prosper Ai",
+   "token": "prosper-ai"
+  },
+  {
+   "company": "Supabase",
+   "token": "supabase"
+  },
+  {
+   "company": "Multiverse",
+   "token": "multiverse"
+  },
+  {
+   "company": "Lemon Markets",
+   "token": "lemon-markets"
+  },
+  {
+   "company": "Taktile",
+   "token": "taktile"
+  },
+  {
+   "company": "Hcompany",
+   "token": "hcompany"
+  },
+  {
+   "company": "Abacum",
+   "token": "abacum"
+  },
+  {
+   "company": "Gooddata",
+   "token": "gooddata"
+  },
+  {
+   "company": "Plaid",
+   "token": "plaid"
+  },
+  {
+   "company": "Perk",
+   "token": "perk"
+  },
+  {
+   "company": "Reflectionai",
+   "token": "reflectionai"
+  },
+  {
+   "company": "Lendable",
+   "token": "lendable"
+  },
+  {
+   "company": "OpenAI",
+   "token": "openai"
+  },
+  {
+   "company": "Snowflake",
+   "token": "snowflake"
+  },
+  {
+   "company": "Pennylane",
+   "token": "pennylane"
+  },
+  {
+   "company": "Alan",
+   "token": "alan"
+  },
+  {
+   "company": "Mollie",
+   "token": "mollie"
+  },
+  {
+   "company": "Pleo",
+   "token": "pleo"
+  },
+  {
+   "company": "BackMarket",
+   "token": "backmarket"
+  },
+  {
+   "company": "Marshmallow",
+   "token": "marshmallow"
+  },
+  {
+   "company": "Aleph Alpha",
+   "token": "alephalpha"
+  },
+  {
+   "company": "Sorare",
+   "token": "sorare"
+  },
+  {
+   "company": "Capchase",
+   "token": "capchase"
+  },
+  {
+   "company": "Voicemod",
+   "token": "voicemod"
+  },
+  {
+   "company": "Linear",
+   "token": "linear"
+  },
+  {
+   "company": "Lindushealth",
+   "token": "lindushealth"
+  },
+  {
+   "company": "Tandem Health",
+   "token": "tandem-health"
+  },
+  {
+   "company": "Omnea",
+   "token": "omnea"
+  },
+  {
+   "company": "Stacks",
+   "token": "stacks"
+  },
+  {
+   "company": "Cursor",
+   "token": "cursor"
+  },
+  {
+   "company": "Cognition",
+   "token": "cognition"
+  },
+  {
+   "company": "Sierra",
+   "token": "sierra"
+  },
+  {
+   "company": "Decagon",
+   "token": "decagon"
+  },
+  {
+   "company": "Browserbase",
+   "token": "browserbase"
+  },
+  {
+   "company": "Inkeep",
+   "token": "inkeep"
+  },
+  {
+   "company": "Harvey",
+   "token": "harvey"
+  },
+  {
+   "company": "Perplexity",
+   "token": "perplexity"
+  },
+  {
+   "company": "Replit",
+   "token": "replit"
+  },
+  {
+   "company": "Modal",
+   "token": "modal"
+  },
+  {
+   "company": "Aspora",
+   "token": "Aspora"
+  },
+  {
+   "company": "Centreforeffectivealtruism",
+   "token": "centreforeffectivealtruism"
+  },
+  {
+   "company": "Chattermill",
+   "token": "chattermill"
+  },
+  {
+   "company": "Checkly",
+   "token": "checkly"
+  },
+  {
+   "company": "Circuithub",
+   "token": "circuithub"
+  },
+  {
+   "company": "Codat",
+   "token": "codat"
+  },
+  {
+   "company": "Cuspai",
+   "token": "cuspai"
+  },
+  {
+   "company": "Deepjudge",
+   "token": "deepjudge"
+  },
+  {
+   "company": "Duffel",
+   "token": "duffel"
+  },
+  {
+   "company": "Duna",
+   "token": "duna"
+  },
+  {
+   "company": "Dust",
+   "token": "dust"
+  },
+  {
+   "company": "Elliptic",
+   "token": "elliptic"
+  },
+  {
+   "company": "Eye Security",
+   "token": "eye-security"
+  },
+  {
+   "company": "Farseer",
+   "token": "farseer"
+  },
+  {
+   "company": "Filigran",
+   "token": "filigran"
+  },
+  {
+   "company": "Flagright.com",
+   "token": "flagright.com"
+  },
+  {
+   "company": "Hawk",
+   "token": "hawk"
+  },
+  {
+   "company": "Jupus",
+   "token": "jupus"
+  },
+  {
+   "company": "Kognity",
+   "token": "kognity"
+  },
+  {
+   "company": "Lago",
+   "token": "lago"
+  },
+  {
+   "company": "Lakera.ai",
+   "token": "lakera.ai"
+  },
+  {
+   "company": "Langdock",
+   "token": "langdock"
+  },
+  {
+   "company": "Lemfi",
+   "token": "lemfi"
+  },
+  {
+   "company": "Lightdash",
+   "token": "Lightdash"
+  },
+  {
+   "company": "Limbic",
+   "token": "limbic"
+  },
+  {
+   "company": "Liveflow",
+   "token": "liveflow"
+  },
+  {
+   "company": "Mazedesign",
+   "token": "mazedesign"
+  },
+  {
+   "company": "Mimica",
+   "token": "mimica"
+  },
+  {
+   "company": "Morpho",
+   "token": "morpho"
+  },
+  {
+   "company": "MotherDuck",
+   "token": "MotherDuck"
+  },
+  {
+   "company": "MyTomorrows",
+   "token": "myTomorrows"
+  },
+  {
+   "company": "Nabla",
+   "token": "nabla"
+  },
+  {
+   "company": "Neko Health",
+   "token": "neko-health"
+  },
+  {
+   "company": "Neuralconcept",
+   "token": "neuralconcept"
+  },
+  {
+   "company": "Nivoda",
+   "token": "Nivoda"
+  },
+  {
+   "company": "Ona",
+   "token": "ona"
+  },
+  {
+   "company": "Opal OS",
+   "token": "Opal-OS"
+  },
+  {
+   "company": "Primer.io",
+   "token": "primer.io"
+  },
+  {
+   "company": "Redpine",
+   "token": "redpine"
+  },
+  {
+   "company": "Rerun",
+   "token": "rerun"
+  },
+  {
+   "company": "Salonkee",
+   "token": "salonkee"
+  },
+  {
+   "company": "Sana Roles",
+   "token": "sana-roles"
+  },
+  {
+   "company": "Satispay",
+   "token": "satispay"
+  },
+  {
+   "company": "Scarlet",
+   "token": "scarlet"
+  },
+  {
+   "company": "Shook",
+   "token": "shook"
+  },
+  {
+   "company": "Sifflet",
+   "token": "sifflet"
+  },
+  {
+   "company": "Sosafe",
+   "token": "sosafe"
+  },
+  {
+   "company": "Strala Ai",
+   "token": "strala-ai"
+  },
+  {
+   "company": "Swap",
+   "token": "swap"
+  },
+  {
+   "company": "Triggerdev",
+   "token": "triggerdev"
+  },
+  {
+   "company": "Axelera",
+   "token": "axelera"
+  },
+  {
+   "company": "Vertice",
+   "token": "vertice"
+  },
+  {
+   "company": "Wayflyer",
+   "token": "wayflyer"
+  },
+  {
+   "company": "Pear VC",
+   "token": "Pear-VC"
+  },
+  {
+   "company": "Tools%20for%20Humanity",
+   "token": "Tools for Humanity"
+  },
+  {
+   "company": "Xyz Reality",
+   "token": "xyz-reality"
+  },
+  {
+   "company": "Attio",
+   "token": "attio"
+  },
+  {
+   "company": "Abound",
+   "token": "Abound"
+  },
+  {
+   "company": "Adaptive Ml",
+   "token": "adaptive-ml"
+  },
+  {
+   "company": "Adaptyv",
+   "token": "adaptyv"
+  },
+  {
+   "company": "Aibidia",
+   "token": "aibidia"
+  },
+  {
+   "company": "Airweave",
+   "token": "airweave"
+  },
+  {
+   "company": "Alpic",
+   "token": "alpic"
+  },
+  {
+   "company": "Altura",
+   "token": "altura"
+  },
+  {
+   "company": "Ami",
+   "token": "ami"
+  },
+  {
+   "company": "Anima",
+   "token": "Anima"
+  },
+  {
+   "company": "Apify",
+   "token": "apify"
+  },
+  {
+   "company": "Avelios Medical",
+   "token": "avelios-medical"
+  },
+  {
+   "company": "Birdie",
+   "token": "birdie"
+  },
+  {
+   "company": "Bitstack",
+   "token": "bitstack"
+  },
+  {
+   "company": "Capimoney",
+   "token": "capimoney"
+  },
+  {
+   "company": "Caribou",
+   "token": "caribou"
+  },
+  {
+   "company": "Carwow",
+   "token": "Carwow"
+  },
+  {
+   "company": "Choco",
+   "token": "choco"
+  },
+  {
+   "company": "Conduct",
+   "token": "conduct"
+  },
+  {
+   "company": "Contentoo",
+   "token": "contentoo"
+  },
+  {
+   "company": "Conveo",
+   "token": "conveo"
+  },
+  {
+   "company": "Corti",
+   "token": "corti"
+  },
+  {
+   "company": "Cradlebio",
+   "token": "cradlebio"
+  },
+  {
+   "company": "Dash0",
+   "token": "dash0"
+  },
+  {
+   "company": "Definelycareers",
+   "token": "definelycareers"
+  },
+  {
+   "company": "Delfa",
+   "token": "delfa"
+  },
+  {
+   "company": "Dex",
+   "token": "dex"
+  },
+  {
+   "company": "Dotfile",
+   "token": "dotfile"
+  },
+  {
+   "company": "Elyos",
+   "token": "elyos"
+  },
+  {
+   "company": "Endra",
+   "token": "endra"
+  },
+  {
+   "company": "Enode",
+   "token": "enode"
+  },
+  {
+   "company": "Finary",
+   "token": "finary"
+  },
+  {
+   "company": "Flankai",
+   "token": "flankai"
+  },
+  {
+   "company": "Fleek",
+   "token": "fleek"
+  },
+  {
+   "company": "Fonoa",
+   "token": "fonoa"
+  },
+  {
+   "company": "Formance",
+   "token": "formance"
+  },
+  {
+   "company": "Granola",
+   "token": "granola"
+  },
+  {
+   "company": "Griffin",
+   "token": "griffin"
+  },
+  {
+   "company": "Happl",
+   "token": "happl"
+  },
+  {
+   "company": "Healthtech 1",
+   "token": "Healthtech-1"
+  },
+  {
+   "company": "Herondata",
+   "token": "herondata"
+  },
+  {
+   "company": "Hiya",
+   "token": "hiya"
+  },
+  {
+   "company": "Hook",
+   "token": "hook"
+  },
+  {
+   "company": "Hoxhunt",
+   "token": "hoxhunt"
+  },
+  {
+   "company": "Humaans",
+   "token": "humaans"
+  },
+  {
+   "company": "Invert",
+   "token": "invert"
+  },
+  {
+   "company": "Get Ivy",
+   "token": "get-ivy"
+  },
+  {
+   "company": "Kittl",
+   "token": "kittl"
+  },
+  {
+   "company": "Knowunity",
+   "token": "knowunity"
+  },
+  {
+   "company": "Kombo",
+   "token": "Kombo"
+  },
+  {
+   "company": "Langfuse",
+   "token": "langfuse"
+  },
+  {
+   "company": "Lexroom",
+   "token": "lexroom"
+  },
+  {
+   "company": "Lio",
+   "token": "lio"
+  },
+  {
+   "company": "Lucis",
+   "token": "lucis"
+  },
+  {
+   "company": "Maihem",
+   "token": "maihem"
+  },
+  {
+   "company": "Metaview",
+   "token": "metaview"
+  },
+  {
+   "company": "Mindpeak",
+   "token": "mindpeak"
+  },
+  {
+   "company": "Nory",
+   "token": "nory"
+  },
+  {
+   "company": "Orbem",
+   "token": "orbem"
+  },
+  {
+   "company": "Payrails",
+   "token": "payrails"
+  },
+  {
+   "company": "Peec",
+   "token": "peec"
+  },
+  {
+   "company": "Permutive",
+   "token": "permutive"
+  },
+  {
+   "company": "Pivot",
+   "token": "Pivot"
+  },
+  {
+   "company": "Praxipal",
+   "token": "praxipal"
+  },
+  {
+   "company": "Prior Labs",
+   "token": "prior-labs"
+  },
+  {
+   "company": "Protex%20AI",
+   "token": "Protex AI"
+  },
+  {
+   "company": "Proxima Fusion",
+   "token": "proxima-fusion"
+  },
+  {
+   "company": "Remberg",
+   "token": "remberg"
+  },
+  {
+   "company": "Rossum.ai",
+   "token": "rossum.ai"
+  },
+  {
+   "company": "Saturn",
+   "token": "saturn"
+  },
+  {
+   "company": "Scan Com",
+   "token": "scan-com"
+  },
+  {
+   "company": "Getscope",
+   "token": "getscope"
+  },
+  {
+   "company": "Sensmore",
+   "token": "sensmore"
+  },
+  {
+   "company": "Seyna",
+   "token": "seyna"
+  },
+  {
+   "company": "Sintra",
+   "token": "sintra"
+  },
+  {
+   "company": "Subsets",
+   "token": "subsets"
+  },
+  {
+   "company": "Sylvera",
+   "token": "sylvera"
+  },
+  {
+   "company": "Synthflow",
+   "token": "synthflow"
+  },
+  {
+   "company": "Tacto",
+   "token": "tacto"
+  },
+  {
+   "company": "Tebi",
+   "token": "tebi"
+  },
+  {
+   "company": "Tesslcareers",
+   "token": "tesslcareers"
+  },
+  {
+   "company": "The Exploration Company",
+   "token": "the-exploration-company"
+  },
+  {
+   "company": "Tortus",
+   "token": "tortus"
+  },
+  {
+   "company": "Trawa",
+   "token": "trawa"
+  },
+  {
+   "company": "Upvest",
+   "token": "upvest"
+  },
+  {
+   "company": "Vocca",
+   "token": "vocca"
+  },
+  {
+   "company": "Voize",
+   "token": "voize"
+  },
+  {
+   "company": "Xapien",
+   "token": "xapien"
+  },
+  {
+   "company": "Yepoda",
+   "token": "yepoda"
+  },
+  {
+   "company": "Zefir",
+   "token": "zefir"
+  },
+  {
+   "company": "Zeno",
+   "token": "zeno"
+  },
+  {
+   "company": "Pliant",
+   "token": "pliant"
+  },
+  {
+   "company": "Roompricegenie",
+   "token": "roompricegenie"
+  },
+  {
+   "company": "Katana",
+   "token": "katana"
+  },
+  {
+   "company": "Ostrom",
+   "token": "Ostrom"
+  },
+  {
+   "company": "Reonic",
+   "token": "reonic"
+  },
+  {
+   "company": "Edgetier.com",
+   "token": "edgetier.com"
+  },
+  {
+   "company": "Powerus",
+   "token": "powerus"
+  },
+  {
+   "company": "Teero",
+   "token": "teero"
+  },
+  {
+   "company": "Lovable",
+   "token": "lovable"
+  },
+  {
+   "company": "Monumental",
+   "token": "monumental"
+  },
+  {
+   "company": "Robco",
+   "token": "robco"
+  },
+  {
+   "company": "Tractable",
+   "token": "tractable"
+  },
+  {
+   "company": "Escape",
+   "token": "escape"
+  },
+  {
+   "company": "Wordsmith",
+   "token": "wordsmith"
+  },
+  {
+   "company": "Dune",
+   "token": "dune"
+  },
+  {
+   "company": "Deliveroo",
+   "token": "deliveroo"
+  },
+  {
+   "company": "Preply",
+   "token": "preply"
+  },
+  {
+   "company": "Checkout.com",
+   "token": "checkout.com"
+  },
+  {
+   "company": "Confluent",
+   "token": "confluent"
+  },
+  {
+   "company": "Deel",
+   "token": "deel"
+  },
+  {
+   "company": "Zapier",
+   "token": "zapier"
+  },
+  {
+   "company": "ElevenLabs",
+   "token": "elevenlabs"
+  },
+  {
+   "company": "Cohere",
+   "token": "cohere"
+  },
+  {
+   "company": "RevenueCat",
+   "token": "revenuecat"
+  },
+  {
+   "company": "Orbital",
+   "token": "orbital"
+  },
+  {
+   "company": "Accurx",
+   "token": "accurx"
+  },
+  {
+   "company": "Creem",
+   "token": "creem"
+  },
+  {
+   "company": "Lassie",
+   "token": "lassie"
+  },
+  {
+   "company": "Fonio",
+   "token": "Fonio"
+  },
+  {
+   "company": "Sona",
+   "token": "sona"
+  },
+  {
+   "company": "Light Inc",
+   "token": "light-inc"
+  },
+  {
+   "company": "Deligo",
+   "token": "deligo"
+  },
+  {
+   "company": "Pandektes",
+   "token": "pandektes"
+  },
+  {
+   "company": "Duvo",
+   "token": "duvo"
+  },
+  {
+   "company": "Encord",
+   "token": "encord"
+  },
+  {
+   "company": "Scoreplay",
+   "token": "scoreplay"
+  },
+  {
+   "company": "Genesis",
+   "token": "genesis"
+  },
+  {
+   "company": "Comstruct",
+   "token": "comstruct"
+  },
+  {
+   "company": "Netbird",
+   "token": "netbird"
+  },
+  {
+   "company": "Zauber",
+   "token": "zauber"
+  },
+  {
+   "company": "Seamflow",
+   "token": "seamflow"
+  },
+  {
+   "company": "Testgorilla",
+   "token": "testgorilla"
+  },
+  {
+   "company": "Plancraft",
+   "token": "plancraft"
+  },
+  {
+   "company": "Robin Ai",
+   "token": "robin-ai"
+  },
+  {
+   "company": "Prelude",
+   "token": "Prelude"
+  },
+  {
+   "company": "Ceartas",
+   "token": "ceartas"
+  },
+  {
+   "company": "Jack Jill External Ats",
+   "token": "jack-jill-external-ats"
+  },
+  {
+   "company": "Holywater",
+   "token": "holywater"
+  },
+  {
+   "company": "Lithosquare",
+   "token": "lithosquare"
+  },
+  {
+   "company": "Meticulous",
+   "token": "meticulous"
+  },
+  {
+   "company": "Oneleet",
+   "token": "oneleet"
+  },
+  {
+   "company": "Spaitial",
+   "token": "spaitial"
+  },
+  {
+   "company": "Gradient Labs",
+   "token": "gradient-labs"
+  },
+  {
+   "company": "Wealthsimple",
+   "token": "wealthsimple"
+  },
+  {
+   "company": "Float Financial",
+   "token": "float"
+  },
+  {
+   "company": "1Password",
+   "token": "1password"
+  },
+  {
+   "company": "Clearco",
+   "token": "clearco"
+  },
+  {
+   "company": "KOHO",
+   "token": "koho"
+  },
+  {
+   "company": "Relay Financial",
+   "token": "relayfi"
+  },
+  {
+   "company": "Loopio",
+   "token": "loopio"
+  },
+  {
+   "company": "Miovision",
+   "token": "miovision"
+  },
+  {
+   "company": "Thinkific",
+   "token": "thinkific"
+  },
+  {
+   "company": "Trulioo",
+   "token": "trulioo"
+  },
+  {
+   "company": "Procurify",
+   "token": "procurify"
+  },
+  {
+   "company": "Jobber",
+   "token": "jobber"
+  },
+  {
+   "company": "Klue",
+   "token": "klue"
+  },
+  {
+   "company": "Hopper",
+   "token": "hopper"
+  },
+  {
+   "company": "Neo Financial",
+   "token": "neofinancial"
+  },
+  {
+   "company": "Lightspeed Commerce",
+   "token": "lightspeedhq"
+  },
+  {
+   "company": "Sequence",
+   "token": "sequence"
+  },
+  {
+   "company": "Alta Ares",
+   "token": "alta-ares"
+  },
+  {
+   "company": "Causaprima",
+   "token": "causaprima"
+  },
+  {
+   "company": "Harmattan Ai",
+   "token": "harmattan-ai"
+  },
+  {
+   "company": "Iceye",
+   "token": "iceye"
+  },
+  {
+   "company": "9fin",
+   "token": "9fin"
+  },
+  {
+   "company": "Se3",
+   "token": "se3"
+  },
+  {
+   "company": "Taptapsend",
+   "token": "taptapsend"
+  },
+  {
+   "company": "Ben",
+   "token": "ben"
+  },
+  {
+   "company": "Cortea",
+   "token": "cortea"
+  },
+  {
+   "company": "Wonderful",
+   "token": "wonderful"
+  },
+  {
+   "company": "Scalera",
+   "token": "scalera"
+  },
+  {
+   "company": "Invopop",
+   "token": "invopop"
+  },
+  {
+   "company": "Enpal",
+   "token": "enpal"
+  },
+  {
+   "company": "Buena",
+   "token": "buena"
+  },
+  {
+   "company": "Allica Bank",
+   "token": "allica-bank"
+  },
+  {
+   "company": "Seon",
+   "token": "seon"
+  },
+  {
+   "company": "Viktor",
+   "token": "viktor"
+  },
+  {
+   "company": "Amboss",
+   "token": "amboss"
+  },
+  {
+   "company": "Ameba",
+   "token": "ameba"
+  },
+  {
+   "company": "Tourlane",
+   "token": "tourlane"
+  },
+  {
+   "company": "Serenis",
+   "token": "serenis"
+  },
+  {
+   "company": "Reedsy",
+   "token": "reedsy"
+  },
+  {
+   "company": "Shapr3d",
+   "token": "shapr3d"
+  },
+  {
+   "company": "Bitvavo",
+   "token": "bitvavo"
+  },
+  {
+   "company": "Cape",
+   "token": "cape"
+  },
+  {
+   "company": "Telli",
+   "token": "telli"
+  },
+  {
+   "company": "Flagstone",
+   "token": "flagstone"
+  },
+  {
+   "company": "Gorilla",
+   "token": "gorilla"
+  },
+  {
+   "company": "Smallpdf",
+   "token": "smallpdf"
+  },
+  {
+   "company": "Capsa",
+   "token": "capsa"
+  },
+  {
+   "company": "Solveintelligence",
+   "token": "solveintelligence"
+  },
+  {
+   "company": "Billie",
+   "token": "billie"
+  },
+  {
+   "company": "Spruce",
+   "token": "spruce"
+  },
+  {
+   "company": "Nomos",
+   "token": "nomos"
+  },
+  {
+   "company": "Stotles.com",
+   "token": "stotles.com"
+  },
+  {
+   "company": "Cello",
+   "token": "cello"
+  },
+  {
+   "company": "Cerve",
+   "token": "cerve"
+  },
+  {
+   "company": "Junction",
+   "token": "junction"
+  },
+  {
+   "company": "Clarity",
+   "token": "clarity"
+  },
+  {
+   "company": "Folio",
+   "token": "folio"
+  },
+  {
+   "company": "Cryptio",
+   "token": "cryptio"
+  },
+  {
+   "company": "Cosine",
+   "token": "cosine"
+  },
+  {
+   "company": "Unify",
+   "token": "unify"
+  },
+  {
+   "company": "Windmill",
+   "token": "windmill"
+  },
+  {
+   "company": "Weaviate",
+   "token": "weaviate"
+  },
+  {
+   "company": "Verto",
+   "token": "verto"
+  },
+  {
+   "company": "Nexos Ai",
+   "token": "nexos-ai"
+  },
+  {
+   "company": "Omi",
+   "token": "omi"
+  },
+  {
+   "company": "Paradox",
+   "token": "paradox"
+  },
+  {
+   "company": "Phasebiolabs",
+   "token": "phasebiolabs"
+  },
+  {
+   "company": "Plain",
+   "token": "plain"
+  },
+  {
+   "company": "Plumerai",
+   "token": "plumerai"
+  },
+  {
+   "company": "Adclear",
+   "token": "adclear"
+  },
+  {
+   "company": "Procure",
+   "token": "procure"
+  },
+  {
+   "company": "Reson8",
+   "token": "reson8"
+  },
+  {
+   "company": "Dataguard",
+   "token": "dataguard"
+  },
+  {
+   "company": "Finto",
+   "token": "finto"
+  },
+  {
+   "company": "Flink",
+   "token": "flink"
+  },
+  {
+   "company": "Swarmia",
+   "token": "swarmia"
+  },
+  {
+   "company": "Sweep",
+   "token": "sweep"
+  },
+  {
+   "company": "Hyperscience",
+   "token": "hyperscience"
+  },
+  {
+   "company": "Incident",
+   "token": "incident"
+  },
+  {
+   "company": "Lemlist",
+   "token": "lemlist"
+  },
+  {
+   "company": "Linkup",
+   "token": "Linkup"
+  },
+  {
+   "company": "Molecule",
+   "token": "molecule"
+  },
+  {
+   "company": "Monk",
+   "token": "monk"
+  },
+  {
+   "company": "Multiply",
+   "token": "multiply"
+  },
+  {
+   "company": "Teton",
+   "token": "teton"
+  },
+  {
+   "company": "Tilla",
+   "token": "tilla"
+  },
+  {
+   "company": "Geordieai",
+   "token": "geordieai"
+  },
+  {
+   "company": "Sereact",
+   "token": "sereact"
+  },
+  {
+   "company": "Mirelo",
+   "token": "mirelo"
+  },
+  {
+   "company": "Blacksemiconductor",
+   "token": "blacksemiconductor"
+  },
+  {
+   "company": "Focused",
+   "token": "focused"
+  },
+  {
+   "company": "Olix",
+   "token": "olix"
+  },
+  {
+   "company": "Orbitalindustries",
+   "token": "orbitalindustries"
+  },
+  {
+   "company": "Anam",
+   "token": "anam"
+  },
+  {
+   "company": "Vibiz",
+   "token": "vibiz"
+  },
+  {
+   "company": "Vizzia",
+   "token": "vizzia"
+  },
+  {
+   "company": "Climatiq",
+   "token": "climatiq"
+  },
+  {
+   "company": "Dapper",
+   "token": "ashby-embed-demo-org"
+  },
+  {
+   "company": "DoorFeed",
+   "token": "doorfeed"
+  },
+  {
+   "company": "Kiln",
+   "token": "kiln.fi"
+  },
+  {
+   "company": "Mitiga Solutions",
+   "token": "mitiga-solutions"
+  },
+  {
+   "company": "Urban Jungle",
+   "token": "myurbanjungle.com"
+  },
+  {
+   "company": "Fence",
+   "token": "fence technology inc"
+  }
+ ],
+ "workable": [
+  {
+   "company": "Fairmoney",
+   "token": "fairmoney"
+  },
+  {
+   "company": "Futurae",
+   "token": "futurae"
+  },
+  {
+   "company": "Hedepy",
+   "token": "hedepy"
+  },
+  {
+   "company": "Huggingface",
+   "token": "huggingface"
+  },
+  {
+   "company": "Runware",
+   "token": "runware"
+  },
+  {
+   "company": "Secondnature",
+   "token": "secondnature"
+  },
+  {
+   "company": "Tyk Technologies",
+   "token": "tyk-technologies"
+  },
+  {
+   "company": "Unitary",
+   "token": "unitary"
+  },
+  {
+   "company": "Workmotion",
+   "token": "workmotion"
+  },
+  {
+   "company": "Hilobyaktiia",
+   "token": "hilobyaktiia"
+  },
+  {
+   "company": "Arsenale Bioyards",
+   "token": "arsenale-bioyards"
+  },
+  {
+   "company": "Blast",
+   "token": "blast"
+  },
+  {
+   "company": "Booksy 1",
+   "token": "booksy-1"
+  },
+  {
+   "company": "Carmoola 1",
+   "token": "carmoola-1"
+  },
+  {
+   "company": "Cleafy",
+   "token": "cleafy"
+  },
+  {
+   "company": "Converge",
+   "token": "converge"
+  },
+  {
+   "company": "Dreamdata",
+   "token": "dreamdata"
+  },
+  {
+   "company": "Exoticca",
+   "token": "exoticca"
+  },
+  {
+   "company": "Ferryhopper",
+   "token": "ferryhopper"
+  },
+  {
+   "company": "Flexcarcareers",
+   "token": "flexcarcareers"
+  },
+  {
+   "company": "Fuseenergy",
+   "token": "fuseenergy"
+  },
+  {
+   "company": "Hellasdirect",
+   "token": "hellasdirect"
+  },
+  {
+   "company": "Hero Software",
+   "token": "hero-software"
+  },
+  {
+   "company": "Instacar Sa",
+   "token": "instacar-sa"
+  },
+  {
+   "company": "Knok",
+   "token": "knok"
+  },
+  {
+   "company": "Magic Careers",
+   "token": "magic-careers"
+  },
+  {
+   "company": "Neurolabs",
+   "token": "neurolabs"
+  },
+  {
+   "company": "Newcode",
+   "token": "newcode"
+  },
+  {
+   "company": "Nuclera",
+   "token": "nuclera"
+  },
+  {
+   "company": "Optimile",
+   "token": "optimile"
+  },
+  {
+   "company": "Otiv",
+   "token": "otiv"
+  },
+  {
+   "company": "Perlego",
+   "token": "perlego"
+  },
+  {
+   "company": "Withplum",
+   "token": "withplum"
+  },
+  {
+   "company": "Polaron",
+   "token": "polaron"
+  },
+  {
+   "company": "Prosapient",
+   "token": "prosapient"
+  },
+  {
+   "company": "Qureight",
+   "token": "qureight"
+  },
+  {
+   "company": "Robeaute",
+   "token": "robeaute"
+  },
+  {
+   "company": "Spruce 2",
+   "token": "spruce-2"
+  },
+  {
+   "company": "Strideup",
+   "token": "strideup"
+  },
+  {
+   "company": "Twoinc",
+   "token": "twoinc"
+  },
+  {
+   "company": "Ukio",
+   "token": "ukio"
+  },
+  {
+   "company": "Uncapped",
+   "token": "uncapped"
+  },
+  {
+   "company": "U2y",
+   "token": "u2y"
+  },
+  {
+   "company": "Updraft",
+   "token": "updraft"
+  },
+  {
+   "company": "Usercentrics",
+   "token": "usercentrics"
+  },
+  {
+   "company": "Vitesse Psp",
+   "token": "vitesse-psp"
+  },
+  {
+   "company": "Wavephotonics",
+   "token": "wavephotonics"
+  },
+  {
+   "company": "Zodia Custody",
+   "token": "zodia-custody"
+  },
+  {
+   "company": "Annamoney",
+   "token": "annamoney"
+  },
+  {
+   "company": "Getbits",
+   "token": "getbits"
+  },
+  {
+   "company": "Yourhero Douleutaras",
+   "token": "yourhero-douleutaras"
+  },
+  {
+   "company": "Mondu",
+   "token": "mondu"
+  },
+  {
+   "company": "Aerones",
+   "token": "aerones"
+  },
+  {
+   "company": "J",
+   "token": "j"
+  },
+  {
+   "company": "Flowdesk",
+   "token": "flowdesk"
+  },
+  {
+   "company": "Universalquantum",
+   "token": "universalquantum"
+  },
+  {
+   "company": "Strise",
+   "token": "strise"
+  },
+  {
+   "company": "Quandela",
+   "token": "quandela"
+  },
+  {
+   "company": "Borrowell",
+   "token": "borrowell"
+  },
+  {
+   "company": "Botpress",
+   "token": "botpress"
+  },
+  {
+   "company": "Goodfit",
+   "token": "goodfit"
+  },
+  {
+   "company": "Cogna",
+   "token": "cogna"
+  },
+  {
+   "company": "Aidoptation",
+   "token": "aidoptation"
+  },
+  {
+   "company": "9fin",
+   "token": "9fin"
+  },
+  {
+   "company": "Appear Here",
+   "token": "appearhere"
+  },
+  {
+   "company": "Autonomo Technologies",
+   "token": "autonomo-gmbh"
+  },
+  {
+   "company": "Barkibu",
+   "token": "join-barkibu"
+  },
+  {
+   "company": "BIOS Health",
+   "token": "bios-3"
+  },
+  {
+   "company": "Carbo Culture",
+   "token": "carbo-culture"
+  },
+  {
+   "company": "CleverCards",
+   "token": "clevercards"
+  },
+  {
+   "company": "Cognigy",
+   "token": "cognigy"
+  },
+  {
+   "company": "Convert Group",
+   "token": "convertgroup"
+  },
+  {
+   "company": "Cuvva",
+   "token": "cuvva"
+  },
+  {
+   "company": "CyberSmart",
+   "token": "cybersmart"
+  },
+  {
+   "company": "DESelect",
+   "token": "deselect"
+  },
+  {
+   "company": "dltHub",
+   "token": "dlthub"
+  },
+  {
+   "company": "Gorilla",
+   "token": "gorilla"
+  },
+  {
+   "company": "InSilicoTrials",
+   "token": "insilicotrials"
+  },
+  {
+   "company": "Jacobian",
+   "token": "smartreporting"
+  },
+  {
+   "company": "Metomic",
+   "token": "metomic"
+  },
+  {
+   "company": "Micrographia Bio",
+   "token": "micrographia-bio"
+  },
+  {
+   "company": "Qomodo",
+   "token": "qomodo"
+  },
+  {
+   "company": "Reedsy",
+   "token": "reedsy"
+  },
+  {
+   "company": "Velasca",
+   "token": "velasca"
+  },
+  {
+   "company": "Wallbox",
+   "token": "wallbox"
+  },
+  {
+   "company": "Welcome Pickups",
+   "token": "welcome"
+  },
+  {
+   "company": "Reiterate",
+   "token": "reiterate"
+  },
+  {
+   "company": "Destinus",
+   "token": "destinus"
+  },
+  {
+   "company": "Prem AI",
+   "token": "premai"
+  }
+ ],
+ "smartrecruiters": [
+  {
+   "company": "Wise",
+   "token": "Wise"
+  },
+  {
+   "company": "Palantir",
+   "token": "Palantir"
+  },
+  {
+   "company": "ServiceNow",
+   "token": "ServiceNow"
+  },
+  {
+   "company": "Visa",
+   "token": "Visa"
+  },
+  {
+   "company": "Canva",
+   "token": "canva"
+  },
+  {
+   "company": "Scalable Capital",
+   "token": "ScalableGmbH"
+  },
+  {
+   "company": "Delivery Hero",
+   "token": "DeliveryHero"
+  },
+  {
+   "company": "Red Points",
+   "token": "RedPoints1"
+  },
+  {
+   "company": "Le Collectionist",
+   "token": "LeCollectionist"
+  }
+ ]
 }
