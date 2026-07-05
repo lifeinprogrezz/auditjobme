@@ -284,10 +284,13 @@
     inset 0 16px 32px -22px rgba(255, 255, 255, 0.6),
     inset 0 -1px 0 0 rgba(11, 31, 38, 0.08),
     inset 0 -14px 28px -24px rgba(20, 60, 70, 0.16);
-  background: radial-gradient(120% 100% at 50% 36%, #f7f9fa 0%, #eef2f4 42%, #e2e8ec 78%, #d5dde2 100%);
+  /* Ethereal fade (Rober 7-05): soft luminous core breathing out into mist —
+   * the page darkens gently toward the edges instead of flat bright white. */
+  background: radial-gradient(120% 100% at 50% 36%, #f2f5f7 0%, #e4eaee 38%, #ccd7de 70%, #b3c2cc 100%);
 }
 .roles-theme.light .stars { display: none; }
-.roles-theme.light .vig { box-shadow: inset 0 0 220px 40px rgba(90, 110, 125, 0.18); }
+/* the halo: a wide, soft atmospheric ring that makes the light mode ethereal */
+.roles-theme.light .vig { box-shadow: inset 0 0 320px 90px rgba(126, 148, 162, 0.34), inset 0 0 120px 20px rgba(226, 234, 238, 0.25); }
 .roles-theme.light .liquid::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), transparent 44%); mix-blend-mode: normal; }
 .roles-theme.light .maplibregl-ctrl-icon { filter: invert(0.35); }
 .roles-theme.light .attrib { background: rgba(255, 255, 255, 0.65); color: var(--subtle); }
@@ -318,7 +321,7 @@
 .roles-theme.light .navcv:hover { background: rgba(18, 165, 148, 0.18); border-color: rgba(18, 165, 148, 0.55); }
 
 /* panel */
-.roles-theme.light .panel { background: rgba(255, 255, 255, 0.78);
+.roles-theme.light .panel { background: rgba(247, 250, 251, 0.66);
   box-shadow: 0 18px 50px -16px rgba(20, 60, 70, 0.3),
     inset 0 1.5px 0 0 rgba(255, 255, 255, 0.95),
     inset 0 18px 36px -24px rgba(255, 255, 255, 0.65),
@@ -335,7 +338,7 @@
 .roles-theme.light .cards::-webkit-scrollbar-thumb { background: rgba(11, 31, 38, 0.15); }
 
 /* cards */
-.roles-theme.light .card { background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55)); border-color: rgba(11, 31, 38, 0.08); box-shadow: 0 8px 24px -8px rgba(20, 60, 70, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(11, 31, 38, 0.05); }
+.roles-theme.light .card { background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.46)); border-color: rgba(11, 31, 38, 0.08); box-shadow: 0 8px 24px -8px rgba(20, 60, 70, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(11, 31, 38, 0.05); }
 .roles-theme.light .card::after { background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0px), rgba(18, 165, 148, 0.12), transparent 60%); }
 .roles-theme.light .card:hover { border-color: rgba(18, 165, 148, 0.4); box-shadow: 0 20px 50px -12px rgba(20, 60, 70, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
 .roles-theme.light .card .co { color: var(--muted); }

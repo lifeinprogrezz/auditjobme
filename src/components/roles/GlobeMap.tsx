@@ -22,6 +22,8 @@ type MapTheme = {
   seaStops: [string, string, string, string, string, string];
   hill: { shadow: string; highlight: string; accent: string; exaggeration: number };
   border: { color: string; opacity: number; width: number };
+  /** Optional repaint of the basemap's background layer (tone down raw white). */
+  baseTint?: string;
 };
 
 // Dark = the approved ink & graphite palette (7-05); light = paper (Positron).
@@ -38,13 +40,15 @@ const THEMES: Record<"dark" | "light", MapTheme> = {
   },
   light: {
     styleUrl: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-    sky: { "sky-color": "#dfeaf2", "horizon-color": "#ffffff", "fog-color": "#eef3f7" },
+    sky: { "sky-color": "#d5e2ec", "horizon-color": "#f2f6f8", "fog-color": "#e6edf1" },
     seaStops: [
-      "rgba(168,192,208,1)", "rgba(182,203,217,1)", "rgba(196,214,226,1)",
-      "rgba(208,223,233,1)", "rgba(218,231,239,0.9)", "rgba(220,232,240,0)",
+      "rgba(158,182,199,1)", "rgba(172,194,209,1)", "rgba(186,206,219,1)",
+      "rgba(198,215,226,1)", "rgba(208,223,232,0.9)", "rgba(210,224,233,0)",
     ],
-    hill: { shadow: "#aab6be", highlight: "#ffffff", accent: "#cfd9df", exaggeration: 0.45 },
+    hill: { shadow: "#a3afb7", highlight: "#eef3f5", accent: "#c6d1d8", exaggeration: 0.45 },
     border: { color: "#7d919d", opacity: 0.4, width: 0.6 },
+    // Positron's land is near-pure white — pull it toward mist so the page halo reads.
+    baseTint: "#edf1f3",
   },
 };
 // The Europe frame is always a fitBounds (never a raw zoom number) — the globe
@@ -147,6 +151,15 @@ function buildPin(p: PinProps): HTMLDivElement {
 }
 
 function styleAtmosphere(map: maplibregl.Map, theme: MapTheme): void {
+  if (theme.baseTint) {
+    try {
+      for (const l of map.getStyle().layers) {
+        if (l.type === "background") map.setPaintProperty(l.id, "background-color", theme.baseTint);
+      }
+    } catch {
+      /* tint is decoration */
+    }
+  }
   try {
     map.setSky({
       ...theme.sky,
