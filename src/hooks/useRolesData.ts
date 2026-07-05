@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
 import { scoreJob, RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
-import { byScore, type RoleJob } from "@/lib/roles";
+import { applyLandedScores, byScore, type RoleJob } from "@/lib/roles";
 import { cityOf, sunflowerLngLat } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
 
@@ -59,6 +59,10 @@ function enrichAll(rows: JobsRow[]): RoleJob[] {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Landed scores reach the UI at most this often during a pass (#26): every
+// setJobs re-tiles the whole map source, so per-landing updates (~40/pass)
+// churned the globe while the user browsed.
+const SCORE_FLUSH_MS = 2000;
 
 /**
  * Data plane for the /roles page. Mirrors Digest's load/score/apply flow with two
@@ -94,6 +98,21 @@ export function useRolesData() {
       if (jdError || !jdRows) return;
       const jdById: Record<string, string | null> = {};
       jdRows.forEach((r) => (jdById[r.id] = r.jd_text));
+      // Batched flushes (#26): a per-landing setJobs + re-sort fired a full map
+      // re-index up to 40x per pass, and every re-sort remapped supercluster ids
+      // wholesale (marker churn mid-gesture). Landed scores now reach the UI at
+      // most every SCORE_FLUSH_MS with row order STABLE; the byScore sort runs
+      // once, when the pass completes. Cancelled runs never flush (stale scores
+      // must not leak into the next user's view).
+      const pending = new Map<string, { score: number; reason: string | null }>();
+      let landedAny = false;
+      let lastFlush = Date.now();
+      const flush = (sort: boolean) => {
+        if (pending.size === 0 && !sort) return;
+        const landed = new Map(pending);
+        pending.clear();
+        setJobs((prev) => applyLandedScores(prev, landed, sort));
+      };
       for (const j of batch) {
         if (runRef.current !== runId) return;
         const result = await scoreJob(prof, { ...j, jd_text: jdById[j.id] ?? null });
@@ -109,12 +128,14 @@ export function useRolesData() {
           { onConflict: "user_id,job_id,rubric_version" },
         );
         if (runRef.current !== runId) return;
-        setJobs((prev) =>
-          prev
-            .map((x) => (x.id === j.id ? { ...x, score: result.score, reason: result.reason } : x))
-            .sort(byScore),
-        );
+        pending.set(j.id, { score: result.score, reason: result.reason });
+        landedAny = true;
+        if (Date.now() - lastFlush >= SCORE_FLUSH_MS) {
+          flush(false);
+          lastFlush = Date.now();
+        }
       }
+      if (landedAny) flush(true);
     } finally {
       scoringRef.current = false;
       if (runRef.current === runId) setScoring(false);
