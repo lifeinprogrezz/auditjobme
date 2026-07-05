@@ -27,7 +27,9 @@
   /* Rim-light system (approved live 2026-07-05): glass tells at the rim — light
    * enters top-left; panes catch an icy edge band that falls off fast, and seat
    * into shadow at the bottom. Static paint only — never a filter. */
-  --sh: 0 18px 50px -16px rgba(0, 0, 0, 0.7),
+  /* Drop term reduced 7-05 (Rober: the glass panes' 50px shadow bands washed
+   * over the map — keep the rim identity, shrink the cast onto the world). */
+  --sh: 0 10px 26px -14px rgba(0, 0, 0, 0.45),
     inset 0 1.5px 0 0 rgba(255, 255, 255, 0.18),
     inset 0 16px 32px -22px rgba(170, 225, 240, 0.28),
     inset 0 -1px 0 0 rgba(2, 10, 14, 0.55),
@@ -59,23 +61,34 @@
   box-shadow: 0 0 5px 3px rgba(255, 255, 255, 1), 0 0 48px 18px rgba(228, 242, 254, 0.72), 0 0 160px 60px rgba(175, 208, 240, 0.38), 0 0 320px 140px rgba(130, 170, 215, 0.16); }
 .roles-theme:not(.light) .halo { box-shadow: 0 0 3px 1.5px rgba(220, 240, 250, 0.75), 0 0 28px 10px rgba(165, 205, 235, 0.35), 0 0 110px 44px rgba(110, 160, 205, 0.16); }
 .roles-theme .roles-map { position: absolute; inset: 0; z-index: 1; background: transparent; }
-.roles-theme .vig { position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 260px 60px rgba(0, 0, 0, 0.55); }
+/* Vignette reduced hard (Rober 7-05: clean eye view of 100% of the map —
+ * the 260px/0.55 veil greyed the whole viewport). Kept as a whisper of depth. */
+.roles-theme .vig { position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 140px 12px rgba(0, 0, 0, 0.22); }
+.roles-theme.light .vig { box-shadow: inset 0 0 90px 4px rgba(10, 25, 35, 0.07); }
 
-/* attribution pill (custom, bottom-center) */
-/* Credits: quiet native-map text, no glass box (the pill read as "forced"). */
-.roles-theme .attrib { position: absolute; left: 16px; bottom: 8px; z-index: 12; padding: 0; font-size: 10px; color: var(--subtle); display: flex; gap: 7px; align-items: center; background: none; border: 0; box-shadow: none; opacity: 0.85; }
+/* attribution pill (custom, bottom-center — restored 7-05 after the ticker
+ * that displaced it to the corner was removed) */
+.roles-theme .attrib { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 12; border-radius: 12px; padding: 6px 13px; font-size: 10.5px; color: var(--subtle); display: flex; gap: 8px; align-items: center; background: rgba(22, 38, 46, 0.6); border: 1px solid var(--rim); box-shadow: var(--sh); }
+.roles-theme .attrib::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent 44%); mix-blend-mode: screen; }
 .roles-theme .attrib > * { position: relative; z-index: 1; }
 .roles-theme .attrib a { color: #9fb4b9; text-decoration: none; }
 .roles-theme .attrib a:hover { color: #fff; }
 .roles-theme .attrib .sep { color: var(--subtle); opacity: 0.55; width: auto; height: auto; background: none; }
 
-/* maplibre chrome (zoom at left-middle — big, truly centered: 2×54px buttons) */
-.roles-theme .maplibregl-ctrl-group { background: var(--glass-2) !important; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border: 1px solid var(--rim) !important; box-shadow: var(--sh) !important; border-radius: 16px !important; overflow: hidden; }
-.roles-theme .maplibregl-ctrl-group button { width: 54px !important; height: 54px !important; }
-.roles-theme .maplibregl-ctrl-group button .maplibregl-ctrl-icon { background-size: 26px 26px; }
+/* maplibre chrome (zoom at left-middle) — same glass voice as .panel-toggle:
+ * 42px pill, radius 21, muted ink, act-tint hover, mirrored 14px offset
+ * (Rober 7-05: the +/- must carry the panel chevron's visual strength). */
+.roles-theme .maplibregl-ctrl-top-left { top: 50%; left: 14px; transform: translateY(-50%); }
+.roles-theme .maplibregl-ctrl-top-left .maplibregl-ctrl { margin: 0; }
+.roles-theme .maplibregl-ctrl-group { background: var(--glass-2) !important; -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%); border: 1px solid var(--rim) !important; box-shadow: var(--sh) !important; border-radius: 21px !important; overflow: hidden; }
+.roles-theme .maplibregl-ctrl-group button { width: 42px !important; height: 46px !important; display: grid; place-items: center; color: var(--muted); background: none !important; transition: color 0.2s, background 0.2s; }
+.roles-theme .maplibregl-ctrl-group button:hover { color: #fff; background: var(--act-tint) !important; }
 .roles-theme .maplibregl-ctrl-group button + button { border-top: 1px solid var(--hair) !important; }
-.roles-theme .maplibregl-ctrl-icon { filter: invert(0.85); }
-.roles-theme .maplibregl-ctrl-top-left { top: calc(50% - 54px); left: 6px; }
+/* maplibre ships its glyphs as background-image SVGs (fixed grey via filter) —
+ * swap them for text glyphs so the ink is currentColor, like the chevron SVG. */
+.roles-theme .maplibregl-ctrl-icon { background-image: none !important; display: grid; place-items: center; width: 100%; height: 100%; }
+.roles-theme .maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon::before { content: "+"; font-size: 22px; font-weight: 500; line-height: 1; }
+.roles-theme .maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon::before { content: "−"; font-size: 22px; font-weight: 500; line-height: 1; }
 
 /* glass primitives */
 .roles-theme .glass { background: var(--glass-2); border: 1px solid var(--rim); box-shadow: var(--sh); }
@@ -293,22 +306,6 @@
 .roles-theme .dmore-item .mi-role { font-size: 13px; font-weight: 600; color: #fff; flex: 1; }
 .roles-theme .dmore-item .mi-city { font-size: 11.5px; color: var(--muted); }
 
-/* FOOTER TICKER — freshest roles marquee (startupmap-style footer, real data) */
-.roles-theme .ticker { position: absolute; bottom: 12px; left: calc((100% - 394px) / 2); transform: translateX(-50%); width: min(920px, calc(100% - 394px - 60px)); overflow: hidden; z-index: 11; border-radius: 15px; padding: 5px 6px; background: var(--glass-2); border: 1px solid var(--rim); box-shadow: var(--sh); }
-.roles-theme .ticker::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 2; background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 44%); mix-blend-mode: screen; }
-.roles-theme.light .ticker::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), transparent 46%); mix-blend-mode: normal; }
-.roles-theme .ticker-track { display: flex; align-items: center; gap: 4px; width: max-content; animation: ticker-scroll 160s linear infinite; }
-.roles-theme .ticker:hover .ticker-track { animation-play-state: paused; }
-@keyframes ticker-scroll { to { transform: translateX(-50%); } }
-.roles-theme .tcard { display: flex; align-items: center; gap: 9px; padding: 6px 13px 6px 8px; border-radius: 10px; cursor: pointer; white-space: nowrap; background: transparent; border: 0; transition: background 0.2s; }
-.roles-theme .tcard:hover { background: var(--act-tint); }
-.roles-theme .tcard .tlogo { width: 26px; height: 26px; border-radius: 8px; overflow: hidden; background: #fff; display: grid; place-items: center; flex: none; }
-.roles-theme .tcard .tlogo img { width: 100%; height: 100%; object-fit: contain; }
-.roles-theme .tcard .tlogo .fb { width: 100%; height: 100%; display: grid; place-items: center; font-family: var(--font-d); font-weight: 700; font-size: 12px; color: #fff; }
-.roles-theme .tcard .tco { font-size: 12px; font-weight: 700; color: var(--text); }
-.roles-theme .tcard .trole { font-size: 12px; color: var(--muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
-.roles-theme .tcard .tmeta { font-size: 11px; color: var(--subtle); max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
-
 /* empty / signed-out / loading states inside the panel */
 .roles-theme .panel-note { margin: auto 8px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.6; padding: 22px 16px; background: rgba(255, 255, 255, 0.035); border: 1px solid var(--hair); border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 10px 20px -16px rgba(170, 225, 240, 0.14), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.28); }
 .roles-theme .panel-note b { color: #fff; font-family: var(--font-d); font-weight: 600; display: block; font-size: 15.5px; margin-bottom: 6px; }
@@ -342,7 +339,8 @@
   /* Space = rich deep navy (startupmap reference): blue enough that the white
    * stars and the limb glow pop, dark enough to stay "space". */
   background: radial-gradient(120% 100% at 50% 40%, #0e1735 0%, #0a1028 45%, #05091c 100%);
-  --sh: 0 18px 50px -16px rgba(20, 60, 70, 0.28),
+  /* Drop term reduced 7-05 — same map-wash complaint as dark, lighter still. */
+  --sh: 0 8px 20px -14px rgba(20, 60, 70, 0.14),
     inset 0 1.5px 0 0 rgba(255, 255, 255, 0.95),
     inset 0 16px 32px -22px rgba(255, 255, 255, 0.6),
     inset 0 -1px 0 0 rgba(11, 31, 38, 0.08),
@@ -352,8 +350,9 @@
    * the luminous atmosphere halo at the rim is what reads "beautiful". */
 }
 .roles-theme.light .liquid::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), transparent 44%); mix-blend-mode: normal; }
-.roles-theme.light .maplibregl-ctrl-icon { filter: invert(0.35); }
-.roles-theme.light .attrib { color: var(--muted); }
+.roles-theme.light .maplibregl-ctrl-group button:hover { color: #0b1f26; }
+.roles-theme.light .attrib { color: var(--muted); background: var(--glass-2); }
+.roles-theme.light .attrib::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), transparent 46%); mix-blend-mode: normal; }
 .roles-theme.light .attrib a { color: #3a6470; }
 .roles-theme.light .attrib a:hover { color: #0b1f26; }
 
