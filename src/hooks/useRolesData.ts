@@ -4,7 +4,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
 import { scoreJob, RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
 import { byScore, type RoleJob } from "@/lib/roles";
-import { cityOf, jitteredLngLat } from "@/lib/geo";
+import { cityOf, sunflowerLngLat } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
 
 type JobsRow = {
@@ -21,16 +21,41 @@ type JobsRow = {
 
 const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page past it.
 
-function enrich(row: JobsRow): RoleJob {
-  const city = cityOf(row.location);
-  return {
-    ...row,
-    score: null,
-    reason: null,
-    city,
-    lngLat: city ? jitteredLngLat(city, row.id) : null,
-    domain: domainFor(row.company, row.source),
-  };
+/**
+ * City + map-position + logo-domain enrichment. Same-city jobs get a stable
+ * per-city index (sorted by id) that places them on a deterministic sunflower
+ * disc over the city — the logo cloud you see when a city cluster opens.
+ */
+function enrichAll(rows: JobsRow[]): RoleJob[] {
+  const idsByCity = new Map<string, string[]>();
+  const cityById = new Map<string, string | null>();
+  for (const r of rows) {
+    const city = cityOf(r.location);
+    cityById.set(r.id, city);
+    if (city) {
+      const ids = idsByCity.get(city) ?? [];
+      ids.push(r.id);
+      idsByCity.set(city, ids);
+    }
+  }
+  const indexById = new Map<string, number>();
+  for (const ids of idsByCity.values()) {
+    ids.sort();
+    ids.forEach((id, i) => indexById.set(id, i));
+  }
+  return rows.map((r) => {
+    const city = cityById.get(r.id) ?? null;
+    return {
+      ...r,
+      score: null,
+      reason: null,
+      city,
+      lngLat: city
+        ? sunflowerLngLat(city, indexById.get(r.id) ?? 0, idsByCity.get(city)?.length ?? 1)
+        : null,
+      domain: domainFor(r.company, r.source),
+    };
+  });
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -116,7 +141,7 @@ export function useRolesData() {
       if (!user) {
         if (runRef.current !== runId) return;
         // Anonymous browse (or sign-out: clears the previous session's state).
-        setJobs(rows.map(enrich).sort(byScore));
+        setJobs(enrichAll(rows).sort(byScore));
         setProfile(null);
         setApplied(new Set());
         setLoading(false);
@@ -132,14 +157,11 @@ export function useRolesData() {
         const sig = s.signals as { reason?: string } | null;
         scoreByJob[s.job_id] = { score: s.score, reason: sig?.reason ?? null };
       });
-      const merged = rows.map((row) => {
-        const j = enrich(row);
-        return {
-          ...j,
-          score: scoreByJob[j.id]?.score ?? null,
-          reason: scoreByJob[j.id]?.reason ?? null,
-        };
-      });
+      const merged = enrichAll(rows).map((j) => ({
+        ...j,
+        score: scoreByJob[j.id]?.score ?? null,
+        reason: scoreByJob[j.id]?.reason ?? null,
+      }));
       merged.sort(byScore);
       if (runRef.current !== runId) return;
       setJobs(merged);

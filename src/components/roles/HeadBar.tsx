@@ -184,21 +184,20 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
         </button>
       </div>
 
-      {signedIn ? (
-        // CSS hides this once the root carries .scored.
-        <button type="button" className="navcv" onClick={() => navigate("/profile")}>
-          <span className="sp">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </span>
-          Add your CV
-        </button>
-      ) : (
-        <button type="button" className="signin" onClick={() => navigate("/")}>
-          Sign in
-        </button>
-      )}
+      {/* The CV is the unlock and the differentiator — anon gets the same jade door
+          (it routes through sign-in); CSS hides it once the root carries .scored. */}
+      <button
+        type="button"
+        className="navcv"
+        onClick={() => navigate(signedIn ? "/profile" : "/")}
+      >
+        <span className="sp">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </span>
+        Add your CV
+      </button>
 
       <div
         className="av"

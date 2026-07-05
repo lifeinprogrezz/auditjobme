@@ -54,12 +54,13 @@
 .roles-theme .attrib a:hover { color: #fff; }
 .roles-theme .attrib .sep { color: var(--subtle); opacity: 0.55; width: auto; height: auto; background: none; }
 
-/* maplibre chrome (zoom at left-middle) */
-.roles-theme .maplibregl-ctrl-group { background: var(--glass-2) !important; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border: 1px solid var(--rim) !important; box-shadow: var(--sh) !important; border-radius: 13px !important; overflow: hidden; }
-.roles-theme .maplibregl-ctrl-group button { width: 38px !important; height: 38px !important; }
+/* maplibre chrome (zoom at left-middle — big, truly centered: 2×54px buttons) */
+.roles-theme .maplibregl-ctrl-group { background: var(--glass-2) !important; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border: 1px solid var(--rim) !important; box-shadow: var(--sh) !important; border-radius: 16px !important; overflow: hidden; }
+.roles-theme .maplibregl-ctrl-group button { width: 54px !important; height: 54px !important; }
+.roles-theme .maplibregl-ctrl-group button .maplibregl-ctrl-icon { background-size: 26px 26px; }
 .roles-theme .maplibregl-ctrl-group button + button { border-top: 1px solid var(--hair) !important; }
 .roles-theme .maplibregl-ctrl-icon { filter: invert(0.85); }
-.roles-theme .maplibregl-ctrl-top-left { top: calc(50% - 48px); }
+.roles-theme .maplibregl-ctrl-top-left { top: calc(50% - 54px); left: 6px; }
 
 /* glass primitives */
 .roles-theme .glass { background: var(--glass-2); border: 1px solid var(--rim); box-shadow: var(--sh); }
@@ -117,9 +118,21 @@
 .roles-theme .signin { display: flex; align-items: center; height: 38px; padding: 0 16px; border-radius: 11px; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); cursor: pointer; text-decoration: none; transition: background 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .signin:hover { background: rgba(255, 255, 255, 0.1); }
 
+/* GLASS CLUSTER BUBBLES (DOM markers — circle layers can't speak the glass system) */
+/* NO `position` here: these are maplibre Marker elements — .maplibregl-marker
+ * provides position:absolute, and overriding it drops markers into normal flow
+ * (they stack in a vertical line instead of anchoring to their coordinates). */
+.roles-theme .cluster { display: grid; place-items: center; border-radius: 50%; cursor: pointer; color: #fff; background: rgba(22, 38, 46, 0.78); border: 1px solid var(--rim); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22), inset 0 -2px 6px -2px rgba(0, 0, 0, 0.4); transition: border-color 0.3s, box-shadow 0.3s; }
+.roles-theme .cluster::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 46%); mix-blend-mode: screen; }
+.roles-theme .cluster:hover { transform: scale(1.07); border-color: rgba(120, 215, 230, 0.55); z-index: 9; }
+.roles-theme .cluster .cnt { font-family: var(--font-m); font-feature-settings: "tnum" 1; font-weight: 700; letter-spacing: -0.03em; line-height: 1; position: relative; z-index: 1; }
+.roles-theme.scored .cluster.great { border-color: rgba(31, 216, 184, 0.65); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), 0 0 22px rgba(31, 216, 184, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22); }
+.roles-theme.scored .cluster.mid { border-color: rgba(255, 196, 77, 0.6); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), 0 0 18px rgba(255, 196, 77, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22); }
+.roles-theme.scored .cluster.low { border-color: rgba(255, 111, 77, 0.55); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), 0 0 16px rgba(255, 111, 77, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22); }
+
 /* LOGO PINS */
-.roles-theme .pin { width: 38px; height: 38px; border-radius: 50%; background: #fff; display: grid; place-items: center; cursor: pointer; overflow: visible; position: relative; border: 2px solid #fff; box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 0, 0, 0.25); transition: transform 0.16s, box-shadow 0.4s, border-color 0.4s; }
-.roles-theme .pin:hover { transform: scale(1.14); z-index: 9; }
+.roles-theme .pin { width: 38px; height: 38px; border-radius: 50%; background: #fff; display: grid; place-items: center; cursor: pointer; overflow: visible; border: 2px solid #fff; box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 0, 0, 0.25); transition: box-shadow 0.4s, border-color 0.4s; }
+.roles-theme .pin:hover { z-index: 9; }
 .roles-theme .pin img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .roles-theme .pin .fallback { font-family: var(--font-d); font-weight: 700; font-size: 15px; color: #fff; width: 100%; height: 100%; display: grid; place-items: center; border-radius: 50%; }
 .roles-theme.scored .pin.great { border-color: var(--great); box-shadow: 0 8px 22px -4px rgba(0, 0, 0, 0.7), 0 0 20px rgba(31, 216, 184, 0.85); }
@@ -143,7 +156,8 @@
 .roles-theme .panel::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0; background: linear-gradient(150deg, rgba(255, 255, 255, 0.12), transparent 26%); mix-blend-mode: screen; }
 .roles-theme .panel > * { position: relative; z-index: 1; }
 .roles-theme.panel-hidden .panel { transform: translateX(440px); }
-.roles-theme .panel-toggle { position: absolute; top: 50%; right: 372px; transform: translateY(-50%); z-index: 25; width: 30px; height: 60px; border-radius: 15px; display: grid; place-items: center; cursor: pointer; background: var(--glass-2); -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%); border: 1px solid var(--rim); color: var(--muted); box-shadow: var(--sh); transition: right 0.45s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s, background 0.2s; }
+.roles-theme .panel-toggle { position: absolute; top: 50%; right: 382px; transform: translateY(-50%); z-index: 25; width: 42px; height: 92px; border-radius: 21px; display: grid; place-items: center; cursor: pointer; background: var(--glass-2); -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%); border: 1px solid var(--rim); color: var(--muted); box-shadow: var(--sh); transition: right 0.45s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s, background 0.2s; }
+.roles-theme .panel-toggle svg { width: 20px; height: 20px; }
 .roles-theme .panel-toggle:hover { color: #fff; background: rgba(31, 216, 184, 0.16); }
 .roles-theme .panel-toggle svg { transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1); }
 .roles-theme.panel-hidden .panel-toggle { right: 14px; }
@@ -156,7 +170,7 @@
 
 /* list view (post-CV toggle): panel widens into a full list column */
 .roles-theme.view-list .panel { width: min(560px, calc(100% - 36px)); }
-.roles-theme.view-list .panel-toggle { right: calc(min(560px, calc(100% - 36px)) + 14px); }
+.roles-theme.view-list .panel-toggle { right: calc(min(560px, calc(100% - 36px)) + 24px); }
 .roles-theme.view-list.panel-hidden .panel-toggle { right: 14px; }
 
 /* CARDS */

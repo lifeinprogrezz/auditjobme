@@ -57,6 +57,11 @@ describe("logoUrl", () => {
     );
   });
 
+  it("uses light-theme marks when asked (white pin surfaces)", () => {
+    vi.stubEnv("VITE_LOGODEV_TOKEN", "pk_test_123");
+    expect(logoUrl("personio.com", "light")).toContain("theme=light");
+  });
+
   it("returns null when the token is empty or missing", () => {
     vi.stubEnv("VITE_LOGODEV_TOKEN", "");
     expect(logoUrl("personio.com")).toBeNull();

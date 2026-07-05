@@ -231,3 +231,29 @@ export function jitteredLngLat(city: string, jobId: string): [number, number] | 
   };
   return [base[0] + rnd() * 0.28, base[1] + rnd() * 0.2];
 }
+
+const GOLDEN_ANGLE = 2.399963229728653; // radians — sunflower phyllotaxis
+
+/**
+ * Deterministic sunflower packing around the city centre: job `index` (stable
+ * per-city ordering) sits at angle i·golden-angle, radius a·√i. The result is a
+ * tight organic disc OVER the city — the startupmap-style logo cloud — instead
+ * of random scatter. Disc radius is capped ≈6–7 km however many roles a city
+ * has (per-city spacing shrinks as the count grows).
+ */
+export function sunflowerLngLat(
+  city: string,
+  index: number,
+  cityCount: number,
+): [number, number] | null {
+  const base = coordsOf(city);
+  if (!base) return null;
+  if (index <= 0 && cityCount <= 1) return base;
+  const a = Math.min(0.0065, 0.06 / Math.sqrt(Math.max(cityCount, 1)));
+  const r = a * Math.sqrt(index);
+  const theta = index * GOLDEN_ANGLE;
+  const lat = base[1] + r * Math.sin(theta);
+  // stretch lng by 1/cos(lat) so the disc stays visually circular on the map
+  const lng = base[0] + (r * Math.cos(theta)) / Math.max(0.3, Math.cos((lat * Math.PI) / 180));
+  return [lng, lat];
+}

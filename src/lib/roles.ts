@@ -30,9 +30,6 @@ export function scoreBucket(score: number): ScoreBucket {
   return score >= 4 ? "great" : score >= 3 ? "mid" : "low";
 }
 
-/** Cluster paint thresholds on the 0–5 scale (mockup used 6/8 on 0–10). */
-export const CLUSTER_SCORE_STEPS = { mid: 3, great: 4 } as const;
-
 /** Deterministic accent hue per company for logo-initial fallbacks (mockup HUE). */
 const HUE = ["#1FD8B8", "#9E8CFF", "#FFC44D", "#FF6F4D", "#3CB4FF", "#EC6FE0", "#5EE08A"];
 export function hueFor(company: string): string {

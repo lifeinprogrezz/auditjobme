@@ -132,9 +132,14 @@ export function domainFor(company: string, source: string | null): string | null
   return own(KNOWN_DOMAINS, words.join(" "));
 }
 
-/** Logo.dev image URL (mockup shape, fallback=404 so onError can fire); null without a token. */
-export function logoUrl(domain: string): string | null {
+/**
+ * Logo.dev image URL (mockup shape, fallback=404 so onError can fire); null without
+ * a token. `theme` must match the SURFACE the logo sits on: "dark" returns light
+ * marks (for the dark glass cards), "light" returns dark/colored marks (for the
+ * white map pins — dark-theme marks there are white-on-white, i.e. invisible).
+ */
+export function logoUrl(domain: string, theme: "dark" | "light" = "dark"): string | null {
   const token = import.meta.env.VITE_LOGODEV_TOKEN as string | undefined;
   if (!token) return null;
-  return `https://img.logo.dev/${domain}?token=${token}&size=96&format=png&theme=dark&retina=true&fallback=404`;
+  return `https://img.logo.dev/${domain}?token=${token}&size=96&format=png&theme=${theme}&retina=true&fallback=404`;
 }

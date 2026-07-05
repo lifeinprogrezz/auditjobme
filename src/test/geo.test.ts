@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CITY_COORDS, ALIASES, cityOf, coordsOf, jitteredLngLat } from "@/lib/geo";
+import { CITY_COORDS, ALIASES, cityOf, coordsOf, jitteredLngLat, sunflowerLngLat } from "@/lib/geo";
 
 describe("cityOf", () => {
   it("matches an exact city name", () => {
@@ -103,5 +103,32 @@ describe("jitteredLngLat", () => {
 
   it("returns null for an unknown city", () => {
     expect(jitteredLngLat("Atlantis", "job-1")).toBeNull();
+  });
+});
+
+describe("sunflowerLngLat", () => {
+  it("is deterministic and centred on the city", () => {
+    const a = sunflowerLngLat("Paris", 5, 30);
+    const b = sunflowerLngLat("Paris", 5, 30);
+    expect(a).toEqual(b);
+    expect(sunflowerLngLat("Paris", 0, 1)).toEqual(sunflowerLngLat("Paris", 0, 1));
+  });
+  it("spreads same-city indexes onto distinct nearby points", () => {
+    const pts = [0, 1, 2, 3, 4].map((i) => sunflowerLngLat("Berlin", i, 5));
+    const keys = new Set(pts.map((p) => p!.join(",")));
+    expect(keys.size).toBe(5);
+    const base = sunflowerLngLat("Berlin", 0, 1)!;
+    for (const p of pts) {
+      expect(Math.abs(p![0] - base[0])).toBeLessThan(0.2);
+      expect(Math.abs(p![1] - base[1])).toBeLessThan(0.2);
+    }
+  });
+  it("caps the disc radius as the city count grows", () => {
+    const far = sunflowerLngLat("Berlin", 285, 286)!;
+    const base = sunflowerLngLat("Berlin", 0, 1)!;
+    expect(Math.abs(far[1] - base[1])).toBeLessThan(0.08);
+  });
+  it("returns null for unknown cities", () => {
+    expect(sunflowerLngLat("Atlantis", 3, 10)).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, Point as GeoPoint } from "geojson";
-import { CLUSTER_SCORE_STEPS, hueFor, scoreBucket, type RoleJob } from "@/lib/roles";
+import { hueFor, scoreBucket, type RoleJob } from "@/lib/roles";
 import { logoUrl } from "@/lib/logodev";
 
 export type GlobeMapProps = {
@@ -18,12 +18,10 @@ const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.j
 // The Europe frame is always a fitBounds (never a raw zoom number) — the globe
 // projection makes fixed zoom levels frame differently per viewport.
 const EUROPE_BOUNDS: [[number, number], [number, number]] = [[-30, 20], [45, 64]];
+// The right panel (358px + margins) eats that side of the viewport: every camera
+// move must aim for the VISIBLE centre, or targets land hidden behind the panel.
 const EUROPE_PADDING = { top: 80, right: 390, bottom: 80, left: 50 };
 const GREAT = "#1FD8B8";
-const MID = "#FFC44D";
-const LOW = "#FF6F4D";
-const GREY = "#6E858E"; // cluster whose every role is unscored (maxScore -1)
-const CLUSTER_BASE = "#0E2630";
 
 type PinProps = {
   id: string;
@@ -60,26 +58,22 @@ function featureCollection(jobs: RoleJob[]): FeatureCollection {
   };
 }
 
-// 0–5 scale: base below 0 (all-unscored), low from 0, mid ≥3, great ≥4.
-function scoreRamp(base: string): unknown {
-  return [
-    "step",
-    ["get", "maxScore"],
-    base,
-    0,
-    LOW,
-    CLUSTER_SCORE_STEPS.mid,
-    MID,
-    CLUSTER_SCORE_STEPS.great,
-    GREAT,
-  ];
-}
-
-function paintClusters(map: maplibregl.Map, scored: boolean): void {
-  if (!map.getLayer("clusters") || !map.getLayer("clusters-glow")) return;
-  map.setPaintProperty("clusters", "circle-color", scored ? scoreRamp(GREY) : CLUSTER_BASE);
-  map.setPaintProperty("clusters-glow", "circle-color", scored ? scoreRamp(GREAT) : GREAT);
-  map.setPaintProperty("clusters-glow", "circle-opacity", scored ? 0.6 : 0.22);
+/** Glass cluster bubble (DOM marker — circle layers can't speak the glass system). */
+function buildCluster(count: number, abbrev: string, maxScore: number): HTMLDivElement {
+  const el = document.createElement("div");
+  // maxScore -1 = every role unscored → neutral glass; bucket classes only show
+  // their colors once the root carries .scored (CSS-gated).
+  const bucket = maxScore >= 0 ? scoreBucket(maxScore) : "";
+  el.className = bucket ? `cluster ${bucket}` : "cluster";
+  const size = count >= 100 ? 76 : count >= 30 ? 64 : count >= 10 ? 54 : 44;
+  el.style.width = `${size}px`;
+  el.style.height = `${size}px`;
+  const cnt = document.createElement("span");
+  cnt.className = "cnt num";
+  cnt.style.fontSize = count >= 100 ? "17px" : count >= 10 ? "15px" : "13.5px";
+  cnt.textContent = abbrev;
+  el.appendChild(cnt);
+  return el;
 }
 
 /** Content signature: when a feature's score/bucket changes, the pin DOM must be rebuilt. */
@@ -96,7 +90,8 @@ function buildPin(p: PinProps): HTMLDivElement {
   fallback.className = "fallback";
   fallback.style.background = p.hue;
   fallback.textContent = p.co.charAt(0) || "?";
-  const src = p.domain ? logoUrl(p.domain) : null;
+  // light theme: the pin is a WHITE disc — dark-theme marks are white-on-white.
+  const src = p.domain ? logoUrl(p.domain, "light") : null;
   if (src) {
     const img = document.createElement("img");
     img.alt = "";
@@ -228,47 +223,20 @@ function addRolesLayers(map: maplibregl.Map, data: FeatureCollection): void {
     type: "geojson",
     data,
     cluster: true,
-    clusterRadius: 40,
-    clusterMaxZoom: 5,
+    clusterRadius: 46,
+    // Cities stay a single glass bubble until true city zoom; past 10 the
+    // sunflower logo cloud fans out OVER the city (startupmap behavior).
+    clusterMaxZoom: 10,
     clusterProperties: { maxScore: ["max", ["coalesce", ["get", "score"], -1]] },
   } as maplibregl.SourceSpecification);
+  // Clusters + pins render as DOM markers (synced below) — but a source with NO
+  // layer never loads tiles, and querySourceFeatures would return nothing. This
+  // invisible layer forces the source to render so the marker sync can read it.
   map.addLayer({
-    id: "clusters-glow",
+    id: "roles-tiles",
     type: "circle",
     source: "roles",
-    filter: ["has", "point_count"],
-    paint: {
-      "circle-color": GREAT,
-      "circle-opacity": 0.22,
-      "circle-opacity-transition": { duration: 700 },
-      "circle-blur": 1,
-      "circle-radius": ["interpolate", ["linear"], ["get", "point_count"], 2, 26, 20, 52],
-    },
-  } as unknown as maplibregl.LayerSpecification);
-  map.addLayer({
-    id: "clusters",
-    type: "circle",
-    source: "roles",
-    filter: ["has", "point_count"],
-    paint: {
-      "circle-color": CLUSTER_BASE,
-      "circle-color-transition": { duration: 700 },
-      "circle-radius": ["interpolate", ["linear"], ["get", "point_count"], 2, 19, 8, 28, 20, 40],
-      "circle-stroke-width": 1.5,
-      "circle-stroke-color": "rgba(120,215,230,.55)",
-    },
-  } as unknown as maplibregl.LayerSpecification);
-  map.addLayer({
-    id: "cluster-count",
-    type: "symbol",
-    source: "roles",
-    filter: ["has", "point_count"],
-    layout: {
-      "text-field": ["get", "point_count_abbreviated"],
-      "text-font": ["Open Sans Bold"],
-      "text-size": 15,
-    },
-    paint: { "text-color": "#fff" },
+    paint: { "circle-radius": 0, "circle-opacity": 0 },
   } as unknown as maplibregl.LayerSpecification);
   map.addSource("hl", {
     type: "geojson",
@@ -323,7 +291,10 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
   }
 }
 
-export default function GlobeMap({ jobs, scored, focusLngLats }: GlobeMapProps) {
+// `scored` stays in the props type for the page contract, but the map needs no
+// scored logic: marker bucket classes are permanent and CSS gates them on the
+// root .scored class.
+export default function GlobeMap({ jobs, focusLngLats }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const loadedRef = useRef(false);
@@ -331,7 +302,6 @@ export default function GlobeMap({ jobs, scored, focusLngLats }: GlobeMapProps) 
   const fitTimerRef = useRef<number | undefined>(undefined);
   // Latest props for the async load handler (map init effect runs once).
   const jobsRef = useRef(jobs);
-  const scoredRef = useRef(scored);
   const focusRef = useRef(focusLngLats);
 
   const clearPins = () => {
@@ -339,39 +309,68 @@ export default function GlobeMap({ jobs, scored, focusLngLats }: GlobeMapProps) 
     pinsRef.current.clear();
   };
 
-  // Reads only refs so the moveend/idle listeners' first-render closure stays valid.
-  const syncPins = () => {
+  // One sync for BOTH marker kinds (glass cluster bubbles + logo pins). Reads
+  // only refs so the moveend/idle listeners' first-render closure stays valid.
+  const syncMarkers = () => {
     const map = mapRef.current;
     if (!map || !map.getSource("roles")) return;
     let feats: ReturnType<maplibregl.Map["querySourceFeatures"]>;
     try {
-      feats = map.querySourceFeatures("roles", { filter: ["!", ["has", "point_count"]] });
+      feats = map.querySourceFeatures("roles");
     } catch {
       return;
     }
     const pins = pinsRef.current;
     const seen = new Set<string>();
     for (const f of feats) {
-      const p = f.properties as PinProps;
-      const id = String(p.id);
-      if (seen.has(id)) continue;
-      seen.add(id);
-      const existing = pins.get(id);
+      const props = f.properties as Record<string, unknown>;
+      const isCluster = Boolean(props.cluster);
+      const key = isCluster ? `c${props.cluster_id}` : `p${props.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const sig = isCluster
+        ? `${props.point_count}|${props.maxScore}`
+        : pinSig(props as unknown as PinProps);
+      const existing = pins.get(key);
       if (existing) {
         // querySourceFeatures can serve pre-setData tiles; the idle re-sync then
-        // reaches here with fresh properties — rebuild the pin if they changed.
-        if (existing.getElement().dataset.sig === pinSig(p)) continue;
+        // reaches here with fresh properties — rebuild the marker if they changed.
+        if (existing.getElement().dataset.sig === sig) continue;
         existing.remove();
-        pins.delete(id);
+        pins.delete(key);
       }
       const coords = (f.geometry as GeoPoint).coordinates as [number, number];
-      const marker = new maplibregl.Marker({ element: buildPin(p) }).setLngLat(coords).addTo(map);
-      pins.set(id, marker);
+      let el: HTMLDivElement;
+      if (isCluster) {
+        el = buildCluster(
+          Number(props.point_count),
+          String(props.point_count_abbreviated ?? props.point_count),
+          Number(props.maxScore),
+        );
+        const clusterId = props.cluster_id as number;
+        el.addEventListener("click", () => {
+          const src = map.getSource("roles") as maplibregl.GeoJSONSource | undefined;
+          if (!src) return;
+          src
+            .getClusterExpansionZoom(clusterId)
+            // Padding aims the city at the VISIBLE centre (left of the panel),
+            // so the logo cloud opens in view instead of behind the glass.
+            .then((zoom) =>
+              map.easeTo({ center: coords, zoom, duration: 700, padding: EUROPE_PADDING }),
+            )
+            .catch(() => {});
+        });
+      } else {
+        el = buildPin(props as unknown as PinProps);
+      }
+      el.dataset.sig = sig;
+      const marker = new maplibregl.Marker({ element: el }).setLngLat(coords).addTo(map);
+      pins.set(key, marker);
     }
-    for (const [id, marker] of pins) {
-      if (!seen.has(id)) {
+    for (const [key, marker] of pins) {
+      if (!seen.has(key)) {
         marker.remove();
-        pins.delete(id);
+        pins.delete(key);
       }
     }
   };
@@ -390,8 +389,11 @@ export default function GlobeMap({ jobs, scored, focusLngLats }: GlobeMapProps) 
         dragRotate: false,
       } as maplibregl.MapOptions);
       mapRef.current = map;
+      if (import.meta.env.DEV) {
+        (window as unknown as { __rolesMap?: maplibregl.Map }).__rolesMap = map;
+      }
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
-      map.on("moveend", syncPins);
+      map.on("moveend", syncMarkers);
       map.on("load", () => {
         if (mapRef.current !== map) return; // unmounted before style loaded
         // Constructor projection gets reset by style load — set it again.
@@ -413,30 +415,13 @@ export default function GlobeMap({ jobs, scored, focusLngLats }: GlobeMapProps) 
         addTerrain(map);
         try {
           addRolesLayers(map, featureCollection(jobsRef.current));
-          map.on("click", "clusters", (e) => {
-            const f = map.queryRenderedFeatures(e.point, { layers: ["clusters"] })[0];
-            const src = map.getSource("roles") as maplibregl.GeoJSONSource | undefined;
-            if (!f || !src) return;
-            const center = (f.geometry as GeoPoint).coordinates as [number, number];
-            src
-              .getClusterExpansionZoom(f.properties.cluster_id as number)
-              .then((zoom) => map.easeTo({ center, zoom, duration: 700 }))
-              .catch(() => {});
-          });
-          map.on("mouseenter", "clusters", () => {
-            map.getCanvas().style.cursor = "pointer";
-          });
-          map.on("mouseleave", "clusters", () => {
-            map.getCanvas().style.cursor = "";
-          });
         } catch (e) {
           console.warn("roles layers", e);
         }
         loadedRef.current = true;
-        paintClusters(map, scoredRef.current);
         if (focusRef.current) applyFocus(map, focusRef.current);
-        syncPins();
-        map.on("idle", syncPins);
+        syncMarkers();
+        map.on("idle", syncMarkers);
       });
     } catch (err) {
       // WebGL unavailable / init failure: leave the empty .roles-map div — never crash.
@@ -470,21 +455,13 @@ export default function GlobeMap({ jobs, scored, focusLngLats }: GlobeMapProps) 
     } catch {
       /* ignore */
     }
-    // No clear: syncPins rebuilds only pins whose sig changed (setData re-tiles
-    // async, so this pass may see old tiles — the idle re-sync converges).
-    syncPins();
+    // No clear: syncMarkers rebuilds only markers whose sig changed (setData
+    // re-tiles async, so this pass may see old tiles — the idle re-sync
+    // converges). Scored visuals need no map work at all: bucket classes are
+    // always on the markers and the root .scored class gates them in CSS.
+    syncMarkers();
 
   }, [jobs]);
-
-  useEffect(() => {
-    scoredRef.current = scored;
-    const map = mapRef.current;
-    if (!map || !loadedRef.current) return;
-    // Pin borders/badges key on the root .scored class in CSS — only clusters
-    // need a repaint here.
-    paintClusters(map, scored);
-
-  }, [scored]);
 
   // Value-compare the focus: scoreBatch re-sorts jobs up to 40 times, giving
   // focusLngLats a fresh identity each time — re-flying the camera on every
