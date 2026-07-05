@@ -19,6 +19,7 @@ const Tracker = lazy(() => import("./pages/Tracker.tsx"));
 const Profile = lazy(() => import("./pages/Profile.tsx"));
 const Apply = lazy(() => import("./pages/Apply.tsx"));
 const RequestCompany = lazy(() => import("./pages/RequestCompany.tsx"));
+const RolesMap = lazy(() => import("./pages/RolesMap.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ const App = () => (
               <Route path="/tracker" element={<Tracker />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/request" element={<RequestCompany />} />
+              <Route path="/roles" element={<RolesMap />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -28,6 +28,7 @@ export default defineConfig(() => ({
         // before the bare-react catch.
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
+          if (id.includes("maplibre")) return "maplibre";
           if (id.includes("@radix-ui")) return "radix";
           if (id.includes("@supabase")) return "supabase";
           if (id.includes("@tanstack")) return "query";
