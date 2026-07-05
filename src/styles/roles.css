@@ -56,7 +56,7 @@
 .roles-theme.light .stars { opacity: 0.75; }
 /* the painted atmosphere: crisp limb line blooming into space (sized per-frame by GlobeMap) */
 .roles-theme .halo { position: absolute; z-index: 0; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.4s;
-  box-shadow: 0 0 3px 1.5px rgba(255, 255, 255, 0.95), 0 0 24px 8px rgba(224, 240, 252, 0.55), 0 0 90px 34px rgba(170, 205, 235, 0.28), 0 0 200px 90px rgba(130, 170, 215, 0.12); }
+  box-shadow: 0 0 4px 2px rgba(255, 255, 255, 1), 0 0 30px 12px rgba(224, 240, 252, 0.6), 0 0 110px 45px rgba(170, 205, 235, 0.3), 0 0 220px 100px rgba(130, 170, 215, 0.13); }
 .roles-theme:not(.light) .halo { box-shadow: 0 0 2px 1px rgba(210, 235, 245, 0.6), 0 0 20px 7px rgba(160, 200, 230, 0.28), 0 0 80px 30px rgba(110, 160, 205, 0.13); }
 .roles-theme .roles-map { position: absolute; inset: 0; z-index: 1; background: transparent; }
 .roles-theme .vig { position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 260px 60px rgba(0, 0, 0, 0.55); }

@@ -381,29 +381,64 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
 
   // The atmosphere halo: maplibre's own sky maxes out well below the reference
   // look (bright limb line blooming into space), so we paint it ourselves — a
-  // DOM ring tracking the sphere's screen silhouette every frame. At pitch 0
-  // the globe's apparent radius is worldSize / 2pi (verified empirically).
+  // DOM ring tracking the sphere's screen silhouette every frame. The globe's
+  // screen circle depends on zoom AND the latitude being viewed, so instead of
+  // reproducing maplibre's internal math we sample 12 points on the horizon
+  // (89 deg great-circle distance from the view centre), project them, and fit
+  // the circle through them (Kasa least-squares). Exact at any camera.
   const updateHalo = () => {
     const map = mapRef.current;
     const halo = haloRef.current;
     if (!map || !halo) return;
     try {
-      const tr = (map as unknown as { transform?: { worldSize?: number } }).transform;
-      const worldSize = tr?.worldSize ?? 512 * Math.pow(2, map.getZoom());
-      const r = worldSize / (2 * Math.PI);
       const c = map.getCanvas();
       const w = c.clientWidth;
       const h = c.clientHeight;
+      const ctr = map.getCenter();
+      const p1 = (ctr.lat * Math.PI) / 180;
+      const l1 = (ctr.lng * Math.PI) / 180;
+      const d = (89 * Math.PI) / 180;
+      let sxx = 0, sxy = 0, syy = 0, sx = 0, sy = 0, sxz = 0, syz = 0, sz = 0;
+      const N = 12;
+      for (let k = 0; k < N; k++) {
+        const th = (k / N) * 2 * Math.PI;
+        const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(th));
+        const l2 = l1 + Math.atan2(
+          Math.sin(th) * Math.sin(d) * Math.cos(p1),
+          Math.cos(d) - Math.sin(p1) * Math.sin(p2),
+        );
+        const pt = map.project([(l2 * 180) / Math.PI, (p2 * 180) / Math.PI]);
+        if (!pt || !Number.isFinite(pt.x) || !Number.isFinite(pt.y)) return;
+        const x = pt.x, y = pt.y, z = x * x + y * y;
+        sxx += x * x; sxy += x * y; syy += y * y;
+        sx += x; sy += y; sxz += x * z; syz += y * z; sz += z;
+      }
+      // Solve [sxx sxy sx; sxy syy sy; sx sy N] * [a b cc] = [sxz; syz; sz]
+      const det3 = (m0: number[], m1: number[], m2: number[]) =>
+        m0[0] * (m1[1] * m2[2] - m1[2] * m2[1]) -
+        m0[1] * (m1[0] * m2[2] - m1[2] * m2[0]) +
+        m0[2] * (m1[0] * m2[1] - m1[1] * m2[0]);
+      const D = det3([sxx, sxy, sx], [sxy, syy, sy], [sx, sy, N]);
+      if (Math.abs(D) < 1e-6) return;
+      const a = det3([sxz, sxy, sx], [syz, syy, sy], [sz, sy, N]) / D;
+      const b = det3([sxx, sxz, sx], [sxy, syz, sy], [sx, sz, N]) / D;
+      const cc = det3([sxx, sxy, sxz], [sxy, syy, syz], [sx, sy, sz]) / D;
+      const cx = a / 2;
+      const cy = b / 2;
+      const r2 = cc + cx * cx + cy * cy;
+      if (!(r2 > 0)) return;
+      // +2px: float the bright line just OUTSIDE the limb so the canvas
+      // doesn't swallow half of it.
+      const r = Math.sqrt(r2) + 2;
       // Fade out once the limb leaves the viewport (sphere covers the corners).
       const corner = Math.hypot(w, h) / 2;
-      const fadeStart = corner * 0.98;
-      const fadeEnd = corner * 1.3;
-      const o = r <= fadeStart ? 1 : r >= fadeEnd ? 0 : 1 - (r - fadeStart) / (fadeEnd - fadeStart);
+      const fadeStart = corner * 1.02;
+      const fadeEnd = corner * 1.45;
+      const rimVisible =
+        cx + r > 0 && cx - r < w && cy + r > 0 && cy - r < h;
+      const o = !rimVisible || r >= fadeEnd ? 0 : r <= fadeStart ? 1 : 1 - (r - fadeStart) / (fadeEnd - fadeStart);
       halo.style.opacity = o.toFixed(3);
       if (o <= 0) return;
-      const pad = map.getPadding();
-      const cx = ((pad.left ?? 0) + (w - (pad.right ?? 0))) / 2;
-      const cy = ((pad.top ?? 0) + (h - (pad.bottom ?? 0))) / 2;
       halo.style.width = `${2 * r}px`;
       halo.style.height = `${2 * r}px`;
       halo.style.left = `${cx - r}px`;
