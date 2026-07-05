@@ -83,6 +83,53 @@ Body ≥4.5:1 (ink-900 on pastels clears). The score numeral uses `#067A6F` or `
 `#1FD8B8` (it fails on light glass). **Never color-only:** numeral + label + color together. Wrap glass in
 `@supports (backdrop-filter: blur(1px))` with a solid fallback (and clear-glass needs no blur anyway).
 
-## Open / next (as of 6-23)
-LIVE CAROUSEL of the roles page (landing hero — Rober's explicit ask) · detail-view "Unlock your fit" CTA ·
-lock colors (final pass) · then ship tokens-in-code (CSS `:root` vars + Tailwind theme) + a DESIGN.md guide.
+## Real refraction ("honest" liquid glass) — researched 2026-07-05, for MARKETING surfaces only
+
+Reference: https://glass.outpacestudios.com/ (Outpace Studios' engine + essay; their runcycle demo
+shots — glass dropdown over a cherry-blossom photo and over a 3D glass-mug hero — are the art-direction
+reference set for the landing, issue #17). Their thesis independently confirms our v35 lock: **"blur
+isn't glass"** — a frosted panel with a bright border is an impression of glass. They go the other way
+from us: compute the actual bend.
+
+**The technique, distilled (with attribution — architecture credit goes to Aave's "Building Glass for
+the Web"; the optics are Outpace's):**
+- One displacement map, COMPUTED not painted: model the pane as a convex squircle dome (flat centre,
+  thin rim band), refract a straight-down ray through it with Snell's law at index 1.5, aim the bend
+  along a rounded-rect SDF normal. All bending concentrates at the rim; centre stays clear. Blue
+  channel carries specular height → the bright rim light. Feed it to a single SVG `feDisplacementMap`.
+- **Refract a COPY of the backdrop, never the live backdrop.** `backdrop-filter` + SVG displacement is
+  Chromium-only (Safari/Firefox silently drop the SVG part → flat blur). Plain `filter` runs everywhere:
+  render the backdrop twice, counter-position the copy 1:1 under the lens, bend the copy. The real UI
+  underneath stays unfiltered and interactive.
+- Browser gotchas that bite: feImage REFUSES `data:` URIs in real WebKit — the map must be a `blob:`
+  URL · force sRGB (filters default to linearRGB, silently changing displacement distances) · Safari
+  caches filter output by id — an animating lens needs a fresh id per rebuild · Safari caps filter
+  source size — clip the backdrop copy to the lens box or it renders nothing · tier by engine: Chromium
+  affords 3 passes (chromatic fringe) + specular; Safari gets 1 pass, same material, never a blur
+  fallback.
+- One traveling lens, not one per menu: spring-driven, interruptible, resizes to each dropdown — reads
+  as a single pane of glass moving.
+
+**Where this is allowed:** marketing/landing surfaces only — the #17 landing hero/nav is the natural
+home. **The core app UI (roles globe, panel, headbar) stays CLEAR glass — the v35 lock is unchanged**
+(lighter/airier preference + zero per-frame filter cost; Safari re-rasterises moving-backdrop filters
+in software every frame, which is exactly the perf class we removed). If refraction ever tempts us
+app-side, the answer is still no; propose it for a static marketing moment instead.
+
+**Glass typography (freedrw reference, same 7-05 batch):** translucent white display text over a
+saturated single-hue gradient + giant soft-blurred glass numerals as background texture. Cheap (pure
+CSS, static — no backdrop reads), striking, and a legitimate landing-hero option; never for data UI.
+Clear glass needs a flat/dark backdrop to read (our globe qualifies); over busy photography you need
+either a scrim (token research §scrim) or real refraction — plain clear tint fails there.
+
+## Accessibility — glass + motion fallbacks (added 7-05, applies to the SHIPPED /roles too)
+- `prefers-reduced-motion: reduce` → no springs/count-ups/camera flights: cut to final state
+  (score numerals render final value; flyTo/fitBounds use duration 0).
+- `prefers-reduced-transparency: reduce` → swap glass fills for opaque `--surface-2`-class panels
+  (text on solid, full contrast). Treat as progressive enhancement (Safari ships it; Chromium partial).
+- The glass is an enhancement; the interface must work without it.
+
+## Open / next (as of 7-05; roles page SHIPPED — see planning spec 2026-07-05-roles-globe-port-design.md)
+LIVE CAROUSEL landing hero = issue #17 (refraction + glass-type vocabulary above is its palette) ·
+detail-view "Unlock your fit" CTA = issue #18 · reduced-motion/transparency fallbacks on /roles ·
+lock colors (final pass — values live in src/styles/roles.css) · DESIGN.md guide.
