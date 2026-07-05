@@ -26,6 +26,10 @@ type MapTheme = {
   baseTint?: string;
   /** Atmosphere glow at the globe rim, zoom-0 strength (default 0.9 = dramatic). */
   atmosphere?: number;
+  /** Optional repaint of basemap water fills (the big value-contrast lever). */
+  waterColor?: string;
+  /** Optional darkening of place/country label text. */
+  labelColor?: string;
 };
 
 // Dark = the approved ink & graphite palette (7-05); light = paper (Positron).
@@ -42,17 +46,21 @@ const THEMES: Record<"dark" | "light", MapTheme> = {
   },
   light: {
     styleUrl: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-    sky: { "sky-color": "#cdd9e1", "horizon-color": "#dde4e9", "fog-color": "#d8e0e5" },
+    sky: { "sky-color": "#bfced9", "horizon-color": "#d3dde3", "fog-color": "#cdd7dd" },
+    // CONTRAST (Rober 7-05): light-mode readability = a real VALUE STEP between
+    // land and everything else (the startupmap lesson). Sea is mid-tone, not mist.
     seaStops: [
-      "rgba(158,182,199,1)", "rgba(172,194,209,1)", "rgba(186,206,219,1)",
-      "rgba(198,215,226,1)", "rgba(208,223,232,0.9)", "rgba(210,224,233,0)",
+      "rgba(118,143,162,1)", "rgba(131,155,173,1)", "rgba(144,167,184,1)",
+      "rgba(155,177,192,1)", "rgba(165,186,200,0.95)", "rgba(170,190,204,0.55)",
     ],
-    hill: { shadow: "#a3afb7", highlight: "#eef3f5", accent: "#c6d1d8", exaggeration: 0.45 },
-    border: { color: "#7d919d", opacity: 0.4, width: 0.6 },
-    // Positron's land is near-pure white — pull it toward mist.
-    baseTint: "#edf1f3",
+    hill: { shadow: "#7e8c96", highlight: "#f7fafb", accent: "#b7c3ca", exaggeration: 0.5 },
+    border: { color: "#5c7280", opacity: 0.5, width: 0.75 },
+    // Land stays light — the step against the darker sea carries the contrast.
+    baseTint: "#eff2f4",
     // No radiant rim: the bright halo around the sphere read as "too bright".
     atmosphere: 0.25,
+    waterColor: "#aec3d2",
+    labelColor: "#4e5f6a",
   },
 };
 // The Europe frame is always a fitBounds (never a raw zoom number) — the globe
@@ -155,14 +163,28 @@ function buildPin(p: PinProps): HTMLDivElement {
 }
 
 function styleAtmosphere(map: maplibregl.Map, theme: MapTheme): void {
-  if (theme.baseTint) {
-    try {
-      for (const l of map.getStyle().layers) {
-        if (l.type === "background") map.setPaintProperty(l.id, "background-color", theme.baseTint);
+  try {
+    for (const l of map.getStyle().layers) {
+      if (theme.baseTint && l.type === "background") {
+        map.setPaintProperty(l.id, "background-color", theme.baseTint);
       }
-    } catch {
-      /* tint is decoration */
+      if (theme.waterColor && l.type === "fill" && /water/i.test(l.id)) {
+        try {
+          map.setPaintProperty(l.id, "fill-color", theme.waterColor);
+        } catch {
+          /* some water fills reject repaint */
+        }
+      }
+      if (theme.labelColor && l.type === "symbol" && /place|country|state|city|town|continent|water.?name/i.test(l.id)) {
+        try {
+          map.setPaintProperty(l.id, "text-color", theme.labelColor);
+        } catch {
+          /* label classes vary per style */
+        }
+      }
     }
+  } catch {
+    /* tints are decoration */
   }
   try {
     map.setSky({

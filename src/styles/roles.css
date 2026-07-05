@@ -286,10 +286,10 @@
     inset 0 -14px 28px -24px rgba(20, 60, 70, 0.16);
   /* NO halo (Rober 7-05): the bright glow around the globe was what read as
    * "too bright". Flat, calm mist surround — the sphere sits matte on it. */
-  background: linear-gradient(180deg, #e2e8ec 0%, #d9e1e6 100%);
+  background: linear-gradient(180deg, #d5dde2 0%, #c8d2d8 100%);
 }
 .roles-theme.light .stars { display: none; }
-.roles-theme.light .vig { box-shadow: inset 0 0 180px 30px rgba(100, 120, 135, 0.12); }
+.roles-theme.light .vig { box-shadow: inset 0 0 200px 36px rgba(84, 104, 119, 0.16); }
 .roles-theme.light .liquid::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), transparent 44%); mix-blend-mode: normal; }
 .roles-theme.light .maplibregl-ctrl-icon { filter: invert(0.35); }
 .roles-theme.light .attrib { background: rgba(255, 255, 255, 0.65); color: var(--subtle); }
