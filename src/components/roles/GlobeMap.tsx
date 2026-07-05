@@ -73,6 +73,20 @@ const EUROPE_BOUNDS: [[number, number], [number, number]] = [[-32, 18], [48, 64]
 // The right panel (358px + margins) eats that side of the viewport: every camera
 // move must aim for the VISIBLE centre, or targets land hidden behind the panel.
 const EUROPE_PADDING = { top: 80, right: 390, bottom: 80, left: 50 };
+type CamPadding = typeof EUROPE_PADDING;
+// Scale a fixed padding budget down on small canvases: when padding exceeds the
+// canvas, maplibre's fitBounds silently no-ops (mercator) or THROWS in the
+// globe camera helper — the 440px horizontal budget above made every cluster
+// tap a dead click on portrait phones. Keeps >=120px of usable map per axis.
+function fitPad(map: maplibregl.Map, pad: CamPadding): CamPadding {
+  const el = map.getContainer();
+  const s = Math.min(
+    1,
+    Math.max(0, el.clientWidth - 120) / Math.max(1, pad.left + pad.right),
+    Math.max(0, el.clientHeight - 120) / Math.max(1, pad.top + pad.bottom),
+  );
+  return { top: pad.top * s, right: pad.right * s, bottom: pad.bottom * s, left: pad.left * s };
+}
 // Startupmap's bubble click is a one-shot reveal (easeTo z12/800ms lands on the
 // full logo cloud). Our expansion zoom at continent scale often splits into
 // sub-clusters instead — so a click always eases to at least clusterMaxZoom+0.6,
@@ -412,12 +426,12 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
             [Math.min(...lo) - 3, Math.min(...la) - 3],
             [Math.max(...lo) + 3, Math.max(...la) + 3],
           ],
-          { padding: { top: 90, right: 400, bottom: 90, left: 60 }, duration: CONTINENT_MS },
+          { padding: fitPad(map, { top: 90, right: 400, bottom: 90, left: 60 }), duration: CONTINENT_MS },
         );
       }
     } else {
       src.setData({ type: "FeatureCollection", features: [] });
-      map.fitBounds(EUROPE_BOUNDS, { padding: EUROPE_PADDING, duration: CONTINENT_MS });
+      map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: CONTINENT_MS });
     }
   } catch {
     /* style mid-load or map mid-teardown */
@@ -550,15 +564,23 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
       const sig = isCluster
         ? `${props.point_count}|${props.maxScore}`
         : pinSig(props as unknown as PinProps);
+      const coords = (f.geometry as GeoPoint).coordinates as [number, number];
       const existing = pins.get(key);
       if (existing) {
         // querySourceFeatures can serve pre-setData tiles; the idle re-sync then
         // reaches here with fresh properties — rebuild the marker if they changed.
-        if (existing.getElement().dataset.sig === sig) continue;
+        if (existing.getElement().dataset.sig === sig) {
+          // Always re-anchor the kept marker: supercluster ids are dataset-relative,
+          // so after any setData (search keystroke, score landing) the same
+          // c${cluster_id} key + count|score sig can name a DIFFERENT cluster —
+          // without this, the bubble strands over the old city while its click
+          // resolves against the new one (review finding, 2026-07-05).
+          existing.setLngLat(coords);
+          continue;
+        }
         existing.remove();
         pins.delete(key);
       }
-      const coords = (f.geometry as GeoPoint).coordinates as [number, number];
       let el: HTMLDivElement;
       if (isCluster) {
         el = buildCluster(Number(props.point_count), Number(props.maxScore));
@@ -589,7 +611,7 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
                   [Math.min(...lo), Math.min(...la)],
                   [Math.max(...lo), Math.max(...la)],
                 ],
-                { padding: EUROPE_PADDING, maxZoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS },
+                { padding: fitPad(map, EUROPE_PADDING), maxZoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS },
               );
             })
             .catch(() => {});
@@ -655,7 +677,7 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
         fitTimerRef.current = window.setTimeout(() => {
           if (mapRef.current !== map || focusRef.current) return;
           try {
-            map.fitBounds(EUROPE_BOUNDS, { padding: EUROPE_PADDING, duration: CONTINENT_MS });
+            map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: CONTINENT_MS });
           } catch {
             /* ignore */
           }
