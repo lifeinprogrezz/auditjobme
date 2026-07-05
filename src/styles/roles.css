@@ -80,6 +80,8 @@
  * (Rober 7-05: the +/- must carry the panel chevron's visual strength). */
 .roles-theme .maplibregl-ctrl-top-left { top: 50%; left: 14px; transform: translateY(-50%); }
 .roles-theme .maplibregl-ctrl-top-left .maplibregl-ctrl { margin: 0; }
+/* Reset-view control sits as its own glass button just below the zoom group. */
+.roles-theme .maplibregl-ctrl-top-left .maplibregl-ctrl-group + .maplibregl-ctrl-group { margin-top: 8px !important; }
 .roles-theme .maplibregl-ctrl-group { background: var(--glass-2) !important; -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%); border: 1px solid var(--rim) !important; box-shadow: var(--sh) !important; border-radius: 21px !important; overflow: hidden; }
 .roles-theme .maplibregl-ctrl-group button { width: 42px !important; height: 46px !important; display: grid; place-items: center; color: var(--muted); background: none !important; transition: color 0.2s, background 0.2s; }
 .roles-theme .maplibregl-ctrl-group button:hover { color: #fff; background: var(--act-tint) !important; }

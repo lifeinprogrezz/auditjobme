@@ -109,6 +109,10 @@ export default function RolesMap() {
           setSel({ co: null, city });
           setPanelHidden(false);
         }}
+        onResetView={() => {
+          setSel({ co: null, city: null });
+          setDetailJob(null);
+        }}
       />
       <div className="vig" />
       <div className="ui">

@@ -19,6 +19,8 @@ export type GlobeMapProps = {
   onCompanyClick?: (company: string, city: string | null) => void;
   /** Single-city cluster click → filter the panel to that city (null never sent). */
   onCityClick?: (city: string) => void;
+  /** Reset-view button (under the zoom control) → clear the panel selection too. */
+  onResetView?: () => void;
 };
 
 type MapTheme = {
@@ -534,7 +536,7 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 // `scored` stays in the props type for the page contract, but the map needs no
 // scored logic: marker bucket classes are permanent and CSS gates them on the
 // root .scored class.
-export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyClick, onCityClick }: GlobeMapProps) {
+export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyClick, onCityClick, onResetView }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const haloRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -551,6 +553,8 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyC
   onCompanyClickRef.current = onCompanyClick;
   const onCityClickRef = useRef(onCityClick);
   onCityClickRef.current = onCityClick;
+  const onResetViewRef = useRef(onResetView);
+  onResetViewRef.current = onResetView;
 
   const clearPins = () => {
     for (const marker of pinsRef.current.values()) marker.remove();
@@ -773,6 +777,36 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyC
         (window as unknown as { __rolesMap?: maplibregl.Map }).__rolesMap = map;
       }
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
+      // Reset-view control (under the +/-): one click back to the default Europe
+      // frame — after focusing a city you'd otherwise click "−" several times to
+      // zoom out. Also clears the panel selection so it's a true "home".
+      const resetCtrl: maplibregl.IControl = {
+        onAdd: () => {
+          const c = document.createElement("div");
+          c.className = "maplibregl-ctrl maplibregl-ctrl-group";
+          const b = document.createElement("button");
+          b.type = "button";
+          b.title = "Reset view";
+          b.setAttribute("aria-label", "Reset view to Europe");
+          b.innerHTML =
+            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.4 4 5.6 4 9s-1.5 6.6-4 9c-2.5-2.4-4-5.6-4-9s1.5-6.6 4-9z"/></svg>';
+          b.addEventListener("click", () => {
+            const m = mapRef.current;
+            if (m) {
+              try {
+                m.fitBounds(EUROPE_BOUNDS, { padding: fitPad(m, EUROPE_PADDING), duration: CONTINENT_MS });
+              } catch {
+                /* ignore */
+              }
+            }
+            onResetViewRef.current?.();
+          });
+          c.appendChild(b);
+          return c;
+        },
+        onRemove: () => {},
+      };
+      map.addControl(resetCtrl, "top-left");
       map.on("moveend", syncMarkers);
       // moveend fires before the new GeoJSON tiles are parsed, and idle can lag
       // seconds behind it (terrain raster trickle) — sync the moment the roles
