@@ -53,7 +53,18 @@ bloom + count up + re-rank).
   (display) / **Geist** (UI) / **Geist Mono** (numerals). Logos via Logo.dev — **theme must match the
   surface**: white pins → `theme=light`, dark glass cards → `theme=dark` (dark marks on white = the
   "broken logos" bug).
-- **MAP PALETTE = INK & GRAPHITE (Rober's pick 2026-07-05, live A/B vs indigo + the original teal).**
+- **IDENTITY = PAPER LIGHT in DARK SPACE (Rober's final call 2026-07-05, after full light-skin A/B).**
+  The shipped default: daylight Positron globe with a luminous white-blue atmosphere HALO, floating in
+  the SAME ink starfield cosmos as dark mode (space never goes light). Light glass = white fills + INK
+  text + dark hairline rims (a white border on light reads as a plain contour, not glass) + inner white
+  catch-light. Contrast rule: sea is MID-TONE slate (never mist-on-mist — white-on-white was the failed
+  first pass), labels/borders carry real ink. Cluster bubbles are TWO-TIER (startupmap pattern): counts
+  <10 = white glass w/ ink text, hubs = near-black ink glass. **Interactive accent = ONE family: jade
+  (#12A594/#1FD8B8, ink text on primary buttons) — violet is dead**; score pills stay their own luminous
+  system. Footer = freshest-roles marquee ticker (the liveness signal); CARTO/OSM attribution = corner
+  pill, must stay visible. Dark ink remains the alternate identity behind the DEV "L" toggle (future
+  theme setting). Initial camera = fitBounds [[-32,18],[48,64]] w/ panel padding (startupmap framing).
+- **MAP PALETTE (dark identity) = INK & GRAPHITE (2026-07-05, live A/B vs indigo + the original teal).**
   The world is a neutral graphite stage: slate-blue sea relief (rgba(4,8,14)→rgba(20,34,50) ramp),
   graphite hillshade (highlight #38434c), hairline neutral borders (#7f95a3 @ .22), ink page halo
   (#10181f→#020407). Rationale: the old teal Atlantic spent the score's hue on scenery; ink makes

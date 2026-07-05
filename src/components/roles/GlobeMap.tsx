@@ -46,7 +46,9 @@ const THEMES: Record<"dark" | "light", MapTheme> = {
   },
   light: {
     styleUrl: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-    sky: { "sky-color": "#bfced9", "horizon-color": "#d3dde3", "fog-color": "#cdd7dd" },
+    // The startupmap-reference halo: a luminous white-blue atmosphere ring
+    // glowing against the dark starfield space shared with dark mode.
+    sky: { "sky-color": "#9fc2dd", "horizon-color": "#f6fbff", "fog-color": "#dfeaf2" },
     // CONTRAST (Rober 7-05): light-mode readability = a real VALUE STEP between
     // land and everything else (the startupmap lesson). Sea is mid-tone, not mist.
     seaStops: [
@@ -57,15 +59,15 @@ const THEMES: Record<"dark" | "light", MapTheme> = {
     border: { color: "#5c7280", opacity: 0.5, width: 0.75 },
     // Land stays light — the step against the darker sea carries the contrast.
     baseTint: "#eff2f4",
-    // No radiant rim: the bright halo around the sphere read as "too bright".
-    atmosphere: 0.25,
+    atmosphere: 0.85,
     waterColor: "#aec3d2",
     labelColor: "#4e5f6a",
   },
 };
 // The Europe frame is always a fitBounds (never a raw zoom number) — the globe
 // projection makes fixed zoom levels frame differently per viewport.
-const EUROPE_BOUNDS: [[number, number], [number, number]] = [[-30, 20], [45, 64]];
+// Startupmap-matched initial framing: more of the sphere + North Atlantic visible.
+const EUROPE_BOUNDS: [[number, number], [number, number]] = [[-32, 18], [48, 64]];
 // The right panel (358px + margins) eats that side of the viewport: every camera
 // move must aim for the VISIBLE centre, or targets land hidden behind the panel.
 const EUROPE_PADDING = { top: 80, right: 390, bottom: 80, left: 50 };
@@ -112,7 +114,9 @@ function buildCluster(count: number, abbrev: string, maxScore: number): HTMLDivE
   // maxScore -1 = every role unscored → neutral glass; bucket classes only show
   // their colors once the root carries .scored (CSS-gated).
   const bucket = maxScore >= 0 ? scoreBucket(maxScore) : "";
-  el.className = bucket ? `cluster ${bucket}` : "cluster";
+  // Two-tier weight (startupmap): small counts are light, hubs are ink.
+  const tier = count < 10 ? " sm" : "";
+  el.className = ("cluster" + tier + (bucket ? ` ${bucket}` : ""));
   const size = count >= 100 ? 76 : count >= 30 ? 64 : count >= 10 ? 54 : 44;
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;

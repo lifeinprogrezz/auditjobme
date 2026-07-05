@@ -49,7 +49,7 @@
 .roles-theme .vig { position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 260px 60px rgba(0, 0, 0, 0.55); }
 
 /* attribution pill (custom, bottom-center) */
-.roles-theme .attrib { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 12; border-radius: 12px; padding: 6px 13px; font-size: 10.5px; color: var(--subtle); display: flex; gap: 8px; align-items: center; background: rgba(22, 38, 46, 0.6); border: 1px solid var(--rim); box-shadow: var(--sh); }
+.roles-theme .attrib { position: absolute; left: 14px; bottom: 12px; z-index: 12; border-radius: 10px; padding: 5px 11px; font-size: 10px; color: var(--subtle); display: flex; gap: 8px; align-items: center; background: rgba(22, 38, 46, 0.6); border: 1px solid var(--rim); box-shadow: var(--sh); }
 .roles-theme .attrib::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent 44%); mix-blend-mode: screen; }
 .roles-theme .attrib > * { position: relative; z-index: 1; }
 .roles-theme .attrib a { color: #9fb4b9; text-decoration: none; }
@@ -89,7 +89,7 @@
 .roles-theme:not(.scored) .seg { display: none; }
 .roles-theme .navcv { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: #c8f3e9; border: 1px solid rgba(31, 216, 184, 0.3); background: rgba(31, 216, 184, 0.1); box-shadow: var(--sh); transition: background 0.2s, border-color 0.2s; }
 .roles-theme .navcv:hover { background: rgba(31, 216, 184, 0.16); border-color: rgba(31, 216, 184, 0.45); }
-.roles-theme .navcv .sp { width: 22px; height: 22px; flex: none; border-radius: 7px; display: grid; place-items: center; color: var(--great-ink); background: linear-gradient(135deg, var(--great), #34e3ff); }
+.roles-theme .navcv .sp { width: 22px; height: 22px; flex: none; border-radius: 7px; display: grid; place-items: center; color: var(--great-ink); background: linear-gradient(135deg, #1fd8b8, #12a594); }
 .roles-theme.scored .navcv { display: none; }
 .roles-theme .seg button { width: 74px; font: inherit; font-size: 12.5px; font-weight: 600; border: 0; background: transparent; color: var(--muted); padding: 7px 0; border-radius: 8px; cursor: pointer; z-index: 1; transition: color 0.25s; }
 .roles-theme .seg button.on { color: #06231e; }
@@ -111,6 +111,8 @@
 .roles-theme .fchip.active .fcount { display: inline-flex; }
 .roles-theme .fdrop { position: absolute; top: calc(100% + 9px); left: 0; min-width: 206px; background: var(--glass-2); border: 1px solid var(--rim); border-radius: 14px; box-shadow: var(--sh); padding: 6px; display: flex; flex-direction: column; gap: 1px; z-index: 60; opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.98); transform-origin: top left; pointer-events: none; transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s; }
 .roles-theme .fchip.open .fdrop { opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: auto; }
+.roles-theme .fdrop::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), transparent 44%); mix-blend-mode: screen; }
+.roles-theme .fdrop > * { position: relative; z-index: 1; }
 .roles-theme .fdrop label { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.15s; }
 .roles-theme .fdrop label:hover { background: rgba(255, 255, 255, 0.06); }
 .roles-theme .fdrop input { appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--rim); background: rgba(255, 255, 255, 0.04); cursor: pointer; position: relative; flex: none; }
@@ -124,10 +126,12 @@
 /* NO `position` here: these are maplibre Marker elements — .maplibregl-marker
  * provides position:absolute, and overriding it drops markers into normal flow
  * (they stack in a vertical line instead of anchoring to their coordinates). */
-.roles-theme .cluster { display: grid; place-items: center; border-radius: 50%; cursor: pointer; color: #fff; background: rgba(22, 38, 46, 0.78); border: 1px solid var(--rim); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22), inset 0 -2px 6px -2px rgba(0, 0, 0, 0.4); transition: border-color 0.3s, box-shadow 0.3s; }
+.roles-theme .cluster { display: grid; place-items: center; border-radius: 50%; cursor: pointer; color: #fff; background: rgba(14, 23, 30, 0.92); border: 1px solid var(--rim); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22), inset 0 -2px 6px -2px rgba(0, 0, 0, 0.4); transition: border-color 0.3s, box-shadow 0.3s; }
 .roles-theme .cluster::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 46%); mix-blend-mode: screen; }
 .roles-theme .cluster:hover { transform: scale(1.07); border-color: rgba(120, 215, 230, 0.55); z-index: 9; }
 .roles-theme .cluster .cnt { font-family: var(--font-m); font-feature-settings: "tnum" 1; font-weight: 700; letter-spacing: -0.03em; line-height: 1; position: relative; z-index: 1; }
+.roles-theme .cluster.sm { background: rgba(255, 255, 255, 0.92); color: #16262e; border: 1px solid rgba(11, 31, 38, 0.14); box-shadow: 0 6px 18px -6px rgba(10, 25, 35, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
+.roles-theme .cluster.sm:hover { border-color: rgba(18, 165, 148, 0.5); }
 .roles-theme.scored .cluster.great { border-color: rgba(31, 216, 184, 0.65); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), 0 0 22px rgba(31, 216, 184, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22); }
 .roles-theme.scored .cluster.mid { border-color: rgba(255, 196, 77, 0.6); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), 0 0 18px rgba(255, 196, 77, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22); }
 .roles-theme.scored .cluster.low { border-color: rgba(255, 111, 77, 0.55); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), 0 0 16px rgba(255, 111, 77, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22); }
@@ -166,7 +170,7 @@
 .roles-theme.panel-hidden .panel-toggle svg { transform: rotate(180deg); }
 .roles-theme .ptitle { display: none; font-family: var(--font-d); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.035em; color: #fff; margin-bottom: 14px; }
 .roles-theme.scored .ptitle { display: block; }
-.roles-theme .cards { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; padding-right: 8px; }
+.roles-theme .cards { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; padding: 4px 8px 4px 0; }
 .roles-theme .cards::-webkit-scrollbar { width: 6px; }
 .roles-theme .cards::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
 
@@ -194,8 +198,8 @@
 .roles-theme .card .acts { grid-column: 1 / -1; display: flex; gap: 8px; }
 .roles-theme .btn { font: inherit; font-size: 12px; font-weight: 600; border: 0; border-radius: 11px; padding: 9px 13px; cursor: pointer; transition: transform 0.15s, filter 0.15s, box-shadow 0.2s; }
 .roles-theme .btn:active { transform: scale(0.97); }
-.roles-theme .btn.p { background: linear-gradient(150deg, var(--accent-2), var(--accent)); color: #fff; box-shadow: 0 8px 20px -6px rgba(158, 140, 255, 0.6); }
-.roles-theme .btn.p:hover { filter: brightness(1.1); box-shadow: 0 12px 26px -7px rgba(158, 140, 255, 0.75); }
+.roles-theme .btn.p { background: linear-gradient(150deg, #1fd8b8, #12a594); color: #04241f; box-shadow: 0 8px 20px -6px rgba(18, 165, 148, 0.55); }
+.roles-theme .btn.p:hover { filter: brightness(1.06); box-shadow: 0 12px 26px -7px rgba(18, 165, 148, 0.7); }
 .roles-theme .btn.g { background: rgba(255, 255, 255, 0.07); color: var(--text); border: 1px solid var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.24); }
 .roles-theme .btn.g:hover { background: rgba(255, 255, 255, 0.13); }
 .roles-theme .btn.applied { background: rgba(31, 216, 184, 0.14); color: #bff5ec; border: 1px solid rgba(31, 216, 184, 0.4); cursor: default; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.24); }
@@ -256,6 +260,21 @@
 .roles-theme .dmore-item .mi-role { font-size: 13px; font-weight: 600; color: #fff; flex: 1; }
 .roles-theme .dmore-item .mi-city { font-size: 11.5px; color: var(--muted); }
 
+/* FOOTER TICKER — freshest roles marquee (startupmap-style footer, real data) */
+.roles-theme .ticker { position: absolute; bottom: 12px; left: calc((100% - 394px) / 2); transform: translateX(-50%); width: min(920px, calc(100% - 394px - 300px)); overflow: hidden; z-index: 11; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+.roles-theme .ticker-track { display: flex; gap: 10px; width: max-content; animation: ticker-scroll 55s linear infinite; }
+.roles-theme .ticker:hover .ticker-track { animation-play-state: paused; }
+@keyframes ticker-scroll { to { transform: translateX(-50%); } }
+.roles-theme .tcard { display: flex; align-items: center; gap: 9px; padding: 8px 13px 8px 9px; border-radius: 13px; cursor: pointer; white-space: nowrap; background: var(--glass-2); border: 1px solid var(--rim); box-shadow: 0 8px 22px -8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.14); transition: border-color 0.2s; }
+.roles-theme .tcard:hover { border-color: rgba(18, 165, 148, 0.5); }
+.roles-theme .tcard .tlogo { width: 26px; height: 26px; border-radius: 8px; overflow: hidden; background: #fff; display: grid; place-items: center; flex: none; }
+.roles-theme .tcard .tlogo img { width: 100%; height: 100%; object-fit: contain; }
+.roles-theme .tcard .tlogo .fb { width: 100%; height: 100%; display: grid; place-items: center; font-family: var(--font-d); font-weight: 700; font-size: 12px; color: #fff; }
+.roles-theme .tcard .tco { font-size: 12px; font-weight: 700; color: var(--text); }
+.roles-theme .tcard .trole { font-size: 12px; color: var(--muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.roles-theme .tcard .tmeta { font-size: 11px; color: var(--subtle); max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.roles-theme.light .tcard { background: rgba(255, 255, 255, 0.8); box-shadow: 0 8px 22px -8px rgba(20, 60, 70, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
+
 /* empty / signed-out / loading states inside the panel */
 .roles-theme .panel-note { margin: auto 8px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.6; padding: 22px 16px; background: rgba(255, 255, 255, 0.035); border: 1px solid var(--hair); border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 10px 20px -16px rgba(170, 225, 240, 0.14), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.28); }
 .roles-theme .panel-note b { color: #fff; font-family: var(--font-d); font-weight: 600; display: block; font-size: 15.5px; margin-bottom: 6px; }
@@ -278,18 +297,18 @@
   --surface: #ffffff; --surface-2: #f0f4f6; --surface-3: #e4ebee;
   --text: #0b1f26; --muted: #5e828c; --subtle: #8aa6ae;
   --glass: rgba(255, 255, 255, 0.55); --glass-2: rgba(255, 255, 255, 0.72);
-  --rim: rgba(255, 255, 255, 0.85); --hair: rgba(11, 31, 38, 0.1);
+  /* Light glass defines itself with dark hairlines + INNER light — a white
+   * border on light reads as a plain white contour, not glass (Rober, 7-05). */
+  --rim: rgba(11, 31, 38, 0.13); --hair: rgba(11, 31, 38, 0.1);
   --sh: 0 18px 50px -16px rgba(20, 60, 70, 0.28),
     inset 0 1.5px 0 0 rgba(255, 255, 255, 0.95),
     inset 0 16px 32px -22px rgba(255, 255, 255, 0.6),
     inset 0 -1px 0 0 rgba(11, 31, 38, 0.08),
     inset 0 -14px 28px -24px rgba(20, 60, 70, 0.16);
-  /* NO halo (Rober 7-05): the bright glow around the globe was what read as
-   * "too bright". Flat, calm mist surround — the sphere sits matte on it. */
-  background: linear-gradient(180deg, #d5dde2 0%, #c8d2d8 100%);
+  /* Space stays DARK in light mode (startupmap reference, 7-05): a daylight
+   * Earth floating in the same ink cosmos as dark mode, starfield included —
+   * the luminous atmosphere halo at the rim is what reads "beautiful". */
 }
-.roles-theme.light .stars { display: none; }
-.roles-theme.light .vig { box-shadow: inset 0 0 200px 36px rgba(84, 104, 119, 0.16); }
 .roles-theme.light .liquid::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), transparent 44%); mix-blend-mode: normal; }
 .roles-theme.light .maplibregl-ctrl-icon { filter: invert(0.35); }
 .roles-theme.light .attrib { background: rgba(255, 255, 255, 0.65); color: var(--subtle); }
@@ -310,7 +329,8 @@
 .roles-theme.light .fchip:hover { background: rgba(11, 31, 38, 0.08); color: var(--text); }
 .roles-theme.light .fchip.active { background: rgba(18, 165, 148, 0.12); border-color: rgba(18, 165, 148, 0.45); color: #067a6f; }
 .roles-theme.light .fcount { background: #12a594; color: #ffffff; }
-.roles-theme.light .fdrop { background: rgba(255, 255, 255, 0.92); border-color: rgba(255, 255, 255, 0.9); box-shadow: 0 18px 50px -16px rgba(20, 60, 70, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
+.roles-theme.light .fdrop { background: rgba(255, 255, 255, 0.74); border-color: rgba(11, 31, 38, 0.12); box-shadow: 0 18px 50px -16px rgba(20, 60, 70, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
+.roles-theme.light .fdrop::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), transparent 46%); mix-blend-mode: normal; }
 .roles-theme.light .fdrop label { color: var(--text); }
 .roles-theme.light .fdrop label:hover { background: rgba(11, 31, 38, 0.05); }
 .roles-theme.light .fdrop input { border-color: rgba(11, 31, 38, 0.25); background: #ffffff; }

@@ -13,6 +13,7 @@ import "@/styles/roles.css";
 import GlobeMap from "@/components/roles/GlobeMap";
 import RolesPanel from "@/components/roles/RolesPanel";
 import HeadBar from "@/components/roles/HeadBar";
+import FooterTicker from "@/components/roles/FooterTicker";
 import { EMPTY_FILTERS, filterJobs, type RoleJob, type RolesFilters } from "@/lib/roles";
 import { coordsOf } from "@/lib/geo";
 import { useRolesData } from "@/hooks/useRolesData";
@@ -24,10 +25,11 @@ export default function RolesMap() {
   const [view, setView] = useState<"map" | "list">("map");
   const [detailJob, setDetailJob] = useState<RoleJob | null>(null);
   const [panelHidden, setPanelHidden] = useState(false);
-  const [light, setLight] = useState(false);
+  // Light is the shipped default (Rober's call, 2026-07-05); dark ink stays
+  // as the alternate identity for a future theme setting.
+  const [light, setLight] = useState(true);
 
-  // DEV-only identity comparison: "L" flips the whole page (map + glass skin)
-  // between dark ink and paper light. Dark stays the shipped default.
+  // DEV-only identity comparison: "L" flips the whole page (map + glass skin).
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const onKey = (e: KeyboardEvent) => {
@@ -104,6 +106,13 @@ export default function RolesMap() {
           onMarkApplied={markApplied}
           onScoreMore={scoreMore}
           onToggleHidden={() => setPanelHidden((v) => !v)}
+        />
+        <FooterTicker
+          jobs={jobs}
+          onOpen={(j) => {
+            setDetailJob(j);
+            setPanelHidden(false);
+          }}
         />
         <div className="attrib">
           <a href="https://github.com/santifer/career-ops" target="_blank" rel="noopener noreferrer">
