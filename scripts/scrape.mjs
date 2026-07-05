@@ -196,7 +196,15 @@ async function main() {
   const canonUrl = (u) => {
     try {
       const x = new URL(u);
-      if (STRIP_QUERY_HOSTS.some((re) => re.test(x.hostname))) { x.search = ""; x.hash = ""; }
+      if (STRIP_QUERY_HOSTS.some((re) => re.test(x.hostname))) {
+        x.search = "";
+        x.hash = "";
+        // Ashby/Lever board tokens are case-insensitive: /perk/UUID and /Perk/UUID
+        // are the SAME posting. Lowercasing the path collapses the case-duplicate
+        // rows the jobs.url UNIQUE constraint would otherwise keep (the Perk /
+        // TravelPerk class — one company scraped under two board-name casings).
+        x.pathname = x.pathname.toLowerCase();
+      }
       return x.toString();
     } catch { return u; }
   };

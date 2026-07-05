@@ -147,7 +147,7 @@ function featureCollection(jobs: RoleJob[]): FeatureCollection {
         co: g.rep.company,
         domain: g.rep.domain,
         city: g.rep.city,
-        role: g.count > 1 ? `${g.count} open roles` : g.rep.title,
+        role: `${g.count} open role${g.count === 1 ? "" : "s"}`,
         score: g.maxScore,
         // Unscored companies carry NO bucket: a "low" class would paint them with
         // the red poor-fit border in scored mode — a fabricated verdict.
