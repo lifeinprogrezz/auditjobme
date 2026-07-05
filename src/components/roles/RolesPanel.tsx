@@ -8,6 +8,10 @@ import { useNavigate } from "react-router-dom";
 import { LEVELS, hueFor, postedAgo, scoreBucket, type RoleJob } from "@/lib/roles";
 import { logoUrl } from "@/lib/logodev";
 
+// The pool is unbounded (1000+ live rows); each card mounts a Logo.dev <img>,
+// so cap the DOM and point the user at search/filters for the tail.
+const CARD_CAP = 200;
+
 export type RolesPanelProps = {
   jobs: RoleJob[];
   allJobs: RoleJob[];
@@ -124,7 +128,7 @@ export default function RolesPanel({
       {!signedIn ? (
         <div className="panel-note">
           <b>Browse roles on the map</b>
-          Sign in to load the live European PM pool and score it against your CV.
+          Sign in to load live European Product Manager roles and score them against your CV.
           <button className="btn p" onClick={() => navigate("/")}>
             Sign in
           </button>
@@ -138,15 +142,22 @@ export default function RolesPanel({
         </div>
       ) : (
         <div className="cards" onMouseMove={handleCardsMove}>
-          {jobs.map((job, i) => {
+          {jobs.slice(0, CARD_CAP).map((job, i) => {
             const ago = postedAgo(job.posted_at);
+            const open = (e: React.SyntheticEvent) => {
+              if ((e.target as HTMLElement).closest(".acts")) return;
+              onOpenDetail(job);
+            };
             return (
               <article
                 key={job.id}
                 className={"card" + (scored && i === 0 ? " hero" : "")}
-                onClick={(e) => {
-                  if ((e.target as HTMLElement).closest(".acts")) return;
-                  onOpenDetail(job);
+                role="button"
+                tabIndex={0}
+                onClick={open}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  open(e);
                 }}
               >
                 <div className="logo">
@@ -193,6 +204,11 @@ export default function RolesPanel({
               </article>
             );
           })}
+          {jobs.length > CARD_CAP && (
+            <div className="scorebar">
+              Showing the top {CARD_CAP} of {jobs.length} roles. Narrow with search or filters.
+            </div>
+          )}
         </div>
       )}
       {signedIn && scored && remaining > 0 && !scoring && (
@@ -294,7 +310,18 @@ export default function RolesPanel({
           </div>
           <div className="dmore-list">
             {others.map((o) => (
-              <div key={o.id} className="dmore-item" onClick={() => onOpenDetail(o)}>
+              <div
+                key={o.id}
+                className="dmore-item"
+                role="button"
+                tabIndex={0}
+                onClick={() => onOpenDetail(o)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" && e.key !== " ") return;
+                  e.preventDefault();
+                  onOpenDetail(o);
+                }}
+              >
                 <span className="mi-role">{o.title}</span>
                 <span className="mi-city">{o.city ?? o.location ?? ""}</span>
               </div>

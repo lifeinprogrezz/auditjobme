@@ -38,6 +38,13 @@ describe("domainFor", () => {
     expect(domainFor("Acme GmbH", null)).toBeNull();
     expect(domainFor("", null)).toBeNull();
   });
+
+  it("never resolves inherited Object members as domains", () => {
+    expect(domainFor("Constructor", null)).toBeNull();
+    expect(domainFor("__proto__", null)).toBeNull();
+    expect(domainFor("hasOwnProperty", null)).toBeNull();
+    expect(domainFor("valueOf", "constructor")).toBeNull();
+  });
 });
 
 describe("logoUrl", () => {

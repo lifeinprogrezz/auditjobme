@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "@fontsource/space-grotesk/500.css";
 import "@fontsource/space-grotesk/600.css";
 import "@fontsource/space-grotesk/700.css";
@@ -27,21 +27,33 @@ export default function RolesMap() {
 
   const visible = useMemo(() => filterJobs(jobs, filters), [jobs, filters]);
 
+  // The click-time snapshot goes stale when a background score lands — re-read
+  // the live row by id so the detail view matches the card.
+  const detailLive = useMemo(
+    () => (detailJob ? jobs.find((j) => j.id === detailJob.id) ?? detailJob : null),
+    [detailJob, jobs],
+  );
+
+  // Personalized detail must not outlive the session.
+  useEffect(() => {
+    if (!signedIn) setDetailJob(null);
+  }, [signedIn]);
+
   // Detail highlight: the selected company's cities, unjittered (mockup behavior).
   const focusLngLats = useMemo(() => {
-    if (!detailJob) return null;
+    if (!detailLive) return null;
     const cities = [
       ...new Set(
-        jobs.filter((j) => j.company === detailJob.company && j.city).map((j) => j.city as string),
+        jobs.filter((j) => j.company === detailLive.company && j.city).map((j) => j.city as string),
       ),
     ];
     return cities.map((c) => coordsOf(c)).filter((c): c is [number, number] => c !== null);
-  }, [detailJob, jobs]);
+  }, [detailLive, jobs]);
 
   const rootClass = [
     "roles-theme",
     scored && "scored",
-    detailJob && "detail-open",
+    detailLive && "detail-open",
     panelHidden && "panel-hidden",
     view === "list" && "view-list",
   ]
@@ -70,7 +82,7 @@ export default function RolesMap() {
           loading={loading}
           scoring={scoring}
           remaining={remaining}
-          detailJob={detailJob}
+          detailJob={detailLive}
           applied={applied}
           onOpenDetail={setDetailJob}
           onCloseDetail={() => setDetailJob(null)}

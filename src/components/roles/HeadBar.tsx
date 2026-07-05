@@ -79,6 +79,14 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
   const levelOpen = openChip === "level";
   const levelActive = filters.levels.length > 0;
 
+  // div[role=button] chips don't fire click on Enter/Space — wire it explicitly.
+  const keyActivate = (fn: () => void) => (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    if ((e.target as Element).closest(".fdrop")) return; // let checkboxes handle their own keys
+    e.preventDefault();
+    fn();
+  };
+
   return (
     <header className="nav glass liquid">
       <a className="brand" href="/">auditjob.me</a>
@@ -122,6 +130,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
             if ((e.target as Element).closest(".fdrop")) return;
             setOpenChip(levelOpen ? null : "level");
           }}
+          onKeyDown={keyActivate(() => setOpenChip(levelOpen ? null : "level"))}
         >
           <span className="flabel">Level</span>
           <span className="fcount">{filters.levels.length}</span>
@@ -152,6 +161,10 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
             setOpenChip(null);
             onFilters({ ...filters, remoteOnly: !filters.remoteOnly });
           }}
+          onKeyDown={keyActivate(() => {
+            setOpenChip(null);
+            onFilters({ ...filters, remoteOnly: !filters.remoteOnly });
+          })}
         >
           <span className="flabel">Remote</span>
           <span className="fcount">1</span>
@@ -187,7 +200,14 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
         </button>
       )}
 
-      <div className="av" role="button" aria-label="Profile" onClick={() => navigate(signedIn ? "/profile" : "/")} />
+      <div
+        className="av"
+        role="button"
+        tabIndex={0}
+        aria-label="Profile"
+        onClick={() => navigate(signedIn ? "/profile" : "/")}
+        onKeyDown={keyActivate(() => navigate(signedIn ? "/profile" : "/"))}
+      />
     </header>
   );
 }

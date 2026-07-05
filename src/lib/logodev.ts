@@ -114,14 +114,22 @@ const LEGAL_SUFFIXES = new Set([
   "plc", "llc", "limited", "srl", "s.r.l", "s.r.l.", "sa", "s.a", "s.a.",
 ]);
 
+// Own-property lookup: a plain bracket read on an object literal walks the
+// prototype chain, so e.g. "Constructor" or "__proto__" as a company name
+// would return inherited Object members instead of null.
+function own(map: Record<string, string>, key: string): string | null {
+  return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : null;
+}
+
 export function domainFor(company: string, source: string | null): string | null {
-  const bySource = source ? SOURCE_DOMAINS[source.trim().toLowerCase()] : undefined;
+  const bySource = source ? own(SOURCE_DOMAINS, source.trim().toLowerCase()) : null;
   if (bySource) return bySource;
   const name = company.trim().toLowerCase().replace(/,/g, " ").replace(/\s+/g, " ");
-  if (KNOWN_DOMAINS[name]) return KNOWN_DOMAINS[name];
+  const direct = own(KNOWN_DOMAINS, name);
+  if (direct) return direct;
   const words = name.split(" ");
   while (words.length > 1 && LEGAL_SUFFIXES.has(words[words.length - 1])) words.pop();
-  return KNOWN_DOMAINS[words.join(" ")] ?? null;
+  return own(KNOWN_DOMAINS, words.join(" "));
 }
 
 /** Logo.dev image URL (mockup shape, fallback=404 so onError can fire); null without a token. */

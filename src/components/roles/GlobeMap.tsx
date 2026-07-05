@@ -50,7 +50,9 @@ function featureCollection(jobs: RoleJob[]): FeatureCollection {
           city: j.city,
           role: j.title,
           score: j.score,
-          bucket: j.score != null ? scoreBucket(j.score) : "low",
+          // Unscored roles carry NO bucket: a "low" class would paint them with
+          // the red poor-fit border in scored mode — a fabricated verdict.
+          bucket: j.score != null ? scoreBucket(j.score) : "",
           hue: hueFor(j.company),
         } satisfies PinProps,
         geometry: { type: "Point" as const, coordinates: j.lngLat as [number, number] },
@@ -80,9 +82,15 @@ function paintClusters(map: maplibregl.Map, scored: boolean): void {
   map.setPaintProperty("clusters-glow", "circle-opacity", scored ? 0.6 : 0.22);
 }
 
+/** Content signature: when a feature's score/bucket changes, the pin DOM must be rebuilt. */
+function pinSig(p: PinProps): string {
+  return `${p.score ?? ""}|${p.bucket}`;
+}
+
 function buildPin(p: PinProps): HTMLDivElement {
   const el = document.createElement("div");
-  el.className = "pin " + p.bucket;
+  el.className = p.bucket ? "pin " + p.bucket : "pin";
+  el.dataset.sig = pinSig(p);
   el.title = [p.co, p.role, p.city].filter(Boolean).join(" · ");
   const fallback = document.createElement("span");
   fallback.className = "fallback";
@@ -348,7 +356,14 @@ export default function GlobeMap({ jobs, scored, focusLngLats }: GlobeMapProps) 
       const id = String(p.id);
       if (seen.has(id)) continue;
       seen.add(id);
-      if (pins.has(id)) continue;
+      const existing = pins.get(id);
+      if (existing) {
+        // querySourceFeatures can serve pre-setData tiles; the idle re-sync then
+        // reaches here with fresh properties — rebuild the pin if they changed.
+        if (existing.getElement().dataset.sig === pinSig(p)) continue;
+        existing.remove();
+        pins.delete(id);
+      }
       const coords = (f.geometry as GeoPoint).coordinates as [number, number];
       const marker = new maplibregl.Marker({ element: buildPin(p) }).setLngLat(coords).addTo(map);
       pins.set(id, marker);
@@ -455,28 +470,35 @@ export default function GlobeMap({ jobs, scored, focusLngLats }: GlobeMapProps) 
     } catch {
       /* ignore */
     }
-    clearPins();
-    syncPins(); // idle listener re-syncs again once the new data renders
-     
+    // No clear: syncPins rebuilds only pins whose sig changed (setData re-tiles
+    // async, so this pass may see old tiles — the idle re-sync converges).
+    syncPins();
+
   }, [jobs]);
 
   useEffect(() => {
     scoredRef.current = scored;
     const map = mapRef.current;
     if (!map || !loadedRef.current) return;
+    // Pin borders/badges key on the root .scored class in CSS — only clusters
+    // need a repaint here.
     paintClusters(map, scored);
-    // Pins bake bucket class + badge into the DOM: clear + resync re-renders them.
-    clearPins();
-    syncPins();
-     
+
   }, [scored]);
 
+  // Value-compare the focus: scoreBatch re-sorts jobs up to 40 times, giving
+  // focusLngLats a fresh identity each time — re-flying the camera on every
+  // score would fight the user for the whole pass.
+  const lastFocusKeyRef = useRef<string | null>(null);
   useEffect(() => {
     focusRef.current = focusLngLats;
+    const key = focusLngLats ? focusLngLats.map((c) => c.join(",")).join(";") : null;
+    if (key === lastFocusKeyRef.current) return;
+    lastFocusKeyRef.current = key;
     const map = mapRef.current;
     if (!map || !loadedRef.current) return;
     applyFocus(map, focusLngLats);
-     
+
   }, [focusLngLats]);
 
   return <div ref={containerRef} className="roles-map" />;
