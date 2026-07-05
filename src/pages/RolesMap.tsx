@@ -13,7 +13,6 @@ import "@/styles/roles.css";
 import GlobeMap from "@/components/roles/GlobeMap";
 import RolesPanel from "@/components/roles/RolesPanel";
 import HeadBar from "@/components/roles/HeadBar";
-import FooterTicker from "@/components/roles/FooterTicker";
 import { EMPTY_FILTERS, filterJobs, type RoleJob, type RolesFilters } from "@/lib/roles";
 import { coordsOf } from "@/lib/geo";
 import { useRolesData } from "@/hooks/useRolesData";
@@ -118,13 +117,6 @@ export default function RolesMap() {
           onMarkApplied={markApplied}
           onScoreMore={scoreMore}
           onToggleHidden={() => setPanelHidden((v) => !v)}
-        />
-        <FooterTicker
-          jobs={jobs}
-          onOpen={(j) => {
-            setDetailJob(j);
-            setPanelHidden(false);
-          }}
         />
         <div className="attrib">
           <a href="https://github.com/santifer/career-ops" target="_blank" rel="noopener noreferrer">
