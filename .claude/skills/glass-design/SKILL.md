@@ -27,6 +27,17 @@ bloom + count up + re-rank).
   sharp while panning) so it "condensed" on stop — disliked, and the gate was the perf cost. Clear =
   consistent + smooth + his preference. The SVG `#gd` displacement filter may still exist unused; don't
   wire it back. (If frost is ever wanted, it's a one-line add to the headbar ONLY.)
+- **RIM-LIGHT SYSTEM (approved live 2026-07-05, system-wide in `src/styles/roles.css`).** Glass tells
+  at the rim (the Outpace optics insight, done as STATIC PAINT — inset box-shadows, never a filter).
+  Light enters top-left. **Raised panes** (headbar/dropdowns/attrib/zoom via `--sh`): top hairline
+  `rgba(255,255,255,.18)` + icy band `rgba(170,225,240,.28)` falling off ~16px + bottom seat into
+  shadow. **Tall panes** (the roles panel): same plus side edges — lit left (hairline .07 + band .16),
+  seated right. **Small chips/buttons** (filterbtn/fchip/signin/btn.g/score-pending): compact version,
+  1px top light + faint band + 1px bottom seat. **Sunken wells** (search field, Map/List track): the
+  INVERSE — `inset 0 1px 2px rgba(0,0,0,.28)` top seat + faint bottom light. **Cards/drole/panel-note:**
+  mid-scale bands. **Luminous elements stay EXEMPT** (scored pills, btn.p, seg indicator, CV spark) —
+  the score remains the only glow. The icy band color (170,225,240) is glass-light, deliberately far
+  from the score teal — don't drift them together.
 - **Headbar CV unlock (v40+):** pre-CV = calm jade-tinted **"Add your CV"** button + ＋ spark chip;
   the Map/List toggle is HIDDEN pre-CV (no scored roles yet) and appears only **post-CV**, at which
   point the "Add your CV" button moves to the profile/avatar (headbar stays clean). Swap driven by
