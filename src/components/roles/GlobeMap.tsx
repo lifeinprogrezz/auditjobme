@@ -364,6 +364,7 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 // root .scored class.
 export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const haloRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const loadedRef = useRef(false);
   const pinsRef = useRef<Map<string, maplibregl.Marker>>(new Map());
@@ -376,6 +377,40 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
   const clearPins = () => {
     for (const marker of pinsRef.current.values()) marker.remove();
     pinsRef.current.clear();
+  };
+
+  // The atmosphere halo: maplibre's own sky maxes out well below the reference
+  // look (bright limb line blooming into space), so we paint it ourselves — a
+  // DOM ring tracking the sphere's screen silhouette every frame. At pitch 0
+  // the globe's apparent radius is worldSize / 2pi (verified empirically).
+  const updateHalo = () => {
+    const map = mapRef.current;
+    const halo = haloRef.current;
+    if (!map || !halo) return;
+    try {
+      const tr = (map as unknown as { transform?: { worldSize?: number } }).transform;
+      const worldSize = tr?.worldSize ?? 512 * Math.pow(2, map.getZoom());
+      const r = worldSize / (2 * Math.PI);
+      const c = map.getCanvas();
+      const w = c.clientWidth;
+      const h = c.clientHeight;
+      // Fade out once the limb leaves the viewport (sphere covers the corners).
+      const corner = Math.hypot(w, h) / 2;
+      const fadeStart = corner * 0.98;
+      const fadeEnd = corner * 1.3;
+      const o = r <= fadeStart ? 1 : r >= fadeEnd ? 0 : 1 - (r - fadeStart) / (fadeEnd - fadeStart);
+      halo.style.opacity = o.toFixed(3);
+      if (o <= 0) return;
+      const pad = map.getPadding();
+      const cx = ((pad.left ?? 0) + (w - (pad.right ?? 0))) / 2;
+      const cy = ((pad.top ?? 0) + (h - (pad.bottom ?? 0))) / 2;
+      halo.style.width = `${2 * r}px`;
+      halo.style.height = `${2 * r}px`;
+      halo.style.left = `${cx - r}px`;
+      halo.style.top = `${cy - r}px`;
+    } catch {
+      /* halo is decoration */
+    }
   };
 
   // One sync for BOTH marker kinds (glass cluster bubbles + logo pins). Reads
@@ -463,6 +498,8 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
       }
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
       map.on("moveend", syncMarkers);
+      map.on("move", updateHalo);
+      map.on("resize", updateHalo);
       map.on("load", () => {
         if (mapRef.current !== map) return; // unmounted before style loaded
         // Constructor projection gets reset by style load — set it again.
@@ -490,6 +527,7 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
         }
         loadedRef.current = true;
         if (focusRef.current) applyFocus(map, focusRef.current);
+        updateHalo();
         syncMarkers();
         map.on("idle", syncMarkers);
       });
@@ -595,5 +633,10 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
 
   }, [focusLngLats]);
 
-  return <div ref={containerRef} className="roles-map" />;
+  return (
+    <>
+      <div ref={haloRef} className="halo" />
+      <div ref={containerRef} className="roles-map" />
+    </>
+  );
 }
