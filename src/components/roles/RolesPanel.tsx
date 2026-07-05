@@ -125,15 +125,7 @@ export default function RolesPanel({
       {scoring && (
         <div className="scorebar">Scoring roles against your profile… {remaining} to go</div>
       )}
-      {!signedIn ? (
-        <div className="panel-note">
-          <b>Browse roles on the map</b>
-          Sign in to load live European Product Manager roles and score them against your CV.
-          <button className="btn p" onClick={() => navigate("/")}>
-            Sign in
-          </button>
-        </div>
-      ) : loading ? (
+      {loading ? (
         <div className="panel-note">Loading roles…</div>
       ) : jobs.length === 0 ? (
         <div className="panel-note">
