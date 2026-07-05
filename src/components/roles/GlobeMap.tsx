@@ -71,6 +71,15 @@ const EUROPE_BOUNDS: [[number, number], [number, number]] = [[-32, 18], [48, 64]
 // The right panel (358px + margins) eats that side of the viewport: every camera
 // move must aim for the VISIBLE centre, or targets land hidden behind the panel.
 const EUROPE_PADDING = { top: 80, right: 390, bottom: 80, left: 50 };
+// Startupmap's bubble click is a one-shot reveal (easeTo z12/800ms lands on the
+// full logo cloud). Our expansion zoom at continent scale often splits into
+// sub-clusters instead — so a click always eases to at least clusterMaxZoom+0.6,
+// where the sunflower cloud is fully fanned out.
+const CITY_REVEAL_ZOOM = 10.6;
+// Camera grammar (startupmap-matched): marker-target flights 800ms,
+// continent-scale flights (Europe frame, multi-focus) 1200ms.
+const FLIGHT_MS = 800;
+const CONTINENT_MS = 1200;
 const GREAT = "#1FD8B8";
 
 type PinProps = {
@@ -338,7 +347,14 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
         })),
       });
       if (focus.length === 1) {
-        map.flyTo({ center: focus[0], zoom: 4.5, duration: 900 });
+        // Skip-if-already-close (startupmap's guard): re-flying a camera that is
+        // effectively at the target reads as a stutter, not a move.
+        const ctr = map.getCenter();
+        const close =
+          Math.abs(map.getZoom() - 4.5) < 0.5 &&
+          Math.abs(ctr.lng - focus[0][0]) < 0.01 &&
+          Math.abs(ctr.lat - focus[0][1]) < 0.01;
+        if (!close) map.flyTo({ center: focus[0], zoom: 4.5, duration: FLIGHT_MS });
       } else if (focus.length > 1) {
         const lo = focus.map((c) => c[0]);
         const la = focus.map((c) => c[1]);
@@ -347,12 +363,12 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
             [Math.min(...lo) - 3, Math.min(...la) - 3],
             [Math.max(...lo) + 3, Math.max(...la) + 3],
           ],
-          { padding: { top: 90, right: 400, bottom: 90, left: 60 }, duration: 900 },
+          { padding: { top: 90, right: 400, bottom: 90, left: 60 }, duration: CONTINENT_MS },
         );
       }
     } else {
       src.setData({ type: "FeatureCollection", features: [] });
-      map.fitBounds(EUROPE_BOUNDS, { padding: EUROPE_PADDING, duration: 800 });
+      map.fitBounds(EUROPE_BOUNDS, { padding: EUROPE_PADDING, duration: CONTINENT_MS });
     }
   } catch {
     /* style mid-load or map mid-teardown */
@@ -506,7 +522,12 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
             // Padding aims the city at the VISIBLE centre (left of the panel),
             // so the logo cloud opens in view instead of behind the glass.
             .then((zoom) =>
-              map.easeTo({ center: coords, zoom, duration: 700, padding: EUROPE_PADDING }),
+              map.easeTo({
+                center: coords,
+                zoom: Math.max(zoom, CITY_REVEAL_ZOOM),
+                duration: FLIGHT_MS,
+                padding: EUROPE_PADDING,
+              }),
             )
             .catch(() => {});
         });
@@ -557,7 +578,7 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
         fitTimerRef.current = window.setTimeout(() => {
           if (mapRef.current !== map || focusRef.current) return;
           try {
-            map.fitBounds(EUROPE_BOUNDS, { padding: EUROPE_PADDING, duration: 700 });
+            map.fitBounds(EUROPE_BOUNDS, { padding: EUROPE_PADDING, duration: CONTINENT_MS });
           } catch {
             /* ignore */
           }
