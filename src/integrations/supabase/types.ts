@@ -229,9 +229,74 @@ export type Database = {
         }
         Relationships: []
       }
+      companies: {
+        Row: {
+          careers_url: string | null
+          coord_precision: string
+          headcount_bucket: string | null
+          hq_city: string | null
+          hq_country: string | null
+          lat: number | null
+          linkedin_url: string | null
+          lng: number | null
+          logo_domain: string | null
+          name: string
+          open_roles_count: number | null
+          sector: string | null
+          slug: string
+          source: string | null
+          stage: string | null
+          uk_sponsor_status: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          careers_url?: string | null
+          coord_precision?: string
+          headcount_bucket?: string | null
+          hq_city?: string | null
+          hq_country?: string | null
+          lat?: number | null
+          linkedin_url?: string | null
+          lng?: number | null
+          logo_domain?: string | null
+          name: string
+          open_roles_count?: number | null
+          sector?: string | null
+          slug: string
+          source?: string | null
+          stage?: string | null
+          uk_sponsor_status?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          careers_url?: string | null
+          coord_precision?: string
+          headcount_bucket?: string | null
+          hq_city?: string | null
+          hq_country?: string | null
+          lat?: number | null
+          linkedin_url?: string | null
+          lng?: number | null
+          logo_domain?: string | null
+          name?: string
+          open_roles_count?: number | null
+          sector?: string | null
+          slug?: string
+          source?: string | null
+          stage?: string | null
+          uk_sponsor_status?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       jobs: {
         Row: {
+          city: string | null
           company: string
+          company_id: string | null
           created_at: string
           first_seen_at: string
           id: string
@@ -246,7 +311,9 @@ export type Database = {
           url: string
         }
         Insert: {
+          city?: string | null
           company: string
+          company_id?: string | null
           created_at?: string
           first_seen_at?: string
           id?: string
@@ -261,7 +328,9 @@ export type Database = {
           url: string
         }
         Update: {
+          city?: string | null
           company?: string
+          company_id?: string | null
           created_at?: string
           first_seen_at?: string
           id?: string
@@ -275,7 +344,15 @@ export type Database = {
           title?: string
           url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["slug"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -481,6 +558,7 @@ export type Database = {
         Returns: string
       }
       get_global_avg_duration: { Args: never; Returns: number }
+      link_jobs_to_companies: { Args: never; Returns: number }
     }
     Enums: {
       [_ in never]: never

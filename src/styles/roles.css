@@ -226,6 +226,12 @@
 .roles-theme.panel-hidden .panel-toggle svg { transform: rotate(180deg); }
 .roles-theme .ptitle { display: none; font-family: var(--font-d); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.035em; color: #fff; margin-bottom: 14px; }
 .roles-theme.scored .ptitle { display: block; }
+/* City filter header (globe cluster click -> panel narrows to that city). */
+.roles-theme .cityhdr { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: var(--font-d); font-size: 13.5px; font-weight: 500; color: var(--muted); padding: 7px 12px; margin-bottom: 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--hair); }
+.roles-theme .cityhdr b { color: var(--text); font-weight: 600; }
+.roles-theme .cityclear { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 7px; border: 1px solid var(--hair); background: transparent; color: var(--muted); font-size: 14px; line-height: 1; cursor: pointer; }
+.roles-theme .cityclear:hover { color: var(--text); border-color: var(--text); }
+.roles-theme.light .cityhdr { background: rgba(255, 255, 255, 0.6); }
 .roles-theme .cards { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; padding: 4px 8px 4px 0; }
 .roles-theme .cards::-webkit-scrollbar { width: 6px; }
 .roles-theme .cards::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }

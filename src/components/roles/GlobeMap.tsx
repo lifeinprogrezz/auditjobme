@@ -16,6 +16,8 @@ export type GlobeMapProps = {
   light?: boolean;
   /** Pin click → open that role's detail (startupmap's logo→panel mechanic). */
   onOpenRole?: (id: string) => void;
+  /** Single-city cluster click → filter the panel to that city (null never sent). */
+  onCityClick?: (city: string) => void;
 };
 
 type MapTheme = {
@@ -452,7 +454,7 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 // `scored` stays in the props type for the page contract, but the map needs no
 // scored logic: marker bucket classes are permanent and CSS gates them on the
 // root .scored class.
-export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole }: GlobeMapProps) {
+export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole, onCityClick }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const haloRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -467,6 +469,8 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
   // so they always call the latest callback.
   const onOpenRoleRef = useRef(onOpenRole);
   onOpenRoleRef.current = onOpenRole;
+  const onCityClickRef = useRef(onCityClick);
+  onCityClickRef.current = onCityClick;
 
   const clearPins = () => {
     for (const marker of pinsRef.current.values()) marker.remove();
@@ -613,6 +617,14 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
                 .map((l) => (l.geometry as GeoPoint).coordinates as [number, number])
                 .filter((c) => Number.isFinite(c?.[0]) && Number.isFinite(c?.[1]));
               if (!pts.length) return;
+              // City-cluster click also drives the panel: when every member role
+              // sits in ONE city, tell the parent (startupmap's map→list sync).
+              // Multi-city bubbles only zoom — picking a "dominant" city there
+              // would filter the list to something the user didn't click.
+              const cities = new Set(
+                leaves.map((l) => (l.properties as { city?: string | null } | null)?.city).filter(Boolean),
+              );
+              if (cities.size === 1) onCityClickRef.current?.([...cities][0] as string);
               const lo = pts.map((c) => c[0]);
               const la = pts.map((c) => c[1]);
               // Padding aims the content at the VISIBLE centre (left of the

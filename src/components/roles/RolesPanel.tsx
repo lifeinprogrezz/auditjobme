@@ -27,6 +27,9 @@ export type RolesPanelProps = {
   onMarkApplied: (j: RoleJob) => void;
   onScoreMore: () => void;
   onToggleHidden: () => void;
+  /** City picked on the globe (single-city cluster click); null = no city filter. */
+  cityFilter?: string | null;
+  onClearCity?: () => void;
 };
 
 /** Logo.dev image with colored-initial fallback (never a favicon service). */
@@ -99,6 +102,8 @@ export default function RolesPanel({
   onMarkApplied,
   onScoreMore,
   onToggleHidden,
+  cityFilter,
+  onClearCity,
 }: RolesPanelProps) {
   const navigate = useNavigate();
   const detailRef = useRef<HTMLDivElement>(null);
@@ -122,6 +127,18 @@ export default function RolesPanel({
   const renderCards = () => (
     <>
       <h1 className="ptitle">Your matches</h1>
+      {cityFilter && (
+        <div className="cityhdr">
+          <span>
+            Roles in <b>{cityFilter}</b> · {jobs.length}
+          </span>
+          {onClearCity && (
+            <button className="cityclear" onClick={onClearCity} aria-label="Clear city filter">
+              ×
+            </button>
+          )}
+        </div>
+      )}
       {scoring && (
         <div className="scorebar">Scoring roles against your profile… {remaining} to go</div>
       )}
@@ -130,7 +147,7 @@ export default function RolesPanel({
       ) : jobs.length === 0 ? (
         <div className="panel-note">
           <b>No roles match</b>
-          Try clearing filters.
+          {cityFilter ? `No roles in ${cityFilter} match your filters.` : "Try clearing filters."}
         </div>
       ) : (
         <div className="cards" onMouseMove={handleCardsMove}>

@@ -40,7 +40,16 @@ export default function RolesMap() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
+  // City selected by clicking a single-city cluster on the globe. Kept OUTSIDE
+  // RolesFilters: the globe keeps rendering all `visible` roles (so other city
+  // bubbles stay clickable) while only the panel narrows to the picked city.
+  const [cityFilter, setCityFilter] = useState<string | null>(null);
+
   const visible = useMemo(() => filterJobs(jobs, filters), [jobs, filters]);
+  const panelJobs = useMemo(
+    () => (cityFilter ? visible.filter((j) => j.city === cityFilter) : visible),
+    [visible, cityFilter],
+  );
 
   // The click-time snapshot goes stale when a background score lands — re-read
   // the live row by id so the detail view matches the card.
@@ -91,6 +100,10 @@ export default function RolesMap() {
             setPanelHidden(false);
           }
         }}
+        onCityClick={(city) => {
+          setCityFilter(city);
+          setPanelHidden(false);
+        }}
       />
       <div className="vig" />
       <div className="ui">
@@ -103,8 +116,10 @@ export default function RolesMap() {
           onView={setView}
         />
         <RolesPanel
-          jobs={visible}
+          jobs={panelJobs}
           allJobs={jobs}
+          cityFilter={cityFilter}
+          onClearCity={() => setCityFilter(null)}
           scored={scored}
           signedIn={signedIn}
           loading={loading}

@@ -17,6 +17,7 @@ type JobsRow = {
   source: string | null;
   seniority: string | null;
   posted_at: string | null;
+  company_id: string | null;
 };
 
 const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page past it.
@@ -26,7 +27,7 @@ const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page pas
  * per-city index (sorted by id) that places them on a deterministic sunflower
  * disc over the city — the logo cloud you see when a city cluster opens.
  */
-function enrichAll(rows: JobsRow[]): RoleJob[] {
+function enrichAll(rows: JobsRow[], logoBySlug: Map<string, string | null>): RoleJob[] {
   const idsByCity = new Map<string, string[]>();
   const cityById = new Map<string, string | null>();
   for (const r of rows) {
@@ -53,7 +54,9 @@ function enrichAll(rows: JobsRow[]): RoleJob[] {
       lngLat: city
         ? sunflowerLngLat(city, indexById.get(r.id) ?? 0, idsByCity.get(city)?.length ?? 1)
         : null,
-      domain: domainFor(r.company, r.source),
+      // companies.logo_domain (engine-verified website) wins; name-guess is the
+      // fallback for rows not yet linked to the companies dimension.
+      domain: (r.company_id ? logoBySlug.get(r.company_id) : null) ?? domainFor(r.company, r.source),
     };
   });
 }
@@ -152,17 +155,22 @@ export function useRolesData() {
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await supabase
           .from("jobs")
-          .select("id, company, title, url, location, remote, source, seniority, posted_at")
+          .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id")
           .eq("is_live", true)
           .range(from, from + PAGE - 1);
         if (error || !data) break;
         rows = rows.concat(data as JobsRow[]);
         if (data.length < PAGE) break;
       }
+      // Companies dimension (anon-readable, ~550 rows): real logo domains beat
+      // the name-guess in domainFor. Failure degrades to guessing, never blocks.
+      const logoBySlug = new Map<string, string | null>();
+      const { data: cos } = await supabase.from("companies").select("slug, logo_domain");
+      (cos ?? []).forEach((c) => logoBySlug.set(c.slug, c.logo_domain));
       if (!user) {
         if (runRef.current !== runId) return;
         // Anonymous browse (or sign-out: clears the previous session's state).
-        setJobs(enrichAll(rows).sort(byScore));
+        setJobs(enrichAll(rows, logoBySlug).sort(byScore));
         setProfile(null);
         setApplied(new Set());
         setLoading(false);
@@ -178,7 +186,7 @@ export function useRolesData() {
         const sig = s.signals as { reason?: string } | null;
         scoreByJob[s.job_id] = { score: s.score, reason: sig?.reason ?? null };
       });
-      const merged = enrichAll(rows).map((j) => ({
+      const merged = enrichAll(rows, logoBySlug).map((j) => ({
         ...j,
         score: scoreByJob[j.id]?.score ?? null,
         reason: scoreByJob[j.id]?.reason ?? null,
