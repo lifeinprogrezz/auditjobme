@@ -30,6 +30,25 @@ export function scoreBucket(score: number): ScoreBucket {
   return score >= 4 ? "great" : score >= 3 ? "mid" : "low";
 }
 
+/** Cluster bubble tier — startupmap-matched count breaks (<15 / ≥15 / ≥50 / ≥150).
+ *  Light glass below 50, ink above (their light→dark hub split); z-index ladder
+ *  so bigger hubs win marker overlaps; the top tier carries a "roles" sublabel. */
+export type ClusterTier = {
+  size: number;
+  fontSize: number;
+  /** Light glass bubble (small counts); false = ink hub. */
+  light: boolean;
+  zIndex: number;
+  /** Uppercase sublabel under the count (top tier only). */
+  sublabel: string | null;
+};
+export function clusterTier(count: number): ClusterTier {
+  if (count >= 150) return { size: 76, fontSize: 17, light: false, zIndex: 24, sublabel: "roles" };
+  if (count >= 50) return { size: 64, fontSize: 15, light: false, zIndex: 22, sublabel: null };
+  if (count >= 15) return { size: 54, fontSize: 14, light: true, zIndex: 20, sublabel: null };
+  return { size: 44, fontSize: 13.5, light: true, zIndex: 20, sublabel: null };
+}
+
 /** Deterministic accent hue per company for logo-initial fallbacks (mockup HUE). */
 const HUE = ["#1FD8B8", "#9E8CFF", "#FFC44D", "#FF6F4D", "#3CB4FF", "#EC6FE0", "#5EE08A"];
 export function hueFor(company: string): string {

@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, Point as GeoPoint } from "geojson";
-import { hueFor, scoreBucket, type RoleJob } from "@/lib/roles";
+import { clusterTier, hueFor, scoreBucket, type RoleJob } from "@/lib/roles";
 import { logoUrl } from "@/lib/logodev";
 
 export type GlobeMapProps = {
@@ -120,22 +120,30 @@ function featureCollection(jobs: RoleJob[]): FeatureCollection {
 }
 
 /** Glass cluster bubble (DOM marker — circle layers can't speak the glass system). */
-function buildCluster(count: number, abbrev: string, maxScore: number): HTMLDivElement {
+function buildCluster(count: number, maxScore: number): HTMLDivElement {
   const el = document.createElement("div");
   // maxScore -1 = every role unscored → neutral glass; bucket classes only show
   // their colors once the root carries .scored (CSS-gated).
   const bucket = maxScore >= 0 ? scoreBucket(maxScore) : "";
-  // Two-tier weight (startupmap): small counts are light, hubs are ink.
-  const tier = count < 10 ? " sm" : "";
-  el.className = ("cluster" + tier + (bucket ? ` ${bucket}` : ""));
-  const size = count >= 100 ? 76 : count >= 30 ? 64 : count >= 10 ? 54 : 44;
-  el.style.width = `${size}px`;
-  el.style.height = `${size}px`;
+  // Tier ladder (startupmap-matched breaks + weights) lives in clusterTier.
+  const t = clusterTier(count);
+  el.className = "cluster" + (t.light ? " sm" : "") + (bucket ? ` ${bucket}` : "");
+  el.style.width = `${t.size}px`;
+  el.style.height = `${t.size}px`;
+  // Bigger hubs win marker overlaps (their z ladder: 20/22/24 by count).
+  el.style.zIndex = String(t.zIndex);
   const cnt = document.createElement("span");
   cnt.className = "cnt num";
-  cnt.style.fontSize = count >= 100 ? "17px" : count >= 10 ? "15px" : "13.5px";
-  cnt.textContent = abbrev;
+  cnt.style.fontSize = `${t.fontSize}px`;
+  // Raw count, never abbreviated (startupmap: the precision reads as honesty).
+  cnt.textContent = String(count);
   el.appendChild(cnt);
+  if (t.sublabel) {
+    const sub = document.createElement("span");
+    sub.className = "sub";
+    sub.textContent = t.sublabel;
+    el.appendChild(sub);
+  }
   return el;
 }
 
@@ -540,11 +548,7 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
       const coords = (f.geometry as GeoPoint).coordinates as [number, number];
       let el: HTMLDivElement;
       if (isCluster) {
-        el = buildCluster(
-          Number(props.point_count),
-          String(props.point_count_abbreviated ?? props.point_count),
-          Number(props.maxScore),
-        );
+        el = buildCluster(Number(props.point_count), Number(props.maxScore));
         const clusterId = props.cluster_id as number;
         el.addEventListener("click", () => {
           const src = map.getSource("roles") as maplibregl.GeoJSONSource | undefined;
