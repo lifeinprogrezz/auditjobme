@@ -116,7 +116,10 @@
 .roles-theme .spacer { flex: 1; }
 .roles-theme .seg { display: flex; background: rgba(255, 255, 255, 0.06); border-radius: 11px; padding: 3px; position: relative; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.05); }
 .roles-theme:not(.scored) .seg { display: none; }
-.roles-theme .navcv { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); border: 1px solid var(--act-border); background: var(--act-tint); box-shadow: var(--sh); transition: background 0.2s, border-color 0.2s; }
+/* Hover is a full ink inversion — glide it at the panel's cadence (0.45s, same
+ * curve), and transition COLOR too: untransitioned, the text snapped while the
+ * background faded, which read as "too fast" (Rober 7-05). */
+.roles-theme .navcv { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); border: 1px solid var(--act-border); background: var(--act-tint); box-shadow: var(--sh); transition: background 0.45s cubic-bezier(0.4, 0, 0.2, 1), color 0.45s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.45s cubic-bezier(0.4, 0, 0.2, 1); }
 .roles-theme .navcv:hover { background: var(--act-strong); color: var(--act-strong-ink); }
 .roles-theme .navcv .sp { width: 22px; height: 22px; flex: none; border-radius: 7px; display: grid; place-items: center; color: var(--act-strong-ink); background: var(--act-strong); }
 .roles-theme.scored .navcv { display: none; }
