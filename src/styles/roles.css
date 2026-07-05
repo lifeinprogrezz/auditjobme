@@ -49,11 +49,11 @@
 .roles-theme .num { font-family: var(--font-m); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
 
 /* starfield + atmosphere */
-.roles-theme .stars { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.55;
-  background-image: radial-gradient(1px 1px at 20% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 20%, #cfe, transparent), radial-gradient(1px 1px at 40% 70%, #fff, transparent), radial-gradient(1.5px 1.5px at 85% 60%, #bdf, transparent), radial-gradient(1px 1px at 12% 80%, #fff, transparent), radial-gradient(1px 1px at 60% 85%, #fff, transparent), radial-gradient(1px 1px at 90% 35%, #cff, transparent), radial-gradient(1px 1px at 33% 15%, #fff, transparent), radial-gradient(2px 2px at 55% 45%, rgba(255, 255, 255, 0.95), transparent), radial-gradient(1.6px 1.6px at 8% 42%, rgba(235, 245, 255, 0.9), transparent);
-  /* repeat each layer at a different rhythm = a real field, not 8 lonely dots */
-  background-size: 520px 520px, 640px 640px, 750px 750px, 880px 880px, 570px 570px, 690px 690px, 810px 810px, 460px 460px, 1150px 1150px, 990px 990px; }
-.roles-theme.light .stars { opacity: 0.95; }
+.roles-theme .stars { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.6;
+  /* 16 layers, each repeating at its own rhythm = a dense startupmap-grade field */
+  background-image: radial-gradient(2px 2px at 43% 21%, #fff, transparent), radial-gradient(1.6px 1.6px at 70% 14%, rgba(255,255,255,0.65), transparent), radial-gradient(2px 2px at 6% 13%, #fff, transparent), radial-gradient(2px 2px at 13% 72%, rgba(255,255,255,0.65), transparent), radial-gradient(0.8px 0.8px at 30% 82%, #fff, transparent), radial-gradient(1px 1px at 7% 73%, #dfeeff, transparent), radial-gradient(1.4px 1.4px at 71% 17%, #fff, transparent), radial-gradient(1.2px 1.2px at 75% 83%, #cfe6ff, transparent), radial-gradient(0.8px 0.8px at 93% 10%, #eef6ff, transparent), radial-gradient(1.6px 1.6px at 70% 56%, #e8f4ff, transparent), radial-gradient(1.4px 1.4px at 60% 48%, #eef6ff, transparent), radial-gradient(1.4px 1.4px at 33% 12%, #e8f4ff, transparent), radial-gradient(1px 1px at 59% 38%, rgba(255,255,255,0.65), transparent), radial-gradient(1px 1px at 23% 45%, #e8f4ff, transparent), radial-gradient(1.6px 1.6px at 87% 11%, #cfe6ff, transparent), radial-gradient(2.4px 2.4px at 65% 76%, #fff, transparent);
+  background-size: 760px 760px, 449px 449px, 463px 463px, 403px 403px, 453px 453px, 413px 413px, 637px 637px, 620px 620px, 688px 688px, 812px 812px, 697px 697px, 713px 713px, 554px 554px, 360px 360px, 644px 644px, 478px 478px; }
+.roles-theme.light .stars { opacity: 1; }
 /* the painted atmosphere: crisp limb line blooming into space (sized per-frame by GlobeMap) */
 .roles-theme .halo { position: absolute; z-index: 0; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.4s;
   box-shadow: 0 0 5px 3px rgba(255, 255, 255, 1), 0 0 48px 18px rgba(228, 242, 254, 0.72), 0 0 160px 60px rgba(175, 208, 240, 0.38), 0 0 320px 140px rgba(130, 170, 215, 0.16); }
