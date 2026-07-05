@@ -284,13 +284,12 @@
     inset 0 16px 32px -22px rgba(255, 255, 255, 0.6),
     inset 0 -1px 0 0 rgba(11, 31, 38, 0.08),
     inset 0 -14px 28px -24px rgba(20, 60, 70, 0.16);
-  /* Ethereal fade (Rober 7-05): soft luminous core breathing out into mist —
-   * the page darkens gently toward the edges instead of flat bright white. */
-  background: radial-gradient(120% 100% at 50% 36%, #f2f5f7 0%, #e4eaee 38%, #ccd7de 70%, #b3c2cc 100%);
+  /* NO halo (Rober 7-05): the bright glow around the globe was what read as
+   * "too bright". Flat, calm mist surround — the sphere sits matte on it. */
+  background: linear-gradient(180deg, #e2e8ec 0%, #d9e1e6 100%);
 }
 .roles-theme.light .stars { display: none; }
-/* the halo: a wide, soft atmospheric ring that makes the light mode ethereal */
-.roles-theme.light .vig { box-shadow: inset 0 0 320px 90px rgba(126, 148, 162, 0.34), inset 0 0 120px 20px rgba(226, 234, 238, 0.25); }
+.roles-theme.light .vig { box-shadow: inset 0 0 180px 30px rgba(100, 120, 135, 0.12); }
 .roles-theme.light .liquid::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), transparent 44%); mix-blend-mode: normal; }
 .roles-theme.light .maplibregl-ctrl-icon { filter: invert(0.35); }
 .roles-theme.light .attrib { background: rgba(255, 255, 255, 0.65); color: var(--subtle); }

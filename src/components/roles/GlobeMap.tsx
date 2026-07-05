@@ -24,6 +24,8 @@ type MapTheme = {
   border: { color: string; opacity: number; width: number };
   /** Optional repaint of the basemap's background layer (tone down raw white). */
   baseTint?: string;
+  /** Atmosphere glow at the globe rim, zoom-0 strength (default 0.9 = dramatic). */
+  atmosphere?: number;
 };
 
 // Dark = the approved ink & graphite palette (7-05); light = paper (Positron).
@@ -40,15 +42,17 @@ const THEMES: Record<"dark" | "light", MapTheme> = {
   },
   light: {
     styleUrl: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-    sky: { "sky-color": "#d5e2ec", "horizon-color": "#f2f6f8", "fog-color": "#e6edf1" },
+    sky: { "sky-color": "#cdd9e1", "horizon-color": "#dde4e9", "fog-color": "#d8e0e5" },
     seaStops: [
       "rgba(158,182,199,1)", "rgba(172,194,209,1)", "rgba(186,206,219,1)",
       "rgba(198,215,226,1)", "rgba(208,223,232,0.9)", "rgba(210,224,233,0)",
     ],
     hill: { shadow: "#a3afb7", highlight: "#eef3f5", accent: "#c6d1d8", exaggeration: 0.45 },
     border: { color: "#7d919d", opacity: 0.4, width: 0.6 },
-    // Positron's land is near-pure white — pull it toward mist so the page halo reads.
+    // Positron's land is near-pure white — pull it toward mist.
     baseTint: "#edf1f3",
+    // No radiant rim: the bright halo around the sphere read as "too bright".
+    atmosphere: 0.25,
   },
 };
 // The Europe frame is always a fitBounds (never a raw zoom number) — the globe
@@ -166,7 +170,7 @@ function styleAtmosphere(map: maplibregl.Map, theme: MapTheme): void {
       "sky-horizon-blend": 0.5,
       "horizon-fog-blend": 0.5,
       "fog-ground-blend": 0.6,
-      "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 0.9, 6, 0.2],
+      "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, theme.atmosphere ?? 0.9, 6, 0.1],
     } as maplibregl.SkySpecification);
   } catch {
     /* sky is decoration */
@@ -191,6 +195,7 @@ function boostBorders(map: maplibregl.Map, theme: MapTheme): void {
 }
 
 function addTerrain(map: maplibregl.Map, theme: MapTheme): void {
+  if (map.getSource("dem")) return;
   try {
     map.addSource("dem", {
       type: "raster-dem",
@@ -255,6 +260,7 @@ function addTerrain(map: maplibregl.Map, theme: MapTheme): void {
 }
 
 function addRolesLayers(map: maplibregl.Map, data: FeatureCollection): void {
+  if (map.getSource("roles")) return;
   map.addSource("roles", {
     type: "geojson",
     data,
@@ -502,17 +508,30 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
   }, [jobs]);
 
   // Theme flip = full basemap swap: setStyle wipes every source/layer, so we
-  // rebuild the stack on style.load. DOM markers survive setStyle untouched.
+  // rebuild the stack once the new style reports loaded. Polling (not the
+  // style.load event) sidesteps races with the initial load — a flip that
+  // lands mid-load simply retargets the style and rebuilds when ready.
+  // DOM markers survive setStyle untouched.
   useEffect(() => {
     const next: "dark" | "light" = light ? "light" : "dark";
     if (themeRef.current === next) return;
     themeRef.current = next;
     const map = mapRef.current;
-    if (!map || !loadedRef.current) return;
+    if (!map) return; // not constructed yet — the constructor reads themeRef
     const theme = THEMES[next];
     loadedRef.current = false;
-    map.once("style.load", () => {
-      if (mapRef.current !== map) return;
+    let cancelled = false;
+    try {
+      map.setStyle(theme.styleUrl);
+    } catch (e) {
+      console.warn("setStyle", e);
+    }
+    const tryRebuild = () => {
+      if (cancelled || mapRef.current !== map) return;
+      if (!map.isStyleLoaded()) {
+        window.setTimeout(tryRebuild, 150);
+        return;
+      }
       try {
         map.setProjection({ type: "globe" });
       } catch {
@@ -528,14 +547,11 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
       }
       loadedRef.current = true;
       syncMarkers();
-    });
-    try {
-      map.setStyle(theme.styleUrl);
-    } catch (e) {
-      console.warn("setStyle", e);
-      loadedRef.current = true;
-    }
-
+    };
+    window.setTimeout(tryRebuild, 150);
+    return () => {
+      cancelled = true;
+    };
   }, [light]);
 
   // Value-compare the focus: scoreBatch re-sorts jobs up to 40 times, giving
