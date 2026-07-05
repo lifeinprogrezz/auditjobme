@@ -222,6 +222,23 @@ function buildPin(p: PinProps): HTMLDivElement {
   co.textContent = [p.co, p.city].filter(Boolean).join(" · ");
   tip.append(row, co);
   root.appendChild(tip);
+  // Edge-aware tip placement (#25), classified at hover time — not per-frame.
+  // Above-tip clips at the viewport top and washes out under the nav glass
+  // (markers stack below .ui), so flip below in that band; near the sides the
+  // card hugs the pin's edge instead of centering off screen. The right panel
+  // overlays the map, so its lit edge is the effective right boundary.
+  root.addEventListener("mouseenter", () => {
+    const r = root.getBoundingClientRect();
+    let right = window.innerWidth;
+    const panel = document.querySelector(".roles-theme .panel");
+    if (panel) {
+      const pr = panel.getBoundingClientRect();
+      if (pr.width > 0 && pr.left > 0) right = Math.min(right, pr.left);
+    }
+    root.classList.toggle("tip-below", r.top < 150);
+    root.classList.toggle("tip-east", r.left < 140);
+    root.classList.toggle("tip-west", right - r.right < 140);
+  });
   return root;
 }
 
