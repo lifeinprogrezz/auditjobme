@@ -14,6 +14,8 @@ export type GlobeMapProps = {
   focusLngLats: [number, number][] | null;
   /** Full light identity (paper basemap + light layer palette). Default dark ink. */
   light?: boolean;
+  /** Pin click → open that role's detail (startupmap's logo→panel mechanic). */
+  onOpenRole?: (id: string) => void;
 };
 
 type MapTheme = {
@@ -143,10 +145,13 @@ function pinSig(p: PinProps): string {
 }
 
 function buildPin(p: PinProps): HTMLDivElement {
+  // Wrapper = the maplibre Marker root: maplibre owns its inline transform
+  // (translate), so the hover scale must live on the inner disc — a transform
+  // on the root would fight the marker positioning.
+  const root = document.createElement("div");
+  root.className = "pinwrap";
   const el = document.createElement("div");
   el.className = p.bucket ? "pin " + p.bucket : "pin";
-  el.dataset.sig = pinSig(p);
-  el.title = [p.co, p.role, p.city].filter(Boolean).join(" · ");
   const fallback = document.createElement("span");
   fallback.className = "fallback";
   fallback.style.background = p.hue;
@@ -172,7 +177,30 @@ function buildPin(p: PinProps): HTMLDivElement {
     sc.textContent = p.score.toFixed(1);
     el.appendChild(sc);
   }
-  return el;
+  root.appendChild(el);
+  // Glass tooltip (startupmap's 200ms hover card): role + company · city, plus
+  // the fit score CSS-gated on the root .scored class — unscored roles build
+  // no pill at all (never fabricate a number).
+  const tip = document.createElement("div");
+  tip.className = "pintip";
+  const row = document.createElement("span");
+  row.className = "tiprow";
+  const role = document.createElement("span");
+  role.className = "tr";
+  role.textContent = p.role;
+  row.appendChild(role);
+  if (typeof p.score === "number") {
+    const ts = document.createElement("span");
+    ts.className = "tsc num";
+    ts.textContent = p.score.toFixed(1);
+    row.appendChild(ts);
+  }
+  const co = document.createElement("span");
+  co.className = "tco";
+  co.textContent = [p.co, p.city].filter(Boolean).join(" · ");
+  tip.append(row, co);
+  root.appendChild(tip);
+  return root;
 }
 
 function styleAtmosphere(map: maplibregl.Map, theme: MapTheme): void {
@@ -378,7 +406,7 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 // `scored` stays in the props type for the page contract, but the map needs no
 // scored logic: marker bucket classes are permanent and CSS gates them on the
 // root .scored class.
-export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMapProps) {
+export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const haloRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -389,6 +417,10 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
   const jobsRef = useRef(jobs);
   const focusRef = useRef(focusLngLats);
   const themeRef = useRef<"dark" | "light">(light ? "light" : "dark");
+  // Pin click handlers are attached once at marker build — read through a ref
+  // so they always call the latest callback.
+  const onOpenRoleRef = useRef(onOpenRole);
+  onOpenRoleRef.current = onOpenRole;
 
   const clearPins = () => {
     for (const marker of pinsRef.current.values()) marker.remove();
@@ -532,7 +564,13 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
             .catch(() => {});
         });
       } else {
-        el = buildPin(props as unknown as PinProps);
+        const pin = props as unknown as PinProps;
+        el = buildPin(pin);
+        const pid = String(pin.id);
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          onOpenRoleRef.current?.(pid);
+        });
       }
       el.dataset.sig = sig;
       const marker = new maplibregl.Marker({ element: el }).setLngLat(coords).addTo(map);
