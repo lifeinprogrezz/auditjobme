@@ -693,20 +693,34 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyC
           src
             .getClusterLeaves(clusterId, 10000, 0)
             .then((leaves) => {
-              const pts = leaves
-                .map((l) => (l.geometry as GeoPoint).coordinates as [number, number])
-                .filter((c) => Number.isFinite(c?.[0]) && Number.isFinite(c?.[1]));
-              if (!pts.length) return;
-              // City-cluster click also drives the panel: when every member role
-              // sits in ONE city, tell the parent (startupmap's map→list sync).
-              // Multi-city bubbles only zoom — picking a "dominant" city there
-              // would filter the list to something the user didn't click.
-              const cities = new Set(
-                leaves.map((l) => (l.properties as { city?: string | null } | null)?.city).filter(Boolean),
-              );
-              if (cities.size === 1) onCityClickRef.current?.([...cities][0] as string);
-              const lo = pts.map((c) => c[0]);
-              const la = pts.map((c) => c[1]);
+              // Group leaves by city so a lone outlier can't blow out the frame.
+              const byCity = new Map<string, [number, number][]>();
+              for (const l of leaves) {
+                const c = ((l.properties as { city?: string | null } | null)?.city as string) || "";
+                const xy = (l.geometry as GeoPoint).coordinates as [number, number];
+                if (!Number.isFinite(xy?.[0]) || !Number.isFinite(xy?.[1])) continue;
+                (byCity.get(c) ?? byCity.set(c, []).get(c)!).push(xy);
+              }
+              let domCity = "";
+              let domPts: [number, number][] = [];
+              for (const [c, ps] of byCity) if (c && ps.length > domPts.length) { domCity = c; domPts = ps; }
+              const total = leaves.length;
+              // If ONE real city holds most of the cluster (Paris 39 of 40), frame
+              // ONLY its points and drive the panel there — so a single stray role
+              // in another city doesn't leave the camera stranded between the two,
+              // zoomed out (the "40 → 39+1, re-centre by hand" report). A genuine
+              // multi-city continental bubble (no clear majority) frames everything.
+              const dominant = domCity && domPts.length >= Math.max(2, Math.ceil(total * 0.6));
+              const framePts = dominant
+                ? domPts
+                : leaves
+                    .map((l) => (l.geometry as GeoPoint).coordinates as [number, number])
+                    .filter((c) => Number.isFinite(c?.[0]) && Number.isFinite(c?.[1]));
+              if (!framePts.length) return;
+              if (dominant) onCityClickRef.current?.(domCity);
+              else if (byCity.size === 1 && domCity) onCityClickRef.current?.(domCity);
+              const lo = framePts.map((c) => c[0]);
+              const la = framePts.map((c) => c[1]);
               // Padding aims the content at the VISIBLE centre (left of the
               // panel), so the reveal opens in view instead of behind the glass.
               map.fitBounds(
