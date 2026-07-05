@@ -80,7 +80,19 @@ export default function RolesMap() {
   return (
     <div className={rootClass}>
       <div className="stars" />
-      <GlobeMap jobs={visible} scored={scored} focusLngLats={focusLngLats} light={light} />
+      <GlobeMap
+        jobs={visible}
+        scored={scored}
+        focusLngLats={focusLngLats}
+        light={light}
+        onOpenRole={(id) => {
+          const j = jobs.find((x) => x.id === id);
+          if (j) {
+            setDetailJob(j);
+            setPanelHidden(false);
+          }
+        }}
+      />
       <div className="vig" />
       <div className="ui">
         <HeadBar
