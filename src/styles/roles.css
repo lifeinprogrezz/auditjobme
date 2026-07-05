@@ -226,6 +226,6 @@
 /* empty / signed-out / loading states inside the panel */
 .roles-theme .panel-note { margin: auto 8px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.6; padding: 22px 16px; background: rgba(255, 255, 255, 0.035); border: 1px solid var(--hair); border-radius: 16px; }
 .roles-theme .panel-note b { color: #fff; font-family: var(--font-d); font-weight: 600; display: block; font-size: 15.5px; margin-bottom: 6px; }
-.roles-theme .panel-note .btn { margin-top: 14px; }
+.roles-theme .panel-note .btn { display: block; margin: 14px auto 0; }
 .roles-theme .scorebar { font-size: 12px; color: var(--muted); padding: 8px 10px; margin-bottom: 10px; border-radius: 10px; background: rgba(31, 216, 184, 0.07); border: 1px solid rgba(31, 216, 184, 0.2); }
 .roles-theme .morebtn { margin-top: 10px; width: calc(100% - 8px); }
