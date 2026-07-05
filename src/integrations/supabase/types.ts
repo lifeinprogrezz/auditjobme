@@ -146,6 +146,44 @@ export type Database = {
         }
         Relationships: []
       }
+      company_offices: {
+        Row: {
+          address: string | null
+          city: string | null
+          city_key: string
+          company_slug: string
+          lat: number
+          lng: number
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          city_key: string
+          company_slug: string
+          lat: number
+          lng: number
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          city_key?: string
+          company_slug?: string
+          lat?: number
+          lng?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_offices_company_slug_fkey"
+            columns: ["company_slug"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
       company_requests: {
         Row: {
           careers_url: string | null
