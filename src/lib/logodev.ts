@@ -152,9 +152,13 @@ export function logoUrl(domain: string, theme: "dark" | "light" = "dark"): strin
   return `https://img.logo.dev/${domain}?token=${token}&size=96&format=png&theme=${theme}&retina=true&fallback=404`;
 }
 
-/** Site favicon fallback chain (real brand mark for domains logo.dev lacks). */
+/** Site favicon fallback chain (real brand mark for domains logo.dev lacks).
+ *  icon.horse serves the site's high-res apple-touch-icon (~180px) — much crisper
+ *  than DuckDuckGo's 32px — with DuckDuckGo then Google as reliable fallbacks when
+ *  icon.horse can't reach a site. */
 export function faviconUrls(domain: string): string[] {
   return [
+    `https://icon.horse/icon/${domain}`,
     `https://icons.duckduckgo.com/ip3/${domain}.ico`,
     `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
   ];
