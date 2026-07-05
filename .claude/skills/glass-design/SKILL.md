@@ -47,10 +47,25 @@ bloom + count up + re-rank).
   cursor-follow spotlight hover, full scrolling list, `bottom:22px`. **Post-CV:** score pills bloom +
   count up, Audit/Prep + "why it fits" appear, re-rank. Detail-view contextual **"Unlock your fit"**
   CTA per role = agreed, not built yet.
-- **Map chrome:** zoom (+/-) at **left-middle, vertically centered**; NO live "footbar" (removed);
-  contributors = custom glass pill **centered bottom**, credits `santifer | © CARTO | © OpenStreetMap`
-  (vertical-bar seps, all linked). Fonts: **Space Grotesk** (display) / **Geist** (UI) / **Geist Mono**
-  (numerals). Logos via Logo.dev.
+- **Map chrome:** zoom (+/-) at **left-middle, vertically centered** (54px buttons since 7-05); NO live
+  "footbar" (removed); contributors = custom glass pill **centered bottom**, credits
+  `santifer | © CARTO | © OpenStreetMap` (vertical-bar seps, all linked). Fonts: **Space Grotesk**
+  (display) / **Geist** (UI) / **Geist Mono** (numerals). Logos via Logo.dev — **theme must match the
+  surface**: white pins → `theme=light`, dark glass cards → `theme=dark` (dark marks on white = the
+  "broken logos" bug).
+- **MAP PALETTE = INK & GRAPHITE (Rober's pick 2026-07-05, live A/B vs indigo + the original teal).**
+  The world is a neutral graphite stage: slate-blue sea relief (rgba(4,8,14)→rgba(20,34,50) ramp),
+  graphite hillshade (highlight #38434c), hairline neutral borders (#7f95a3 @ .22), ink page halo
+  (#10181f→#020407). Rationale: the old teal Atlantic spent the score's hue on scenery; ink makes
+  glass rims, score pills, and brand logos the only color. Values in GlobeMap.tsx + roles.css —
+  retune there only (final color lock may still adjust).
+- **Markers (clusters + pins) are DOM elements** — never override `.maplibregl-marker`'s
+  `position:absolute` (position:relative drops them into flow → the vertical-stack bug) and never put
+  CSS `transform` on the marker element itself (it clobbers maplibre's positioning transform — scale an
+  inner child if hover-scale is ever wanted). A source with no layer never loads tiles: keep the
+  invisible `roles-tiles` probe layer or querySourceFeatures goes empty. Same-city roles sit on a
+  deterministic sunflower disc (geo.ts `sunflowerLngLat`, ~6 km cap); cities hold one glass bubble
+  until zoom 10 (clusterMaxZoom); cluster-click easeTo must carry the panel-aware padding.
 
 ## Hard-won technical learnings (DON'T regress)
 1. **Globe:** call `map.setProjection({type:'globe'})` AFTER `style.load` (the constructor option gets

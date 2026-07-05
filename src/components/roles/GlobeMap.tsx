@@ -135,9 +135,11 @@ function boostBorders(map: maplibregl.Map): void {
     for (const l of map.getStyle().layers) {
       if (l.type !== "line" || !/bound|admin|border/i.test(l.id)) continue;
       try {
-        map.setPaintProperty(l.id, "line-color", "#5AC8DA");
-        map.setPaintProperty(l.id, "line-opacity", 0.45);
-        map.setPaintProperty(l.id, "line-width", 0.8);
+        // Ink palette (Rober's pick, 2026-07-05): neutral hairline borders — the
+        // world is a graphite stage; scores/logos/glass carry all the color.
+        map.setPaintProperty(l.id, "line-color", "#7f95a3");
+        map.setPaintProperty(l.id, "line-opacity", 0.22);
+        map.setPaintProperty(l.id, "line-width", 0.6);
       } catch {
         /* some basemap line layers reject individual props */
       }
@@ -171,9 +173,9 @@ function addTerrain(map: maplibregl.Map): void {
         type: "hillshade",
         source: "dem",
         paint: {
-          "hillshade-shadow-color": "#02090d",
-          "hillshade-highlight-color": "#3f7d8c",
-          "hillshade-accent-color": "#0a2a33",
+          "hillshade-shadow-color": "#01050a",
+          "hillshade-highlight-color": "#38434c",
+          "hillshade-accent-color": "#0d161d",
           "hillshade-exaggeration": 0.7,
         },
       } as maplibregl.LayerSpecification,
@@ -192,17 +194,17 @@ function addTerrain(map: maplibregl.Map): void {
               ["linear"],
               ["elevation"],
               -6000,
-              "rgba(5,18,30,1)",
+              "rgba(4,8,14,1)",
               -2500,
-              "rgba(7,34,54,1)",
+              "rgba(7,13,22,1)",
               -800,
-              "rgba(11,52,78,1)",
+              "rgba(11,19,31,1)",
               -200,
-              "rgba(16,78,104,1)",
+              "rgba(15,26,40,1)",
               -20,
-              "rgba(22,104,128,0.92)",
+              "rgba(20,34,50,0.92)",
               0,
-              "rgba(20,90,112,0)",
+              "rgba(18,30,44,0)",
               30,
               "rgba(0,0,0,0)",
             ],

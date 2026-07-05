@@ -35,7 +35,9 @@
   position: fixed; inset: 0; overflow: hidden;
   font-family: var(--font-s); color: var(--text); letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
-  background: radial-gradient(120% 100% at 50% 36%, #0c2630 0%, #081720 42%, #040b10 78%, #02070a 100%);
+  /* Ink & graphite world (Rober's pick over indigo + the teal Atlantic, 7-05):
+   * neutral stage so glass rims, scores, and brand logos are the only color. */
+  background: radial-gradient(120% 100% at 50% 36%, #10181f 0%, #0a1016 42%, #04070b 78%, #020407 100%);
 }
 .roles-theme *, .roles-theme *::before, .roles-theme *::after { box-sizing: border-box; }
 .roles-theme .num { font-family: var(--font-m); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
