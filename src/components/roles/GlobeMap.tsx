@@ -105,6 +105,10 @@ function fitPad(map: maplibregl.Map, pad: CamPadding): CamPadding {
 // sub-clusters instead — so a click always eases to at least clusterMaxZoom+0.6,
 // where the sunflower cloud is fully fanned out.
 const CITY_REVEAL_ZOOM = 11.6;
+// Below this zoom, a lone company renders as a count bubble (not its logo) so the
+// continent/country view is all bubbles — logos reveal only once you zoom into a
+// city. Set just above the source clusterMaxZoom (9) where clusters break apart.
+const LOGO_REVEAL_ZOOM = 9.5;
 // Camera grammar (startupmap-matched): marker-target flights 800ms,
 // continent-scale flights (Europe frame, multi-focus) 1200ms.
 const FLIGHT_MS = 800;
@@ -660,6 +664,10 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyC
     }
     const pins = pinsRef.current;
     const seen = new Set<string>();
+    // Below this zoom a single-company point shows as a count bubble, not a logo
+    // (continent view = all bubbles). The sig carries the mode so a marker rebuilds
+    // when the camera crosses the threshold.
+    const showLogos = map.getZoom() >= LOGO_REVEAL_ZOOM;
     for (const f of feats) {
       const props = f.properties as Record<string, unknown>;
       const isCluster = Boolean(props.cluster);
@@ -668,7 +676,7 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyC
       seen.add(key);
       const sig = isCluster
         ? `${props.point_count}|${props.maxScore}`
-        : pinSig(props as unknown as PinProps);
+        : `${showLogos ? "L" : "B"}|${pinSig(props as unknown as PinProps)}`;
       const coords = (f.geometry as GeoPoint).coordinates as [number, number];
       const existing = pins.get(key);
       if (existing) {
@@ -752,6 +760,17 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyC
               );
             })
             .catch(() => {});
+        });
+      } else if (!showLogos) {
+        // Single-company point at continent/country zoom: render as a count bubble
+        // like the multi-company clusters, so the first impression is all bubbles —
+        // no lone logos (Málaga/Vilnius/Edinburgh). Reveals its logo on zoom-in.
+        const pin = props as unknown as PinProps;
+        el = buildCluster(pin.count, pin.score == null ? -1 : pin.score);
+        const cty = pin.city ? String(pin.city) : null;
+        el.addEventListener("click", () => {
+          map.easeTo({ center: coords, zoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS });
+          if (cty) onCityClickRef.current?.(cty);
         });
       } else {
         const pin = props as unknown as PinProps;
