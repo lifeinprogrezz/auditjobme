@@ -37,11 +37,23 @@ type CompanyDim = { logo_domain: string | null; lat: number | null; lng: number 
 const OFFICE_SNAP_DEG = 0.5;
 const normName = (s: string) => s.trim().toLowerCase();
 
-function officeFor(centroid: [number, number], dim: CompanyDim | undefined): [number, number] | null {
-  if (!dim || dim.lat == null || dim.lng == null) return null;
-  const dLng = (dim.lng - centroid[0]) * Math.cos((dim.lat * Math.PI) / 180);
-  const dLat = dim.lat - centroid[1];
-  return dLng * dLng + dLat * dLat <= OFFICE_SNAP_DEG * OFFICE_SNAP_DEG ? [dim.lng, dim.lat] : null;
+// From a company's candidate office coords, pick the one NEAREST the job's city
+// centroid, within ~55km. Distance (not city-name) matching means a company with
+// offices in Barcelona + London + Edinburgh lands each city's role on the right
+// office, robust to name spelling (München vs Munich).
+function officeFor(centroid: [number, number], coords: [number, number][]): [number, number] | null {
+  let best: [number, number] | null = null;
+  let bestD = OFFICE_SNAP_DEG * OFFICE_SNAP_DEG;
+  for (const [lng, lat] of coords) {
+    const dLng = (lng - centroid[0]) * Math.cos((lat * Math.PI) / 180);
+    const dLat = lat - centroid[1];
+    const d = dLng * dLng + dLat * dLat;
+    if (d <= bestD) {
+      bestD = d;
+      best = [lng, lat];
+    }
+  }
+  return best;
 }
 
 // Companies without a street office fan out on a SMALL golden-angle disc around
@@ -57,7 +69,11 @@ function centroidPlace(centroid: [number, number], idx: number, n: number): [num
   ];
 }
 
-function enrichAll(rows: JobsRow[], dims: Map<string, CompanyDim>): RoleJob[] {
+function enrichAll(
+  rows: JobsRow[],
+  dims: Map<string, CompanyDim>,
+  officesBySlug: Map<string, [number, number][]>,
+): RoleJob[] {
   const cityById = new Map<string, string | null>();
   const companiesByCity = new Map<string, Set<string>>(); // city -> set of normalized company names
   for (const r of rows) {
@@ -86,8 +102,13 @@ function enrichAll(rows: JobsRow[], dims: Map<string, CompanyDim>): RoleJob[] {
     const centroid = coordsOf(city);
     let pos: [number, number] | null = null;
     if (centroid) {
+      // Candidate offices: the company's per-city offices (company_offices) plus
+      // its single companies.lat/lng, all treated as candidates — the nearest one
+      // within snap wins, so the Barcelona role lands on the Barcelona office.
+      const cands: [number, number][] = r.company_id ? [...(officesBySlug.get(r.company_id) ?? [])] : [];
       const dim = r.company_id ? dims.get(r.company_id) : undefined;
-      pos = officeFor(centroid, dim) ?? centroidPlace(centroid, coIdx.get(gk) ?? 0, coCount.get(city) ?? 1);
+      if (dim && dim.lat != null && dim.lng != null) cands.push([dim.lng, dim.lat]);
+      pos = officeFor(centroid, cands) ?? centroidPlace(centroid, coIdx.get(gk) ?? 0, coCount.get(city) ?? 1);
     }
     posByGroup.set(gk, pos);
     return pos;
@@ -215,10 +236,20 @@ export function useRolesData() {
       const dims = new Map<string, CompanyDim>();
       const { data: cos } = await supabase.from("companies").select("slug, logo_domain, lat, lng");
       (cos ?? []).forEach((c) => dims.set(c.slug, { logo_domain: c.logo_domain, lat: c.lat, lng: c.lng }));
+      // Per-city offices: a company hiring in several cities gets each pin on the
+      // right office (distance-matched). Empty until seeded — degrades to the
+      // single companies coord, never blocks.
+      const officesBySlug = new Map<string, [number, number][]>();
+      const { data: offs } = await supabase.from("company_offices").select("company_slug, lat, lng");
+      (offs ?? []).forEach((o) => {
+        const arr = officesBySlug.get(o.company_slug) ?? [];
+        arr.push([o.lng, o.lat]);
+        officesBySlug.set(o.company_slug, arr);
+      });
       if (!user) {
         if (runRef.current !== runId) return;
         // Anonymous browse (or sign-out: clears the previous session's state).
-        setJobs(enrichAll(rows, dims).sort(byScore));
+        setJobs(enrichAll(rows, dims, officesBySlug).sort(byScore));
         setProfile(null);
         setApplied(new Set());
         setLoading(false);
@@ -234,7 +265,7 @@ export function useRolesData() {
         const sig = s.signals as { reason?: string } | null;
         scoreByJob[s.job_id] = { score: s.score, reason: sig?.reason ?? null };
       });
-      const merged = enrichAll(rows, dims).map((j) => ({
+      const merged = enrichAll(rows, dims, officesBySlug).map((j) => ({
         ...j,
         score: scoreByJob[j.id]?.score ?? null,
         reason: scoreByJob[j.id]?.reason ?? null,

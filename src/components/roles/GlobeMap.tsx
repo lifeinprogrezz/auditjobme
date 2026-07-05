@@ -163,26 +163,32 @@ function featureCollection(jobs: RoleJob[]): FeatureCollection {
   };
 }
 
-/** Glass cluster bubble (DOM marker — circle layers can't speak the glass system). */
+/** Glass cluster bubble (DOM marker — circle layers can't speak the glass system).
+ *  Wrapped like pins: maplibre owns the wrapper's translate, so the hover scale
+ *  lives on the inner .cluster (a transform on the wrapper would fight the marker
+ *  positioning). The grow signals "clickable" just like the company pins. */
 function buildCluster(count: number, maxScore: number): HTMLDivElement {
-  const el = document.createElement("div");
+  const root = document.createElement("div");
+  root.className = "clusterwrap";
   // maxScore -1 = every role unscored → neutral glass; bucket classes only show
   // their colors once the root carries .scored (CSS-gated).
   const bucket = maxScore >= 0 ? scoreBucket(maxScore) : "";
   // Tier ladder (startupmap-matched breaks + weights) lives in clusterTier.
   const t = clusterTier(count);
-  el.className = "cluster" + (t.light ? " sm" : "") + (bucket ? ` ${bucket}` : "");
-  el.style.width = `${t.size}px`;
-  el.style.height = `${t.size}px`;
+  root.style.width = `${t.size}px`;
+  root.style.height = `${t.size}px`;
   // Bigger hubs win marker overlaps (their z ladder: 20/22/24 by count).
-  el.style.zIndex = String(t.zIndex);
+  root.style.zIndex = String(t.zIndex);
+  const el = document.createElement("div");
+  el.className = "cluster" + (t.light ? " sm" : "") + (bucket ? ` ${bucket}` : "");
   const cnt = document.createElement("span");
   cnt.className = "cnt num";
   cnt.style.fontSize = `${t.fontSize}px`;
   // Raw count, never abbreviated (startupmap: the precision reads as honesty).
   cnt.textContent = String(count);
   el.appendChild(cnt);
-  return el;
+  root.appendChild(el);
+  return root;
 }
 
 /** Content signature: when a feature's score/bucket changes, the pin DOM must be rebuilt. */
