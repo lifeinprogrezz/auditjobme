@@ -365,7 +365,6 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const haloRef = useRef<HTMLDivElement | null>(null);
-  const haloInRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const loadedRef = useRef(false);
   const pinsRef = useRef<Map<string, maplibregl.Marker>>(new Map());
@@ -398,7 +397,18 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
       const ctr = map.getCenter();
       const p1 = (ctr.lat * Math.PI) / 180;
       const l1 = (ctr.lng * Math.PI) / 180;
-      const d = (89 * Math.PI) / 180;
+      // The VISIBLE horizon of a perspective globe is at acos(R/(R+f)) from the
+      // view centre (62-75 deg at our zooms), NOT 90: sampling past it made the
+      // fitted ring float outside the sphere at some cameras (the "double
+      // globe"). Compute it from the live camera each frame.
+      const tr = (map as unknown as {
+        transform?: { worldSize?: number; cameraToCenterDistance?: number };
+      }).transform;
+      const worldSize = tr?.worldSize ?? 512 * Math.pow(2, map.getZoom());
+      const R = worldSize / (2 * Math.PI);
+      const f = tr?.cameraToCenterDistance ?? Math.max(w, h);
+      const cosH = Math.min(0.9999, Math.max(0.0001, R / (R + f)));
+      const d = Math.acos(cosH) * 0.997;
       let sxx = 0, sxy = 0, syy = 0, sx = 0, sy = 0, sxz = 0, syz = 0, sz = 0;
       const N = 12;
       for (let k = 0; k < N; k++) {
@@ -438,18 +448,12 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
       const rimVisible =
         cx + r > 0 && cx - r < w && cy + r > 0 && cy - r < h;
       const o = !rimVisible || r >= fadeEnd ? 0 : r <= fadeStart ? 1 : 1 - (r - fadeStart) / (fadeEnd - fadeStart);
-      const haloIn = haloInRef.current;
       halo.style.opacity = o.toFixed(3);
-      if (haloIn) haloIn.style.opacity = o.toFixed(3);
       if (o <= 0) return;
-      const place = (el: HTMLDivElement, rad: number) => {
-        el.style.width = `${2 * rad}px`;
-        el.style.height = `${2 * rad}px`;
-        el.style.left = `${cx - rad}px`;
-        el.style.top = `${cy - rad}px`;
-      };
-      place(halo, r);
-      if (haloIn) place(haloIn, r - 3);
+      halo.style.width = `${2 * r}px`;
+      halo.style.height = `${2 * r}px`;
+      halo.style.left = `${cx - r}px`;
+      halo.style.top = `${cy - r}px`;
     } catch {
       /* halo is decoration */
     }
@@ -679,7 +683,6 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
     <>
       <div ref={haloRef} className="halo" />
       <div ref={containerRef} className="roles-map" />
-      <div ref={haloInRef} className="halo-in" />
     </>
   );
 }

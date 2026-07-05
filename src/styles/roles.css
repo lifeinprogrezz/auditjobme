@@ -58,10 +58,6 @@
 .roles-theme .halo { position: absolute; z-index: 0; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.4s;
   box-shadow: 0 0 5px 3px rgba(255, 255, 255, 1), 0 0 48px 18px rgba(228, 242, 254, 0.72), 0 0 160px 60px rgba(175, 208, 240, 0.38), 0 0 320px 140px rgba(130, 170, 215, 0.16); }
 .roles-theme:not(.light) .halo { box-shadow: 0 0 3px 1.5px rgba(220, 240, 250, 0.75), 0 0 28px 10px rgba(165, 205, 235, 0.35), 0 0 110px 44px rgba(110, 160, 205, 0.16); }
-/* the inside of the atmosphere: a soft wash over the sphere's own rim */
-.roles-theme .halo-in { position: absolute; z-index: 1; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.4s;
-  box-shadow: inset 0 0 34px 8px rgba(255, 255, 255, 0.5), inset 0 0 110px 30px rgba(200, 225, 250, 0.18); }
-.roles-theme:not(.light) .halo-in { box-shadow: inset 0 0 26px 6px rgba(210, 235, 250, 0.3), inset 0 0 90px 24px rgba(160, 200, 235, 0.1); }
 .roles-theme .roles-map { position: absolute; inset: 0; z-index: 1; background: transparent; }
 .roles-theme .vig { position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 260px 60px rgba(0, 0, 0, 0.55); }
 
