@@ -97,6 +97,22 @@ export function byScore(a: RoleJob, b: RoleJob): number {
   return b.score - a.score || a.company.localeCompare(b.company);
 }
 
+/** Apply a batch of landed scores to the jobs array (#26). Row order is kept
+ * STABLE unless `sort`: a mid-pass re-sort remaps supercluster ids wholesale
+ * (full marker churn on the globe per landed score) — the display sort belongs
+ * at the end of the scoring pass, once. */
+export function applyLandedScores(
+  prev: RoleJob[],
+  landed: ReadonlyMap<string, { score: number; reason: string | null }>,
+  sort: boolean,
+): RoleJob[] {
+  const next = prev.map((x) => {
+    const hit = landed.get(x.id);
+    return hit ? { ...x, score: hit.score, reason: hit.reason } : x;
+  });
+  return sort ? next.sort(byScore) : next;
+}
+
 /** "3d ago"-style label from posted_at; null when unknown (never fabricate). */
 export function postedAgo(postedAt: string | null, now = Date.now()): string | null {
   if (!postedAt) return null;
