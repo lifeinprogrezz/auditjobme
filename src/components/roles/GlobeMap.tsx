@@ -101,7 +101,7 @@ function fitPad(map: maplibregl.Map, pad: CamPadding): CamPadding {
 // full logo cloud). Our expansion zoom at continent scale often splits into
 // sub-clusters instead — so a click always eases to at least clusterMaxZoom+0.6,
 // where the sunflower cloud is fully fanned out.
-const CITY_REVEAL_ZOOM = 10.6;
+const CITY_REVEAL_ZOOM = 11.6;
 // Camera grammar (startupmap-matched): marker-target flights 800ms,
 // continent-scale flights (Europe frame, multi-focus) 1200ms.
 const FLIGHT_MS = 800;
@@ -312,6 +312,15 @@ function boostCityDetail(map: maplibregl.Map, theme: MapTheme): void {
           map.setPaintProperty(l.id, "text-halo-width", 1.2);
           map.setLayerZoomRange(l.id, 10.4, 24);
         } catch { /* label classes vary per style */ }
+      }
+      // Street-network completeness (startupmap parity, Rober 7-05): the basemap
+      // hides minor roads until deep zooms — pull every road layer in ~2 levels
+      // earlier (never below z9.5, so the Europe frame stays untouched).
+      if (l.type === "line" && /road|street|highway|motorway|primary|secondary|tertiary|minor|service|path|pedestrian/i.test(l.id)) {
+        try {
+          const min = (l as { minzoom?: number }).minzoom;
+          if (min != null && min > 9.5) map.setLayerZoomRange(l.id, Math.max(9.5, min - 2), 24);
+        } catch { /* road classes vary per style */ }
       }
     }
   } catch {

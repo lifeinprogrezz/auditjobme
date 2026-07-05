@@ -4,7 +4,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
 import { scoreJob, RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
 import { applyLandedScores, byScore, type RoleJob } from "@/lib/roles";
-import { cityOf, sunflowerLngLat } from "@/lib/geo";
+import { cityOf, coordsOf, sunflowerLngLat } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
 
 type JobsRow = {
@@ -27,7 +27,31 @@ const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page pas
  * per-city index (sorted by id) that places them on a deterministic sunflower
  * disc over the city — the logo cloud you see when a city cluster opens.
  */
-function enrichAll(rows: JobsRow[], logoBySlug: Map<string, string | null>): RoleJob[] {
+type CompanyDim = { logo_domain: string | null; lat: number | null; lng: number | null };
+
+// A street coordinate only speaks for the job's OWN city: snap when the office
+// sits within ~40km of that city's centroid (distance beats name-matching —
+// Nominatim returns "München"/"Köln", cityOf returns "Munich"/"Cologne").
+const OFFICE_SNAP_DEG = 0.5;
+function officeFor(city: string | null, dim: CompanyDim | undefined): [number, number] | null {
+  if (!city || !dim || dim.lat == null || dim.lng == null) return null;
+  const cc = coordsOf(city);
+  if (!cc) return null;
+  const dLng = (dim.lng - cc[0]) * Math.cos((dim.lat * Math.PI) / 180);
+  const dLat = dim.lat - cc[1];
+  return dLng * dLng + dLat * dLat <= OFFICE_SNAP_DEG * OFFICE_SNAP_DEG ? [dim.lng, dim.lat] : null;
+}
+
+// Same-office roles stack on a tight golden-angle ring (~10-25m) around the
+// building — visibly ONE address, individually clickable (startupmap's stacks).
+function stackedAt(office: [number, number], i: number, lat: number): [number, number] {
+  if (i === 0) return office;
+  const a = i * 2.39996;
+  const r = 0.00012 * Math.sqrt(i);
+  return [office[0] + (r * Math.cos(a)) / Math.cos((lat * Math.PI) / 180), office[1] + r * Math.sin(a)];
+}
+
+function enrichAll(rows: JobsRow[], dims: Map<string, CompanyDim>): RoleJob[] {
   const idsByCity = new Map<string, string[]>();
   const cityById = new Map<string, string | null>();
   for (const r of rows) {
@@ -44,19 +68,29 @@ function enrichAll(rows: JobsRow[], logoBySlug: Map<string, string | null>): Rol
     ids.sort();
     ids.forEach((id, i) => indexById.set(id, i));
   }
+  const officeStackCount = new Map<string, number>(); // "lng,lat" -> roles placed there
   return rows.map((r) => {
     const city = cityById.get(r.id) ?? null;
+    const dim = r.company_id ? dims.get(r.company_id) : undefined;
+    const office = officeFor(city, dim);
+    let lngLat: [number, number] | null = null;
+    if (office) {
+      const key = `${office[0]},${office[1]}`;
+      const n = officeStackCount.get(key) ?? 0;
+      officeStackCount.set(key, n + 1);
+      lngLat = stackedAt(office, n, office[1]);
+    } else if (city) {
+      lngLat = sunflowerLngLat(city, indexById.get(r.id) ?? 0, idsByCity.get(city)?.length ?? 1);
+    }
     return {
       ...r,
       score: null,
       reason: null,
       city,
-      lngLat: city
-        ? sunflowerLngLat(city, indexById.get(r.id) ?? 0, idsByCity.get(city)?.length ?? 1)
-        : null,
+      lngLat,
       // companies.logo_domain (engine-verified website) wins; name-guess is the
       // fallback for rows not yet linked to the companies dimension.
-      domain: (r.company_id ? logoBySlug.get(r.company_id) : null) ?? domainFor(r.company, r.source),
+      domain: dim?.logo_domain ?? domainFor(r.company, r.source),
     };
   });
 }
@@ -163,14 +197,15 @@ export function useRolesData() {
         if (data.length < PAGE) break;
       }
       // Companies dimension (anon-readable, ~550 rows): real logo domains beat
-      // the name-guess in domainFor. Failure degrades to guessing, never blocks.
-      const logoBySlug = new Map<string, string | null>();
-      const { data: cos } = await supabase.from("companies").select("slug, logo_domain");
-      (cos ?? []).forEach((c) => logoBySlug.set(c.slug, c.logo_domain));
+      // the name-guess, street office coords beat the sunflower scatter.
+      // Failure degrades to guess + centroid, never blocks.
+      const dims = new Map<string, CompanyDim>();
+      const { data: cos } = await supabase.from("companies").select("slug, logo_domain, lat, lng");
+      (cos ?? []).forEach((c) => dims.set(c.slug, { logo_domain: c.logo_domain, lat: c.lat, lng: c.lng }));
       if (!user) {
         if (runRef.current !== runId) return;
         // Anonymous browse (or sign-out: clears the previous session's state).
-        setJobs(enrichAll(rows, logoBySlug).sort(byScore));
+        setJobs(enrichAll(rows, dims).sort(byScore));
         setProfile(null);
         setApplied(new Set());
         setLoading(false);
@@ -186,7 +221,7 @@ export function useRolesData() {
         const sig = s.signals as { reason?: string } | null;
         scoreByJob[s.job_id] = { score: s.score, reason: sig?.reason ?? null };
       });
-      const merged = enrichAll(rows, logoBySlug).map((j) => ({
+      const merged = enrichAll(rows, dims).map((j) => ({
         ...j,
         score: scoreByJob[j.id]?.score ?? null,
         reason: scoreByJob[j.id]?.reason ?? null,
