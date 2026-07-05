@@ -140,9 +140,15 @@ export function domainFor(company: string, source: string | null): string | null
  * domain), which reads as a wrong logo. `theme` matches the SURFACE: "dark" returns
  * light marks (dark glass cards), "light" returns dark/colored marks (white map pins).
  */
+// Domains logo.dev serves its generic pinwheel placeholder for — a 200 (so it
+// can't be caught by onError at load time) that is byte-identical for every such
+// domain. Verified by batch-testing all 324 live company domains: exactly these
+// two. Skip logo.dev for them so the chain starts at the real site favicon.
+const LOGODEV_PLACEHOLDER = new Set(["travelperk.com", "gozauber.com"]);
+
 export function logoUrl(domain: string, theme: "dark" | "light" = "dark"): string | null {
   const token = import.meta.env.VITE_LOGODEV_TOKEN as string | undefined;
-  if (!token) return null;
+  if (!token || LOGODEV_PLACEHOLDER.has(domain)) return null;
   return `https://img.logo.dev/${domain}?token=${token}&size=96&format=png&theme=${theme}&retina=true&fallback=404`;
 }
 

@@ -203,15 +203,14 @@ function buildPin(p: PinProps): HTMLDivElement {
   fallback.style.background = p.hue;
   fallback.textContent = p.co.charAt(0) || "?";
   // light theme: the pin is a WHITE disc — dark-theme marks are white-on-white.
-  const src = p.domain ? logoUrl(p.domain, "light") : null;
-  if (src) {
+  // Chain: logo.dev (skipped for its 2 placeholder domains) → the site's real
+  // favicon (DuckDuckGo, then Google) → colored initial. Falling through to the
+  // favicon is what shows a correct TravelPerk mark, not logo.dev's pinwheel.
+  const chain = p.domain ? [logoUrl(p.domain, "light"), ...faviconUrls(p.domain)].filter(Boolean) as string[] : [];
+  if (chain.length) {
     const img = document.createElement("img");
     img.alt = "";
-    // Fallback chain: logo.dev (404s when it lacks the brand) → the site's real
-    // favicon (DuckDuckGo, then Google) → colored initial. This is what shows a
-    // correct TravelPerk mark instead of logo.dev's generic pinwheel placeholder.
-    const chain = p.domain ? faviconUrls(p.domain) : [];
-    let step = -1;
+    let step = 0;
     img.onerror = () => {
       step++;
       if (step < chain.length) {
@@ -222,7 +221,7 @@ function buildPin(p: PinProps): HTMLDivElement {
       fallback.style.display = "grid";
     };
     fallback.style.display = "none";
-    img.src = src;
+    img.src = chain[0];
     el.appendChild(img);
   }
   el.appendChild(fallback);
