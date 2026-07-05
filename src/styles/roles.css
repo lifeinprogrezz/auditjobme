@@ -262,3 +262,113 @@
 .roles-theme .panel-note .btn { display: block; margin: 14px auto 0; }
 .roles-theme .scorebar { font-size: 12px; color: var(--muted); padding: 8px 10px; margin-bottom: 10px; border-radius: 10px; background: rgba(31, 216, 184, 0.07); border: 1px solid rgba(31, 216, 184, 0.2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
 .roles-theme .morebtn { margin-top: 10px; width: calc(100% - 8px); }
+
+/* ============================================================================
+ * PAPER LIGHT identity (.roles-theme.light) — the token-research light-glass
+ * system (white fills, ink text, rim-top catch-light, cool ink shadows).
+ * Toggled in DEV with the "L" key for the dark-vs-light decision; whichever
+ * identity wins becomes the default. Score pills, primary buttons, and logo
+ * pins are shared between identities (the score stays the only luminous color;
+ * numerals on pills are already dark ink for contrast on light).
+ * Cluster bubbles deliberately STAY dark glass — dark counts on a light map is
+ * the startupmap-proven pattern and keeps them readable over pale terrain.
+ * ========================================================================== */
+.roles-theme.light {
+  --bg0: #f7f9fa; --bg1: #eef2f4; --bg2: #e2e8ec;
+  --surface: #ffffff; --surface-2: #f0f4f6; --surface-3: #e4ebee;
+  --text: #0b1f26; --muted: #5e828c; --subtle: #8aa6ae;
+  --glass: rgba(255, 255, 255, 0.55); --glass-2: rgba(255, 255, 255, 0.72);
+  --rim: rgba(255, 255, 255, 0.85); --hair: rgba(11, 31, 38, 0.1);
+  --sh: 0 18px 50px -16px rgba(20, 60, 70, 0.28),
+    inset 0 1.5px 0 0 rgba(255, 255, 255, 0.95),
+    inset 0 16px 32px -22px rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 0 rgba(11, 31, 38, 0.08),
+    inset 0 -14px 28px -24px rgba(20, 60, 70, 0.16);
+  background: radial-gradient(120% 100% at 50% 36%, #f7f9fa 0%, #eef2f4 42%, #e2e8ec 78%, #d5dde2 100%);
+}
+.roles-theme.light .stars { display: none; }
+.roles-theme.light .vig { box-shadow: inset 0 0 220px 40px rgba(90, 110, 125, 0.18); }
+.roles-theme.light .liquid::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), transparent 44%); mix-blend-mode: normal; }
+.roles-theme.light .maplibregl-ctrl-icon { filter: invert(0.35); }
+.roles-theme.light .attrib { background: rgba(255, 255, 255, 0.65); color: var(--subtle); }
+.roles-theme.light .attrib a { color: #3a6470; }
+.roles-theme.light .attrib a:hover { color: #0b1f26; }
+
+/* headbar */
+.roles-theme.light .brand { color: var(--text); }
+.roles-theme.light .nav .sep { background: var(--hair); }
+.roles-theme.light .cmd { background: rgba(11, 31, 38, 0.045); border-color: var(--hair); box-shadow: inset 0 1px 2px rgba(11, 31, 38, 0.12), inset 0 -1px 0 rgba(255, 255, 255, 0.7); }
+.roles-theme.light .cmd:hover, .roles-theme.light .cmd:focus-within { background: rgba(11, 31, 38, 0.07); }
+.roles-theme.light .cmd input { color: var(--text); }
+.roles-theme.light .cmd kbd { color: var(--muted); background: rgba(11, 31, 38, 0.06); border-color: var(--hair); }
+.roles-theme.light .filterbtn { border-color: var(--hair); background: rgba(11, 31, 38, 0.045); color: var(--text); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 -1px 0 rgba(11, 31, 38, 0.06); }
+.roles-theme.light .filterbtn:hover { background: rgba(11, 31, 38, 0.08); }
+.roles-theme.light .filterbtn.on { background: rgba(18, 165, 148, 0.12); border-color: rgba(18, 165, 148, 0.45); color: #067a6f; }
+.roles-theme.light .fchip { border-color: var(--hair); background: rgba(11, 31, 38, 0.045); color: var(--muted); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 -1px 0 rgba(11, 31, 38, 0.06); }
+.roles-theme.light .fchip:hover { background: rgba(11, 31, 38, 0.08); color: var(--text); }
+.roles-theme.light .fchip.active { background: rgba(18, 165, 148, 0.12); border-color: rgba(18, 165, 148, 0.45); color: #067a6f; }
+.roles-theme.light .fcount { background: #12a594; color: #ffffff; }
+.roles-theme.light .fdrop { background: rgba(255, 255, 255, 0.92); border-color: rgba(255, 255, 255, 0.9); box-shadow: 0 18px 50px -16px rgba(20, 60, 70, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
+.roles-theme.light .fdrop label { color: var(--text); }
+.roles-theme.light .fdrop label:hover { background: rgba(11, 31, 38, 0.05); }
+.roles-theme.light .fdrop input { border-color: rgba(11, 31, 38, 0.25); background: #ffffff; }
+.roles-theme.light .seg { background: rgba(11, 31, 38, 0.06); box-shadow: inset 0 1px 2px rgba(11, 31, 38, 0.12), inset 0 -1px 0 rgba(255, 255, 255, 0.7); }
+.roles-theme.light .seg button { color: var(--muted); }
+.roles-theme.light .navcv { color: #067a6f; border-color: rgba(18, 165, 148, 0.4); background: rgba(18, 165, 148, 0.12); }
+.roles-theme.light .navcv:hover { background: rgba(18, 165, 148, 0.18); border-color: rgba(18, 165, 148, 0.55); }
+
+/* panel */
+.roles-theme.light .panel { background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 18px 50px -16px rgba(20, 60, 70, 0.3),
+    inset 0 1.5px 0 0 rgba(255, 255, 255, 0.95),
+    inset 0 18px 36px -24px rgba(255, 255, 255, 0.65),
+    inset 1px 0 0 0 rgba(255, 255, 255, 0.9),
+    inset 18px 0 36px -28px rgba(255, 255, 255, 0.5),
+    inset -1px 0 0 0 rgba(11, 31, 38, 0.06),
+    inset -16px 0 32px -26px rgba(20, 60, 70, 0.12),
+    inset 0 -1px 0 0 rgba(11, 31, 38, 0.08),
+    inset 0 -14px 28px -24px rgba(20, 60, 70, 0.14); }
+.roles-theme.light .panel::before { background: linear-gradient(150deg, rgba(255, 255, 255, 0.85), transparent 26%); mix-blend-mode: normal; }
+.roles-theme.light .panel-toggle { color: var(--muted); }
+.roles-theme.light .panel-toggle:hover { color: #0b1f26; background: rgba(18, 165, 148, 0.14); }
+.roles-theme.light .ptitle { color: var(--text); }
+.roles-theme.light .cards::-webkit-scrollbar-thumb { background: rgba(11, 31, 38, 0.15); }
+
+/* cards */
+.roles-theme.light .card { background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55)); border-color: rgba(11, 31, 38, 0.08); box-shadow: 0 8px 24px -8px rgba(20, 60, 70, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(11, 31, 38, 0.05); }
+.roles-theme.light .card::after { background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0px), rgba(18, 165, 148, 0.12), transparent 60%); }
+.roles-theme.light .card:hover { border-color: rgba(18, 165, 148, 0.4); box-shadow: 0 20px 50px -12px rgba(20, 60, 70, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
+.roles-theme.light .card .co { color: var(--muted); }
+.roles-theme.light .card .role { color: var(--text); }
+.roles-theme.light .card .meta { color: var(--subtle); }
+.roles-theme.light .card .meta b { color: var(--muted); }
+.roles-theme.light .card .meta .d { background: rgba(11, 31, 38, 0.2); }
+.roles-theme.light .card .why { color: #1e4753; background: rgba(11, 31, 38, 0.035); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+.roles-theme.light .score { background: rgba(11, 31, 38, 0.05); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -1px 0 rgba(11, 31, 38, 0.05); }
+.roles-theme.light .btn.g { background: rgba(11, 31, 38, 0.05); color: var(--text); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(11, 31, 38, 0.05); }
+.roles-theme.light .btn.g:hover { background: rgba(11, 31, 38, 0.09); }
+.roles-theme.light .btn.applied { background: rgba(18, 165, 148, 0.12); color: #067a6f; border-color: rgba(18, 165, 148, 0.4); }
+.roles-theme.light .panel-note { color: var(--muted); background: rgba(255, 255, 255, 0.6); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9); }
+.roles-theme.light .panel-note b { color: var(--text); }
+.roles-theme.light .scorebar { color: #067a6f; background: rgba(18, 165, 148, 0.08); border-color: rgba(18, 165, 148, 0.25); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+
+/* detail view */
+.roles-theme.light .dback { color: var(--muted); }
+.roles-theme.light .dback:hover { color: var(--text); }
+.roles-theme.light .dbanner { border-color: rgba(11, 31, 38, 0.1); box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.8), inset 0 -12px 24px -20px rgba(20, 60, 70, 0.25); }
+.roles-theme.light .dbanner-scrim { background: linear-gradient(180deg, rgba(247, 250, 251, 0.15), rgba(247, 250, 251, 0.9)); }
+.roles-theme.light .dname { color: var(--text); }
+.roles-theme.light .dhiring { color: #067a6f; }
+.roles-theme.light .dfact { color: var(--muted); background: rgba(11, 31, 38, 0.04); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+.roles-theme.light .dfact b { color: var(--text); }
+.roles-theme.light .drole { background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55)); border-color: rgba(11, 31, 38, 0.08); box-shadow: 0 8px 24px -8px rgba(20, 60, 70, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9); }
+.roles-theme.light .drole .rt { color: var(--text); }
+.roles-theme.light .drole .rm { color: var(--subtle); }
+.roles-theme.light .drole .rm b { color: var(--text); }
+.roles-theme.light .drole .rm .d { background: rgba(11, 31, 38, 0.2); }
+.roles-theme.light .dwhy { color: #1e4753; background: rgba(18, 165, 148, 0.08); border-color: rgba(18, 165, 148, 0.25); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+.roles-theme.light .dmore-h { color: var(--muted); }
+.roles-theme.light .dmore-item { background: rgba(11, 31, 38, 0.035); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -1px 0 rgba(11, 31, 38, 0.04); }
+.roles-theme.light .dmore-item:hover { background: rgba(11, 31, 38, 0.07); border-color: rgba(18, 165, 148, 0.35); }
+.roles-theme.light .dmore-item .mi-role { color: var(--text); }
+.roles-theme.light .dmore-item .mi-city { color: var(--muted); }

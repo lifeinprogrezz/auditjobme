@@ -24,6 +24,20 @@ export default function RolesMap() {
   const [view, setView] = useState<"map" | "list">("map");
   const [detailJob, setDetailJob] = useState<RoleJob | null>(null);
   const [panelHidden, setPanelHidden] = useState(false);
+  const [light, setLight] = useState(false);
+
+  // DEV-only identity comparison: "L" flips the whole page (map + glass skin)
+  // between dark ink and paper light. Dark stays the shipped default.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as Element | null;
+      if (t && "closest" in t && t.closest("input,textarea")) return;
+      if (e.key === "l" || e.key === "L") setLight((v) => !v);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   const visible = useMemo(() => filterJobs(jobs, filters), [jobs, filters]);
 
@@ -52,6 +66,7 @@ export default function RolesMap() {
 
   const rootClass = [
     "roles-theme",
+    light && "light",
     scored && "scored",
     detailLive && "detail-open",
     panelHidden && "panel-hidden",
@@ -63,7 +78,7 @@ export default function RolesMap() {
   return (
     <div className={rootClass}>
       <div className="stars" />
-      <GlobeMap jobs={visible} scored={scored} focusLngLats={focusLngLats} />
+      <GlobeMap jobs={visible} scored={scored} focusLngLats={focusLngLats} light={light} />
       <div className="vig" />
       <div className="ui">
         <HeadBar

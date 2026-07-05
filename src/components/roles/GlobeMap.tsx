@@ -12,9 +12,41 @@ export type GlobeMapProps = {
   jobs: RoleJob[];
   scored: boolean;
   focusLngLats: [number, number][] | null;
+  /** Full light identity (paper basemap + light layer palette). Default dark ink. */
+  light?: boolean;
 };
 
-const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+type MapTheme = {
+  styleUrl: string;
+  sky: Record<string, string>;
+  seaStops: [string, string, string, string, string, string];
+  hill: { shadow: string; highlight: string; accent: string; exaggeration: number };
+  border: { color: string; opacity: number; width: number };
+};
+
+// Dark = the approved ink & graphite palette (7-05); light = paper (Positron).
+const THEMES: Record<"dark" | "light", MapTheme> = {
+  dark: {
+    styleUrl: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+    sky: { "sky-color": "#0a1a24", "horizon-color": "#0d2630", "fog-color": "#06121a" },
+    seaStops: [
+      "rgba(4,8,14,1)", "rgba(7,13,22,1)", "rgba(11,19,31,1)",
+      "rgba(15,26,40,1)", "rgba(20,34,50,0.92)", "rgba(18,30,44,0)",
+    ],
+    hill: { shadow: "#01050a", highlight: "#38434c", accent: "#0d161d", exaggeration: 0.7 },
+    border: { color: "#7f95a3", opacity: 0.22, width: 0.6 },
+  },
+  light: {
+    styleUrl: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+    sky: { "sky-color": "#dfeaf2", "horizon-color": "#ffffff", "fog-color": "#eef3f7" },
+    seaStops: [
+      "rgba(168,192,208,1)", "rgba(182,203,217,1)", "rgba(196,214,226,1)",
+      "rgba(208,223,233,1)", "rgba(218,231,239,0.9)", "rgba(220,232,240,0)",
+    ],
+    hill: { shadow: "#aab6be", highlight: "#ffffff", accent: "#cfd9df", exaggeration: 0.45 },
+    border: { color: "#7d919d", opacity: 0.4, width: 0.6 },
+  },
+};
 // The Europe frame is always a fitBounds (never a raw zoom number) — the globe
 // projection makes fixed zoom levels frame differently per viewport.
 const EUROPE_BOUNDS: [[number, number], [number, number]] = [[-30, 20], [45, 64]];
@@ -114,14 +146,12 @@ function buildPin(p: PinProps): HTMLDivElement {
   return el;
 }
 
-function styleAtmosphere(map: maplibregl.Map): void {
+function styleAtmosphere(map: maplibregl.Map, theme: MapTheme): void {
   try {
     map.setSky({
-      "sky-color": "#0a1a24",
+      ...theme.sky,
       "sky-horizon-blend": 0.5,
-      "horizon-color": "#0d2630",
       "horizon-fog-blend": 0.5,
-      "fog-color": "#06121a",
       "fog-ground-blend": 0.6,
       "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 0.9, 6, 0.2],
     } as maplibregl.SkySpecification);
@@ -130,16 +160,14 @@ function styleAtmosphere(map: maplibregl.Map): void {
   }
 }
 
-function boostBorders(map: maplibregl.Map): void {
+function boostBorders(map: maplibregl.Map, theme: MapTheme): void {
   try {
     for (const l of map.getStyle().layers) {
       if (l.type !== "line" || !/bound|admin|border/i.test(l.id)) continue;
       try {
-        // Ink palette (Rober's pick, 2026-07-05): neutral hairline borders — the
-        // world is a graphite stage; scores/logos/glass carry all the color.
-        map.setPaintProperty(l.id, "line-color", "#7f95a3");
-        map.setPaintProperty(l.id, "line-opacity", 0.22);
-        map.setPaintProperty(l.id, "line-width", 0.6);
+        map.setPaintProperty(l.id, "line-color", theme.border.color);
+        map.setPaintProperty(l.id, "line-opacity", theme.border.opacity);
+        map.setPaintProperty(l.id, "line-width", theme.border.width);
       } catch {
         /* some basemap line layers reject individual props */
       }
@@ -149,7 +177,7 @@ function boostBorders(map: maplibregl.Map): void {
   }
 }
 
-function addTerrain(map: maplibregl.Map): void {
+function addTerrain(map: maplibregl.Map, theme: MapTheme): void {
   try {
     map.addSource("dem", {
       type: "raster-dem",
@@ -173,10 +201,10 @@ function addTerrain(map: maplibregl.Map): void {
         type: "hillshade",
         source: "dem",
         paint: {
-          "hillshade-shadow-color": "#01050a",
-          "hillshade-highlight-color": "#38434c",
-          "hillshade-accent-color": "#0d161d",
-          "hillshade-exaggeration": 0.7,
+          "hillshade-shadow-color": theme.hill.shadow,
+          "hillshade-highlight-color": theme.hill.highlight,
+          "hillshade-accent-color": theme.hill.accent,
+          "hillshade-exaggeration": theme.hill.exaggeration,
         },
       } as maplibregl.LayerSpecification,
       before,
@@ -193,20 +221,13 @@ function addTerrain(map: maplibregl.Map): void {
               "interpolate",
               ["linear"],
               ["elevation"],
-              -6000,
-              "rgba(4,8,14,1)",
-              -2500,
-              "rgba(7,13,22,1)",
-              -800,
-              "rgba(11,19,31,1)",
-              -200,
-              "rgba(15,26,40,1)",
-              -20,
-              "rgba(20,34,50,0.92)",
-              0,
-              "rgba(18,30,44,0)",
-              30,
-              "rgba(0,0,0,0)",
+              -6000, theme.seaStops[0],
+              -2500, theme.seaStops[1],
+              -800, theme.seaStops[2],
+              -200, theme.seaStops[3],
+              -20, theme.seaStops[4],
+              0, theme.seaStops[5],
+              30, "rgba(0,0,0,0)",
             ],
           },
         } as unknown as maplibregl.LayerSpecification,
@@ -296,7 +317,7 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 // `scored` stays in the props type for the page contract, but the map needs no
 // scored logic: marker bucket classes are permanent and CSS gates them on the
 // root .scored class.
-export default function GlobeMap({ jobs, focusLngLats }: GlobeMapProps) {
+export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const loadedRef = useRef(false);
@@ -305,6 +326,7 @@ export default function GlobeMap({ jobs, focusLngLats }: GlobeMapProps) {
   // Latest props for the async load handler (map init effect runs once).
   const jobsRef = useRef(jobs);
   const focusRef = useRef(focusLngLats);
+  const themeRef = useRef<"dark" | "light">(light ? "light" : "dark");
 
   const clearPins = () => {
     for (const marker of pinsRef.current.values()) marker.remove();
@@ -383,7 +405,7 @@ export default function GlobeMap({ jobs, focusLngLats }: GlobeMapProps) {
     try {
       const map = new maplibregl.Map({
         container: containerRef.current,
-        style: STYLE_URL,
+        style: THEMES[themeRef.current].styleUrl,
         center: [10, 48],
         zoom: 2.2,
         projection: { type: "globe" },
@@ -412,9 +434,10 @@ export default function GlobeMap({ jobs, focusLngLats }: GlobeMapProps) {
             /* ignore */
           }
         }, 450);
-        styleAtmosphere(map);
-        boostBorders(map);
-        addTerrain(map);
+        const theme = THEMES[themeRef.current];
+        styleAtmosphere(map, theme);
+        boostBorders(map, theme);
+        addTerrain(map, theme);
         try {
           addRolesLayers(map, featureCollection(jobsRef.current));
         } catch (e) {
@@ -464,6 +487,43 @@ export default function GlobeMap({ jobs, focusLngLats }: GlobeMapProps) {
     syncMarkers();
 
   }, [jobs]);
+
+  // Theme flip = full basemap swap: setStyle wipes every source/layer, so we
+  // rebuild the stack on style.load. DOM markers survive setStyle untouched.
+  useEffect(() => {
+    const next: "dark" | "light" = light ? "light" : "dark";
+    if (themeRef.current === next) return;
+    themeRef.current = next;
+    const map = mapRef.current;
+    if (!map || !loadedRef.current) return;
+    const theme = THEMES[next];
+    loadedRef.current = false;
+    map.once("style.load", () => {
+      if (mapRef.current !== map) return;
+      try {
+        map.setProjection({ type: "globe" });
+      } catch {
+        /* flat fallback is acceptable */
+      }
+      styleAtmosphere(map, theme);
+      boostBorders(map, theme);
+      addTerrain(map, theme);
+      try {
+        addRolesLayers(map, featureCollection(jobsRef.current));
+      } catch (e) {
+        console.warn("roles layers", e);
+      }
+      loadedRef.current = true;
+      syncMarkers();
+    });
+    try {
+      map.setStyle(theme.styleUrl);
+    } catch (e) {
+      console.warn("setStyle", e);
+      loadedRef.current = true;
+    }
+
+  }, [light]);
 
   // Value-compare the focus: scoreBatch re-sorts jobs up to 40 times, giving
   // focusLngLats a fresh identity each time — re-flying the camera on every
