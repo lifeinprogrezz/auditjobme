@@ -50,14 +50,18 @@
 
 /* starfield + atmosphere */
 .roles-theme .stars { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.55;
-  background-image: radial-gradient(1px 1px at 20% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 20%, #cfe, transparent), radial-gradient(1px 1px at 40% 70%, #fff, transparent), radial-gradient(1.5px 1.5px at 85% 60%, #bdf, transparent), radial-gradient(1px 1px at 12% 80%, #fff, transparent), radial-gradient(1px 1px at 60% 85%, #fff, transparent), radial-gradient(1px 1px at 90% 35%, #cff, transparent), radial-gradient(1px 1px at 33% 15%, #fff, transparent);
+  background-image: radial-gradient(1px 1px at 20% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 20%, #cfe, transparent), radial-gradient(1px 1px at 40% 70%, #fff, transparent), radial-gradient(1.5px 1.5px at 85% 60%, #bdf, transparent), radial-gradient(1px 1px at 12% 80%, #fff, transparent), radial-gradient(1px 1px at 60% 85%, #fff, transparent), radial-gradient(1px 1px at 90% 35%, #cff, transparent), radial-gradient(1px 1px at 33% 15%, #fff, transparent), radial-gradient(2px 2px at 55% 45%, rgba(255, 255, 255, 0.95), transparent), radial-gradient(1.6px 1.6px at 8% 42%, rgba(235, 245, 255, 0.9), transparent);
   /* repeat each layer at a different rhythm = a real field, not 8 lonely dots */
-  background-size: 520px 520px, 640px 640px, 750px 750px, 880px 880px, 570px 570px, 690px 690px, 810px 810px, 460px 460px; }
-.roles-theme.light .stars { opacity: 0.75; }
+  background-size: 520px 520px, 640px 640px, 750px 750px, 880px 880px, 570px 570px, 690px 690px, 810px 810px, 460px 460px, 1150px 1150px, 990px 990px; }
+.roles-theme.light .stars { opacity: 0.95; }
 /* the painted atmosphere: crisp limb line blooming into space (sized per-frame by GlobeMap) */
 .roles-theme .halo { position: absolute; z-index: 0; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.4s;
-  box-shadow: 0 0 4px 2px rgba(255, 255, 255, 1), 0 0 30px 12px rgba(224, 240, 252, 0.6), 0 0 110px 45px rgba(170, 205, 235, 0.3), 0 0 220px 100px rgba(130, 170, 215, 0.13); }
-.roles-theme:not(.light) .halo { box-shadow: 0 0 2px 1px rgba(210, 235, 245, 0.6), 0 0 20px 7px rgba(160, 200, 230, 0.28), 0 0 80px 30px rgba(110, 160, 205, 0.13); }
+  box-shadow: 0 0 5px 3px rgba(255, 255, 255, 1), 0 0 48px 18px rgba(228, 242, 254, 0.72), 0 0 160px 60px rgba(175, 208, 240, 0.38), 0 0 320px 140px rgba(130, 170, 215, 0.16); }
+.roles-theme:not(.light) .halo { box-shadow: 0 0 3px 1.5px rgba(220, 240, 250, 0.75), 0 0 28px 10px rgba(165, 205, 235, 0.35), 0 0 110px 44px rgba(110, 160, 205, 0.16); }
+/* the inside of the atmosphere: a soft wash over the sphere's own rim */
+.roles-theme .halo-in { position: absolute; z-index: 1; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.4s;
+  box-shadow: inset 0 0 34px 8px rgba(255, 255, 255, 0.5), inset 0 0 110px 30px rgba(200, 225, 250, 0.18); }
+.roles-theme:not(.light) .halo-in { box-shadow: inset 0 0 26px 6px rgba(210, 235, 250, 0.3), inset 0 0 90px 24px rgba(160, 200, 235, 0.1); }
 .roles-theme .roles-map { position: absolute; inset: 0; z-index: 1; background: transparent; }
 .roles-theme .vig { position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 260px 60px rgba(0, 0, 0, 0.55); }
 
@@ -319,6 +323,9 @@
   --act-strong: #15232c;
   --act-strong-ink: #f4f8f9;
   --act-shadow: rgba(16, 29, 38, 0.35);
+  /* Space = rich deep navy (startupmap reference): blue enough that the white
+   * stars and the limb glow pop, dark enough to stay "space". */
+  background: radial-gradient(120% 100% at 50% 40%, #0e1735 0%, #0a1028 45%, #05091c 100%);
   --sh: 0 18px 50px -16px rgba(20, 60, 70, 0.28),
     inset 0 1.5px 0 0 rgba(255, 255, 255, 0.95),
     inset 0 16px 32px -22px rgba(255, 255, 255, 0.6),

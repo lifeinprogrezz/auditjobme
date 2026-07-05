@@ -365,6 +365,7 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const haloRef = useRef<HTMLDivElement | null>(null);
+  const haloInRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const loadedRef = useRef(false);
   const pinsRef = useRef<Map<string, maplibregl.Marker>>(new Map());
@@ -437,12 +438,18 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
       const rimVisible =
         cx + r > 0 && cx - r < w && cy + r > 0 && cy - r < h;
       const o = !rimVisible || r >= fadeEnd ? 0 : r <= fadeStart ? 1 : 1 - (r - fadeStart) / (fadeEnd - fadeStart);
+      const haloIn = haloInRef.current;
       halo.style.opacity = o.toFixed(3);
+      if (haloIn) haloIn.style.opacity = o.toFixed(3);
       if (o <= 0) return;
-      halo.style.width = `${2 * r}px`;
-      halo.style.height = `${2 * r}px`;
-      halo.style.left = `${cx - r}px`;
-      halo.style.top = `${cy - r}px`;
+      const place = (el: HTMLDivElement, rad: number) => {
+        el.style.width = `${2 * rad}px`;
+        el.style.height = `${2 * rad}px`;
+        el.style.left = `${cx - rad}px`;
+        el.style.top = `${cy - rad}px`;
+      };
+      place(halo, r);
+      if (haloIn) place(haloIn, r - 3);
     } catch {
       /* halo is decoration */
     }
@@ -672,6 +679,7 @@ export default function GlobeMap({ jobs, focusLngLats, light = false }: GlobeMap
     <>
       <div ref={haloRef} className="halo" />
       <div ref={containerRef} className="roles-map" />
+      <div ref={haloInRef} className="halo-in" />
     </>
   );
 }
