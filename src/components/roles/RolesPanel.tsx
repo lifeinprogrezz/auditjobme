@@ -30,20 +30,25 @@ export type RolesPanelProps = {
   /** City picked on the globe (single-city cluster click); null = no city filter. */
   cityFilter?: string | null;
   onClearCity?: () => void;
+  /** Company picked on the globe (logo click); null = no company filter. */
+  companyFilter?: string | null;
+  onClearCompany?: () => void;
 };
 
-/** Logo.dev image with colored-initial fallback (never a favicon service). */
+/** Logo.dev → site favicon → colored-initial fallback chain (a logo on every co). */
 function Logo({ domain, company }: { domain: string | null; company: string }) {
-  const src = domain ? logoUrl(domain) : null;
-  const [failed, setFailed] = useState(false);
-  if (!src || failed) {
+  const primary = domain ? logoUrl(domain) : null;
+  const favicon = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128` : null;
+  const [stage, setStage] = useState<0 | 1 | 2>(0); // 0 logo.dev · 1 favicon · 2 initial
+  const src = stage === 0 ? primary : stage === 1 ? favicon : null;
+  if (!src) {
     return (
       <span className="fb" style={{ background: hueFor(company) }}>
         {company.charAt(0)}
       </span>
     );
   }
-  return <img src={src} alt="" onError={() => setFailed(true)} />;
+  return <img src={src} alt="" onError={() => setStage((s) => (s + 1) as 0 | 1 | 2)} />;
 }
 
 /**
@@ -104,6 +109,8 @@ export default function RolesPanel({
   onToggleHidden,
   cityFilter,
   onClearCity,
+  companyFilter,
+  onClearCompany,
 }: RolesPanelProps) {
   const navigate = useNavigate();
   const detailRef = useRef<HTMLDivElement>(null);
@@ -127,17 +134,30 @@ export default function RolesPanel({
   const renderCards = () => (
     <>
       <h1 className="ptitle">Your matches</h1>
-      {cityFilter && (
+      {companyFilter ? (
         <div className="cityhdr">
           <span>
-            Roles in <b>{cityFilter}</b> · {jobs.length}
+            Roles at <b>{companyFilter}</b> · {jobs.length}
           </span>
-          {onClearCity && (
-            <button className="cityclear" onClick={onClearCity} aria-label="Clear city filter">
+          {onClearCompany && (
+            <button className="cityclear" onClick={onClearCompany} aria-label="Clear company filter">
               ×
             </button>
           )}
         </div>
+      ) : (
+        cityFilter && (
+          <div className="cityhdr">
+            <span>
+              Roles in <b>{cityFilter}</b> · {jobs.length}
+            </span>
+            {onClearCity && (
+              <button className="cityclear" onClick={onClearCity} aria-label="Clear city filter">
+                ×
+              </button>
+            )}
+          </div>
+        )
       )}
       {scoring && (
         <div className="scorebar">Scoring roles against your profile… {remaining} to go</div>
@@ -147,7 +167,11 @@ export default function RolesPanel({
       ) : jobs.length === 0 ? (
         <div className="panel-note">
           <b>No roles match</b>
-          {cityFilter ? `No roles in ${cityFilter} match your filters.` : "Try clearing filters."}
+          {companyFilter
+            ? `No ${companyFilter} roles match your filters.`
+            : cityFilter
+              ? `No roles in ${cityFilter} match your filters.`
+              : "Try clearing filters."}
         </div>
       ) : (
         <div className="cards" onMouseMove={handleCardsMove}>

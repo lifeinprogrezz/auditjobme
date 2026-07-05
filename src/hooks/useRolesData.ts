@@ -4,7 +4,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
 import { scoreJob, RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
 import { applyLandedScores, byScore, type RoleJob } from "@/lib/roles";
-import { cityOf, coordsOf, sunflowerLngLat } from "@/lib/geo";
+import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
 
 type JobsRow = {
@@ -29,65 +29,78 @@ const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page pas
  */
 type CompanyDim = { logo_domain: string | null; lat: number | null; lng: number | null };
 
-// A street coordinate only speaks for the job's OWN city: snap when the office
-// sits within ~40km of that city's centroid (distance beats name-matching —
-// Nominatim returns "München"/"Köln", cityOf returns "Munich"/"Cologne").
+// ONE position per company-in-a-city (not per role): every role of a company in
+// a city shares the same point, so the map shows one logo per company and the
+// panel shows that company's roles on click (startupmap's model). A company's
+// street office is used only when it sits within ~40km of the job's own city
+// centroid — a Barcelona role must never snap to the company's Paris HQ.
 const OFFICE_SNAP_DEG = 0.5;
-function officeFor(city: string | null, dim: CompanyDim | undefined): [number, number] | null {
-  if (!city || !dim || dim.lat == null || dim.lng == null) return null;
-  const cc = coordsOf(city);
-  if (!cc) return null;
-  const dLng = (dim.lng - cc[0]) * Math.cos((dim.lat * Math.PI) / 180);
-  const dLat = dim.lat - cc[1];
+const normName = (s: string) => s.trim().toLowerCase();
+
+function officeFor(centroid: [number, number], dim: CompanyDim | undefined): [number, number] | null {
+  if (!dim || dim.lat == null || dim.lng == null) return null;
+  const dLng = (dim.lng - centroid[0]) * Math.cos((dim.lat * Math.PI) / 180);
+  const dLat = dim.lat - centroid[1];
   return dLng * dLng + dLat * dLat <= OFFICE_SNAP_DEG * OFFICE_SNAP_DEG ? [dim.lng, dim.lat] : null;
 }
 
-// Same-office roles stack on a tight golden-angle ring (~10-25m) around the
-// building — visibly ONE address, individually clickable (startupmap's stacks).
-function stackedAt(office: [number, number], i: number, lat: number): [number, number] {
-  if (i === 0) return office;
-  const a = i * 2.39996;
-  const r = 0.00012 * Math.sqrt(i);
-  return [office[0] + (r * Math.cos(a)) / Math.cos((lat * Math.PI) / 180), office[1] + r * Math.sin(a)];
+// Companies without a street office fan out on a SMALL golden-angle disc around
+// the city centroid — capped at ~0.85km so pins never reach the sea (the old
+// per-role sunflower spread ~6km and dropped logos in the Mediterranean/port).
+const CO_DISC_DEG = 0.0085;
+function centroidPlace(centroid: [number, number], idx: number, n: number): [number, number] {
+  const a = idx * 2.399963; // golden angle; idx is the company's stable rank in the city
+  const r = CO_DISC_DEG * Math.sqrt((idx + 0.5) / Math.max(n, 1));
+  return [
+    centroid[0] + (r * Math.cos(a)) / Math.cos((centroid[1] * Math.PI) / 180),
+    centroid[1] + r * Math.sin(a),
+  ];
 }
 
 function enrichAll(rows: JobsRow[], dims: Map<string, CompanyDim>): RoleJob[] {
-  const idsByCity = new Map<string, string[]>();
   const cityById = new Map<string, string | null>();
+  const companiesByCity = new Map<string, Set<string>>(); // city -> set of normalized company names
   for (const r of rows) {
     const city = cityOf(r.location);
     cityById.set(r.id, city);
     if (city) {
-      const ids = idsByCity.get(city) ?? [];
-      ids.push(r.id);
-      idsByCity.set(city, ids);
+      const set = companiesByCity.get(city) ?? new Set<string>();
+      set.add(normName(r.company));
+      companiesByCity.set(city, set);
     }
   }
-  const indexById = new Map<string, number>();
-  for (const ids of idsByCity.values()) {
-    ids.sort();
-    ids.forEach((id, i) => indexById.set(id, i));
+  // Stable per-company rank within each city (sorted) → deterministic disc slot.
+  const coIdx = new Map<string, number>(); // `${city}|${co}` -> idx
+  const coCount = new Map<string, number>(); // city -> distinct company count
+  for (const [city, set] of companiesByCity) {
+    const arr = [...set].sort();
+    coCount.set(city, arr.length);
+    arr.forEach((cn, i) => coIdx.set(`${city}|${cn}`, i));
   }
-  const officeStackCount = new Map<string, number>(); // "lng,lat" -> roles placed there
+  const posByGroup = new Map<string, [number, number] | null>(); // `${city}|${co}` -> shared point
+  const posFor = (city: string | null, r: JobsRow): [number, number] | null => {
+    if (!city) return null;
+    const gk = `${city}|${normName(r.company)}`;
+    const cached = posByGroup.get(gk);
+    if (cached !== undefined) return cached;
+    const centroid = coordsOf(city);
+    let pos: [number, number] | null = null;
+    if (centroid) {
+      const dim = r.company_id ? dims.get(r.company_id) : undefined;
+      pos = officeFor(centroid, dim) ?? centroidPlace(centroid, coIdx.get(gk) ?? 0, coCount.get(city) ?? 1);
+    }
+    posByGroup.set(gk, pos);
+    return pos;
+  };
   return rows.map((r) => {
     const city = cityById.get(r.id) ?? null;
     const dim = r.company_id ? dims.get(r.company_id) : undefined;
-    const office = officeFor(city, dim);
-    let lngLat: [number, number] | null = null;
-    if (office) {
-      const key = `${office[0]},${office[1]}`;
-      const n = officeStackCount.get(key) ?? 0;
-      officeStackCount.set(key, n + 1);
-      lngLat = stackedAt(office, n, office[1]);
-    } else if (city) {
-      lngLat = sunflowerLngLat(city, indexById.get(r.id) ?? 0, idsByCity.get(city)?.length ?? 1);
-    }
     return {
       ...r,
       score: null,
       reason: null,
       city,
-      lngLat,
+      lngLat: posFor(city, r),
       // companies.logo_domain (engine-verified website) wins; name-guess is the
       // fallback for rows not yet linked to the companies dimension.
       domain: dim?.logo_domain ?? domainFor(r.company, r.source),

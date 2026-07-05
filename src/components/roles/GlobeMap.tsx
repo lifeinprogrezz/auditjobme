@@ -14,8 +14,8 @@ export type GlobeMapProps = {
   focusLngLats: [number, number][] | null;
   /** Full light identity (paper basemap + light layer palette). Default dark ink. */
   light?: boolean;
-  /** Pin click → open that role's detail (startupmap's logo→panel mechanic). */
-  onOpenRole?: (id: string) => void;
+  /** Company-logo click → filter the panel to that company's roles. */
+  onCompanyClick?: (company: string) => void;
   /** Single-city cluster click → filter the panel to that city (null never sent). */
   onCityClick?: (city: string) => void;
 };
@@ -117,29 +117,46 @@ type PinProps = {
   score: number | null;
   bucket: string;
   hue: string;
+  count: number;
 };
 
+// ONE feature per company-in-a-city (startupmap's model): all roles of a company
+// share a point (assigned in useRolesData), so the map shows a single logo per
+// company and the count feeds the tooltip / cluster. Clicking it filters the
+// panel to that company's roles.
 function featureCollection(jobs: RoleJob[]): FeatureCollection {
+  const groups = new Map<string, { rep: RoleJob; count: number; maxScore: number | null }>();
+  for (const j of jobs) {
+    if (j.lngLat == null) continue;
+    const key = `${j.company.trim().toLowerCase()}|${j.city ?? ""}`;
+    const g = groups.get(key);
+    if (!g) {
+      groups.set(key, { rep: j, count: 1, maxScore: j.score });
+    } else {
+      g.count++;
+      if ((j.score ?? -1) > (g.rep.score ?? -1)) g.rep = j; // rep = best-scoring role
+      if (j.score != null) g.maxScore = Math.max(g.maxScore ?? -1, j.score);
+    }
+  }
   return {
     type: "FeatureCollection",
-    features: jobs
-      .filter((j) => j.lngLat != null)
-      .map((j) => ({
-        type: "Feature" as const,
-        properties: {
-          id: j.id,
-          co: j.company,
-          domain: j.domain,
-          city: j.city,
-          role: j.title,
-          score: j.score,
-          // Unscored roles carry NO bucket: a "low" class would paint them with
-          // the red poor-fit border in scored mode — a fabricated verdict.
-          bucket: j.score != null ? scoreBucket(j.score) : "",
-          hue: hueFor(j.company),
-        } satisfies PinProps,
-        geometry: { type: "Point" as const, coordinates: j.lngLat as [number, number] },
-      })),
+    features: [...groups.entries()].map(([key, g]) => ({
+      type: "Feature" as const,
+      properties: {
+        id: key,
+        co: g.rep.company,
+        domain: g.rep.domain,
+        city: g.rep.city,
+        role: g.count > 1 ? `${g.count} open roles` : g.rep.title,
+        score: g.maxScore,
+        // Unscored companies carry NO bucket: a "low" class would paint them with
+        // the red poor-fit border in scored mode — a fabricated verdict.
+        bucket: g.maxScore != null ? scoreBucket(g.maxScore) : "",
+        hue: hueFor(g.rep.company),
+        count: g.count,
+      } satisfies PinProps,
+      geometry: { type: "Point" as const, coordinates: g.rep.lngLat as [number, number] },
+    })),
   };
 }
 
@@ -187,7 +204,16 @@ function buildPin(p: PinProps): HTMLDivElement {
   if (src) {
     const img = document.createElement("img");
     img.alt = "";
+    // Logo fallback chain toward "a logo on every company": logo.dev →
+    // the site's real favicon → colored initial. logo.dev serves a monogram
+    // for known-but-logoless brands, so the favicon step mainly rescues a bad
+    // domain; the initial only shows when we have no usable domain at all.
     img.onerror = () => {
+      if (!img.dataset.fav && p.domain) {
+        img.dataset.fav = "1";
+        img.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(p.domain)}&sz=128`;
+        return;
+      }
       img.style.display = "none";
       fallback.style.display = "grid";
     };
@@ -507,7 +533,7 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 // `scored` stays in the props type for the page contract, but the map needs no
 // scored logic: marker bucket classes are permanent and CSS gates them on the
 // root .scored class.
-export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole, onCityClick }: GlobeMapProps) {
+export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyClick, onCityClick }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const haloRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -520,8 +546,8 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
   const themeRef = useRef<"dark" | "light">(light ? "light" : "dark");
   // Pin click handlers are attached once at marker build — read through a ref
   // so they always call the latest callback.
-  const onOpenRoleRef = useRef(onOpenRole);
-  onOpenRoleRef.current = onOpenRole;
+  const onCompanyClickRef = useRef(onCompanyClick);
+  onCompanyClickRef.current = onCompanyClick;
   const onCityClickRef = useRef(onCityClick);
   onCityClickRef.current = onCityClick;
 
@@ -695,10 +721,10 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
       } else {
         const pin = props as unknown as PinProps;
         el = buildPin(pin);
-        const pid = String(pin.id);
+        const co = String(pin.co);
         el.addEventListener("click", (e) => {
           e.stopPropagation();
-          onOpenRoleRef.current?.(pid);
+          onCompanyClickRef.current?.(co);
         });
       }
       el.dataset.sig = sig;
