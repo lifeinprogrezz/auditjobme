@@ -73,6 +73,20 @@ const EUROPE_BOUNDS: [[number, number], [number, number]] = [[-32, 18], [48, 64]
 // The right panel (358px + margins) eats that side of the viewport: every camera
 // move must aim for the VISIBLE centre, or targets land hidden behind the panel.
 const EUROPE_PADDING = { top: 80, right: 390, bottom: 80, left: 50 };
+type CamPadding = typeof EUROPE_PADDING;
+// Scale a fixed padding budget down on small canvases: when padding exceeds the
+// canvas, maplibre's fitBounds silently no-ops (mercator) or THROWS in the
+// globe camera helper — the 440px horizontal budget above made every cluster
+// tap a dead click on portrait phones. Keeps >=120px of usable map per axis.
+function fitPad(map: maplibregl.Map, pad: CamPadding): CamPadding {
+  const el = map.getContainer();
+  const s = Math.min(
+    1,
+    Math.max(0, el.clientWidth - 120) / Math.max(1, pad.left + pad.right),
+    Math.max(0, el.clientHeight - 120) / Math.max(1, pad.top + pad.bottom),
+  );
+  return { top: pad.top * s, right: pad.right * s, bottom: pad.bottom * s, left: pad.left * s };
+}
 // Startupmap's bubble click is a one-shot reveal (easeTo z12/800ms lands on the
 // full logo cloud). Our expansion zoom at continent scale often splits into
 // sub-clusters instead — so a click always eases to at least clusterMaxZoom+0.6,
@@ -273,7 +287,11 @@ function addTerrain(map: maplibregl.Map, theme: MapTheme): void {
       tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
       encoding: "terrarium",
       tileSize: 256,
-      maxzoom: 13,
+      // z5 cap: DEM decode work scales with tile churn and blocked the main
+      // thread for tens of seconds during multi-zoom flights at maxzoom 13
+      // (live-measured). The terrain identity is a globe-scale effect (z2-4.5);
+      // overzoomed z5 tiles carry it to the z8 layer cap unnoticed.
+      maxzoom: 5,
     });
     // Insert ABOVE the basemap water fill: before the layer that follows the
     // LAST fill layer whose id matches /water/i (the mockup's _fs logic).
@@ -289,6 +307,10 @@ function addTerrain(map: maplibregl.Map, theme: MapTheme): void {
         id: "hillshade",
         type: "hillshade",
         source: "dem",
+        // The terrain identity is a GLOBE-scale effect. Past z8 the DEM stack
+        // does multi-second main-thread work per view (live-measured 15-18s
+        // freezes at z10.6) — cap it where the city basemap takes over anyway.
+        maxzoom: 8,
         paint: {
           "hillshade-shadow-color": theme.hill.shadow,
           "hillshade-highlight-color": theme.hill.highlight,
@@ -305,6 +327,8 @@ function addTerrain(map: maplibregl.Map, theme: MapTheme): void {
           id: "sea-color",
           type: "color-relief",
           source: "dem",
+          // Same z8 cap as hillshade — see the freeze note above.
+          maxzoom: 8,
           paint: {
             "color-relief-color": [
               "interpolate",
@@ -337,9 +361,12 @@ function addRolesLayers(map: maplibregl.Map, data: FeatureCollection): void {
     data,
     cluster: true,
     clusterRadius: 46,
-    // Cities stay a single glass bubble until true city zoom; past 10 the
-    // sunflower logo cloud fans out OVER the city (startupmap behavior).
-    clusterMaxZoom: 10,
+    // Cities stay a single glass bubble until city zoom, then the sunflower
+    // logo cloud fans out. 9 = startupmap's measured explosion threshold AND
+    // the value that makes the one-click reveal complete: with 10, tiles were
+    // still clustered at the z10.6 reveal target, so a city click landed on
+    // sub-cluster bubbles that were a click dead-end (live-verified on London).
+    clusterMaxZoom: 9,
     clusterProperties: { maxScore: ["max", ["coalesce", ["get", "score"], -1]] },
   } as maplibregl.SourceSpecification);
   // Clusters + pins render as DOM markers (synced below) — but a source with NO
@@ -399,12 +426,12 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
             [Math.min(...lo) - 3, Math.min(...la) - 3],
             [Math.max(...lo) + 3, Math.max(...la) + 3],
           ],
-          { padding: { top: 90, right: 400, bottom: 90, left: 60 }, duration: CONTINENT_MS },
+          { padding: fitPad(map, { top: 90, right: 400, bottom: 90, left: 60 }), duration: CONTINENT_MS },
         );
       }
     } else {
       src.setData({ type: "FeatureCollection", features: [] });
-      map.fitBounds(EUROPE_BOUNDS, { padding: EUROPE_PADDING, duration: CONTINENT_MS });
+      map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: CONTINENT_MS });
     }
   } catch {
     /* style mid-load or map mid-teardown */
@@ -537,15 +564,23 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
       const sig = isCluster
         ? `${props.point_count}|${props.maxScore}`
         : pinSig(props as unknown as PinProps);
+      const coords = (f.geometry as GeoPoint).coordinates as [number, number];
       const existing = pins.get(key);
       if (existing) {
         // querySourceFeatures can serve pre-setData tiles; the idle re-sync then
         // reaches here with fresh properties — rebuild the marker if they changed.
-        if (existing.getElement().dataset.sig === sig) continue;
+        if (existing.getElement().dataset.sig === sig) {
+          // Always re-anchor the kept marker: supercluster ids are dataset-relative,
+          // so after any setData (search keystroke, score landing) the same
+          // c${cluster_id} key + count|score sig can name a DIFFERENT cluster —
+          // without this, the bubble strands over the old city while its click
+          // resolves against the new one (review finding, 2026-07-05).
+          existing.setLngLat(coords);
+          continue;
+        }
         existing.remove();
         pins.delete(key);
       }
-      const coords = (f.geometry as GeoPoint).coordinates as [number, number];
       let el: HTMLDivElement;
       if (isCluster) {
         el = buildCluster(Number(props.point_count), Number(props.maxScore));
@@ -553,18 +588,32 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
         el.addEventListener("click", () => {
           const src = map.getSource("roles") as maplibregl.GeoJSONSource | undefined;
           if (!src) return;
+          // One-click reveal, supercluster-correct: frame the cluster's MEMBER
+          // POINTS, capped at the logo-cloud zoom. A city-sized cluster lands at
+          // CITY_REVEAL_ZOOM exactly (fully-fanned sunflower cloud, startupmap's
+          // easeTo-z12 feel); a continent-spanning cluster frames its member
+          // cities instead — easing to a fixed zoom on the cluster CENTROID put
+          // the camera over empty countryside between cities (live-verified on
+          // the 432-role Europe bubble).
           src
-            .getClusterExpansionZoom(clusterId)
-            // Padding aims the city at the VISIBLE centre (left of the panel),
-            // so the logo cloud opens in view instead of behind the glass.
-            .then((zoom) =>
-              map.easeTo({
-                center: coords,
-                zoom: Math.max(zoom, CITY_REVEAL_ZOOM),
-                duration: FLIGHT_MS,
-                padding: EUROPE_PADDING,
-              }),
-            )
+            .getClusterLeaves(clusterId, 10000, 0)
+            .then((leaves) => {
+              const pts = leaves
+                .map((l) => (l.geometry as GeoPoint).coordinates as [number, number])
+                .filter((c) => Number.isFinite(c?.[0]) && Number.isFinite(c?.[1]));
+              if (!pts.length) return;
+              const lo = pts.map((c) => c[0]);
+              const la = pts.map((c) => c[1]);
+              // Padding aims the content at the VISIBLE centre (left of the
+              // panel), so the reveal opens in view instead of behind the glass.
+              map.fitBounds(
+                [
+                  [Math.min(...lo), Math.min(...la)],
+                  [Math.max(...lo), Math.max(...la)],
+                ],
+                { padding: fitPad(map, EUROPE_PADDING), maxZoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS },
+              );
+            })
             .catch(() => {});
         });
       } else {
@@ -607,6 +656,14 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
       }
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
       map.on("moveend", syncMarkers);
+      // moveend fires before the new GeoJSON tiles are parsed, and idle can lag
+      // seconds behind it (terrain raster trickle) — sync the moment the roles
+      // source itself reports loaded, so markers re-cluster right after a
+      // reveal flight instead of on the next camera nudge. syncMarkers is
+      // sig-deduped, so the extra firings are cheap no-ops.
+      map.on("sourcedata", (e) => {
+        if (e.sourceId === "roles" && e.isSourceLoaded) syncMarkers();
+      });
       map.on("move", updateHalo);
       map.on("resize", updateHalo);
       map.on("load", () => {
@@ -620,7 +677,7 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onOpenRole
         fitTimerRef.current = window.setTimeout(() => {
           if (mapRef.current !== map || focusRef.current) return;
           try {
-            map.fitBounds(EUROPE_BOUNDS, { padding: EUROPE_PADDING, duration: CONTINENT_MS });
+            map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: CONTINENT_MS });
           } catch {
             /* ignore */
           }
