@@ -99,14 +99,9 @@ export function useRolesData() {
   useEffect(() => {
     const runId = ++runRef.current;
     async function load() {
-      if (!user) {
-        // Sign-out: clear the previous session's personalized state.
-        setJobs([]);
-        setProfile(null);
-        setApplied(new Set());
-        setLoading(false);
-        return;
-      }
+      // Jobs are public postings (anon SELECT on is_live rows, migration
+      // 20260705121000) — fetch them signed-in or not. Everything personalized
+      // below stays behind the user check.
       let rows: JobsRow[] = [];
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await supabase
@@ -117,6 +112,15 @@ export function useRolesData() {
         if (error || !data) break;
         rows = rows.concat(data as JobsRow[]);
         if (data.length < PAGE) break;
+      }
+      if (!user) {
+        if (runRef.current !== runId) return;
+        // Anonymous browse (or sign-out: clears the previous session's state).
+        setJobs(rows.map(enrich).sort(byScore));
+        setProfile(null);
+        setApplied(new Set());
+        setLoading(false);
+        return;
       }
       const { data: scoresData } = await supabase
         .from("scores")
