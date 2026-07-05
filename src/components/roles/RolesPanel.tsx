@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LEVELS, hueFor, postedAgo, scoreBucket, type RoleJob } from "@/lib/roles";
-import { logoUrl } from "@/lib/logodev";
+import { logoUrl, faviconUrls } from "@/lib/logodev";
 
 // The pool is unbounded (1000+ live rows); each card mounts a Logo.dev <img>,
 // so cap the DOM and point the user at search/filters for the tail.
@@ -34,12 +34,13 @@ export type RolesPanelProps = {
   onClearCity?: () => void;
 };
 
-/** Logo.dev → site favicon → colored-initial fallback chain (a logo on every co). */
+/** Logo.dev → site favicon (DuckDuckGo, then Google) → colored initial. logo.dev
+ *  404s when it lacks the brand, so the favicon step shows the real mark instead
+ *  of logo.dev's generic pinwheel placeholder (the TravelPerk case). */
 function Logo({ domain, company }: { domain: string | null; company: string }) {
-  const primary = domain ? logoUrl(domain) : null;
-  const favicon = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128` : null;
-  const [stage, setStage] = useState<0 | 1 | 2>(0); // 0 logo.dev · 1 favicon · 2 initial
-  const src = stage === 0 ? primary : stage === 1 ? favicon : null;
+  const chain = domain ? [logoUrl(domain), ...faviconUrls(domain)].filter(Boolean) : [];
+  const [stage, setStage] = useState(0);
+  const src = chain[stage] ?? null;
   if (!src) {
     return (
       <span className="fb" style={{ background: hueFor(company) }}>
@@ -47,7 +48,7 @@ function Logo({ domain, company }: { domain: string | null; company: string }) {
       </span>
     );
   }
-  return <img src={src} alt="" onError={() => setStage((s) => (s + 1) as 0 | 1 | 2)} />;
+  return <img src={src as string} alt="" onError={() => setStage((s) => s + 1)} />;
 }
 
 /**

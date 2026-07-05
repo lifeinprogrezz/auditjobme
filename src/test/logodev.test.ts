@@ -53,7 +53,7 @@ describe("logoUrl", () => {
   it("builds the Logo.dev URL when a token is configured", () => {
     vi.stubEnv("VITE_LOGODEV_TOKEN", "pk_test_123");
     expect(logoUrl("personio.com")).toBe(
-      "https://img.logo.dev/personio.com?token=pk_test_123&size=96&format=png&theme=dark&retina=true",
+      "https://img.logo.dev/personio.com?token=pk_test_123&size=96&format=png&theme=dark&retina=true&fallback=404",
     );
   });
 

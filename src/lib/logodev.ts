@@ -133,15 +133,23 @@ export function domainFor(company: string, source: string | null): string | null
 }
 
 /**
- * Logo.dev image URL; null without a token. NO fallback=404 (Rober 7-05): unknown
- * brands get logo.dev's generated monogram instead of our letter tile — 'a logo on
- * every company', the approved mockup behavior. Letter fallback still covers null
- * domains + network errors. `theme` must match the SURFACE the logo sits on: "dark" returns light
- * marks (for the dark glass cards), "light" returns dark/colored marks (for the
- * white map pins — dark-theme marks there are white-on-white, i.e. invisible).
+ * Logo.dev image URL; null without a token. fallback=404 (Rober 7-05): for a domain
+ * logo.dev DOESN'T have (e.g. travelperk.com) it must 404 so onError fires and the
+ * caller falls through to the site's real favicon — WITHOUT it, logo.dev serves a
+ * generic colored-pinwheel placeholder with a 200 (identical for every unknown
+ * domain), which reads as a wrong logo. `theme` matches the SURFACE: "dark" returns
+ * light marks (dark glass cards), "light" returns dark/colored marks (white map pins).
  */
 export function logoUrl(domain: string, theme: "dark" | "light" = "dark"): string | null {
   const token = import.meta.env.VITE_LOGODEV_TOKEN as string | undefined;
   if (!token) return null;
-  return `https://img.logo.dev/${domain}?token=${token}&size=96&format=png&theme=${theme}&retina=true`;
+  return `https://img.logo.dev/${domain}?token=${token}&size=96&format=png&theme=${theme}&retina=true&fallback=404`;
+}
+
+/** Site favicon fallback chain (real brand mark for domains logo.dev lacks). */
+export function faviconUrls(domain: string): string[] {
+  return [
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
+  ];
 }

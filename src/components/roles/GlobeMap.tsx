@@ -6,7 +6,7 @@ import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, Point as GeoPoint } from "geojson";
 import { clusterTier, hueFor, scoreBucket, type RoleJob } from "@/lib/roles";
-import { logoUrl } from "@/lib/logodev";
+import { logoUrl, faviconUrls } from "@/lib/logodev";
 
 export type GlobeMapProps = {
   jobs: RoleJob[];
@@ -207,14 +207,15 @@ function buildPin(p: PinProps): HTMLDivElement {
   if (src) {
     const img = document.createElement("img");
     img.alt = "";
-    // Logo fallback chain toward "a logo on every company": logo.dev →
-    // the site's real favicon → colored initial. logo.dev serves a monogram
-    // for known-but-logoless brands, so the favicon step mainly rescues a bad
-    // domain; the initial only shows when we have no usable domain at all.
+    // Fallback chain: logo.dev (404s when it lacks the brand) → the site's real
+    // favicon (DuckDuckGo, then Google) → colored initial. This is what shows a
+    // correct TravelPerk mark instead of logo.dev's generic pinwheel placeholder.
+    const chain = p.domain ? faviconUrls(p.domain) : [];
+    let step = -1;
     img.onerror = () => {
-      if (!img.dataset.fav && p.domain) {
-        img.dataset.fav = "1";
-        img.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(p.domain)}&sz=128`;
+      step++;
+      if (step < chain.length) {
+        img.src = chain[step];
         return;
       }
       img.style.display = "none";
@@ -723,14 +724,24 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyC
               if (!framePts.length) return;
               if (dominant) onCityClickRef.current?.(domCity);
               else if (byCity.size === 1 && domCity) onCityClickRef.current?.(domCity);
-              const lo = framePts.map((c) => c[0]);
-              const la = framePts.map((c) => c[1]);
+              // Trim per-axis outliers before framing: a company geocoded to a far
+              // suburb (La Fourche → Mitry-Mory, 25km out but still tagged "Paris")
+              // must not blow out the frame so the camera stops zoomed-out between
+              // the core and the stray pin. Frame the 8th–92nd percentile of each
+              // axis — the dense city core — with a floor so tiny sets are unaffected.
+              const pctBounds = (vals: number[]) => {
+                const s = [...vals].sort((a, b) => a - b);
+                const q = (t: number) => s[Math.min(s.length - 1, Math.max(0, Math.round((s.length - 1) * t)))];
+                return s.length >= 8 ? ([q(0.08), q(0.92)] as const) : ([s[0], s[s.length - 1]] as const);
+              };
+              const [loMin, loMax] = pctBounds(framePts.map((c) => c[0]));
+              const [laMin, laMax] = pctBounds(framePts.map((c) => c[1]));
               // Padding aims the content at the VISIBLE centre (left of the
               // panel), so the reveal opens in view instead of behind the glass.
               map.fitBounds(
                 [
-                  [Math.min(...lo), Math.min(...la)],
-                  [Math.max(...lo), Math.max(...la)],
+                  [loMin, laMin],
+                  [loMax, laMax],
                 ],
                 { padding: fitPad(map, EUROPE_PADDING), maxZoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS },
               );
