@@ -188,6 +188,19 @@ async function main() {
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  // Canonicalize before dedup: tracking suffixes (?lever-source=..., utm) on ATS
+  // hosts create duplicate rows under jobs.url UNIQUE — the 01Health/32Co class.
+  // Greenhouse is exempt (its embedded boards need ?gh_jid=). Board-class sources
+  // are listed first in SOURCES, so on collision the correctly-attributed row wins.
+  const STRIP_QUERY_HOSTS = [/(^|\.)lever\.co$/, /(^|\.)ashbyhq\.com$/, /(^|\.)workable\.com$/, /(^|\.)smartrecruiters\.com$/, /(^|\.)breezy\.hr$/];
+  const canonUrl = (u) => {
+    try {
+      const x = new URL(u);
+      if (STRIP_QUERY_HOSTS.some((re) => re.test(x.hostname))) { x.search = ""; x.hash = ""; }
+      return x.toString();
+    } catch { return u; }
+  };
+  all = all.map((j) => ({ ...j, url: canonUrl(j.url) }));
   const seen = new Set();
   all = all.filter((j) => (seen.has(j.url) ? false : seen.add(j.url)));
   // Drop rows missing a required NOT NULL field. Some scraped sources (e.g. startupmap)
