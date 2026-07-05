@@ -4,16 +4,16 @@ import { clusterTier } from "@/lib/roles";
 // Startupmap-matched tier ladder (spec: planning repo
 // docs/specs/2026-07-05-startupmap-motion-choreography.md §4.5):
 // count breaks <15 / ≥15 / ≥50 / ≥150, light glass below 50, ink above,
-// z ladder 20/22/24, "roles" sublabel on the top tier only.
+// z ladder 20/22/24. No sublabel on any tier — the "roles" word under the
+// count pushed the number off the bubble's center (removed 7-05).
 describe("clusterTier", () => {
-  it("smallest tier: 2–14 → 44px light, z20, no sublabel", () => {
+  it("smallest tier: 2–14 → 44px light, z20", () => {
     for (const n of [2, 9, 14]) {
       expect(clusterTier(n)).toEqual({
         size: 44,
         fontSize: 13.5,
         light: true,
         zIndex: 20,
-        sublabel: null,
       });
     }
   });
@@ -25,7 +25,6 @@ describe("clusterTier", () => {
         fontSize: 14,
         light: true,
         zIndex: 20,
-        sublabel: null,
       });
     }
   });
@@ -37,19 +36,17 @@ describe("clusterTier", () => {
         fontSize: 15,
         light: false,
         zIndex: 22,
-        sublabel: null,
       });
     }
   });
 
-  it("mega tier: ≥150 → 76px ink, z24, roles sublabel", () => {
+  it("mega tier: ≥150 → 76px ink, z24, count only (no sublabel)", () => {
     for (const n of [150, 400]) {
       expect(clusterTier(n)).toEqual({
         size: 76,
         fontSize: 17,
         light: false,
         zIndex: 24,
-        sublabel: "roles",
       });
     }
   });

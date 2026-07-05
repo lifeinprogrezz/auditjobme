@@ -152,12 +152,6 @@ function buildCluster(count: number, maxScore: number): HTMLDivElement {
   // Raw count, never abbreviated (startupmap: the precision reads as honesty).
   cnt.textContent = String(count);
   el.appendChild(cnt);
-  if (t.sublabel) {
-    const sub = document.createElement("span");
-    sub.className = "sub";
-    sub.textContent = t.sublabel;
-    el.appendChild(sub);
-  }
   return el;
 }
 
