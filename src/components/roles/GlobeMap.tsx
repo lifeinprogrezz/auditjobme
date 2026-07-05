@@ -48,7 +48,7 @@ const THEMES: Record<"dark" | "light", MapTheme> = {
     styleUrl: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
     // The startupmap-reference halo: a luminous white-blue atmosphere ring
     // glowing against the dark starfield space shared with dark mode.
-    sky: { "sky-color": "#9fc2dd", "horizon-color": "#f6fbff", "fog-color": "#dfeaf2" },
+    sky: { "sky-color": "#cbe3f6", "horizon-color": "#ffffff", "fog-color": "#eaf2f8" },
     // CONTRAST (Rober 7-05): light-mode readability = a real VALUE STEP between
     // land and everything else (the startupmap lesson). Sea is mid-tone, not mist.
     seaStops: [
@@ -59,7 +59,7 @@ const THEMES: Record<"dark" | "light", MapTheme> = {
     border: { color: "#5c7280", opacity: 0.5, width: 0.75 },
     // Land stays light — the step against the darker sea carries the contrast.
     baseTint: "#eff2f4",
-    atmosphere: 0.85,
+    atmosphere: 1,
     waterColor: "#aec3d2",
     labelColor: "#4e5f6a",
   },

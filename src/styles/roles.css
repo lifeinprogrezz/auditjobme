@@ -15,7 +15,13 @@
   --text: #eaf2f3; --muted: #9db1b8; --subtle: #6e858e;
   --great: #1fd8b8; --great-deep: #12a594; --great-ink: #04241f;
   --mid: #ffc44d; --low: #ff6f4d;
-  --accent: #9e8cff; --accent-2: #b7a8ff;
+  /* Interaction accent = NEUTRAL INK (Rober 7-05): interactions are quiet,
+   * logos + the score carry all the color. Swap these five to re-accent the app. */
+  --act-tint: rgba(255, 255, 255, 0.1);
+  --act-border: rgba(255, 255, 255, 0.38);
+  --act-strong: #eaf2f3;
+  --act-strong-ink: #0b1f26;
+  --act-shadow: rgba(0, 0, 0, 0.5);
   --glass: rgba(18, 32, 39, 0.55); --glass-2: rgba(22, 38, 46, 0.7);
   --rim: rgba(255, 255, 255, 0.14); --hair: rgba(255, 255, 255, 0.07);
   /* Rim-light system (approved live 2026-07-05): glass tells at the rim — light
@@ -43,14 +49,17 @@
 .roles-theme .num { font-family: var(--font-m); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
 
 /* starfield + atmosphere */
-.roles-theme .stars { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.5;
-  background-image: radial-gradient(1px 1px at 20% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 20%, #cfe, transparent), radial-gradient(1px 1px at 40% 70%, #fff, transparent), radial-gradient(1.5px 1.5px at 85% 60%, #bdf, transparent), radial-gradient(1px 1px at 12% 80%, #fff, transparent), radial-gradient(1px 1px at 60% 85%, #fff, transparent), radial-gradient(1px 1px at 90% 35%, #cff, transparent), radial-gradient(1px 1px at 33% 15%, #fff, transparent); }
+.roles-theme .stars { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.55;
+  background-image: radial-gradient(1px 1px at 20% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 20%, #cfe, transparent), radial-gradient(1px 1px at 40% 70%, #fff, transparent), radial-gradient(1.5px 1.5px at 85% 60%, #bdf, transparent), radial-gradient(1px 1px at 12% 80%, #fff, transparent), radial-gradient(1px 1px at 60% 85%, #fff, transparent), radial-gradient(1px 1px at 90% 35%, #cff, transparent), radial-gradient(1px 1px at 33% 15%, #fff, transparent);
+  /* repeat each layer at a different rhythm = a real field, not 8 lonely dots */
+  background-size: 520px 520px, 640px 640px, 750px 750px, 880px 880px, 570px 570px, 690px 690px, 810px 810px, 460px 460px; }
+.roles-theme.light .stars { opacity: 0.75; }
 .roles-theme .roles-map { position: absolute; inset: 0; z-index: 1; background: transparent; }
 .roles-theme .vig { position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 260px 60px rgba(0, 0, 0, 0.55); }
 
 /* attribution pill (custom, bottom-center) */
-.roles-theme .attrib { position: absolute; left: 14px; bottom: 12px; z-index: 12; border-radius: 10px; padding: 5px 11px; font-size: 10px; color: var(--subtle); display: flex; gap: 8px; align-items: center; background: rgba(22, 38, 46, 0.6); border: 1px solid var(--rim); box-shadow: var(--sh); }
-.roles-theme .attrib::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent 44%); mix-blend-mode: screen; }
+/* Credits: quiet native-map text, no glass box (the pill read as "forced"). */
+.roles-theme .attrib { position: absolute; left: 16px; bottom: 8px; z-index: 12; padding: 0; font-size: 10px; color: var(--subtle); display: flex; gap: 7px; align-items: center; background: none; border: 0; box-shadow: none; opacity: 0.85; }
 .roles-theme .attrib > * { position: relative; z-index: 1; }
 .roles-theme .attrib a { color: #9fb4b9; text-decoration: none; }
 .roles-theme .attrib a:hover { color: #fff; }
@@ -87,27 +96,27 @@
 .roles-theme .spacer { flex: 1; }
 .roles-theme .seg { display: flex; background: rgba(255, 255, 255, 0.06); border-radius: 11px; padding: 3px; position: relative; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.05); }
 .roles-theme:not(.scored) .seg { display: none; }
-.roles-theme .navcv { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: #c8f3e9; border: 1px solid rgba(31, 216, 184, 0.3); background: rgba(31, 216, 184, 0.1); box-shadow: var(--sh); transition: background 0.2s, border-color 0.2s; }
-.roles-theme .navcv:hover { background: rgba(31, 216, 184, 0.16); border-color: rgba(31, 216, 184, 0.45); }
-.roles-theme .navcv .sp { width: 22px; height: 22px; flex: none; border-radius: 7px; display: grid; place-items: center; color: var(--great-ink); background: linear-gradient(135deg, #1fd8b8, #12a594); }
+.roles-theme .navcv { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); border: 1px solid var(--act-border); background: var(--act-tint); box-shadow: var(--sh); transition: background 0.2s, border-color 0.2s; }
+.roles-theme .navcv:hover { background: var(--act-strong); color: var(--act-strong-ink); }
+.roles-theme .navcv .sp { width: 22px; height: 22px; flex: none; border-radius: 7px; display: grid; place-items: center; color: var(--act-strong-ink); background: var(--act-strong); }
 .roles-theme.scored .navcv { display: none; }
 .roles-theme .seg button { width: 74px; font: inherit; font-size: 12.5px; font-weight: 600; border: 0; background: transparent; color: var(--muted); padding: 7px 0; border-radius: 8px; cursor: pointer; z-index: 1; transition: color 0.25s; }
-.roles-theme .seg button.on { color: #06231e; }
-.roles-theme .seg .ind { position: absolute; top: 3px; left: 3px; height: calc(100% - 6px); width: 74px; background: linear-gradient(150deg, var(--great), #36e0c6); border-radius: 8px; box-shadow: 0 0 18px rgba(31, 216, 184, 0.6); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.roles-theme .seg button.on { color: var(--act-strong-ink); }
+.roles-theme .seg .ind { position: absolute; top: 3px; left: 3px; height: calc(100% - 6px); width: 74px; background: var(--act-strong); border-radius: 8px; box-shadow: 0 2px 8px -2px var(--act-shadow); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .roles-theme .seg.list .ind { transform: translateX(74px); }
 .roles-theme .filterbtn { display: flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .filterbtn:hover { background: rgba(255, 255, 255, 0.1); }
-.roles-theme .filterbtn.on { background: rgba(31, 216, 184, 0.14); border-color: rgba(31, 216, 184, 0.5); color: #bff5ec; }
+.roles-theme .filterbtn.on { background: var(--act-tint); border-color: var(--act-border); color: var(--text); }
 .roles-theme .filterbtn svg { opacity: 0.7; }
 .roles-theme .fchips { display: flex; align-items: center; gap: 8px; max-width: 0; opacity: 0; overflow: hidden; pointer-events: none; margin-left: 0; transition: max-width 0.34s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.26s ease, margin-left 0.34s; }
 .roles-theme .fchips.show { max-width: 460px; opacity: 1; pointer-events: auto; margin-left: 6px; }
 .roles-theme .fchips.expanded { overflow: visible; }
 .roles-theme .fchip { position: relative; display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 11px; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .fchip:hover { background: rgba(255, 255, 255, 0.1); color: var(--text); }
-.roles-theme .fchip.active { background: rgba(31, 216, 184, 0.14); border-color: rgba(31, 216, 184, 0.45); color: #bff5ec; }
+.roles-theme .fchip.active { background: var(--act-tint); border-color: var(--act-border); color: var(--text); }
 .roles-theme .fchip .caret { opacity: 0.6; transition: transform 0.2s; }
 .roles-theme .fchip.open .caret { transform: rotate(180deg); }
-.roles-theme .fcount { display: none; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 6px; background: var(--great); color: var(--great-ink); font-family: var(--font-m); font-size: 11px; font-weight: 700; align-items: center; justify-content: center; }
+.roles-theme .fcount { display: none; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 6px; background: var(--act-strong); color: var(--act-strong-ink); font-family: var(--font-m); font-size: 11px; font-weight: 700; align-items: center; justify-content: center; }
 .roles-theme .fchip.active .fcount { display: inline-flex; }
 .roles-theme .fdrop { position: absolute; top: calc(100% + 9px); left: 0; min-width: 206px; background: var(--glass-2); border: 1px solid var(--rim); border-radius: 14px; box-shadow: var(--sh); padding: 6px; display: flex; flex-direction: column; gap: 1px; z-index: 60; opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.98); transform-origin: top left; pointer-events: none; transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s; }
 .roles-theme .fchip.open .fdrop { opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: auto; }
@@ -116,8 +125,8 @@
 .roles-theme .fdrop label { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.15s; }
 .roles-theme .fdrop label:hover { background: rgba(255, 255, 255, 0.06); }
 .roles-theme .fdrop input { appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--rim); background: rgba(255, 255, 255, 0.04); cursor: pointer; position: relative; flex: none; }
-.roles-theme .fdrop input:checked { background: var(--great); border-color: var(--great); }
-.roles-theme .fdrop input:checked::after { content: ""; position: absolute; left: 5px; top: 1px; width: 4px; height: 9px; border: solid var(--great-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.roles-theme .fdrop input:checked { background: var(--act-strong); border-color: var(--act-strong); }
+.roles-theme .fdrop input:checked::after { content: ""; position: absolute; left: 5px; top: 1px; width: 4px; height: 9px; border: solid var(--act-strong-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .roles-theme .av { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--rim); background: conic-gradient(from 200deg, #1fd8b8, #3cb4ff, #9e8cff, #1fd8b8); box-shadow: 0 0 14px rgba(31, 216, 184, 0.4); cursor: pointer; }
 .roles-theme .signin { display: flex; align-items: center; height: 38px; padding: 0 16px; border-radius: 11px; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); cursor: pointer; text-decoration: none; transition: background 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .signin:hover { background: rgba(255, 255, 255, 0.1); }
@@ -128,10 +137,10 @@
  * (they stack in a vertical line instead of anchoring to their coordinates). */
 .roles-theme .cluster { display: grid; place-items: center; border-radius: 50%; cursor: pointer; color: #fff; background: rgba(14, 23, 30, 0.92); border: 1px solid var(--rim); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22), inset 0 -2px 6px -2px rgba(0, 0, 0, 0.4); transition: border-color 0.3s, box-shadow 0.3s; }
 .roles-theme .cluster::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 46%); mix-blend-mode: screen; }
-.roles-theme .cluster:hover { transform: scale(1.07); border-color: rgba(120, 215, 230, 0.55); z-index: 9; }
+.roles-theme .cluster:hover { border-color: rgba(255, 255, 255, 0.6); z-index: 9; }
 .roles-theme .cluster .cnt { font-family: var(--font-m); font-feature-settings: "tnum" 1; font-weight: 700; letter-spacing: -0.03em; line-height: 1; position: relative; z-index: 1; }
 .roles-theme .cluster.sm { background: rgba(255, 255, 255, 0.92); color: #16262e; border: 1px solid rgba(11, 31, 38, 0.14); box-shadow: 0 6px 18px -6px rgba(10, 25, 35, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
-.roles-theme .cluster.sm:hover { border-color: rgba(18, 165, 148, 0.5); }
+.roles-theme .cluster.sm:hover { border-color: var(--act-border); }
 .roles-theme.scored .cluster.great { border-color: rgba(31, 216, 184, 0.65); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), 0 0 22px rgba(31, 216, 184, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22); }
 .roles-theme.scored .cluster.mid { border-color: rgba(255, 196, 77, 0.6); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), 0 0 18px rgba(255, 196, 77, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22); }
 .roles-theme.scored .cluster.low { border-color: rgba(255, 111, 77, 0.55); box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.65), 0 0 16px rgba(255, 111, 77, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 8px 18px -10px rgba(170, 225, 240, 0.22); }
@@ -164,7 +173,7 @@
 .roles-theme.panel-hidden .panel { transform: translateX(440px); }
 .roles-theme .panel-toggle { position: absolute; top: 50%; right: 382px; transform: translateY(-50%); z-index: 25; width: 42px; height: 92px; border-radius: 21px; display: grid; place-items: center; cursor: pointer; background: var(--glass-2); -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%); border: 1px solid var(--rim); color: var(--muted); box-shadow: var(--sh); transition: right 0.45s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s, background 0.2s; }
 .roles-theme .panel-toggle svg { width: 20px; height: 20px; }
-.roles-theme .panel-toggle:hover { color: #fff; background: rgba(31, 216, 184, 0.16); }
+.roles-theme .panel-toggle:hover { color: #fff; background: var(--act-tint); }
 .roles-theme .panel-toggle svg { transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1); }
 .roles-theme.panel-hidden .panel-toggle { right: 14px; }
 .roles-theme.panel-hidden .panel-toggle svg { transform: rotate(180deg); }
@@ -181,9 +190,9 @@
 
 /* CARDS */
 .roles-theme .card { position: relative; border-radius: 18px; padding: 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px 13px; align-items: center; background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02)); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 3px 14px -8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 10px 20px -16px rgba(170, 225, 240, 0.16), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.3); transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; cursor: pointer; }
-.roles-theme .card::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0; opacity: 0; transition: opacity 0.35s ease; background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0px), rgba(31, 216, 184, 0.18), transparent 60%); }
+.roles-theme .card::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0; opacity: 0; transition: opacity 0.35s ease; background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0px), rgba(255, 255, 255, 0.1), transparent 60%); }
 .roles-theme .card > * { position: relative; z-index: 1; }
-.roles-theme .card:hover { transform: translateY(-2px); border-color: rgba(31, 216, 184, 0.35); box-shadow: 0 16px 36px -16px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 10px 20px -16px rgba(170, 225, 240, 0.2), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.3); }
+.roles-theme .card:hover { transform: translateY(-1px); border-color: var(--act-border); box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 10px 20px -16px rgba(170, 225, 240, 0.18), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.3); }
 .roles-theme .card:hover::after { opacity: 1; }
 .roles-theme .card .logo { width: 48px; height: 48px; border-radius: 12px; overflow: hidden; background: transparent; display: grid; place-items: center; }
 .roles-theme .card .logo img { width: 100%; height: 100%; object-fit: contain; }
@@ -198,11 +207,11 @@
 .roles-theme .card .acts { grid-column: 1 / -1; display: flex; gap: 8px; }
 .roles-theme .btn { font: inherit; font-size: 12px; font-weight: 600; border: 0; border-radius: 11px; padding: 9px 13px; cursor: pointer; transition: transform 0.15s, filter 0.15s, box-shadow 0.2s; }
 .roles-theme .btn:active { transform: scale(0.97); }
-.roles-theme .btn.p { background: linear-gradient(150deg, #1fd8b8, #12a594); color: #04241f; box-shadow: 0 8px 20px -6px rgba(18, 165, 148, 0.55); }
-.roles-theme .btn.p:hover { filter: brightness(1.06); box-shadow: 0 12px 26px -7px rgba(18, 165, 148, 0.7); }
+.roles-theme .btn.p { background: var(--act-strong); color: var(--act-strong-ink); box-shadow: 0 8px 20px -6px var(--act-shadow); }
+.roles-theme .btn.p:hover { filter: brightness(1.08); box-shadow: 0 12px 26px -7px var(--act-shadow); }
 .roles-theme .btn.g { background: rgba(255, 255, 255, 0.07); color: var(--text); border: 1px solid var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.24); }
 .roles-theme .btn.g:hover { background: rgba(255, 255, 255, 0.13); }
-.roles-theme .btn.applied { background: rgba(31, 216, 184, 0.14); color: #bff5ec; border: 1px solid rgba(31, 216, 184, 0.4); cursor: default; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.24); }
+.roles-theme .btn.applied { background: var(--act-tint); color: var(--muted); border: 1px solid var(--act-border); cursor: default; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.24); }
 
 /* score pill — pure light */
 .roles-theme .score { width: 54px; height: 54px; border-radius: 15px; display: grid; place-items: center; position: relative; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.22); }
@@ -256,24 +265,25 @@
 .roles-theme .dmore-h { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
 .roles-theme .dmore-list { display: flex; flex-direction: column; gap: 7px; }
 .roles-theme .dmore-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 11px; background: rgba(255, 255, 255, 0.035); border: 1px solid var(--hair); cursor: pointer; transition: background 0.2s, border-color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.2); }
-.roles-theme .dmore-item:hover { background: rgba(255, 255, 255, 0.07); border-color: rgba(31, 216, 184, 0.3); }
+.roles-theme .dmore-item:hover { background: rgba(255, 255, 255, 0.07); border-color: var(--act-border); }
 .roles-theme .dmore-item .mi-role { font-size: 13px; font-weight: 600; color: #fff; flex: 1; }
 .roles-theme .dmore-item .mi-city { font-size: 11.5px; color: var(--muted); }
 
 /* FOOTER TICKER — freshest roles marquee (startupmap-style footer, real data) */
-.roles-theme .ticker { position: absolute; bottom: 12px; left: calc((100% - 394px) / 2); transform: translateX(-50%); width: min(920px, calc(100% - 394px - 300px)); overflow: hidden; z-index: 11; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
-.roles-theme .ticker-track { display: flex; gap: 10px; width: max-content; animation: ticker-scroll 55s linear infinite; }
+.roles-theme .ticker { position: absolute; bottom: 12px; left: calc((100% - 394px) / 2); transform: translateX(-50%); width: min(920px, calc(100% - 394px - 60px)); overflow: hidden; z-index: 11; border-radius: 15px; padding: 5px 6px; background: var(--glass-2); border: 1px solid var(--rim); box-shadow: var(--sh); }
+.roles-theme .ticker::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 2; background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 44%); mix-blend-mode: screen; }
+.roles-theme.light .ticker::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), transparent 46%); mix-blend-mode: normal; }
+.roles-theme .ticker-track { display: flex; align-items: center; gap: 4px; width: max-content; animation: ticker-scroll 160s linear infinite; }
 .roles-theme .ticker:hover .ticker-track { animation-play-state: paused; }
 @keyframes ticker-scroll { to { transform: translateX(-50%); } }
-.roles-theme .tcard { display: flex; align-items: center; gap: 9px; padding: 8px 13px 8px 9px; border-radius: 13px; cursor: pointer; white-space: nowrap; background: var(--glass-2); border: 1px solid var(--rim); box-shadow: 0 8px 22px -8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.14); transition: border-color 0.2s; }
-.roles-theme .tcard:hover { border-color: rgba(18, 165, 148, 0.5); }
+.roles-theme .tcard { display: flex; align-items: center; gap: 9px; padding: 6px 13px 6px 8px; border-radius: 10px; cursor: pointer; white-space: nowrap; background: transparent; border: 0; transition: background 0.2s; }
+.roles-theme .tcard:hover { background: var(--act-tint); }
 .roles-theme .tcard .tlogo { width: 26px; height: 26px; border-radius: 8px; overflow: hidden; background: #fff; display: grid; place-items: center; flex: none; }
 .roles-theme .tcard .tlogo img { width: 100%; height: 100%; object-fit: contain; }
 .roles-theme .tcard .tlogo .fb { width: 100%; height: 100%; display: grid; place-items: center; font-family: var(--font-d); font-weight: 700; font-size: 12px; color: #fff; }
 .roles-theme .tcard .tco { font-size: 12px; font-weight: 700; color: var(--text); }
 .roles-theme .tcard .trole { font-size: 12px; color: var(--muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .roles-theme .tcard .tmeta { font-size: 11px; color: var(--subtle); max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
-.roles-theme.light .tcard { background: rgba(255, 255, 255, 0.8); box-shadow: 0 8px 22px -8px rgba(20, 60, 70, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
 
 /* empty / signed-out / loading states inside the panel */
 .roles-theme .panel-note { margin: auto 8px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.6; padding: 22px 16px; background: rgba(255, 255, 255, 0.035); border: 1px solid var(--hair); border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 10px 20px -16px rgba(170, 225, 240, 0.14), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.28); }
@@ -300,6 +310,11 @@
   /* Light glass defines itself with dark hairlines + INNER light — a white
    * border on light reads as a plain white contour, not glass (Rober, 7-05). */
   --rim: rgba(11, 31, 38, 0.13); --hair: rgba(11, 31, 38, 0.1);
+  --act-tint: rgba(11, 31, 38, 0.07);
+  --act-border: rgba(11, 31, 38, 0.32);
+  --act-strong: #15232c;
+  --act-strong-ink: #f4f8f9;
+  --act-shadow: rgba(16, 29, 38, 0.35);
   --sh: 0 18px 50px -16px rgba(20, 60, 70, 0.28),
     inset 0 1.5px 0 0 rgba(255, 255, 255, 0.95),
     inset 0 16px 32px -22px rgba(255, 255, 255, 0.6),
@@ -311,7 +326,7 @@
 }
 .roles-theme.light .liquid::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), transparent 44%); mix-blend-mode: normal; }
 .roles-theme.light .maplibregl-ctrl-icon { filter: invert(0.35); }
-.roles-theme.light .attrib { background: rgba(255, 255, 255, 0.65); color: var(--subtle); }
+.roles-theme.light .attrib { color: var(--muted); }
 .roles-theme.light .attrib a { color: #3a6470; }
 .roles-theme.light .attrib a:hover { color: #0b1f26; }
 
@@ -324,11 +339,8 @@
 .roles-theme.light .cmd kbd { color: var(--muted); background: rgba(11, 31, 38, 0.06); border-color: var(--hair); }
 .roles-theme.light .filterbtn { border-color: var(--hair); background: rgba(11, 31, 38, 0.045); color: var(--text); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 -1px 0 rgba(11, 31, 38, 0.06); }
 .roles-theme.light .filterbtn:hover { background: rgba(11, 31, 38, 0.08); }
-.roles-theme.light .filterbtn.on { background: rgba(18, 165, 148, 0.12); border-color: rgba(18, 165, 148, 0.45); color: #067a6f; }
 .roles-theme.light .fchip { border-color: var(--hair); background: rgba(11, 31, 38, 0.045); color: var(--muted); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 -1px 0 rgba(11, 31, 38, 0.06); }
 .roles-theme.light .fchip:hover { background: rgba(11, 31, 38, 0.08); color: var(--text); }
-.roles-theme.light .fchip.active { background: rgba(18, 165, 148, 0.12); border-color: rgba(18, 165, 148, 0.45); color: #067a6f; }
-.roles-theme.light .fcount { background: #12a594; color: #ffffff; }
 .roles-theme.light .fdrop { background: rgba(255, 255, 255, 0.74); border-color: rgba(11, 31, 38, 0.12); box-shadow: 0 18px 50px -16px rgba(20, 60, 70, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
 .roles-theme.light .fdrop::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), transparent 46%); mix-blend-mode: normal; }
 .roles-theme.light .fdrop label { color: var(--text); }
@@ -336,8 +348,6 @@
 .roles-theme.light .fdrop input { border-color: rgba(11, 31, 38, 0.25); background: #ffffff; }
 .roles-theme.light .seg { background: rgba(11, 31, 38, 0.06); box-shadow: inset 0 1px 2px rgba(11, 31, 38, 0.12), inset 0 -1px 0 rgba(255, 255, 255, 0.7); }
 .roles-theme.light .seg button { color: var(--muted); }
-.roles-theme.light .navcv { color: #067a6f; border-color: rgba(18, 165, 148, 0.4); background: rgba(18, 165, 148, 0.12); }
-.roles-theme.light .navcv:hover { background: rgba(18, 165, 148, 0.18); border-color: rgba(18, 165, 148, 0.55); }
 
 /* panel */
 .roles-theme.light .panel { background: rgba(247, 250, 251, 0.66);
@@ -352,14 +362,14 @@
     inset 0 -14px 28px -24px rgba(20, 60, 70, 0.14); }
 .roles-theme.light .panel::before { background: linear-gradient(150deg, rgba(255, 255, 255, 0.85), transparent 26%); mix-blend-mode: normal; }
 .roles-theme.light .panel-toggle { color: var(--muted); }
-.roles-theme.light .panel-toggle:hover { color: #0b1f26; background: rgba(18, 165, 148, 0.14); }
+.roles-theme.light .panel-toggle:hover { color: #0b1f26; background: var(--act-tint); }
 .roles-theme.light .ptitle { color: var(--text); }
 .roles-theme.light .cards::-webkit-scrollbar-thumb { background: rgba(11, 31, 38, 0.15); }
 
 /* cards */
 .roles-theme.light .card { background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.46)); border-color: rgba(11, 31, 38, 0.08); box-shadow: 0 8px 24px -8px rgba(20, 60, 70, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(11, 31, 38, 0.05); }
-.roles-theme.light .card::after { background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0px), rgba(18, 165, 148, 0.12), transparent 60%); }
-.roles-theme.light .card:hover { border-color: rgba(18, 165, 148, 0.4); box-shadow: 0 20px 50px -12px rgba(20, 60, 70, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
+.roles-theme.light .card::after { background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0px), rgba(11, 31, 38, 0.05), transparent 60%); }
+.roles-theme.light .card:hover { border-color: var(--act-border); box-shadow: 0 8px 22px -12px rgba(20, 60, 70, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
 .roles-theme.light .card .co { color: var(--muted); }
 .roles-theme.light .card .role { color: var(--text); }
 .roles-theme.light .card .meta { color: var(--subtle); }
@@ -369,7 +379,6 @@
 .roles-theme.light .score { background: rgba(11, 31, 38, 0.05); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -1px 0 rgba(11, 31, 38, 0.05); }
 .roles-theme.light .btn.g { background: rgba(11, 31, 38, 0.05); color: var(--text); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(11, 31, 38, 0.05); }
 .roles-theme.light .btn.g:hover { background: rgba(11, 31, 38, 0.09); }
-.roles-theme.light .btn.applied { background: rgba(18, 165, 148, 0.12); color: #067a6f; border-color: rgba(18, 165, 148, 0.4); }
 .roles-theme.light .panel-note { color: var(--muted); background: rgba(255, 255, 255, 0.6); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9); }
 .roles-theme.light .panel-note b { color: var(--text); }
 .roles-theme.light .scorebar { color: #067a6f; background: rgba(18, 165, 148, 0.08); border-color: rgba(18, 165, 148, 0.25); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7); }
@@ -391,6 +400,6 @@
 .roles-theme.light .dwhy { color: #1e4753; background: rgba(18, 165, 148, 0.08); border-color: rgba(18, 165, 148, 0.25); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7); }
 .roles-theme.light .dmore-h { color: var(--muted); }
 .roles-theme.light .dmore-item { background: rgba(11, 31, 38, 0.035); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -1px 0 rgba(11, 31, 38, 0.04); }
-.roles-theme.light .dmore-item:hover { background: rgba(11, 31, 38, 0.07); border-color: rgba(18, 165, 148, 0.35); }
+.roles-theme.light .dmore-item:hover { background: rgba(11, 31, 38, 0.07); border-color: var(--act-border); }
 .roles-theme.light .dmore-item .mi-role { color: var(--text); }
 .roles-theme.light .dmore-item .mi-city { color: var(--muted); }
