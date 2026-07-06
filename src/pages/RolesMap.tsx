@@ -59,6 +59,8 @@ export default function RolesMap() {
   // "Hot right now" is a first-impression state: once you've narrowed anything, a
   // later full clear shows the honest full list, not the curated showcase again.
   const [hasExplored, setHasExplored] = useState(false);
+  // Bumped to snap an anon visitor back to the Europe landing frame (see below).
+  const [europeFrame, setEuropeFrame] = useState(0);
   const [panelHidden, setPanelHidden] = useState(false);
   // Light is the shipped default (Rober's call, 2026-07-05); dark ink stays
   // as the alternate identity for a future theme setting.
@@ -143,7 +145,17 @@ export default function RolesMap() {
   useEffect(() => {
     if (!isDefaultView) setHasExplored(true);
   }, [isDefaultView]);
-  const showShowcase = isDefaultView && !hasExplored;
+  // Without a CV, a "score-ranked" full list is just alphabetical noise — so for an
+  // anon visitor, returning to the default view snaps back to the LANDING (showcase +
+  // Europe frame), exactly like the reset-view control. A scored visitor keeps the
+  // genuinely ranked full list with the camera left where it was (Rober 7-06).
+  useEffect(() => {
+    if (isDefaultView && hasExplored && !scored) {
+      setHasExplored(false);
+      setEuropeFrame((n) => n + 1);
+    }
+  }, [isDefaultView, hasExplored, scored]);
+  const showShowcase = isDefaultView && (!scored || !hasExplored);
 
   const hotJobs = useMemo(() => {
     // Each showcase card must be a FRESH (<=21d) real PM role: skip legal/EA/intern/
@@ -280,6 +292,7 @@ export default function RolesMap() {
         focusLngLats={focusLngLats}
         flyTo={flyTarget}
         cityFrame={cityFrame}
+        europeFrame={europeFrame}
         light={light}
         onCompanyClick={(company, city) => {
           // One role in this city → jump straight to its full detail; several →

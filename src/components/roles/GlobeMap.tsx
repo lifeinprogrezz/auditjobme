@@ -19,6 +19,9 @@ export type GlobeMapProps = {
   /** Headbar City-filter selection → frame these city coords: one eases in, several
    *  fit together. Nonce re-fires on every selection change. */
   cityFrame?: { coords: [number, number][]; nonce: number } | null;
+  /** Bump to snap the camera back to the Europe landing frame (an anon visitor
+   *  returning to the default view). */
+  europeFrame?: number;
   /** Full light identity (paper basemap + light layer palette). Default dark ink. */
   light?: boolean;
   /** Company-logo click → filter the panel to that company's roles IN THAT CITY
@@ -532,7 +535,7 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 // `scored` stays in the props type for the page contract, but the map needs no
 // scored logic: marker bucket classes are permanent and CSS gates them on the
 // root .scored class.
-export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, light = false, onCompanyClick, onCityClick, onResetView }: GlobeMapProps) {
+export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeFrame, light = false, onCompanyClick, onCityClick, onResetView }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const haloRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -1008,6 +1011,16 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, light =
       });
     }
   }, [cityFrame]);
+
+  // Anon visitor returned to the default view → snap back to the Europe landing frame.
+  const europeFrameRef = useRef(0);
+  useEffect(() => {
+    if (!europeFrame || europeFrame === europeFrameRef.current) return;
+    const map = mapRef.current;
+    if (!map || !loadedRef.current) return;
+    europeFrameRef.current = europeFrame;
+    map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: CONTINENT_MS });
+  }, [europeFrame]);
 
   return (
     <>
