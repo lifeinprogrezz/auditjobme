@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  EMPTY_FILTERS,
   LEVELS,
   fitLabel,
   formatHeadcount,
@@ -15,6 +16,7 @@ import {
   scoreBucket,
   websiteUrl,
   type RoleJob,
+  type RolesFilters,
 } from "@/lib/roles";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
 
@@ -38,6 +40,9 @@ export type RolesPanelProps = {
   onCloseDetail: () => void;
   onScoreMore: () => void;
   onToggleHidden: () => void;
+  /** The live headbar filter state (mirrored as removable chips in the panel). */
+  filters: RolesFilters;
+  onFilters: (f: RolesFilters) => void;
   /** Map selection: company and/or city, each independently removable via a chip. */
   selCo?: string | null;
   selCity?: string | null;
@@ -128,6 +133,8 @@ export default function RolesPanel({
   onCloseDetail,
   onScoreMore,
   onToggleHidden,
+  filters,
+  onFilters,
   selCo,
   selCity,
   onClearCo,
@@ -145,16 +152,43 @@ export default function RolesPanel({
   const goApply = (_j: RoleJob) => navigate("/underconstruction");
   const onAddCv = () => navigate("/underconstruction");
 
-  // In-panel search: inside a city/company context, a local box finds a specific
-  // company here without going back up to the headbar (Rober 7-06). It narrows ONLY
-  // the panel's current list (company + role); the headbar search stays global, and
-  // it resets whenever the city/company context changes.
+  // Active-filter chips: map selection (co/city) + every headbar filter, each
+  // removable. They read/write the SAME filter state the headbar uses, so the two
+  // can never drift out of sync (Rober 7-06).
+  const levelLabel = (v: string) => LEVELS.find((l) => l.value === v)?.label ?? v;
+  const remove = (key: "levels" | "cities" | "sectors" | "sizes", v: string) =>
+    onFilters({ ...filters, [key]: (filters[key] as string[]).filter((x) => x !== v) });
+  const activeChips: { key: string; label: string; bold?: boolean; onX?: () => void }[] = [
+    ...(selCo ? [{ key: "co", label: selCo, bold: true, onX: onClearCo }] : []),
+    ...(selCity ? [{ key: "citysel", label: selCity, onX: onClearCity }] : []),
+    ...(filters.query
+      ? [{ key: "q", label: `“${filters.query}”`, onX: () => onFilters({ ...filters, query: "" }) }]
+      : []),
+    ...filters.levels.map((v) => ({ key: `lv-${v}`, label: levelLabel(v), onX: () => remove("levels", v) })),
+    ...filters.cities.map((v) => ({ key: `ci-${v}`, label: v, onX: () => remove("cities", v) })),
+    ...filters.sectors.map((v) => ({ key: `se-${v}`, label: v, onX: () => remove("sectors", v) })),
+    ...filters.sizes.map((v) => ({ key: `sz-${v}`, label: v, onX: () => remove("sizes", v) })),
+    ...(filters.remoteOnly
+      ? [{ key: "remote", label: "Remote", onX: () => onFilters({ ...filters, remoteOnly: false }) }]
+      : []),
+  ];
+  const clearAllFilters = () => {
+    onFilters(EMPTY_FILTERS);
+    onClearCo?.();
+    onClearCity?.();
+  };
+
+  // In-panel search: inside any narrowed view, a local box finds a company without
+  // going back up to the headbar (Rober 7-06). It narrows ONLY the panel's current
+  // list (company + role); the headbar search stays global, and it resets whenever
+  // the context changes.
+  const searchTarget = selCity || selCo || (filters.cities.length === 1 ? filters.cities[0] : null);
   const [panelQ, setPanelQ] = useState("");
   const panelSearchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setPanelQ("");
   }, [selCo, selCity]);
-  const listContext = Boolean(selCo || selCity);
+  const listContext = activeChips.length > 0;
   const shown = (() => {
     const q = panelQ.trim().toLowerCase();
     return q ? jobs.filter((j) => `${j.company} ${j.title}`.toLowerCase().includes(q)) : jobs;
@@ -172,21 +206,25 @@ export default function RolesPanel({
   const renderCards = () => (
     <>
       <h1 className="ptitle">{defaultView ? "Hot right now" : "Your matches"}</h1>
-      {(selCo || selCity) && (
+      {activeChips.length > 0 && (
         <div className="selhdr">
-          {selCo && (
-            <button className="selchip" onClick={onClearCo} aria-label={`Remove ${selCo} filter`}>
-              <b>{selCo}</b>
+          {activeChips.map((c) => (
+            <button
+              key={c.key}
+              className="selchip"
+              onClick={c.onX}
+              aria-label={`Remove ${c.label} filter`}
+            >
+              {c.bold ? <b>{c.label}</b> : c.label}
               <span className="x">×</span>
             </button>
-          )}
-          {selCity && (
-            <button className="selchip" onClick={onClearCity} aria-label={`Remove ${selCity} filter`}>
-              {selCity}
-              <span className="x">×</span>
+          ))}
+          <span className="selcount">{shown.length} roles</span>
+          {activeChips.length > 1 && (
+            <button className="selclear" onClick={clearAllFilters}>
+              Clear all
             </button>
           )}
-          <span className="selcount">{shown.length}</span>
         </div>
       )}
       {listContext && jobs.length > 0 && (
@@ -199,7 +237,7 @@ export default function RolesPanel({
             ref={panelSearchRef}
             type="text"
             aria-label="Search this list"
-            placeholder={`Search in ${selCity || selCo}`}
+            placeholder={searchTarget ? `Search in ${searchTarget}` : "Search these roles"}
             value={panelQ}
             onChange={(e) => setPanelQ(e.target.value)}
           />

@@ -151,9 +151,9 @@
 .roles-theme .fdrop > * { position: relative; z-index: 1; }
 .roles-theme .fdrop label { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.15s; }
 .roles-theme .fdrop label:hover { background: rgba(255, 255, 255, 0.06); }
-.roles-theme .fdrop input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--rim); background: rgba(255, 255, 255, 0.04); cursor: pointer; position: relative; flex: none; }
+.roles-theme .fdrop input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--act-border); background: rgba(255, 255, 255, 0.04); cursor: pointer; position: relative; flex: none; }
 .roles-theme .fdrop input:checked { background: var(--act-strong); border-color: var(--act-strong); }
-.roles-theme .fdrop input:checked::after { content: ""; position: absolute; left: 5px; top: 1px; width: 4px; height: 9px; border: solid var(--act-strong-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.roles-theme .fdrop input:checked::after { content: ""; position: absolute; left: 5px; top: 1px; width: 5px; height: 10px; border: solid var(--act-strong-ink); border-width: 0 2.6px 2.6px 0; transform: rotate(45deg); }
 
 /* Searchable multi-select dropdown (City / Sector / Size) — scrollable list + per-option count (Rober 7-06). */
 .roles-theme .fdrop-multi { min-width: 238px; }
@@ -167,6 +167,8 @@
 .roles-theme .fdrop-lab { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .roles-theme .fdrop-n { flex: none; font-size: 11px; font-weight: 600; color: var(--muted); opacity: 0.75; font-variant-numeric: tabular-nums; }
 .roles-theme .fdrop-empty { padding: 12px 10px; font-size: 12.5px; color: var(--muted); text-align: center; }
+.roles-theme .fdrop-clearall { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 7px 10px; border-radius: 9px; border: none; background: var(--act-tint); color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.roles-theme .fdrop-clearall:hover { background: var(--act-strong); color: var(--act-strong-ink); }
 
 /* Top-left scope badge — catalog size at a glance (Rober 7-06). */
 /* Flush to the left edge (like the zoom +/- control) but at the headbar's height —
@@ -273,7 +275,9 @@
 .roles-theme .selchip .x { font-size: 14px; line-height: 1; opacity: .7; }
 .roles-theme .selchip:hover { border-color: var(--text); color: var(--text); }
 .roles-theme .selchip:hover .x { opacity: 1; }
-.roles-theme .selcount { font-family: var(--font-m); font-size: 12px; color: var(--muted); margin-left: 2px; }
+.roles-theme .selcount { font-family: var(--font-m); font-size: 11.5px; font-weight: 600; color: var(--muted); margin-left: auto; white-space: nowrap; }
+.roles-theme .selclear { border: none; background: none; color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 6px; border-radius: 7px; }
+.roles-theme .selclear:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .roles-theme.light .selchip { background: rgba(255, 255, 255, 0.6); }
 .roles-theme .cards { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; padding: 4px 8px 4px 0; }
 .roles-theme .cards::-webkit-scrollbar { width: 6px; }
@@ -502,6 +506,9 @@
 .roles-theme.light .fdrop label { color: var(--text); }
 .roles-theme.light .fdrop label:hover { background: rgba(11, 31, 38, 0.05); }
 .roles-theme.light .fdrop input { border-color: rgba(11, 31, 38, 0.25); background: #ffffff; }
+/* Checked state must beat the white-fill rule above (Rober 7-06) — dark box + light
+   tick so a ticked filter reads clearly. */
+.roles-theme.light .fdrop input:checked { background: var(--act-strong); border-color: var(--act-strong); }
 .roles-theme.light .seg { background: rgba(11, 31, 38, 0.06); box-shadow: inset 0 1px 2px rgba(11, 31, 38, 0.12), inset 0 -1px 0 rgba(255, 255, 255, 0.7); }
 .roles-theme.light .seg button { color: var(--muted); }
 

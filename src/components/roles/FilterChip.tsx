@@ -9,6 +9,8 @@ type Props = {
   onToggle: (value: string) => void;
   open: boolean;
   onOpenToggle: () => void;
+  /** Clear every selection for this dimension at once. */
+  onClearAll: () => void;
   /** Show an in-dropdown search box (for long lists — City, Sector). */
   searchable?: boolean;
 };
@@ -24,6 +26,7 @@ export default function FilterChip({
   onToggle,
   open,
   onOpenToggle,
+  onClearAll,
   searchable,
 }: Props) {
   const [q, setQ] = useState("");
@@ -67,6 +70,18 @@ export default function FilterChip({
             onChange={(e) => setQ(e.target.value)}
             onClick={(e) => e.stopPropagation()}
           />
+        )}
+        {selected.length > 0 && (
+          <button
+            type="button"
+            className="fdrop-clearall"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClearAll();
+            }}
+          >
+            Clear all ({selected.length})
+          </button>
         )}
         <div className="fdrop-list">
           {shown.map((o) => (

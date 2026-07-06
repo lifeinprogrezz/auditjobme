@@ -16,6 +16,9 @@ export type GlobeMapProps = {
    *  single-city bubble click performs). The nonce re-fires even when the city
    *  is unchanged, so reopening the same role re-flies. */
   flyTo?: { center: [number, number]; nonce: number } | null;
+  /** Headbar City-filter selection → frame these city coords: one eases in, several
+   *  fit together. Nonce re-fires on every selection change. */
+  cityFrame?: { coords: [number, number][]; nonce: number } | null;
   /** Full light identity (paper basemap + light layer palette). Default dark ink. */
   light?: boolean;
   /** Company-logo click → filter the panel to that company's roles IN THAT CITY
@@ -529,7 +532,7 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 // `scored` stays in the props type for the page contract, but the map needs no
 // scored logic: marker bucket classes are permanent and CSS gates them on the
 // root .scored class.
-export default function GlobeMap({ jobs, focusLngLats, flyTo, light = false, onCompanyClick, onCityClick, onResetView }: GlobeMapProps) {
+export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, light = false, onCompanyClick, onCityClick, onResetView }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const haloRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -982,6 +985,29 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, light = false, onC
     flyNonceRef.current = flyTo.nonce;
     map.easeTo({ center: flyTo.center, zoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS });
   }, [flyTo]);
+
+  // Headbar City filter frames the map: one city eases in at city zoom, several fit
+  // together. Empty selection never reaches here (RolesMap skips it). Rober 7-06.
+  const cityFrameRef = useRef(0);
+  useEffect(() => {
+    if (!cityFrame || cityFrame.nonce === cityFrameRef.current) return;
+    const map = mapRef.current;
+    if (!map || !loadedRef.current) return;
+    const cs = cityFrame.coords;
+    if (cs.length === 0) return;
+    cityFrameRef.current = cityFrame.nonce;
+    if (cs.length === 1) {
+      map.easeTo({ center: cs[0], zoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS });
+    } else {
+      const b = new maplibregl.LngLatBounds(cs[0], cs[0]);
+      for (const c of cs) b.extend(c);
+      map.fitBounds(b, {
+        padding: fitPad(map, EUROPE_PADDING),
+        maxZoom: CITY_REVEAL_ZOOM,
+        duration: FLIGHT_MS,
+      });
+    }
+  }, [cityFrame]);
 
   return (
     <>

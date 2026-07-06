@@ -50,6 +50,11 @@ export default function RolesMap() {
   const [flyTarget, setFlyTarget] = useState<{ center: [number, number]; nonce: number } | null>(
     null,
   );
+  // City-filter camera frame: selecting cities in the headbar frames them on the
+  // map (1 → fly to it, 2+ → fit them together). Nonce re-fires each change. 7-06.
+  const [cityFrame, setCityFrame] = useState<{ coords: [number, number][]; nonce: number } | null>(
+    null,
+  );
   const [panelHidden, setPanelHidden] = useState(false);
   // Light is the shipped default (Rober's call, 2026-07-05); dark ink stays
   // as the alternate identity for a future theme setting.
@@ -79,12 +84,12 @@ export default function RolesMap() {
 
   const visible = useMemo(() => filterJobs(jobs, filters), [jobs, filters]);
 
-  // Live scope for the top-left badge: roles + distinct companies in the CURRENT
-  // (filtered) view — the full catalog when nothing is filtered. Rober 7-06.
-  const scopeRoles = visible.length;
+  // Top-left badge is the TOTAL catalog size — always the full numbers, never the
+  // filtered view (Rober 7-06). The per-view count lives in the panel's filter bar.
+  const scopeRoles = jobs.length;
   const scopeCos = useMemo(
-    () => new Set(visible.map((j) => j.company_id ?? j.company)).size,
-    [visible],
+    () => new Set(jobs.map((j) => j.company_id ?? j.company)).size,
+    [jobs],
   );
 
   // Filter option lists, derived from the FULL catalog (not the filtered view) so
@@ -199,6 +204,17 @@ export default function RolesMap() {
     if (!signedIn) setDetailJob(null);
   }, [signedIn]);
 
+  // The headbar City filter drives the camera: frame the selected cities so the map
+  // always matches your city selection (Rober 7-06). Empty selection leaves the
+  // camera untouched — the reset-view control is the one way back to Europe.
+  useEffect(() => {
+    if (filters.cities.length === 0) return;
+    const coords = filters.cities
+      .map((c) => coordsOf(c))
+      .filter((c): c is [number, number] => c !== null);
+    if (coords.length) setCityFrame((prev) => ({ coords, nonce: (prev?.nonce ?? 0) + 1 }));
+  }, [filters.cities]);
+
   // Detail highlight: the selected company's cities, unjittered (mockup behavior).
   const focusLngLats = useMemo(() => {
     if (!detailLive) return null;
@@ -246,6 +262,7 @@ export default function RolesMap() {
         scored={scored}
         focusLngLats={focusLngLats}
         flyTo={flyTarget}
+        cityFrame={cityFrame}
         light={light}
         onCompanyClick={(company, city) => {
           // One role in this city → jump straight to its full detail; several →
@@ -292,6 +309,8 @@ export default function RolesMap() {
           jobs={panelJobs}
           allJobs={jobs}
           defaultView={isDefaultView}
+          filters={filters}
+          onFilters={setFilters}
           selCo={sel.co}
           selCity={sel.city}
           onClearCo={() => setSel((s) => ({ ...s, co: null }))}

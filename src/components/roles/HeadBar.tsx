@@ -189,6 +189,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
           onToggle={(v) => toggleIn("cities", v)}
           open={openChip === "city"}
           onOpenToggle={chipOpen("city")}
+          onClearAll={() => onFilters({ ...filters, cities: [] })}
         />
         <FilterChip
           label="Sector"
@@ -198,6 +199,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
           onToggle={(v) => toggleIn("sectors", v)}
           open={openChip === "sector"}
           onOpenToggle={chipOpen("sector")}
+          onClearAll={() => onFilters({ ...filters, sectors: [] })}
         />
         <FilterChip
           label="Size"
@@ -206,6 +208,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
           onToggle={(v) => toggleIn("sizes", v)}
           open={openChip === "size"}
           onOpenToggle={chipOpen("size")}
+          onClearAll={() => onFilters({ ...filters, sizes: [] })}
         />
 
         <div
