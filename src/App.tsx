@@ -1,23 +1,14 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/AuthProvider";
 
-// Route-level code-splitting: each page loads on navigation, so a landing
-// visitor never downloads the authed app (digest/apply/audit/profile/...).
-const PublicAudit = lazy(() => import("./pages/PublicAudit.tsx"));
-const NotFound = lazy(() => import("./pages/NotFound.tsx"));
-const Privacy = lazy(() => import("./pages/Privacy.tsx"));
-const Terms = lazy(() => import("./pages/Terms.tsx"));
-const Digest = lazy(() => import("./pages/Digest.tsx"));
-const AuditGenerator = lazy(() => import("@/components/AuditGenerator"));
-const Tracker = lazy(() => import("./pages/Tracker.tsx"));
-const Profile = lazy(() => import("./pages/Profile.tsx"));
-const Apply = lazy(() => import("./pages/Apply.tsx"));
-const RequestCompany = lazy(() => import("./pages/RequestCompany.tsx"));
+// Route-level code-splitting. Pre-launch, the app serves ONLY the interactive map
+// and the coming-soon placeholder; the rest of the product (digest/apply/audit/
+// profile/…) is built but not routed yet — re-add routes here to bring a page back.
 const RolesMap = lazy(() => import("./pages/RolesMap.tsx"));
 const UnderConstruction = lazy(() => import("./pages/UnderConstruction.tsx"));
 
@@ -42,23 +33,14 @@ const App = () => (
         <BrowserRouter>
           <Suspense fallback={<PageFallback />}>
             <Routes>
-              {/* The interactive roles map is the live product → it owns the root
-                  domain (Rober 7-06). /roles stays as an alias. Everything not yet
-                  public routes to /underconstruction (see HeadBar + RolesPanel). */}
+              {/* Pre-launch: the interactive roles map is the only live surface and
+                  owns the root domain (/roles is an alias). EVERY other path — feature
+                  pages, legal, shared audits, unknown URLs — shows the coming-soon
+                  placeholder until those pages ship (Rober 7-06). */}
               <Route path="/" element={<RolesMap />} />
-              <Route path="/underconstruction" element={<UnderConstruction />} />
-              <Route path="/a/:username/:slug" element={<PublicAudit />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/terms" element={<Terms />} />
-              <Route path="/digest" element={<Digest />} />
-              <Route path="/audit" element={<AuditGenerator />} />
-              <Route path="/apply" element={<Apply />} />
-              <Route path="/tracker" element={<Tracker />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/request" element={<RequestCompany />} />
               <Route path="/roles" element={<RolesMap />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
+              <Route path="/underconstruction" element={<UnderConstruction />} />
+              <Route path="*" element={<Navigate to="/underconstruction" replace />} />
             </Routes>
           </Suspense>
         </BrowserRouter>
