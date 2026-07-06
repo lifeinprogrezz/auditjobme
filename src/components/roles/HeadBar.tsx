@@ -105,7 +105,23 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
           value={filters.query}
           onChange={(e) => onFilters({ ...filters, query: e.target.value })}
         />
-        <kbd>⌘K</kbd>
+        {filters.query ? (
+          <button
+            type="button"
+            className="cmd-clear"
+            aria-label="Clear search"
+            onClick={() => {
+              onFilters({ ...filters, query: "" });
+              searchRef.current?.focus();
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        ) : (
+          <kbd>⌘K</kbd>
+        )}
       </div>
 
       <button
