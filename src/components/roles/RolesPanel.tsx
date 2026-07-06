@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   LEVELS,
+  fitLabel,
   formatHeadcount,
   formatStage,
   hueFor,
@@ -36,7 +37,6 @@ export type RolesPanelProps = {
   applied: Set<string>;
   onOpenDetail: (j: RoleJob) => void;
   onCloseDetail: () => void;
-  onMarkApplied: (j: RoleJob) => void;
   onScoreMore: () => void;
   onToggleHidden: () => void;
   /** Map selection: company and/or city, each independently removable via a chip. */
@@ -99,9 +99,10 @@ function scorePillClass(score: number | null): string {
   return b === "great" ? "score" : `score s-${b}`;
 }
 
-function dscoreClass(score: number): string {
+/** Fit-score hero color bucket (great = jade, mid = amber, low = coral). */
+function heroClass(score: number): string {
   const b = scoreBucket(score);
-  return b === "great" ? "dscore" : `dscore s-${b}`;
+  return b === "great" ? "dhs" : `dhs s-${b}`;
 }
 
 export default function RolesPanel({
@@ -118,7 +119,6 @@ export default function RolesPanel({
   applied,
   onOpenDetail,
   onCloseDetail,
-  onMarkApplied,
   onScoreMore,
   onToggleHidden,
   selCo,
@@ -133,8 +133,9 @@ export default function RolesPanel({
     if (detailJob) detailRef.current?.scrollTo(0, 0);
   }, [detailJob]);
 
-  const goAudit = (j: RoleJob) => navigate("/audit?job=" + encodeURIComponent(j.url));
   const goApply = (j: RoleJob) => navigate("/apply?job=" + encodeURIComponent(j.url));
+  // Unscored hero + CTA mirror the nav's "Add your CV": profile if signed in, else home → sign-in.
+  const onAddCv = () => navigate(signedIn ? "/profile" : "/");
 
   // Cursor spotlight: one listener on the container, sets --mx/--my on the hovered card.
   const handleCardsMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -218,22 +219,13 @@ export default function RolesPanel({
                 {scored && job.reason && <div className="why">{job.reason}</div>}
                 <div className="acts">
                   <button
-                    className="btn p"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      goAudit(job);
-                    }}
-                  >
-                    Audit this company
-                  </button>
-                  <button
                     className="btn g"
                     onClick={(e) => {
                       e.stopPropagation();
                       goApply(job);
                     }}
                   >
-                    Prep application
+                    Prepare application
                   </button>
                 </div>
               </article>
@@ -255,23 +247,28 @@ export default function RolesPanel({
   );
 
   const renderDetail = (job: RoleJob) => {
-    const hue = hueFor(job.company);
     const ago = postedAgo(job.posted_at);
-    const facts: [string, string][] = [];
-    const loc = job.city ?? job.location;
-    if (loc) facts.push(["Location", loc]);
-    const level = LEVELS.find((l) => l.value === job.seniority)?.label;
-    if (level) facts.push(["Level", level]);
-    const stage = formatStage(job.stage);
-    if (stage) facts.push(["Stage", stage]);
-    const size = formatHeadcount(job.headcount);
-    if (size) facts.push(["Size", size]);
-    if (job.foundedYear) facts.push(["Founded", String(job.foundedYear)]);
-    if (job.remote) facts.push(["Remote", "Yes"]);
-    if (ago) facts.push(["Posted", ago]);
-    // Company links: an explicit website, else derived from the 99%-covered logo domain.
     const site = websiteUrl(job.website, job.domain);
+    const level = LEVELS.find((l) => l.value === job.seniority)?.label;
+    // Company traits (stage / size / founded) read as "the company"; role traits
+    // (location / level / remote / posted) read as "this role" — grouped apart.
+    const companyTraits: string[] = [];
+    const stage = formatStage(job.stage);
+    if (stage) companyTraits.push(stage);
+    const size = formatHeadcount(job.headcount);
+    if (size) companyTraits.push(size);
+    if (job.foundedYear) companyTraits.push(`Founded ${job.foundedYear}`);
+    const roleTraits: string[] = [];
+    const loc = job.city ?? job.location;
+    if (loc) roleTraits.push(loc);
+    if (level) roleTraits.push(level);
+    if (job.remote) roleTraits.push("Remote");
+    if (ago) roleTraits.push(ago);
     const others = allJobs.filter((j) => j.company === job.company && j.url !== job.url);
+    // Hero: a CV holder sees their fit (or a pending state); everyone else sees the
+    // unlock prompt — the pre-CV conversion moment (absorbs issue #18).
+    const hasCv = scored;
+    const bullets = job.fitBullets?.length ? job.fitBullets : job.reason ? [job.reason] : [];
 
     return (
       <div className="detail" ref={detailRef}>
@@ -281,99 +278,149 @@ export default function RolesPanel({
           </svg>
           All roles
         </button>
-        <div className="dbanner">
-          <div
-            className="dbanner-img"
-            style={{
-              backgroundImage: `linear-gradient(135deg, ${hue}55, ${hue}11 60%, transparent)`,
-              backgroundColor: "var(--surface-2)",
-            }}
-          />
-          <div className="dbanner-scrim" />
-          <div className="dhead">
-            <div className="dlogo">
-              <Logo key={job.id} domain={job.domain} company={job.company} />
-            </div>
-            <div>
-              <div className="dname">{job.company}</div>
-              {job.sector && <div className="dsector">{job.sector}</div>}
-              <div className="dhiring">● Actively hiring</div>
-            </div>
+        <div className="dco">
+          <div className="dco-logo">
+            <Logo key={job.id} domain={job.domain} company={job.company} />
           </div>
+          <div className="dco-main">
+            <div className="dname">{job.company}</div>
+            {job.sector && <div className="dsector">{job.sector}</div>}
+          </div>
+          {(site || job.linkedin) && (
+            <div className="dco-links">
+              {site && (
+                <a className="dico" href={site} target="_blank" rel="noopener noreferrer" aria-label="Company website">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M3 12h18" />
+                    <path d="M12 3c2.4 2.5 2.4 15.5 0 18M12 3c-2.4 2.5-2.4 15.5 0 18" />
+                  </svg>
+                </a>
+              )}
+              {job.linkedin && (
+                <a className="dico" href={job.linkedin} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M4.98 3.5C4.98 4.88 3.87 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM.25 8h4.5v13H.25V8zm7 0h4.32v1.78h.06c.6-1.07 2.07-2.2 4.26-2.2 4.56 0 5.4 2.9 5.4 6.67V21h-4.5v-5.9c0-1.4-.03-3.2-2-3.2-2 0-2.3 1.53-2.3 3.1V21h-4.5V8z" />
+                  </svg>
+                </a>
+              )}
+            </div>
+          )}
         </div>
         {job.description && <p className="ddesc">{job.description}</p>}
-        {(site || job.linkedin) && (
-          <div className="dlinks">
-            {site && (
-              <a className="dlink" href={site} target="_blank" rel="noopener noreferrer">
-                Website
-              </a>
-            )}
-            {job.linkedin && (
-              <a className="dlink" href={job.linkedin} target="_blank" rel="noopener noreferrer">
-                LinkedIn
-              </a>
-            )}
+        {companyTraits.length > 0 && (
+          <div className="dtraits">
+            {companyTraits.map((t, i) => (
+              <span key={i} className="dtrait">
+                {i > 0 && <span className="dsep" />}
+                {t}
+              </span>
+            ))}
           </div>
         )}
-        <div className="dfacts">
-          {facts.map(([label, value]) => (
-            <span key={label} className="dfact">
-              {label} <b>{value}</b>
-            </span>
-          ))}
-        </div>
         <div className="drole">
-          {scored && job.score != null && (
-            <div className={dscoreClass(job.score)}>{job.score.toFixed(1)}</div>
+          <a className="rt" href={job.url} target="_blank" rel="noopener noreferrer">
+            {job.title}
+            <svg className="rt-ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+              <path d="M7 17 17 7M9 7h8v8" />
+            </svg>
+          </a>
+          {roleTraits.length > 0 && (
+            <div className="rm">
+              {roleTraits.map((t, i) => (
+                <span key={i} className="rmi">
+                  {i > 0 && <span className="d" />}
+                  {t}
+                </span>
+              ))}
+            </div>
           )}
-          <div className="rt">{job.title}</div>
-          <div className="rm">
-            <b>{job.city ?? job.location ?? "—"}</b>
-            {ago && (
+        </div>
+        {hasCv ? (
+          <div className="dhero">
+            {job.score != null ? (
               <>
-                <span className="d" />
-                {ago}
+                <div className={heroClass(job.score)}>
+                  <span className="hn num">{job.score.toFixed(1)}</span>
+                  <span className="hx">/5</span>
+                </div>
+                <div className="dhl">
+                  <div className="hlt">{fitLabel(job.score)}</div>
+                  {bullets.length > 0 && <div className="hls">Why you fit</div>}
+                </div>
               </>
+            ) : (
+              <div className="dhl">
+                <div className="hlt">Scoring this role…</div>
+                <div className="hls">Your fit lands in a moment.</div>
+              </div>
             )}
           </div>
-          {scored && job.reason && <div className="dwhy">{job.reason}</div>}
-        </div>
-        <div className="dacts">
-          <button className="btn p" onClick={() => goAudit(job)}>
-            Audit this company
+        ) : (
+          <div
+            className="dhero unlock"
+            role="button"
+            tabIndex={0}
+            onClick={onAddCv}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              onAddCv();
+            }}
+          >
+            <div className="dlock">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <rect x="4" y="11" width="16" height="10" rx="2" />
+                <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+              </svg>
+            </div>
+            <div className="dhl">
+              <div className="hlt">Unlock your fit</div>
+              <div className="hls">Add your CV to see how you match this role.</div>
+            </div>
+          </div>
+        )}
+        {hasCv && bullets.length > 0 && (
+          <ul className="dfit">
+            {bullets.map((b, i) => (
+              <li key={i}>{b}</li>
+            ))}
+          </ul>
+        )}
+        {applied.has(job.id) ? (
+          <button className="btn dcta applied-cta" disabled>
+            ✓ Applied
           </button>
-          <button className="btn g" onClick={() => goApply(job)}>
-            Prep application
+        ) : hasCv ? (
+          <button className="btn g dcta" onClick={() => goApply(job)}>
+            Prepare application
           </button>
-          <button className="btn g" onClick={() => window.open(job.url, "_blank", "noopener")}>
-            View posting
+        ) : (
+          <button className="btn g dcta" onClick={onAddCv}>
+            Add your CV
           </button>
-          {applied.has(job.id) ? (
-            <button className="btn applied" disabled>
-              ✓ Applied
-            </button>
-          ) : (
-            <button className="btn g" onClick={() => onMarkApplied(job)}>
-              Mark applied
-            </button>
-          )}
-        </div>
-        <div className="djd">
-          <div className="djd-h">The role</div>
+        )}
+        <details className="djd">
+          <summary className="djd-sum">
+            Full description
+            <svg className="djd-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </summary>
           {detailJdLoading ? (
             <div className="djd-note">Loading description…</div>
           ) : detailJd ? (
             <p className="djd-body">{detailJd}</p>
           ) : (
             <div className="djd-note">
-              The full description lives on the posting.{" "}
+              The full description lives on the{" "}
               <a href={job.url} target="_blank" rel="noopener noreferrer">
-                View posting
+                posting
               </a>
+              .
             </div>
           )}
-        </div>
+        </details>
         <div>
           <div className="dmore-h">
             {others.length

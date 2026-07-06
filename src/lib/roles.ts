@@ -15,6 +15,8 @@ export type RoleJob = {
   score: number | null;
   /** One-sentence "why it fits" from scores.signals.reason. */
   reason: string | null;
+  /** 3-5 grounded "why you fit" bullets (scores.signals.fit_bullets, v2 rubric). */
+  fitBullets?: string[] | null;
   /** Normalized city (geo.ts), null = unknown → shown in panel, not on map. */
   city: string | null;
   /** Jittered map coords, null when city is unknown. */
@@ -39,6 +41,12 @@ export type ScoreBucket = "great" | "mid" | "low";
 /** Scores are 0–5 (NOT the mockup's 0–10): great ≥4.0 · mid ≥3.0 · low <3.0. */
 export function scoreBucket(score: number): ScoreBucket {
   return score >= 4 ? "great" : score >= 3 ? "mid" : "low";
+}
+
+/** Short, honest qualitative label for the score hero in the /roles detail panel. */
+export function fitLabel(score: number): string {
+  const b = scoreBucket(score);
+  return b === "great" ? "Strong fit" : b === "mid" ? "Solid fit" : "Weak fit";
 }
 
 /** Cluster bubble tier — startupmap-matched count breaks (<15 / ≥15 / ≥50 / ≥150).
@@ -128,12 +136,14 @@ export function byScore(a: RoleJob, b: RoleJob): number {
  * at the end of the scoring pass, once. */
 export function applyLandedScores(
   prev: RoleJob[],
-  landed: ReadonlyMap<string, { score: number; reason: string | null }>,
+  landed: ReadonlyMap<string, { score: number; reason: string | null; fitBullets?: string[] | null }>,
   sort: boolean,
 ): RoleJob[] {
   const next = prev.map((x) => {
     const hit = landed.get(x.id);
-    return hit ? { ...x, score: hit.score, reason: hit.reason } : x;
+    return hit
+      ? { ...x, score: hit.score, reason: hit.reason, fitBullets: hit.fitBullets ?? x.fitBullets }
+      : x;
   });
   return sort ? next.sort(byScore) : next;
 }

@@ -43,6 +43,7 @@ export default function Apply() {
   const [busy, setBusy] = useState<null | "cv" | "cover">(null);
   const [error, setError] = useState("");
   const [done, setDone] = useState<Set<string>>(new Set());
+  const [hasApplied, setHasApplied] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -62,12 +63,17 @@ export default function Apply() {
       setCvText(profile?.cv_text ?? null);
       setName(profile?.display_name ?? "");
       if (jobData) {
-        const { data: arts } = await supabase
-          .from("artifacts")
-          .select("kind")
-          .eq("user_id", user.id)
-          .eq("job_id", (jobData as Job).id);
+        const [{ data: arts }, { data: app }] = await Promise.all([
+          supabase.from("artifacts").select("kind").eq("user_id", user.id).eq("job_id", (jobData as Job).id),
+          supabase
+            .from("applications")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("job_id", (jobData as Job).id)
+            .maybeSingle(),
+        ]);
         if (active && arts) setDone(new Set(arts.map((a) => a.kind)));
+        if (active && app) setHasApplied(true);
       }
       if (active) setLoading(false);
     }
@@ -112,6 +118,18 @@ export default function Apply() {
       setError(e instanceof Error ? e.message : "Cover letter generation failed");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function markApplied() {
+    if (!user || !job) return;
+    setHasApplied(true);
+    const { error } = await supabase
+      .from("applications")
+      .upsert({ user_id: user.id, job_id: job.id }, { onConflict: "user_id,job_id" });
+    if (error) {
+      setHasApplied(false);
+      setError("Couldn't mark as applied. Please try again.");
     }
   }
 
@@ -160,6 +178,10 @@ export default function Apply() {
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: ".8rem" }}>
+          <button onClick={() => navigate(`/audit?job=${encodeURIComponent(job.url)}`)} disabled={busy !== null} style={btnStyle(busy !== null)}>
+            <span style={{ fontWeight: 700, color: ACCENT }}>Build a company audit</span>
+            <div style={{ fontSize: ".68rem", color: MUTED, marginTop: ".25rem" }}>A short product audit of {job.company} to send with your application — the thing that gets you noticed.</div>
+          </button>
           <button onClick={genCv} disabled={busy !== null} style={btnStyle(busy !== null)}>
             <span style={{ fontWeight: 700 }}>{busy === "cv" ? "Tailoring your CV..." : done.has("cv") ? "Regenerate tailored CV" : "Generate tailored CV"}</span>
             <div style={{ fontSize: ".68rem", color: MUTED, marginTop: ".25rem" }}>Your CV, with a summary written for this role. Opens a print dialog (save as PDF).</div>
@@ -168,10 +190,17 @@ export default function Apply() {
             <span style={{ fontWeight: 700 }}>{busy === "cover" ? "Writing your cover letter..." : done.has("letter") ? "Regenerate cover letter" : "Generate cover letter"}</span>
             <div style={{ fontSize: ".68rem", color: MUTED, marginTop: ".25rem" }}>A short, warm cover letter drawn from your CV. Opens a print dialog (save as PDF).</div>
           </button>
-          <button onClick={() => navigate(`/audit?job=${encodeURIComponent(job.url)}`)} disabled={busy !== null} style={btnStyle(busy !== null)}>
-            <span style={{ fontWeight: 700, color: ACCENT }}>Build a company audit</span>
-            <div style={{ fontSize: ".68rem", color: MUTED, marginTop: ".25rem" }}>A short product audit of {job.company} to send with your application.</div>
-          </button>
+          {hasApplied ? (
+            <button disabled style={{ ...btnStyle(true), color: ACCENT, borderColor: ACCENT, opacity: 1 }}>
+              <span style={{ fontWeight: 700 }}>✓ Marked as applied</span>
+              <div style={{ fontSize: ".68rem", color: MUTED, marginTop: ".25rem" }}>It's in your applications tracker.</div>
+            </button>
+          ) : (
+            <button onClick={markApplied} disabled={busy !== null} style={btnStyle(busy !== null)}>
+              <span style={{ fontWeight: 700 }}>Mark as applied</span>
+              <div style={{ fontSize: ".68rem", color: MUTED, marginTop: ".25rem" }}>Once you've sent it — tracks it in your applications.</div>
+            </button>
+          )}
         </div>
       )}
 

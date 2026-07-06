@@ -190,7 +190,7 @@ export function useRolesData() {
       // most every SCORE_FLUSH_MS with row order STABLE; the byScore sort runs
       // once, when the pass completes. Cancelled runs never flush (stale scores
       // must not leak into the next user's view).
-      const pending = new Map<string, { score: number; reason: string | null }>();
+      const pending = new Map<string, { score: number; reason: string | null; fitBullets: string[] }>();
       let landedAny = false;
       let lastFlush = Date.now();
       const flush = (sort: boolean) => {
@@ -209,12 +209,12 @@ export function useRolesData() {
             job_id: j.id,
             score: result.score,
             rubric_version: RUBRIC_VERSION,
-            signals: { reason: result.reason },
+            signals: { reason: result.reason, fit_bullets: result.fitBullets },
           },
           { onConflict: "user_id,job_id,rubric_version" },
         );
         if (runRef.current !== runId) return;
-        pending.set(j.id, { score: result.score, reason: result.reason });
+        pending.set(j.id, { score: result.score, reason: result.reason, fitBullets: result.fitBullets });
         landedAny = true;
         if (Date.now() - lastFlush >= SCORE_FLUSH_MS) {
           flush(false);
@@ -286,15 +286,23 @@ export function useRolesData() {
         .select("job_id, score, signals")
         .eq("user_id", user.id)
         .eq("rubric_version", RUBRIC_VERSION);
-      const scoreByJob: Record<string, { score: number | null; reason: string | null }> = {};
+      const scoreByJob: Record<
+        string,
+        { score: number | null; reason: string | null; fitBullets: string[] | null }
+      > = {};
       (scoresData ?? []).forEach((s) => {
-        const sig = s.signals as { reason?: string } | null;
-        scoreByJob[s.job_id] = { score: s.score, reason: sig?.reason ?? null };
+        const sig = s.signals as { reason?: string; fit_bullets?: string[] } | null;
+        scoreByJob[s.job_id] = {
+          score: s.score,
+          reason: sig?.reason ?? null,
+          fitBullets: sig?.fit_bullets ?? null,
+        };
       });
       const merged = enrichAll(rows, dims, officesBySlug).map((j) => ({
         ...j,
         score: scoreByJob[j.id]?.score ?? null,
         reason: scoreByJob[j.id]?.reason ?? null,
+        fitBullets: scoreByJob[j.id]?.fitBullets ?? null,
       }));
       merged.sort(byScore);
       if (runRef.current !== runId) return;

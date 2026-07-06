@@ -19,7 +19,7 @@ import { useRolesData } from "@/hooks/useRolesData";
 import { useJobDescription } from "@/hooks/useJobDescription";
 
 export default function RolesMap() {
-  const { jobs, loading, scoring, remaining, applied, markApplied, scoreMore, scored, signedIn } =
+  const { jobs, loading, scoring, remaining, applied, scoreMore, scored, signedIn } =
     useRolesData();
   const [filters, setFilters] = useState<RolesFilters>(EMPTY_FILTERS);
   const [view, setView] = useState<"map" | "list">("map");
@@ -155,7 +155,6 @@ export default function RolesMap() {
           applied={applied}
           onOpenDetail={setDetailJob}
           onCloseDetail={() => setDetailJob(null)}
-          onMarkApplied={markApplied}
           onScoreMore={scoreMore}
           onToggleHidden={() => setPanelHidden((v) => !v)}
         />

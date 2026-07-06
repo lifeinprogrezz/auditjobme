@@ -6,6 +6,7 @@ describe("parseScoreResponse", () => {
     expect(parseScoreResponse('{"score": 4.2, "reason": "strong fit"}')).toEqual({
       score: 4.2,
       reason: "strong fit",
+      fitBullets: [],
     });
   });
 
@@ -13,6 +14,7 @@ describe("parseScoreResponse", () => {
     expect(parseScoreResponse('Here you go: {"score": 3, "reason": "ok"} done')).toEqual({
       score: 3,
       reason: "ok",
+      fitBullets: [],
     });
   });
 
@@ -36,7 +38,25 @@ describe("parseScoreResponse", () => {
     expect(parseScoreResponse('{"score": 4, "reason": "x",}')).toBeNull();
   });
 
-  it("defaults reason to empty string when missing", () => {
-    expect(parseScoreResponse('{"score": 2}')).toEqual({ score: 2, reason: "" });
+  it("defaults reason to empty string and fitBullets to [] when missing", () => {
+    expect(parseScoreResponse('{"score": 2}')).toEqual({ score: 2, reason: "", fitBullets: [] });
+  });
+
+  it("parses fit_bullets, trims them, and caps at 5", () => {
+    const out = parseScoreResponse(
+      '{"score":4.5,"reason":"great","fit_bullets":["  a ","b","c","d","e","f"]}',
+    );
+    expect(out?.fitBullets).toEqual(["a", "b", "c", "d", "e"]);
+  });
+
+  it("drops non-string / empty bullets", () => {
+    const out = parseScoreResponse(
+      '{"score":3,"reason":"ok","fit_bullets":["real", "", 42, null, "  ", "also real"]}',
+    );
+    expect(out?.fitBullets).toEqual(["real", "also real"]);
+  });
+
+  it("tolerates fit_bullets that isn't an array", () => {
+    expect(parseScoreResponse('{"score":3,"reason":"ok","fit_bullets":"nope"}')?.fitBullets).toEqual([]);
   });
 });
