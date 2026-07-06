@@ -327,8 +327,8 @@
 .roles-theme .dmore-list { display: flex; flex-direction: column; gap: 7px; }
 .roles-theme .dmore-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 11px; background: rgba(255, 255, 255, 0.035); border: 1px solid var(--hair); cursor: pointer; transition: background 0.2s, border-color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.2); }
 .roles-theme .dmore-item:hover { background: rgba(255, 255, 255, 0.07); border-color: var(--act-border); }
-.roles-theme .dmore-item .mi-role { font-size: 13px; font-weight: 600; color: #fff; flex: 1; }
-.roles-theme .dmore-item .mi-city { font-size: 11.5px; color: var(--muted); }
+.roles-theme .dmore-item .mi-role { font-size: 13px; font-weight: 600; color: #fff; flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.roles-theme .dmore-item .mi-city { font-size: 11.5px; color: var(--muted); flex: none; max-width: 42%; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* company context + JD body in the detail (Rober 2026-07-06) */
 .roles-theme .dsector { font-size: 11.5px; font-weight: 600; color: rgba(255, 255, 255, 0.72); letter-spacing: 0.02em; margin-top: 2px; }
 .roles-theme .ddesc { font-size: 13px; line-height: 1.5; color: var(--subtle); margin: 0; }
@@ -353,19 +353,18 @@
 .roles-theme .dtrait { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
 .roles-theme .dtrait .dsep { width: 3px; height: 3px; border-radius: 50%; background: rgba(255, 255, 255, 0.28); }
 .roles-theme .drole .rt { display: inline-flex; align-items: baseline; gap: 5px; text-decoration: none; }
-.roles-theme .drole .rt:hover { color: var(--great); }
-.roles-theme .drole .rt:hover .rt-ext { opacity: 1; }
-.roles-theme .rt-ext { opacity: 0.5; flex: none; align-self: center; transition: opacity 0.2s; }
+.roles-theme .drole .rt { cursor: pointer; }
+.roles-theme .drole .rt:hover { text-decoration: underline; text-underline-offset: 3px; }
 .roles-theme .drole .rm .rmi { display: inline-flex; align-items: center; gap: 7px; }
 .roles-theme .dhero { display: flex; align-items: center; gap: 13px; }
-.roles-theme .dhero.unlock { cursor: pointer; padding: 12px 14px; border-radius: 14px; background: rgba(31, 216, 184, 0.06); border: 1px solid rgba(31, 216, 184, 0.22); transition: background 0.2s, border-color 0.2s; }
-.roles-theme .dhero.unlock:hover { background: rgba(31, 216, 184, 0.1); border-color: rgba(31, 216, 184, 0.4); }
+.roles-theme .dhero.unlock { cursor: pointer; padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--hair); transition: background 0.2s, border-color 0.2s; }
+.roles-theme .dhero.unlock:hover { background: rgba(255, 255, 255, 0.08); border-color: var(--act-border); }
 .roles-theme .dhs { display: flex; align-items: center; justify-content: center; gap: 1px; width: 66px; height: 66px; border-radius: 16px; flex: none; background: linear-gradient(150deg, var(--great), #34e3ff); color: var(--great-ink); box-shadow: var(--glow); }
 .roles-theme .dhs.s-mid { background: linear-gradient(150deg, #ffd884, var(--mid)); color: #3a2600; box-shadow: 0 0 26px rgba(255, 196, 77, 0.6); }
 .roles-theme .dhs.s-low { background: linear-gradient(150deg, #ff9a7d, var(--low)); color: #3a1200; box-shadow: 0 0 22px rgba(255, 111, 77, 0.5); }
 .roles-theme .dhs .hn { font-family: var(--font-m); font-weight: 700; font-size: 26px; letter-spacing: -0.04em; line-height: 1; }
 .roles-theme .dhs .hx { font-family: var(--font-m); font-weight: 600; font-size: 12px; opacity: 0.7; align-self: flex-end; margin-bottom: 6px; }
-.roles-theme .dlock { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; flex: none; color: var(--great); background: rgba(31, 216, 184, 0.12); border: 1px solid rgba(31, 216, 184, 0.3); }
+.roles-theme .dlock { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; flex: none; color: var(--muted); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--hair); }
 .roles-theme .dhl { min-width: 0; }
 .roles-theme .dhl .hlt { font-family: var(--font-d); font-size: 16px; font-weight: 600; color: #fff; letter-spacing: -0.01em; }
 .roles-theme .dhl .hls { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
@@ -380,6 +379,21 @@
 .roles-theme .djd-caret { transition: transform 0.2s; opacity: 0.7; }
 .roles-theme .djd[open] .djd-caret { transform: rotate(180deg); }
 .roles-theme .djd .djd-body { margin-top: 6px; }
+/* labeled 2-col fact grid (company + role), blurred pre-CV teaser, thin scrollbars (Rober 7-06) */
+.roles-theme .dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 14px; }
+.roles-theme .dg { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.roles-theme .dg-k { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); opacity: 0.7; }
+.roles-theme .dg-v { font-size: 12.5px; font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.roles-theme .dg-inrole { margin-top: 12px; }
+.roles-theme .dfit-lock { position: relative; }
+.roles-theme .dfit.blurred { filter: blur(4.5px); opacity: 0.45; user-select: none; pointer-events: none; }
+.roles-theme .dfl-cta { position: absolute; inset: 0; display: grid; place-items: center; width: 100%; height: 100%; padding: 0; background: none; border: 0; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--great); }
+.roles-theme .dfl-cta:hover { text-decoration: underline; text-underline-offset: 3px; }
+.roles-theme .detail, .roles-theme .cards { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
+.roles-theme .detail::-webkit-scrollbar, .roles-theme .cards::-webkit-scrollbar { width: 7px; }
+.roles-theme .detail::-webkit-scrollbar-track, .roles-theme .cards::-webkit-scrollbar-track { background: transparent; }
+.roles-theme .detail::-webkit-scrollbar-thumb, .roles-theme .cards::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 999px; }
+.roles-theme .detail::-webkit-scrollbar-thumb:hover, .roles-theme .cards::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
 
 /* empty / signed-out / loading states inside the panel */
 .roles-theme .panel-note { margin: auto 8px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.6; padding: 22px 16px; background: rgba(255, 255, 255, 0.035); border: 1px solid var(--hair); border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 10px 20px -16px rgba(170, 225, 240, 0.14), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.28); }
@@ -427,6 +441,14 @@
 .roles-theme.light .liquid::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), transparent 44%); mix-blend-mode: normal; }
 .roles-theme.light .maplibregl-ctrl-group button:hover { color: #0b1f26; }
 .roles-theme.light .attrib { color: var(--muted); background: var(--glass-2); }
+/* Map controls (left) + panel toggle (right): dark + opaque on the light map so a
+   first-time visitor actually sees them, not just the app's author (Rober 7-06). */
+.roles-theme.light .maplibregl-ctrl-group { background: rgba(17, 30, 37, 0.8) !important; border-color: rgba(11, 31, 38, 0.4) !important; box-shadow: 0 12px 28px -12px rgba(20, 60, 70, 0.55) !important; }
+.roles-theme.light .maplibregl-ctrl-group button { color: rgba(255, 255, 255, 0.88); }
+.roles-theme.light .maplibregl-ctrl-group button:hover { color: #fff; background: rgba(255, 255, 255, 0.14) !important; }
+.roles-theme.light .maplibregl-ctrl-group button + button { border-top-color: rgba(255, 255, 255, 0.13) !important; }
+.roles-theme.light .panel-toggle { background: rgba(17, 30, 37, 0.8); border-color: rgba(11, 31, 38, 0.4); box-shadow: 0 12px 28px -12px rgba(20, 60, 70, 0.55); color: rgba(255, 255, 255, 0.88); }
+.roles-theme.light .panel-toggle:hover { color: #fff; background: rgba(17, 30, 37, 0.92); }
 .roles-theme.light .attrib::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), transparent 46%); mix-blend-mode: normal; }
 .roles-theme.light .attrib a { color: #3a6470; }
 .roles-theme.light .attrib a:hover { color: #0b1f26; }
@@ -518,3 +540,7 @@
 .roles-theme.light .dhl .hlt { color: var(--text); }
 .roles-theme.light .dfit li { color: #1e4753; }
 .roles-theme.light .djd-sum { color: var(--muted); }
+.roles-theme.light .dg-v { color: var(--text); }
+.roles-theme.light .detail, .roles-theme.light .cards { scrollbar-color: rgba(11, 31, 38, 0.22) transparent; }
+.roles-theme.light .detail::-webkit-scrollbar-thumb, .roles-theme.light .cards::-webkit-scrollbar-thumb { background: rgba(11, 31, 38, 0.18); }
+.roles-theme.light .detail::-webkit-scrollbar-thumb:hover, .roles-theme.light .cards::-webkit-scrollbar-thumb:hover { background: rgba(11, 31, 38, 0.32); }

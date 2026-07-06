@@ -105,6 +105,15 @@ function heroClass(score: number): string {
   return b === "great" ? "dhs" : `dhs s-${b}`;
 }
 
+/** Compact location for the "more roles" list: a many-city list collapses to
+ *  "Multiple locations" so one sprawling role can't blow out the row (Rober 7-06). */
+function moreCity(job: RoleJob): string {
+  const loc = job.city ?? job.location ?? "";
+  if (!loc) return "";
+  const parts = loc.split(",").map((s) => s.trim()).filter(Boolean);
+  return parts.length > 2 ? "Multiple locations" : loc;
+}
+
 export default function RolesPanel({
   jobs,
   allJobs,
@@ -250,20 +259,20 @@ export default function RolesPanel({
     const ago = postedAgo(job.posted_at);
     const site = websiteUrl(job.website, job.domain);
     const level = LEVELS.find((l) => l.value === job.seniority)?.label;
-    // Company traits (stage / size / founded) read as "the company"; role traits
-    // (location / level / remote / posted) read as "this role" — grouped apart.
-    const companyTraits: string[] = [];
+    // Company facts (stage / size / founded) vs role facts (location / level /
+    // remote / posted) — labeled key-value cells in a 2-col grid, no separators.
+    const companyFacts: [string, string][] = [];
     const stage = formatStage(job.stage);
-    if (stage) companyTraits.push(stage);
+    if (stage) companyFacts.push(["Stage", stage]);
     const size = formatHeadcount(job.headcount);
-    if (size) companyTraits.push(size);
-    if (job.foundedYear) companyTraits.push(`Founded ${job.foundedYear}`);
-    const roleTraits: string[] = [];
+    if (size) companyFacts.push(["Size", size]);
+    if (job.foundedYear) companyFacts.push(["Founded", String(job.foundedYear)]);
+    const roleFacts: [string, string][] = [];
     const loc = job.city ?? job.location;
-    if (loc) roleTraits.push(loc);
-    if (level) roleTraits.push(level);
-    if (job.remote) roleTraits.push("Remote");
-    if (ago) roleTraits.push(ago);
+    if (loc) roleFacts.push(["Location", loc]);
+    if (level) roleFacts.push(["Level", level]);
+    if (job.remote) roleFacts.push(["Remote", "Yes"]);
+    if (ago) roleFacts.push(["Posted", ago]);
     const others = allJobs.filter((j) => j.company === job.company && j.url !== job.url);
     // Hero: a CV holder sees their fit (or a pending state); everyone else sees the
     // unlock prompt — the pre-CV conversion moment (absorbs issue #18).
@@ -290,10 +299,10 @@ export default function RolesPanel({
             <div className="dco-links">
               {site && (
                 <a className="dico" href={site} target="_blank" rel="noopener noreferrer" aria-label="Company website">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
                     <circle cx="12" cy="12" r="9" />
-                    <path d="M3 12h18" />
-                    <path d="M12 3c2.4 2.5 2.4 15.5 0 18M12 3c-2.4 2.5-2.4 15.5 0 18" />
+                    <path d="M3 9.5h18M3 14.5h18" />
+                    <ellipse cx="12" cy="12" rx="4" ry="9" />
                   </svg>
                 </a>
               )}
@@ -308,30 +317,27 @@ export default function RolesPanel({
           )}
         </div>
         {job.description && <p className="ddesc">{job.description}</p>}
-        {companyTraits.length > 0 && (
-          <div className="dtraits">
-            {companyTraits.map((t, i) => (
-              <span key={i} className="dtrait">
-                {i > 0 && <span className="dsep" />}
-                {t}
-              </span>
+        {companyFacts.length > 0 && (
+          <div className="dgrid">
+            {companyFacts.map(([k, v]) => (
+              <div key={k} className="dg">
+                <span className="dg-k">{k}</span>
+                <span className="dg-v">{v}</span>
+              </div>
             ))}
           </div>
         )}
         <div className="drole">
           <a className="rt" href={job.url} target="_blank" rel="noopener noreferrer">
             {job.title}
-            <svg className="rt-ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-              <path d="M7 17 17 7M9 7h8v8" />
-            </svg>
           </a>
-          {roleTraits.length > 0 && (
-            <div className="rm">
-              {roleTraits.map((t, i) => (
-                <span key={i} className="rmi">
-                  {i > 0 && <span className="d" />}
-                  {t}
-                </span>
+          {roleFacts.length > 0 && (
+            <div className="dgrid dg-inrole">
+              {roleFacts.map(([k, v]) => (
+                <div key={k} className="dg">
+                  <span className="dg-k">{k}</span>
+                  <span className="dg-v">{v}</span>
+                </div>
               ))}
             </div>
           )}
@@ -376,7 +382,7 @@ export default function RolesPanel({
             </div>
             <div className="dhl">
               <div className="hlt">Unlock your fit</div>
-              <div className="hls">Add your CV to see how you match this role.</div>
+              <div className="hls">Add your CV to see your fit.</div>
             </div>
           </div>
         )}
@@ -386,6 +392,18 @@ export default function RolesPanel({
               <li key={i}>{b}</li>
             ))}
           </ul>
+        )}
+        {!hasCv && (
+          <div className="dfit-lock">
+            <ul className="dfit blurred" aria-hidden="true">
+              <li>Your background lines up with what this role needs.</li>
+              <li>Your experience maps to their product and stage.</li>
+              <li>Your level fits the scope of this role.</li>
+            </ul>
+            <button className="dfl-cta" onClick={onAddCv}>
+              Add your CV to unlock why you fit
+            </button>
+          </div>
         )}
         {applied.has(job.id) ? (
           <button className="btn dcta applied-cta" disabled>
@@ -400,27 +418,21 @@ export default function RolesPanel({
             Add your CV
           </button>
         )}
-        <details className="djd">
-          <summary className="djd-sum">
-            Full description
-            <svg className="djd-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </summary>
-          {detailJdLoading ? (
-            <div className="djd-note">Loading description…</div>
-          ) : detailJd ? (
-            <p className="djd-body">{detailJd}</p>
-          ) : (
-            <div className="djd-note">
-              The full description lives on the{" "}
-              <a href={job.url} target="_blank" rel="noopener noreferrer">
-                posting
-              </a>
-              .
-            </div>
-          )}
-        </details>
+        {(detailJdLoading || detailJd) && (
+          <details className="djd">
+            <summary className="djd-sum">
+              Full description
+              <svg className="djd-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </summary>
+            {detailJdLoading ? (
+              <div className="djd-note">Loading description…</div>
+            ) : (
+              <p className="djd-body">{detailJd}</p>
+            )}
+          </details>
+        )}
         <div>
           <div className="dmore-h">
             {others.length
@@ -442,7 +454,7 @@ export default function RolesPanel({
                 }}
               >
                 <span className="mi-role">{o.title}</span>
-                <span className="mi-city">{o.city ?? o.location ?? ""}</span>
+                <span className="mi-city">{moreCity(o)}</span>
               </div>
             ))}
           </div>
