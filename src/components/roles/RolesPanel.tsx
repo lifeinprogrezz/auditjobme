@@ -31,9 +31,6 @@ export type RolesPanelProps = {
   scoring: boolean;
   remaining: number;
   detailJob: RoleJob | null;
-  /** The open role's full JD, lazy-fetched on detail open (null = none stored). */
-  detailJd?: string | null;
-  detailJdLoading?: boolean;
   applied: Set<string>;
   onOpenDetail: (j: RoleJob) => void;
   onCloseDetail: () => void;
@@ -123,8 +120,6 @@ export default function RolesPanel({
   scoring,
   remaining,
   detailJob,
-  detailJd,
-  detailJdLoading,
   applied,
   onOpenDetail,
   onCloseDetail,
@@ -318,7 +313,7 @@ export default function RolesPanel({
         </div>
         {job.description && <p className="ddesc">{job.description}</p>}
         {companyFacts.length > 0 && (
-          <div className="dgrid">
+          <div className="dgrid dg-co">
             {companyFacts.map(([k, v]) => (
               <div key={k} className="dg">
                 <span className="dg-k">{k}</span>
@@ -342,7 +337,7 @@ export default function RolesPanel({
             </div>
           )}
         </div>
-        {hasCv ? (
+        {hasCv && (
           <div className="dhero">
             {job.score != null ? (
               <>
@@ -362,29 +357,6 @@ export default function RolesPanel({
               </div>
             )}
           </div>
-        ) : (
-          <div
-            className="dhero unlock"
-            role="button"
-            tabIndex={0}
-            onClick={onAddCv}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter" && e.key !== " ") return;
-              e.preventDefault();
-              onAddCv();
-            }}
-          >
-            <div className="dlock">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <rect x="4" y="11" width="16" height="10" rx="2" />
-                <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-              </svg>
-            </div>
-            <div className="dhl">
-              <div className="hlt">Unlock your fit</div>
-              <div className="hls">Add your CV to see your fit.</div>
-            </div>
-          </div>
         )}
         {hasCv && bullets.length > 0 && (
           <ul className="dfit">
@@ -394,15 +366,13 @@ export default function RolesPanel({
           </ul>
         )}
         {!hasCv && (
-          <div className="dfit-lock">
+          <div className="dfit-teaser">
+            <div className="dfit-h">Why you fit</div>
             <ul className="dfit blurred" aria-hidden="true">
               <li>Your background lines up with what this role needs.</li>
               <li>Your experience maps to their product and stage.</li>
               <li>Your level fits the scope of this role.</li>
             </ul>
-            <button className="dfl-cta" onClick={onAddCv}>
-              Add your CV to unlock why you fit
-            </button>
           </div>
         )}
         {applied.has(job.id) ? (
@@ -415,23 +385,8 @@ export default function RolesPanel({
           </button>
         ) : (
           <button className="btn g dcta" onClick={onAddCv}>
-            Add your CV
+            Add your CV to see your fit
           </button>
-        )}
-        {(detailJdLoading || detailJd) && (
-          <details className="djd">
-            <summary className="djd-sum">
-              Full description
-              <svg className="djd-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </summary>
-            {detailJdLoading ? (
-              <div className="djd-note">Loading description…</div>
-            ) : (
-              <p className="djd-body">{detailJd}</p>
-            )}
-          </details>
         )}
         <div>
           <div className="dmore-h">

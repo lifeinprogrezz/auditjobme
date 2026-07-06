@@ -16,7 +16,6 @@ import HeadBar from "@/components/roles/HeadBar";
 import { EMPTY_FILTERS, companyCityRoles, filterJobs, type RoleJob, type RolesFilters } from "@/lib/roles";
 import { coordsOf } from "@/lib/geo";
 import { useRolesData } from "@/hooks/useRolesData";
-import { useJobDescription } from "@/hooks/useJobDescription";
 
 export default function RolesMap() {
   const { jobs, loading, scoring, remaining, applied, scoreMore, scored, signedIn } =
@@ -65,9 +64,6 @@ export default function RolesMap() {
     () => (detailJob ? jobs.find((j) => j.id === detailJob.id) ?? detailJob : null),
     [detailJob, jobs],
   );
-
-  // The role's full JD, lazy-fetched the moment a detail opens (Rober 2026-07-06).
-  const detailJd = useJobDescription(detailLive?.id ?? null);
 
   // Personalized detail must not outlive the session.
   useEffect(() => {
@@ -150,8 +146,6 @@ export default function RolesMap() {
           scoring={scoring}
           remaining={remaining}
           detailJob={detailLive}
-          detailJd={detailJd.text}
-          detailJdLoading={detailJd.loading}
           applied={applied}
           onOpenDetail={setDetailJob}
           onCloseDetail={() => setDetailJob(null)}
