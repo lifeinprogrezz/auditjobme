@@ -106,7 +106,11 @@ export default function RolesMap() {
           // way the camera holds — no zoom-out (see applyFocus in GlobeMap).
           const roles = companyCityRoles(visible, company, city);
           if (roles.length === 1) {
-            setSel({ co: null, city: null });
+            // Keep the CITY context (not a full reset): open the single role, but
+            // "All roles" should return to the city you were browsing, e.g.
+            // Barcelona — not the global default list (Rober 7-06). The company's
+            // other-city roles stay reachable via the detail's "More roles" list.
+            setSel({ co: null, city });
             setDetailJob(roles[0]);
           } else {
             setSel({ co: company, city });
