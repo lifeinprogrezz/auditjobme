@@ -13,7 +13,15 @@ import "@/styles/roles.css";
 import GlobeMap from "@/components/roles/GlobeMap";
 import RolesPanel from "@/components/roles/RolesPanel";
 import HeadBar from "@/components/roles/HeadBar";
-import { EMPTY_FILTERS, companyCityRoles, filterJobs, type RoleJob, type RolesFilters } from "@/lib/roles";
+import {
+  EMPTY_FILTERS,
+  companyCityRoles,
+  filterJobs,
+  sizeBand,
+  sizeBandOrder,
+  type RoleJob,
+  type RolesFilters,
+} from "@/lib/roles";
 import { coordsOf } from "@/lib/geo";
 import { useRolesData } from "@/hooks/useRolesData";
 
@@ -70,11 +78,55 @@ export default function RolesMap() {
   const norm = (s: string) => s.trim().toLowerCase();
 
   const visible = useMemo(() => filterJobs(jobs, filters), [jobs, filters]);
+
+  // Live scope for the top-left badge: roles + distinct companies in the CURRENT
+  // (filtered) view — the full catalog when nothing is filtered. Rober 7-06.
+  const scopeRoles = visible.length;
+  const scopeCos = useMemo(
+    () => new Set(visible.map((j) => j.company_id ?? j.company)).size,
+    [visible],
+  );
+
+  // Filter option lists, derived from the FULL catalog (not the filtered view) so
+  // options never disappear as you narrow. Counts are live role counts; city/sector
+  // sorted by frequency, size by the canonical ladder. Rober 7-06.
+  const cityOptions = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const j of jobs) if (j.city) m.set(j.city, (m.get(j.city) ?? 0) + 1);
+    return [...m.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([value, count]) => ({ value, label: value, count }));
+  }, [jobs]);
+  const sectorOptions = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const j of jobs) if (j.sector) m.set(j.sector, (m.get(j.sector) ?? 0) + 1);
+    return [...m.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([value, count]) => ({ value, label: value, count }));
+  }, [jobs]);
+  const sizeOptions = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const j of jobs) {
+      const b = sizeBand(j.headcount);
+      if (b) m.set(b, (m.get(b) ?? 0) + 1);
+    }
+    return [...m.entries()]
+      .sort((a, b) => sizeBandOrder(a[0]) - sizeBandOrder(b[0]))
+      .map(([value, count]) => ({ value, label: value, count }));
+  }, [jobs]);
+
   // Default landing (nothing searched / filtered / selected) shows a curated
   // "hot companies" showcase — one Product role from each (Rober 7-06). The reset
   // control returns here; any search/filter/pin-click switches to real results.
   const isDefaultView =
-    !sel.co && !sel.city && !filters.query && filters.levels.length === 0 && !filters.remoteOnly;
+    !sel.co &&
+    !sel.city &&
+    !filters.query &&
+    filters.levels.length === 0 &&
+    filters.cities.length === 0 &&
+    filters.sectors.length === 0 &&
+    filters.sizes.length === 0 &&
+    !filters.remoteOnly;
   const hotJobs = useMemo(() => {
     // Each showcase card must be a FRESH (<=21d) real PM role: skip legal/EA/intern/
     // eng titles that merely contain "Product" (Rober 7-06 — Lovable was leaking
@@ -166,6 +218,11 @@ export default function RolesMap() {
   const openDetail = (job: RoleJob) => {
     setDetailJob(job);
     if (!job.city) return;
+    // From the default showcase, adopt the clicked role's city as the panel
+    // context so "All roles" returns to THAT city (matching the map, which flies
+    // there) instead of snapping back to the global default. Search / city /
+    // company contexts keep their existing selection. Rober 7-06.
+    if (isDefaultView) setSel({ co: null, city: job.city });
     const c = coordsOf(job.city);
     if (c) setFlyTarget((prev) => ({ center: c, nonce: (prev?.nonce ?? 0) + 1 }));
   };
@@ -225,6 +282,9 @@ export default function RolesMap() {
           signedIn={signedIn}
           filters={filters}
           onFilters={setFilters}
+          cityOptions={cityOptions}
+          sectorOptions={sectorOptions}
+          sizeOptions={sizeOptions}
           view={view}
           onView={setView}
         />
@@ -248,6 +308,15 @@ export default function RolesMap() {
           onScoreMore={scoreMore}
           onToggleHidden={() => setPanelHidden((v) => !v)}
         />
+        <div className="scope" aria-label="Catalog scope">
+          <span className="scope-cell">
+            <b>{scopeRoles.toLocaleString()}</b> roles
+          </span>
+          <span className="scope-sep" />
+          <span className="scope-cell">
+            <b>{scopeCos.toLocaleString()}</b> companies
+          </span>
+        </div>
         <div className="attrib">
           <a href="https://github.com/santifer/career-ops" target="_blank" rel="noopener noreferrer">
             santifer

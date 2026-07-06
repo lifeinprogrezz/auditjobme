@@ -5,7 +5,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/AuthProvider";
-import Index from "./pages/Index.tsx"; // eager: the landing is the first paint
 
 // Route-level code-splitting: each page loads on navigation, so a landing
 // visitor never downloads the authed app (digest/apply/audit/profile/...).
@@ -20,6 +19,7 @@ const Profile = lazy(() => import("./pages/Profile.tsx"));
 const Apply = lazy(() => import("./pages/Apply.tsx"));
 const RequestCompany = lazy(() => import("./pages/RequestCompany.tsx"));
 const RolesMap = lazy(() => import("./pages/RolesMap.tsx"));
+const UnderConstruction = lazy(() => import("./pages/UnderConstruction.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -42,7 +42,11 @@ const App = () => (
         <BrowserRouter>
           <Suspense fallback={<PageFallback />}>
             <Routes>
-              <Route path="/" element={<Index />} />
+              {/* The interactive roles map is the live product → it owns the root
+                  domain (Rober 7-06). /roles stays as an alias. Everything not yet
+                  public routes to /underconstruction (see HeadBar + RolesPanel). */}
+              <Route path="/" element={<RolesMap />} />
+              <Route path="/underconstruction" element={<UnderConstruction />} />
               <Route path="/a/:username/:slug" element={<PublicAudit />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />

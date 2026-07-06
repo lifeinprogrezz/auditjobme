@@ -136,7 +136,7 @@
 .roles-theme .filterbtn.on { background: var(--act-tint); border-color: var(--act-border); color: var(--text); }
 .roles-theme .filterbtn svg { opacity: 0.7; }
 .roles-theme .fchips { display: flex; align-items: center; gap: 8px; max-width: 0; opacity: 0; overflow: hidden; pointer-events: none; margin-left: 0; transition: max-width 0.34s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.26s ease, margin-left 0.34s; }
-.roles-theme .fchips.show { max-width: 460px; opacity: 1; pointer-events: auto; margin-left: 6px; }
+.roles-theme .fchips.show { max-width: 720px; opacity: 1; pointer-events: auto; margin-left: 6px; }
 .roles-theme .fchips.expanded { overflow: visible; }
 .roles-theme .fchip { position: relative; display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 11px; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .fchip:hover { background: rgba(255, 255, 255, 0.1); color: var(--text); }
@@ -151,9 +151,42 @@
 .roles-theme .fdrop > * { position: relative; z-index: 1; }
 .roles-theme .fdrop label { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.15s; }
 .roles-theme .fdrop label:hover { background: rgba(255, 255, 255, 0.06); }
-.roles-theme .fdrop input { appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--rim); background: rgba(255, 255, 255, 0.04); cursor: pointer; position: relative; flex: none; }
+.roles-theme .fdrop input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--rim); background: rgba(255, 255, 255, 0.04); cursor: pointer; position: relative; flex: none; }
 .roles-theme .fdrop input:checked { background: var(--act-strong); border-color: var(--act-strong); }
 .roles-theme .fdrop input:checked::after { content: ""; position: absolute; left: 5px; top: 1px; width: 4px; height: 9px; border: solid var(--act-strong-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+
+/* Searchable multi-select dropdown (City / Sector / Size) — scrollable list + per-option count (Rober 7-06). */
+.roles-theme .fdrop-multi { min-width: 238px; }
+.roles-theme .fdrop-search { width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--rim); background: rgba(255, 255, 255, 0.05); color: var(--text); font-family: inherit; font-size: 12.5px; outline: none; }
+.roles-theme .fdrop-search::placeholder { color: var(--muted); }
+.roles-theme .fdrop-search:focus { border-color: var(--act-border); }
+.roles-theme .fdrop-list { display: flex; flex-direction: column; gap: 1px; max-height: 266px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
+.roles-theme .fdrop-list::-webkit-scrollbar { width: 7px; }
+.roles-theme .fdrop-list::-webkit-scrollbar-track { background: transparent; }
+.roles-theme .fdrop-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 999px; }
+.roles-theme .fdrop-lab { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.roles-theme .fdrop-n { flex: none; font-size: 11px; font-weight: 600; color: var(--muted); opacity: 0.75; font-variant-numeric: tabular-nums; }
+.roles-theme .fdrop-empty { padding: 12px 10px; font-size: 12.5px; color: var(--muted); text-align: center; }
+
+/* Top-left scope badge — catalog size at a glance (Rober 7-06). */
+/* Flush to the left edge (like the zoom +/- control) but at the headbar's height —
+   top-left corner, vertically centered on the nav (Rober 7-06). */
+.roles-theme .scope { position: absolute; left: 16px; top: 29px; z-index: 12; pointer-events: none; display: inline-flex; align-items: center; gap: 11px; padding: 9px 14px; border-radius: 14px; background: var(--glass-2); -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%); border: 1px solid var(--rim); box-shadow: var(--sh); font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.roles-theme .scope b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 3px; }
+.roles-theme .scope-sep { width: 1px; height: 15px; background: var(--hair); }
+
+/* In-panel search (inside a city/company list) — Rober 7-06. */
+.roles-theme .psearch { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 0 11px; height: 38px; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); flex: none; }
+.roles-theme .psearch svg { flex: none; opacity: 0.8; }
+.roles-theme .psearch input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--text); font-family: inherit; font-size: 13px; }
+.roles-theme .psearch input::placeholder { color: var(--muted); }
+.roles-theme .psearch-x { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border: none; background: none; color: var(--muted); cursor: pointer; border-radius: 6px; }
+.roles-theme .psearch-x:hover { color: var(--text); background: rgba(255, 255, 255, 0.08); }
+
+/* Light-theme tweaks for the new search inputs + dropdown scrollbar. */
+.roles-theme.light .fdrop-search, .roles-theme.light .psearch { background: rgba(11, 31, 38, 0.035); }
+.roles-theme.light .fdrop-list { scrollbar-color: rgba(11, 31, 38, 0.22) transparent; }
+.roles-theme.light .fdrop-list::-webkit-scrollbar-thumb { background: rgba(11, 31, 38, 0.18); }
 .roles-theme .av { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--rim); background: conic-gradient(from 200deg, #1fd8b8, #3cb4ff, #9e8cff, #1fd8b8); box-shadow: 0 0 14px rgba(31, 216, 184, 0.4); cursor: pointer; }
 .roles-theme .signin { display: flex; align-items: center; height: 38px; padding: 0 16px; border-radius: 11px; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); cursor: pointer; text-decoration: none; transition: background 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .signin:hover { background: rgba(255, 255, 255, 0.1); }

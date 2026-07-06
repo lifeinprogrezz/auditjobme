@@ -1,26 +1,30 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { LEVELS, type Level, type RolesFilters } from "@/lib/roles";
+import FilterChip, { type FilterOption } from "./FilterChip";
 
 export type HeadBarProps = {
   scored: boolean;
   signedIn: boolean;
   filters: RolesFilters;
   onFilters: (f: RolesFilters) => void;
+  cityOptions: FilterOption[];
+  sectorOptions: FilterOption[];
+  sizeOptions: FilterOption[];
   view: "map" | "list";
   onView: (v: "map" | "list") => void;
 };
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, view, onView }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, cityOptions, sectorOptions, sizeOptions, view, onView }: HeadBarProps) {
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
   const [chipsShown, setChipsShown] = useState(false);
   // Two-step overflow (mockup 330): .show slides chips in with overflow hidden,
   // .expanded (after the 340ms slide) frees overflow so dropdowns can escape.
   const [chipsExpanded, setChipsExpanded] = useState(false);
-  const [openChip, setOpenChip] = useState<"level" | null>(null);
+  const [openChip, setOpenChip] = useState<"level" | "city" | "sector" | "size" | null>(null);
   const expandTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -76,6 +80,15 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
     onFilters({ ...filters, levels });
   };
 
+  // City / Sector / Size are string multi-selects — one generic toggler.
+  const toggleIn = (key: "cities" | "sectors" | "sizes", v: string) => {
+    const cur = filters[key];
+    const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
+    onFilters({ ...filters, [key]: next });
+  };
+  const chipOpen = (key: "city" | "sector" | "size") => () =>
+    setOpenChip(openChip === key ? null : key);
+
   const levelOpen = openChip === "level";
   const levelActive = filters.levels.length > 0;
 
@@ -89,7 +102,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
 
   return (
     <header className="nav glass liquid">
-      <a className="brand" href="/">auditjob.me</a>
+      <Link className="brand" to="/underconstruction">auditjob.me</Link>
       <span className="sep" />
 
       <div className="cmd">
@@ -101,7 +114,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
           ref={searchRef}
           type="text"
           aria-label="Search roles"
-          placeholder="Search roles, companies, cities"
+          placeholder="Search roles, companies"
           value={filters.query}
           onChange={(e) => onFilters({ ...filters, query: e.target.value })}
         />
@@ -168,6 +181,33 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
           </div>
         </div>
 
+        <FilterChip
+          label="City"
+          searchable
+          options={cityOptions}
+          selected={filters.cities}
+          onToggle={(v) => toggleIn("cities", v)}
+          open={openChip === "city"}
+          onOpenToggle={chipOpen("city")}
+        />
+        <FilterChip
+          label="Sector"
+          searchable
+          options={sectorOptions}
+          selected={filters.sectors}
+          onToggle={(v) => toggleIn("sectors", v)}
+          open={openChip === "sector"}
+          onOpenToggle={chipOpen("sector")}
+        />
+        <FilterChip
+          label="Size"
+          options={sizeOptions}
+          selected={filters.sizes}
+          onToggle={(v) => toggleIn("sizes", v)}
+          open={openChip === "size"}
+          onOpenToggle={chipOpen("size")}
+        />
+
         <div
           className={`fchip${filters.remoteOnly ? " active" : ""}`}
           role="button"
@@ -205,7 +245,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
       <button
         type="button"
         className="navcv"
-        onClick={() => navigate(signedIn ? "/profile" : "/")}
+        onClick={() => navigate("/underconstruction")}
       >
         <span className="sp">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
@@ -220,8 +260,8 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, view, on
         role="button"
         tabIndex={0}
         aria-label="Profile"
-        onClick={() => navigate(signedIn ? "/profile" : "/")}
-        onKeyDown={keyActivate(() => navigate(signedIn ? "/profile" : "/"))}
+        onClick={() => navigate("/underconstruction")}
+        onKeyDown={keyActivate(() => navigate("/underconstruction"))}
       />
     </header>
   );

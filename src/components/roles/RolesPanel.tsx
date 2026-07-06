@@ -140,9 +140,25 @@ export default function RolesPanel({
     if (detailJob) detailRef.current?.scrollTo(0, 0);
   }, [detailJob]);
 
-  const goApply = (j: RoleJob) => navigate("/apply?job=" + encodeURIComponent(j.url));
-  // Unscored hero + CTA mirror the nav's "Add your CV": profile if signed in, else home → sign-in.
-  const onAddCv = () => navigate(signedIn ? "/profile" : "/");
+  // Coming-soon gate (Rober 7-06): the roles map is the only live surface, so both
+  // "Prepare application" and the "Add your CV" unlock route to /underconstruction.
+  const goApply = (_j: RoleJob) => navigate("/underconstruction");
+  const onAddCv = () => navigate("/underconstruction");
+
+  // In-panel search: inside a city/company context, a local box finds a specific
+  // company here without going back up to the headbar (Rober 7-06). It narrows ONLY
+  // the panel's current list (company + role); the headbar search stays global, and
+  // it resets whenever the city/company context changes.
+  const [panelQ, setPanelQ] = useState("");
+  const panelSearchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    setPanelQ("");
+  }, [selCo, selCity]);
+  const listContext = Boolean(selCo || selCity);
+  const shown = (() => {
+    const q = panelQ.trim().toLowerCase();
+    return q ? jobs.filter((j) => `${j.company} ${j.title}`.toLowerCase().includes(q)) : jobs;
+  })();
 
   // Cursor spotlight: one listener on the container, sets --mx/--my on the hovered card.
   const handleCardsMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -170,7 +186,38 @@ export default function RolesPanel({
               <span className="x">×</span>
             </button>
           )}
-          <span className="selcount">{jobs.length}</span>
+          <span className="selcount">{shown.length}</span>
+        </div>
+      )}
+      {listContext && jobs.length > 0 && (
+        <div className="psearch">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            ref={panelSearchRef}
+            type="text"
+            aria-label="Search this list"
+            placeholder={`Search in ${selCity || selCo}`}
+            value={panelQ}
+            onChange={(e) => setPanelQ(e.target.value)}
+          />
+          {panelQ && (
+            <button
+              type="button"
+              className="psearch-x"
+              aria-label="Clear search"
+              onClick={() => {
+                setPanelQ("");
+                panelSearchRef.current?.focus();
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
       )}
       {scoring && (
@@ -185,7 +232,13 @@ export default function RolesPanel({
         </div>
       ) : (
         <div className="cards" onMouseMove={handleCardsMove}>
-          {jobs.slice(0, CARD_CAP).map((job, i) => {
+          {shown.length === 0 && (
+            <div className="panel-note">
+              <b>No companies match</b>
+              Nothing here for “{panelQ}”.
+            </div>
+          )}
+          {shown.slice(0, CARD_CAP).map((job, i) => {
             const ago = postedAgo(job.posted_at);
             const open = (e: React.SyntheticEvent) => {
               if ((e.target as HTMLElement).closest(".acts")) return;
@@ -238,9 +291,9 @@ export default function RolesPanel({
               </article>
             );
           })}
-          {jobs.length > CARD_CAP && (
+          {shown.length > CARD_CAP && (
             <div className="scorebar">
-              Showing the top {CARD_CAP} of {jobs.length} roles. Narrow with search or filters.
+              Showing the top {CARD_CAP} of {shown.length} roles. Narrow with search or filters.
             </div>
           )}
         </div>

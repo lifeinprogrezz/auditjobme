@@ -92,22 +92,45 @@ export const LEVELS: { value: Level; label: string }[] = [
 export type RolesFilters = {
   query: string;
   levels: Level[];
+  // City + sector are opt-in multi-selects (Rober 7-06). Only dimensions with
+  // near-complete coverage are filterable: every role has a resolvable city, and
+  // ~80% of companies carry a sector — so an empty selection always shows the full
+  // catalog and no company silently disappears from the default view. Sparse fields
+  // (founded year, funding round) are deliberately NOT filters for that reason.
+  cities: string[];
+  sectors: string[];
+  sizes: string[]; // canonical size bands (sizeBand); ~84% company coverage
   remoteOnly: boolean;
 };
 
-export const EMPTY_FILTERS: RolesFilters = { query: "", levels: [], remoteOnly: false };
+export const EMPTY_FILTERS: RolesFilters = {
+  query: "",
+  levels: [],
+  cities: [],
+  sectors: [],
+  sizes: [],
+  remoteOnly: false,
+};
 
-/** Client-side filter, honest to the data (query over company/title/city/location). */
+/** Client-side filter, honest to the data. Free-text query matches company + title
+ *  ONLY (geography is the City filter's job now — the headbar no longer claims to
+ *  search cities). City/sector/size are OR-within, AND-across: a role passes if its
+ *  city is among the selected cities AND its sector is among the selected sectors AND
+ *  its size band is selected (each ignored when its selection is empty). A role
+ *  missing the field can't match a chosen value. */
 export function filterJobs(jobs: RoleJob[], f: RolesFilters): RoleJob[] {
   const q = f.query.trim().toLowerCase();
   return jobs.filter((j) => {
     if (f.remoteOnly && !j.remote) return false;
     if (f.levels.length && !f.levels.includes((j.seniority ?? "") as Level)) return false;
+    if (f.cities.length && !(j.city != null && f.cities.includes(j.city))) return false;
+    if (f.sectors.length && !(j.sector != null && f.sectors.includes(j.sector))) return false;
+    if (f.sizes.length) {
+      const band = sizeBand(j.headcount);
+      if (!band || !f.sizes.includes(band)) return false;
+    }
     if (!q) return true;
-    return [j.company, j.title, j.city ?? "", j.location ?? ""]
-      .join(" ")
-      .toLowerCase()
-      .includes(q);
+    return [j.company, j.title].join(" ").toLowerCase().includes(q);
   });
 }
 
@@ -171,6 +194,32 @@ export function formatHeadcount(bucket: string | null | undefined): string | nul
   if (!bucket) return null;
   const b = bucket.trim();
   return b ? b.replace(/\s*-\s*/g, "–") : null;
+}
+
+// Raw headcount buckets arrive in two inconsistent source schemes (LinkedIn-style
+// 1-10/11-50/51-200/201-500/500-2k/2k+ AND a scraped <10/10-30/30-100/100-500/500+).
+// Normalize both into ONE canonical, non-overlapping size ladder (mapped by midpoint)
+// so the Size filter offers clean, distinct options instead of overlapping buckets.
+// Rober 7-06; pinned by size-band.test.ts.
+const SIZE_BANDS = ["1–10", "11–50", "51–200", "201–500", "500–2k", "2k+"] as const;
+const RAW_TO_BAND: Record<string, number> = {
+  "<10": 0, "1-10": 0,
+  "10-30": 1, "11-50": 1,
+  "30-100": 2, "51-200": 2,
+  "100-500": 3, "201-500": 3,
+  "500+": 4, "500-2k": 4,
+  "2k+": 5,
+};
+/** Canonical size band for a raw headcount bucket; null when unknown/unmapped. */
+export function sizeBand(bucket: string | null | undefined): string | null {
+  if (!bucket) return null;
+  const i = RAW_TO_BAND[bucket.trim()];
+  return i == null ? null : SIZE_BANDS[i];
+}
+/** Sort order for a canonical size band (small→large); 99 for unknown. */
+export function sizeBandOrder(band: string): number {
+  const i = (SIZE_BANDS as readonly string[]).indexOf(band);
+  return i < 0 ? 99 : i;
 }
 
 /** Best website URL for a company: an explicit website wins, else derive it from the
