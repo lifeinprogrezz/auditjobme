@@ -25,6 +25,8 @@ const CARD_CAP = 200;
 export type RolesPanelProps = {
   jobs: RoleJob[];
   allJobs: RoleJob[];
+  /** Default landing view → the panel shows the curated "hot companies" showcase. */
+  defaultView?: boolean;
   scored: boolean;
   signedIn: boolean;
   loading: boolean;
@@ -114,6 +116,7 @@ function moreCity(job: RoleJob): string {
 export default function RolesPanel({
   jobs,
   allJobs,
+  defaultView,
   scored,
   signedIn,
   loading,
@@ -152,7 +155,7 @@ export default function RolesPanel({
 
   const renderCards = () => (
     <>
-      <h1 className="ptitle">Your matches</h1>
+      <h1 className="ptitle">{defaultView ? "Hot right now" : "Your matches"}</h1>
       {(selCo || selCity) && (
         <div className="selhdr">
           {selCo && (
@@ -254,14 +257,11 @@ export default function RolesPanel({
     const ago = postedAgo(job.posted_at);
     const site = websiteUrl(job.website, job.domain);
     const level = LEVELS.find((l) => l.value === job.seniority)?.label;
-    // Company facts (stage / size / founded) vs role facts (location / level /
-    // remote / posted) — labeled key-value cells in a 2-col grid, no separators.
-    const companyFacts: [string, string][] = [];
+    // Company meta (stage / size / founded) renders as a condensed icon row so a
+    // lone value never floats; role facts (location / level / remote / posted)
+    // stay a labeled grid inside the role box.
     const stage = formatStage(job.stage);
-    if (stage) companyFacts.push(["Stage", stage]);
     const size = formatHeadcount(job.headcount);
-    if (size) companyFacts.push(["Size", size]);
-    if (job.foundedYear) companyFacts.push(["Founded", String(job.foundedYear)]);
     const roleFacts: [string, string][] = [];
     const loc = job.city ?? job.location;
     if (loc) roleFacts.push(["Location", loc]);
@@ -312,14 +312,36 @@ export default function RolesPanel({
           )}
         </div>
         {job.description && <p className="ddesc">{job.description}</p>}
-        {companyFacts.length > 0 && (
-          <div className="dgrid dg-co">
-            {companyFacts.map(([k, v]) => (
-              <div key={k} className="dg">
-                <span className="dg-k">{k}</span>
-                <span className="dg-v">{v}</span>
-              </div>
-            ))}
+        {(stage || size || job.foundedYear) && (
+          <div className="dcmeta">
+            {stage && (
+              <span className="dcm">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M3 17l6-6 4 4 7-7" />
+                  <path d="M17 8h4v4" />
+                </svg>
+                {stage}
+              </span>
+            )}
+            {size && (
+              <span className="dcm">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+                  <circle cx="9" cy="8" r="3" />
+                  <path d="M3.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+                  <path d="M16 5.5a3 3 0 0 1 0 5" />
+                </svg>
+                {size}
+              </span>
+            )}
+            {job.foundedYear && (
+              <span className="dcm">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="16" rx="2" />
+                  <path d="M3 10h18M8 3v4M16 3v4" />
+                </svg>
+                {job.foundedYear}
+              </span>
+            )}
           </div>
         )}
         <div className="drole">

@@ -334,6 +334,9 @@
 /* company context + JD body in the detail (Rober 2026-07-06) */
 .roles-theme .dsector { font-size: 11.5px; font-weight: 600; color: rgba(255, 255, 255, 0.72); letter-spacing: 0.02em; margin-top: 2px; }
 .roles-theme .ddesc { font-size: 13px; line-height: 1.5; color: var(--subtle); margin: 0; }
+.roles-theme .dcmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 15px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.roles-theme .dcm { display: inline-flex; align-items: center; gap: 5px; }
+.roles-theme .dcm svg { opacity: 0.8; flex: none; }
 .roles-theme .dlinks { display: flex; flex-wrap: wrap; gap: 7px; }
 .roles-theme .dlink { font-size: 11.5px; font-weight: 600; color: var(--muted); background: rgba(255, 255, 255, 0.05); border: 1px solid var(--hair); border-radius: 8px; padding: 5px 11px; text-decoration: none; transition: color 0.2s, border-color 0.2s, background 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
 .roles-theme .dlink:hover { color: #fff; border-color: var(--act-border); background: var(--act-tint); }
@@ -386,7 +389,7 @@
 .roles-theme .dg-v { font-size: 12.5px; font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .roles-theme .dg-inrole { margin-top: 12px; }
 .roles-theme .dg-co { padding: 0 14px; }
-.roles-theme .dfit-h { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 9px; opacity: 0.8; }
+.roles-theme .dfit-h { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 9px; }
 .roles-theme .dfit.blurred { filter: blur(3px); opacity: 0.6; user-select: none; pointer-events: none; }
 .roles-theme .detail, .roles-theme .cards { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
 .roles-theme .detail::-webkit-scrollbar, .roles-theme .cards::-webkit-scrollbar { width: 7px; }
@@ -414,7 +417,7 @@
 .roles-theme.light {
   --bg0: #f7f9fa; --bg1: #eef2f4; --bg2: #e2e8ec;
   --surface: #ffffff; --surface-2: #f0f4f6; --surface-3: #e4ebee;
-  --text: #0b1f26; --muted: #5e828c; --subtle: #8aa6ae;
+  --text: #0b1f26; --muted: #3f5a63; --subtle: #6f8a92;
   --glass: rgba(255, 255, 255, 0.55); --glass-2: rgba(255, 255, 255, 0.72);
   /* Light glass defines itself with dark hairlines + INNER light — a white
    * border on light reads as a plain white contour, not glass (Rober, 7-05). */

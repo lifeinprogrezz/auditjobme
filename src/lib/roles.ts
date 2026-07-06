@@ -4,6 +4,8 @@
 export type RoleJob = {
   id: string;
   company: string;
+  /** companies.slug this role belongs to (drives the curated "hot companies" view). */
+  company_id?: string | null;
   title: string;
   url: string;
   location: string | null;

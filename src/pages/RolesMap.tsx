@@ -17,12 +17,31 @@ import { EMPTY_FILTERS, companyCityRoles, filterJobs, type RoleJob, type RolesFi
 import { coordsOf } from "@/lib/geo";
 import { useRolesData } from "@/hooks/useRolesData";
 
+// Curated priority pool for the default "Hot right now" showcase (Rober 7-06):
+// recognizable big-tech + hot young high-growth, cool-first. Each card must be a
+// FRESH (<=21d) real PM role (see hotJobs) — so a company only appears when it has
+// one; Mistral/Lovable sit in the pool and surface automatically the day they post
+// a fresh PM role. If fewer than seven favorites are fresh, the panel backfills
+// with the freshest fresh-PM roles from any other company. Slugs from companies.slug.
+const HOT_PRIORITY = [
+  "google", "stripe", "spotify", "revolut", "n8n_de", "mistral_ai", "lovable_se",
+  "alan_fr", "pleo_dk", "adyen", "wise_it", "n26", "sumup", "getyourguide",
+  "typeform_es", "celonis",
+];
+const HOT_COUNT = 7;
+const FRESH_MS = 21 * 24 * 60 * 60 * 1000;
+
 export default function RolesMap() {
   const { jobs, loading, scoring, remaining, applied, scoreMore, scored, signedIn } =
     useRolesData();
   const [filters, setFilters] = useState<RolesFilters>(EMPTY_FILTERS);
   const [view, setView] = useState<"map" | "list">("map");
   const [detailJob, setDetailJob] = useState<RoleJob | null>(null);
+  // A panel-card click flies the map to the role's city (see openDetail); the
+  // nonce forces a re-fly even when the same city is reopened.
+  const [flyTarget, setFlyTarget] = useState<{ center: [number, number]; nonce: number } | null>(
+    null,
+  );
   const [panelHidden, setPanelHidden] = useState(false);
   // Light is the shipped default (Rober's call, 2026-07-05); dark ink stays
   // as the alternate identity for a future theme setting.
@@ -51,12 +70,70 @@ export default function RolesMap() {
   const norm = (s: string) => s.trim().toLowerCase();
 
   const visible = useMemo(() => filterJobs(jobs, filters), [jobs, filters]);
+  // Default landing (nothing searched / filtered / selected) shows a curated
+  // "hot companies" showcase — one Product role from each (Rober 7-06). The reset
+  // control returns here; any search/filter/pin-click switches to real results.
+  const isDefaultView =
+    !sel.co && !sel.city && !filters.query && filters.levels.length === 0 && !filters.remoteOnly;
+  const hotJobs = useMemo(() => {
+    // Each showcase card must be a FRESH (<=21d) real PM role: skip legal/EA/intern/
+    // eng titles that merely contain "Product" (Rober 7-06 — Lovable was leaking
+    // "Product Counsel", Mistral an "Executive Assistant"), and skip stale roles —
+    // a months-old card "looks bad". Pick each company's freshest qualifying role,
+    // take the priority favorites first, then backfill with the freshest fresh-PM
+    // roles from any other company so the row is always seven fresh, cool cards.
+    const now = Date.now();
+    const BAD = /counsel|assistant|paralegal|recruit|\bintern\b|internship|graduate|designer|\bengineer\b/i;
+    const GOOD =
+      /product (manager|lead|owner)|head of product|group product|principal product|senior product|staff product|director of product|chief product/i;
+    const freshGood = (j: RoleJob) => {
+      if (!j.company_id || !j.posted_at || !GOOD.test(j.title) || BAD.test(j.title)) return false;
+      const t = Date.parse(j.posted_at);
+      return !Number.isNaN(t) && now - t <= FRESH_MS;
+    };
+    // Freshest qualifying role per company.
+    const best = new Map<string, RoleJob>();
+    for (const j of visible) {
+      if (!freshGood(j)) continue;
+      const slug = j.company_id as string;
+      const cur = best.get(slug);
+      if (!cur || Date.parse(j.posted_at as string) > Date.parse(cur.posted_at as string))
+        best.set(slug, j);
+    }
+    const picked: RoleJob[] = [];
+    const used = new Set<string>();
+    for (const slug of HOT_PRIORITY) {
+      const j = best.get(slug);
+      if (j && picked.length < HOT_COUNT) {
+        picked.push(j);
+        used.add(slug);
+      }
+    }
+    if (picked.length < HOT_COUNT) {
+      const backfill = [...best.entries()]
+        .filter(([slug]) => !used.has(slug))
+        .map(([, j]) => j)
+        .sort((a, b) => Date.parse(b.posted_at as string) - Date.parse(a.posted_at as string));
+      for (const j of backfill) {
+        if (picked.length >= HOT_COUNT) break;
+        picked.push(j);
+      }
+    }
+    return picked;
+  }, [visible]);
   const panelJobs = useMemo(() => {
+    if (isDefaultView) {
+      // The seven hot cards first, then every OTHER company's live roles so the
+      // panel keeps scrolling — no dead space under the showcase, and no repeated
+      // logos right below their hero card (Rober 7-06).
+      const hotSlugs = new Set(hotJobs.map((j) => j.company_id));
+      return [...hotJobs, ...visible.filter((j) => !hotSlugs.has(j.company_id ?? null))];
+    }
     let out = visible;
     if (sel.co) out = out.filter((j) => norm(j.company) === norm(sel.co as string));
     if (sel.city) out = out.filter((j) => j.city === sel.city);
     return out;
-  }, [visible, sel]);
+  }, [visible, sel, isDefaultView, hotJobs]);
 
   // The click-time snapshot goes stale when a background score lands — re-read
   // the live row by id so the detail view matches the card.
@@ -81,6 +158,18 @@ export default function RolesMap() {
     return cities.map((c) => coordsOf(c)).filter((c): c is [number, number] => c !== null);
   }, [detailLive, jobs]);
 
+  // Opening a role from the panel list (hot showcase OR a search result) flies the
+  // map to that role's city — the same reveal a city-bubble click performs — so the
+  // globe never stays on the wide default while the panel shows one specific role
+  // (Rober 7-06). Map pin clicks already move the camera, so they set detailJob
+  // directly and bypass this.
+  const openDetail = (job: RoleJob) => {
+    setDetailJob(job);
+    if (!job.city) return;
+    const c = coordsOf(job.city);
+    if (c) setFlyTarget((prev) => ({ center: c, nonce: (prev?.nonce ?? 0) + 1 }));
+  };
+
   const rootClass = [
     "roles-theme",
     light && "light",
@@ -99,6 +188,7 @@ export default function RolesMap() {
         jobs={visible}
         scored={scored}
         focusLngLats={focusLngLats}
+        flyTo={flyTarget}
         light={light}
         onCompanyClick={(company, city) => {
           // One role in this city → jump straight to its full detail; several →
@@ -125,6 +215,7 @@ export default function RolesMap() {
         onResetView={() => {
           setSel({ co: null, city: null });
           setDetailJob(null);
+          setFilters(EMPTY_FILTERS);
         }}
       />
       <div className="vig" />
@@ -140,6 +231,7 @@ export default function RolesMap() {
         <RolesPanel
           jobs={panelJobs}
           allJobs={jobs}
+          defaultView={isDefaultView}
           selCo={sel.co}
           selCity={sel.city}
           onClearCo={() => setSel((s) => ({ ...s, co: null }))}
@@ -151,7 +243,7 @@ export default function RolesMap() {
           remaining={remaining}
           detailJob={detailLive}
           applied={applied}
-          onOpenDetail={setDetailJob}
+          onOpenDetail={openDetail}
           onCloseDetail={() => setDetailJob(null)}
           onScoreMore={scoreMore}
           onToggleHidden={() => setPanelHidden((v) => !v)}

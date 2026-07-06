@@ -12,6 +12,10 @@ export type GlobeMapProps = {
   jobs: RoleJob[];
   scored: boolean;
   focusLngLats: [number, number][] | null;
+  /** Panel-card click → ease the camera to this role's city (same reveal a
+   *  single-city bubble click performs). The nonce re-fires even when the city
+   *  is unchanged, so reopening the same role re-flies. */
+  flyTo?: { center: [number, number]; nonce: number } | null;
   /** Full light identity (paper basemap + light layer palette). Default dark ink. */
   light?: boolean;
   /** Company-logo click → filter the panel to that company's roles IN THAT CITY
@@ -82,7 +86,7 @@ const THEMES: Record<"dark" | "light", MapTheme> = {
 // The Europe frame is always a fitBounds (never a raw zoom number) — the globe
 // projection makes fixed zoom levels frame differently per viewport.
 // Startupmap-matched initial framing: more of the sphere + North Atlantic visible.
-const EUROPE_BOUNDS: [[number, number], [number, number]] = [[-32, 18], [48, 64]];
+const EUROPE_BOUNDS: [[number, number], [number, number]] = [[-11, 34], [30, 60]];
 // The right panel (358px + margins) eats that side of the viewport: every camera
 // move must aim for the VISIBLE centre, or targets land hidden behind the panel.
 const EUROPE_PADDING = { top: 80, right: 390, bottom: 80, left: 50 };
@@ -525,7 +529,7 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 // `scored` stays in the props type for the page contract, but the map needs no
 // scored logic: marker bucket classes are permanent and CSS gates them on the
 // root .scored class.
-export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyClick, onCityClick, onResetView }: GlobeMapProps) {
+export default function GlobeMap({ jobs, focusLngLats, flyTo, light = false, onCompanyClick, onCityClick, onResetView }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const haloRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -966,6 +970,18 @@ export default function GlobeMap({ jobs, focusLngLats, light = false, onCompanyC
     applyFocus(map, focusLngLats);
 
   }, [focusLngLats]);
+
+  // Panel-card click flies the camera to the role's city — the same easeTo reveal a
+  // single-city bubble click performs (Rober 7-06). The nonce lets reopening the
+  // same city re-fly; we only consume it once the map is actually loaded.
+  const flyNonceRef = useRef(0);
+  useEffect(() => {
+    if (!flyTo || flyTo.nonce === flyNonceRef.current) return;
+    const map = mapRef.current;
+    if (!map || !loadedRef.current) return;
+    flyNonceRef.current = flyTo.nonce;
+    map.easeTo({ center: flyTo.center, zoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS });
+  }, [flyTo]);
 
   return (
     <>
