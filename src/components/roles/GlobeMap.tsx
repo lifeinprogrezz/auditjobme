@@ -501,43 +501,22 @@ function addRolesLayers(map: maplibregl.Map, data: FeatureCollection): void {
   } as unknown as maplibregl.LayerSpecification);
 }
 
+// Detail open/close updates ONLY the teal highlight ring — the camera never
+// moves on a role open/close (Rober 2026-07-06: opening a role must keep the
+// exact view you had; the reset-view control is the one way back to Europe).
+// Camera flights live at the pin/cluster/reset handlers, not here.
 function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void {
   try {
     const src = map.getSource("hl") as maplibregl.GeoJSONSource | undefined;
     if (!src) return;
-    if (focus) {
-      src.setData({
-        type: "FeatureCollection",
-        features: focus.map((c) => ({
-          type: "Feature" as const,
-          properties: {},
-          geometry: { type: "Point" as const, coordinates: c },
-        })),
-      });
-      if (focus.length === 1) {
-        // Skip-if-already-close (startupmap's guard): re-flying a camera that is
-        // effectively at the target reads as a stutter, not a move.
-        const ctr = map.getCenter();
-        const close =
-          Math.abs(map.getZoom() - 4.5) < 0.5 &&
-          Math.abs(ctr.lng - focus[0][0]) < 0.01 &&
-          Math.abs(ctr.lat - focus[0][1]) < 0.01;
-        if (!close) map.flyTo({ center: focus[0], zoom: 4.5, duration: FLIGHT_MS });
-      } else if (focus.length > 1) {
-        const lo = focus.map((c) => c[0]);
-        const la = focus.map((c) => c[1]);
-        map.fitBounds(
-          [
-            [Math.min(...lo) - 3, Math.min(...la) - 3],
-            [Math.max(...lo) + 3, Math.max(...la) + 3],
-          ],
-          { padding: fitPad(map, { top: 90, right: 400, bottom: 90, left: 60 }), duration: CONTINENT_MS },
-        );
-      }
-    } else {
-      src.setData({ type: "FeatureCollection", features: [] });
-      map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: CONTINENT_MS });
-    }
+    src.setData({
+      type: "FeatureCollection",
+      features: (focus ?? []).map((c) => ({
+        type: "Feature" as const,
+        properties: {},
+        geometry: { type: "Point" as const, coordinates: c },
+      })),
+    });
   } catch {
     /* style mid-load or map mid-teardown */
   }

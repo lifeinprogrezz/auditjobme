@@ -87,6 +87,21 @@ export function filterJobs(jobs: RoleJob[], f: RolesFilters): RoleJob[] {
   });
 }
 
+/** A company's roles in one city (case-insensitive company match). A null `city`
+ *  matches all of that company's roles regardless of city — mirrors the map pin,
+ *  which is keyed per company-in-a-city but carries a null city for unknowns.
+ *  Drives the /roles pin click: exactly one role → open its detail, else list. */
+export function companyCityRoles(
+  jobs: RoleJob[],
+  company: string,
+  city: string | null,
+): RoleJob[] {
+  const co = company.trim().toLowerCase();
+  return jobs.filter(
+    (j) => j.company.trim().toLowerCase() === co && (city == null || j.city === city),
+  );
+}
+
 /** Score-desc, nulls last, stable for equal scores (company then title). */
 export function byScore(a: RoleJob, b: RoleJob): number {
   if (a.score == null && b.score == null)

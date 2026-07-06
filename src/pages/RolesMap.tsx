@@ -13,7 +13,7 @@ import "@/styles/roles.css";
 import GlobeMap from "@/components/roles/GlobeMap";
 import RolesPanel from "@/components/roles/RolesPanel";
 import HeadBar from "@/components/roles/HeadBar";
-import { EMPTY_FILTERS, filterJobs, type RoleJob, type RolesFilters } from "@/lib/roles";
+import { EMPTY_FILTERS, companyCityRoles, filterJobs, type RoleJob, type RolesFilters } from "@/lib/roles";
 import { coordsOf } from "@/lib/geo";
 import { useRolesData } from "@/hooks/useRolesData";
 
@@ -101,8 +101,17 @@ export default function RolesMap() {
         focusLngLats={focusLngLats}
         light={light}
         onCompanyClick={(company, city) => {
-          setSel({ co: company, city });
-          setDetailJob(null);
+          // One role in this city → jump straight to its full detail; several →
+          // filter the list to this company + city (Rober 2026-07-06). Either
+          // way the camera holds — no zoom-out (see applyFocus in GlobeMap).
+          const roles = companyCityRoles(visible, company, city);
+          if (roles.length === 1) {
+            setSel({ co: null, city: null });
+            setDetailJob(roles[0]);
+          } else {
+            setSel({ co: company, city });
+            setDetailJob(null);
+          }
           setPanelHidden(false);
         }}
         onCityClick={(city) => {
