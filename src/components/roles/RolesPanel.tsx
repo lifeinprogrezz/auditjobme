@@ -367,7 +367,7 @@ export default function RolesPanel({
         )}
         {!hasCv && (
           <div className="dfit-teaser">
-            <div className="dfit-h">Why you fit</div>
+            <div className="dfit-h">Why you're a match</div>
             <ul className="dfit blurred" aria-hidden="true">
               <li>Your background lines up with what this role needs.</li>
               <li>Your experience maps to their product and stage.</li>
@@ -380,11 +380,11 @@ export default function RolesPanel({
             ✓ Applied
           </button>
         ) : hasCv ? (
-          <button className="btn g dcta" onClick={() => goApply(job)}>
+          <button className="btn dcta" onClick={() => goApply(job)}>
             Prepare application
           </button>
         ) : (
-          <button className="btn g dcta" onClick={onAddCv}>
+          <button className="btn dcta" onClick={onAddCv}>
             Add your CV to see your fit
           </button>
         )}

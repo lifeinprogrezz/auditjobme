@@ -367,8 +367,9 @@
 .roles-theme .dhl .hls { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
 .roles-theme .dfit { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .roles-theme .dfit li { position: relative; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: #c6d6db; }
-.roles-theme .dfit li::before { content: ""; position: absolute; left: 4px; top: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--great); box-shadow: 0 0 8px rgba(31, 216, 184, 0.7); }
-.roles-theme .dcta { width: 100%; padding: 12px; font-size: 13.5px; }
+.roles-theme .dfit li::before { content: ""; position: absolute; left: 4px; top: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--text); }
+.roles-theme .dcta { width: 100%; padding: 12px; font-size: 13.5px; background: var(--act-tint); color: var(--text); border: 1px solid var(--act-border); box-shadow: var(--sh); transition: background 0.45s cubic-bezier(0.4, 0, 0.2, 1), color 0.45s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.45s cubic-bezier(0.4, 0, 0.2, 1), transform 0.15s; }
+.roles-theme .dcta:enabled:hover { background: var(--act-strong); color: var(--act-strong-ink); }
 .roles-theme .applied-cta { background: rgba(31, 216, 184, 0.12); color: var(--great); border: 1px solid rgba(31, 216, 184, 0.3); cursor: default; }
 .roles-theme .djd { border-top: 1px solid var(--hair); padding-top: 2px; }
 .roles-theme .djd-sum { display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; padding: 8px 0; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -440,9 +441,9 @@
 /* Map controls (left) + panel toggle (right): keep the light glass fill, but a
    darker OUTLINE so the buttons read against the light map — contrast via the
    border, not the fill (Rober 7-06). */
-.roles-theme.light .maplibregl-ctrl-group { border-color: rgba(11, 31, 38, 0.5) !important; box-shadow: 0 10px 24px -12px rgba(20, 60, 70, 0.32) !important; }
-.roles-theme.light .maplibregl-ctrl-group button + button { border-top-color: rgba(11, 31, 38, 0.18) !important; }
-.roles-theme.light .panel-toggle { border-color: rgba(11, 31, 38, 0.5); box-shadow: 0 10px 24px -12px rgba(20, 60, 70, 0.32); }
+.roles-theme.light .maplibregl-ctrl-group { border-color: rgba(11, 31, 38, 0.38) !important; box-shadow: 0 10px 24px -12px rgba(20, 60, 70, 0.28) !important; }
+.roles-theme.light .maplibregl-ctrl-group button + button { border-top-color: rgba(11, 31, 38, 0.14) !important; }
+.roles-theme.light .panel-toggle { border-color: rgba(11, 31, 38, 0.38); box-shadow: 0 10px 24px -12px rgba(20, 60, 70, 0.28); }
 .roles-theme.light .attrib::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), transparent 46%); mix-blend-mode: normal; }
 .roles-theme.light .attrib a { color: #3a6470; }
 .roles-theme.light .attrib a:hover { color: #0b1f26; }
