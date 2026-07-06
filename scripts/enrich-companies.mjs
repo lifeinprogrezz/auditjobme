@@ -19,7 +19,13 @@
  * Usage: node scripts/enrich-companies.mjs [--limit=150] [--dry-run]
  */
 import { createClient } from "@supabase/supabase-js";
-import { MODEL, parseEnrichment, metaDescription, parseWikidataTime } from "./enrich-lib.mjs";
+import {
+  MODEL,
+  parseEnrichment,
+  metaDescription,
+  parseWikidataTime,
+  linkedinFromHtml,
+} from "./enrich-lib.mjs";
 
 const arg = (name, def) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -41,6 +47,7 @@ async function haikuExtract(company, jd) {
 {"description": "<one plain sentence on what the company does, <=200 chars, or null>",
  "sector": "<short industry label e.g. Fintech, or null>",
  "stage": "<funding stage if stated: seed|series_a|series_b|series_c|series_d|public, else null>",
+ "team_size": "<headcount range if stated e.g. 51-200, else null>",
  "founded_year": <integer year if stated, else null>}
 
 ---
@@ -64,7 +71,7 @@ ${jd.slice(0, JD_CAP)}`;
   }
 }
 
-async function ogFetch(domain) {
+async function fetchHomepage(domain) {
   if (!domain) return null;
   try {
     const res = await fetch(`https://${domain}`, {
@@ -73,7 +80,7 @@ async function ogFetch(domain) {
       signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return null;
-    return metaDescription((await res.text()).slice(0, 60000));
+    return (await res.text()).slice(0, 80000);
   } catch {
     return null;
   }
@@ -109,10 +116,22 @@ async function enrichOne(co) {
       .limit(3);
     jd = (data ?? []).map((r) => r.jd_text).filter(Boolean).join("\n\n---\n\n");
   }
+  // One homepage fetch feeds both the description fallback and the LinkedIn link
+  // (companies link their own LinkedIn in the footer).
+  const html = co.logo_domain ? await fetchHomepage(co.logo_domain) : null;
   const ai = await haikuExtract(co.name, jd);
   const update = {};
+  // The 5 baseline fields every company should carry: website · linkedin · stage
+  // · size · founded (Rober 7-06). Each written only when currently missing.
+  if ((co.website == null || co.website === "") && co.logo_domain) {
+    update.website = `https://${co.logo_domain}`;
+  }
+  if (co.linkedin_url == null && html) {
+    const li = linkedinFromHtml(html);
+    if (li) update.linkedin_url = li;
+  }
   if (co.description == null) {
-    const d = ai.description ?? (await ogFetch(co.logo_domain));
+    const d = ai.description ?? (html ? metaDescription(html) : null);
     if (d) update.description = d;
   }
   if (co.founded_year == null) {
@@ -121,6 +140,7 @@ async function enrichOne(co) {
   }
   if (co.sector == null && ai.sector) update.sector = ai.sector;
   if (co.stage == null && ai.stage) update.stage = ai.stage;
+  if (co.headcount_bucket == null && ai.team_size) update.headcount_bucket = ai.team_size;
   if (Object.keys(update).length === 0) return { slug: co.slug, wrote: null };
   if (!DRY && db) await db.from("companies").update(update).eq("slug", co.slug);
   return { slug: co.slug, wrote: update };
@@ -133,8 +153,12 @@ async function main() {
   }
   const { data: cos, error } = await db
     .from("companies")
-    .select("slug, name, logo_domain, description, founded_year, sector, stage")
-    .or("description.is.null,founded_year.is.null")
+    .select(
+      "slug, name, logo_domain, website, linkedin_url, description, founded_year, sector, stage, headcount_bucket",
+    )
+    .or(
+      "website.is.null,linkedin_url.is.null,stage.is.null,headcount_bucket.is.null,founded_year.is.null,description.is.null",
+    )
     .limit(LIMIT);
   if (error) {
     console.error("enrich: fetch failed —", error.message);

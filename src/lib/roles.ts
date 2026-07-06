@@ -76,12 +76,15 @@ export function hueFor(company: string): string {
 }
 
 export type Level = "apm" | "pm" | "senior" | "lead" | "founding";
+// Normalized seniority ladder (Rober 7-06): title-agnostic tiers, shared by the
+// headbar Level filter AND the detail-panel Level cell so the two never disagree.
+// "Executive" is the top bucket (Founding/Head/Director-level PM roles).
 export const LEVELS: { value: Level; label: string }[] = [
-  { value: "apm", label: "Associate PM" },
-  { value: "pm", label: "Product Manager" },
-  { value: "senior", label: "Senior PM" },
-  { value: "lead", label: "Lead / Group PM" },
-  { value: "founding", label: "Founding PM" },
+  { value: "apm", label: "Junior" },
+  { value: "pm", label: "Mid" },
+  { value: "senior", label: "Senior" },
+  { value: "lead", label: "Lead" },
+  { value: "founding", label: "Executive" },
 ];
 
 export type RolesFilters = {

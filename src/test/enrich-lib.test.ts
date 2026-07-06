@@ -7,6 +7,7 @@ import {
   parseEnrichment,
   metaDescription,
   parseWikidataTime,
+  linkedinFromHtml,
 } from "../../scripts/enrich-lib.mjs";
 
 describe("sanitizeDescription", () => {
@@ -45,6 +46,26 @@ describe("parseEnrichment", () => {
     expect(parseEnrichment("the model refused")).toEqual({});
     expect(parseEnrichment("")).toEqual({});
     expect(parseEnrichment('{bad json,}')).toEqual({});
+  });
+  it("extracts team_size when stated, trimmed", () => {
+    expect(parseEnrichment('{"team_size":" 51-200 "}')).toEqual({ team_size: "51-200" });
+    expect(parseEnrichment('{"description":"tiny"}').team_size).toBeUndefined();
+  });
+});
+
+describe("linkedinFromHtml", () => {
+  it("extracts a company LinkedIn URL from footer markup", () => {
+    expect(linkedinFromHtml('<a href="https://www.linkedin.com/company/deliveroo/">LinkedIn</a>')).toBe(
+      "https://www.linkedin.com/company/deliveroo",
+    );
+    expect(linkedinFromHtml('… "https://uk.linkedin.com/company/9fin?trk=x" …')).toBe(
+      "https://www.linkedin.com/company/9fin",
+    );
+  });
+  it("ignores personal profiles and returns null when absent", () => {
+    expect(linkedinFromHtml('<a href="https://www.linkedin.com/in/some-person">x</a>')).toBeNull();
+    expect(linkedinFromHtml("<html>no socials</html>")).toBeNull();
+    expect(linkedinFromHtml(null)).toBeNull();
   });
 });
 

@@ -388,32 +388,32 @@ export default function RolesPanel({
             Add your CV to see your fit
           </button>
         )}
-        <div>
-          <div className="dmore-h">
-            {others.length
-              ? `More ${job.company} roles in Europe (${others.length})`
-              : `Only role from ${job.company} right now`}
+        {others.length > 0 && (
+          <div>
+            <div className="dmore-h">
+              More {job.company} roles in Europe ({others.length})
+            </div>
+            <div className="dmore-list">
+              {others.map((o) => (
+                <div
+                  key={o.id}
+                  className="dmore-item"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onOpenDetail(o)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" && e.key !== " ") return;
+                    e.preventDefault();
+                    onOpenDetail(o);
+                  }}
+                >
+                  <span className="mi-role">{o.title}</span>
+                  <span className="mi-city">{moreCity(o)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="dmore-list">
-            {others.map((o) => (
-              <div
-                key={o.id}
-                className="dmore-item"
-                role="button"
-                tabIndex={0}
-                onClick={() => onOpenDetail(o)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter" && e.key !== " ") return;
-                  e.preventDefault();
-                  onOpenDetail(o);
-                }}
-              >
-                <span className="mi-role">{o.title}</span>
-                <span className="mi-city">{moreCity(o)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
     );
   };

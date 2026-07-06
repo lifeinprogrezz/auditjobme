@@ -48,6 +48,7 @@ export function parseEnrichment(text) {
   if (desc) out.description = desc;
   if (typeof obj.sector === "string" && obj.sector.trim()) out.sector = obj.sector.trim().slice(0, 60);
   if (typeof obj.stage === "string" && obj.stage.trim()) out.stage = obj.stage.trim().toLowerCase().slice(0, 40);
+  if (typeof obj.team_size === "string" && obj.team_size.trim()) out.team_size = obj.team_size.trim().slice(0, 40);
   const yr = Number(obj.founded_year);
   if (Number.isInteger(yr) && yr >= 1800 && yr <= 2100) out.founded_year = yr;
   return out;
@@ -76,4 +77,16 @@ export function parseWikidataTime(t) {
   if (!m) return null;
   const yr = Number(m[1]);
   return yr >= 1800 && yr <= 2100 ? yr : null;
+}
+
+/** Pull a company's LinkedIn URL from its page HTML (footer/social links) →
+ *  canonical https://www.linkedin.com/company/<slug>, or null. GROUNDED: only what
+ *  the site itself links, never a guessed slug. */
+export function linkedinFromHtml(html) {
+  if (!html || typeof html !== "string") return null;
+  const m = html.match(/https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/company\/([A-Za-z0-9_%.-]+)/i);
+  if (!m) return null;
+  const slug = m[1].replace(/\/+$/, "").split(/[?#]/)[0];
+  if (!slug || slug.length > 100) return null;
+  return `https://www.linkedin.com/company/${slug}`;
 }
