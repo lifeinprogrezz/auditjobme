@@ -850,14 +850,23 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
         } catch {
           /* flat fallback is acceptable */
         }
-        fitTimerRef.current = window.setTimeout(() => {
+        const fitEurope = () => {
           if (mapRef.current !== map || focusRef.current) return;
           try {
             map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: CONTINENT_MS });
           } catch {
             /* ignore */
           }
-        }, 450);
+        };
+        fitTimerRef.current = window.setTimeout(fitEurope, 450);
+        // Prod cold-loads sometimes fire the 450ms fit before the container is laid
+        // out, so it no-ops and the map is stranded at the world init zoom. Frame
+        // Europe once the map is first idle (tiles loaded + container sized) if it's
+        // still zoomed out, cancelling the pending timer so we never double-fit.
+        map.once("idle", () => {
+          window.clearTimeout(fitTimerRef.current);
+          if (mapRef.current === map && !focusRef.current && map.getZoom() < 3) fitEurope();
+        });
         const theme = THEMES[themeRef.current];
         styleAtmosphere(map, theme);
         boostBorders(map, theme);
