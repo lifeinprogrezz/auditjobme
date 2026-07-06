@@ -7,6 +7,8 @@ name: Scrape jobs
 #   SUPABASE_URL               = https://roaervdsjejksaeseeov.supabase.co
 #   SUPABASE_SERVICE_ROLE_KEY  = Supabase dashboard -> Project Settings -> API -> service_role key
 # Until both exist, scrape.mjs dry-runs (fetch + log, no DB write), so this workflow is safe to land now.
+# OPTIONAL: ANTHROPIC_API_KEY enables the Haiku JD-grounded pass in the enrich step below;
+# without it, enrichment still runs on free web (og:description) + Wikidata sources.
 
 on:
   schedule:
@@ -34,3 +36,10 @@ jobs:
           # Optional: residential/rotating proxy for the datacenter-IP-blocked sources
           # (startupmap, Meta). Unset = those two fetch direct (and get blocked from CI).
           SCRAPE_PROXY_URL: ${{ secrets.SCRAPE_PROXY_URL }}
+      - name: Enrich company context (description, founded_year, sector/stage gaps)
+        run: node scripts/enrich-companies.mjs --limit=150
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Optional: enables the Haiku JD-grounded pass. Unset = free og:description + Wikidata only.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

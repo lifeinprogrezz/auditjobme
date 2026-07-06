@@ -271,6 +271,8 @@ export type Database = {
         Row: {
           careers_url: string | null
           coord_precision: string
+          description: string | null
+          founded_year: number | null
           headcount_bucket: string | null
           hq_city: string | null
           hq_country: string | null
@@ -291,6 +293,8 @@ export type Database = {
         Insert: {
           careers_url?: string | null
           coord_precision?: string
+          description?: string | null
+          founded_year?: number | null
           headcount_bucket?: string | null
           hq_city?: string | null
           hq_country?: string | null
@@ -311,6 +315,8 @@ export type Database = {
         Update: {
           careers_url?: string | null
           coord_precision?: string
+          description?: string | null
+          founded_year?: number | null
           headcount_bucket?: string | null
           hq_city?: string | null
           hq_country?: string | null

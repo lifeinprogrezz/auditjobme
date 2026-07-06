@@ -21,6 +21,17 @@ export type RoleJob = {
   lngLat: [number, number] | null;
   /** Company domain for Logo.dev, null → colored-initial fallback. */
   domain: string | null;
+  // Company context (from the companies dimension; null/absent when unknown).
+  // Surfaced in the /roles detail panel — RolesPanel.renderDetail, Rober 2026-07-06.
+  website?: string | null;
+  sector?: string | null;
+  stage?: string | null; // raw enum e.g. "series_b" → formatStage() for display
+  headcount?: string | null; // bucket e.g. "51-200" → formatHeadcount() for display
+  hqCity?: string | null;
+  hqCountry?: string | null;
+  linkedin?: string | null;
+  description?: string | null;
+  foundedYear?: number | null;
 };
 
 export type ScoreBucket = "great" | "mid" | "low";
@@ -125,6 +136,37 @@ export function applyLandedScores(
     return hit ? { ...x, score: hit.score, reason: hit.reason } : x;
   });
   return sort ? next.sort(byScore) : next;
+}
+
+const STAGE_LABELS: Record<string, string> = {
+  pre_seed: "Pre-seed", seed: "Seed", series_a: "Series A", series_b: "Series B",
+  series_c: "Series C", series_d: "Series D", series_e: "Series E", series_f: "Series F",
+  growth: "Growth", late_stage: "Late stage", public: "Public", acquired: "Acquired",
+  bootstrapped: "Bootstrapped", ipo: "IPO",
+};
+/** Funding stage for display: known enum → label, else title-cased fallback. null passes through. */
+export function formatStage(stage: string | null | undefined): string | null {
+  if (!stage) return null;
+  const key = stage.trim().toLowerCase();
+  return STAGE_LABELS[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Headcount bucket for display: "51-200" → "51–200" (en dash, "people" implied). null passes through. */
+export function formatHeadcount(bucket: string | null | undefined): string | null {
+  if (!bucket) return null;
+  const b = bucket.trim();
+  return b ? b.replace(/\s*-\s*/g, "–") : null;
+}
+
+/** Best website URL for a company: an explicit website wins, else derive it from the
+ *  logo domain (99% coverage) so the panel almost always has a live link. null if neither. */
+export function websiteUrl(
+  website: string | null | undefined,
+  domain: string | null | undefined,
+): string | null {
+  if (website && website.trim()) return website.trim();
+  if (domain && domain.trim()) return `https://${domain.trim()}`;
+  return null;
 }
 
 /** "3d ago"-style label from posted_at; null when unknown (never fabricate). */

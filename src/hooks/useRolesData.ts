@@ -27,7 +27,12 @@ const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page pas
  * per-city index (sorted by id) that places them on a deterministic sunflower
  * disc over the city — the logo cloud you see when a city cluster opens.
  */
-type CompanyDim = { logo_domain: string | null; lat: number | null; lng: number | null };
+type CompanyDim = {
+  logo_domain: string | null; lat: number | null; lng: number | null;
+  website: string | null; sector: string | null; stage: string | null;
+  headcount_bucket: string | null; hq_city: string | null; hq_country: string | null;
+  linkedin_url: string | null; description: string | null; founded_year: number | null;
+};
 
 // ONE position per company-in-a-city (not per role): every role of a company in
 // a city shares the same point, so the map shows one logo per company and the
@@ -125,6 +130,16 @@ function enrichAll(
       // companies.logo_domain (engine-verified website) wins; name-guess is the
       // fallback for rows not yet linked to the companies dimension.
       domain: dim?.logo_domain ?? domainFor(r.company, r.source),
+      // Company context for the detail panel (null when the co isn't enriched yet).
+      website: dim?.website ?? null,
+      sector: dim?.sector ?? null,
+      stage: dim?.stage ?? null,
+      headcount: dim?.headcount_bucket ?? null,
+      hqCity: dim?.hq_city ?? null,
+      hqCountry: dim?.hq_country ?? null,
+      linkedin: dim?.linkedin_url ?? null,
+      description: dim?.description ?? null,
+      foundedYear: dim?.founded_year ?? null,
     };
   });
 }
@@ -234,8 +249,19 @@ export function useRolesData() {
       // the name-guess, street office coords beat the sunflower scatter.
       // Failure degrades to guess + centroid, never blocks.
       const dims = new Map<string, CompanyDim>();
-      const { data: cos } = await supabase.from("companies").select("slug, logo_domain, lat, lng");
-      (cos ?? []).forEach((c) => dims.set(c.slug, { logo_domain: c.logo_domain, lat: c.lat, lng: c.lng }));
+      const { data: cos } = await supabase
+        .from("companies")
+        .select(
+          "slug, logo_domain, lat, lng, website, sector, stage, headcount_bucket, hq_city, hq_country, linkedin_url, description, founded_year",
+        );
+      (cos ?? []).forEach((c) =>
+        dims.set(c.slug, {
+          logo_domain: c.logo_domain, lat: c.lat, lng: c.lng,
+          website: c.website, sector: c.sector, stage: c.stage,
+          headcount_bucket: c.headcount_bucket, hq_city: c.hq_city, hq_country: c.hq_country,
+          linkedin_url: c.linkedin_url, description: c.description, founded_year: c.founded_year,
+        }),
+      );
       // Per-city offices: a company hiring in several cities gets each pin on the
       // right office (distance-matched). Empty until seeded — degrades to the
       // single companies coord, never blocks.

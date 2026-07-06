@@ -5,7 +5,16 @@
 // renders panel content and never touches body/root classes.
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LEVELS, hueFor, postedAgo, scoreBucket, type RoleJob } from "@/lib/roles";
+import {
+  LEVELS,
+  formatHeadcount,
+  formatStage,
+  hueFor,
+  postedAgo,
+  scoreBucket,
+  websiteUrl,
+  type RoleJob,
+} from "@/lib/roles";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
 
 // The pool is unbounded (1000+ live rows); each card mounts a Logo.dev <img>,
@@ -21,6 +30,9 @@ export type RolesPanelProps = {
   scoring: boolean;
   remaining: number;
   detailJob: RoleJob | null;
+  /** The open role's full JD, lazy-fetched on detail open (null = none stored). */
+  detailJd?: string | null;
+  detailJdLoading?: boolean;
   applied: Set<string>;
   onOpenDetail: (j: RoleJob) => void;
   onCloseDetail: () => void;
@@ -101,6 +113,8 @@ export default function RolesPanel({
   scoring,
   remaining,
   detailJob,
+  detailJd,
+  detailJdLoading,
   applied,
   onOpenDetail,
   onCloseDetail,
@@ -248,9 +262,15 @@ export default function RolesPanel({
     if (loc) facts.push(["Location", loc]);
     const level = LEVELS.find((l) => l.value === job.seniority)?.label;
     if (level) facts.push(["Level", level]);
+    const stage = formatStage(job.stage);
+    if (stage) facts.push(["Stage", stage]);
+    const size = formatHeadcount(job.headcount);
+    if (size) facts.push(["Size", size]);
+    if (job.foundedYear) facts.push(["Founded", String(job.foundedYear)]);
     if (job.remote) facts.push(["Remote", "Yes"]);
-    if (job.source) facts.push(["Source", job.source]);
     if (ago) facts.push(["Posted", ago]);
+    // Company links: an explicit website, else derived from the 99%-covered logo domain.
+    const site = websiteUrl(job.website, job.domain);
     const others = allJobs.filter((j) => j.company === job.company && j.url !== job.url);
 
     return (
@@ -276,10 +296,26 @@ export default function RolesPanel({
             </div>
             <div>
               <div className="dname">{job.company}</div>
+              {job.sector && <div className="dsector">{job.sector}</div>}
               <div className="dhiring">● Actively hiring</div>
             </div>
           </div>
         </div>
+        {job.description && <p className="ddesc">{job.description}</p>}
+        {(site || job.linkedin) && (
+          <div className="dlinks">
+            {site && (
+              <a className="dlink" href={site} target="_blank" rel="noopener noreferrer">
+                Website
+              </a>
+            )}
+            {job.linkedin && (
+              <a className="dlink" href={job.linkedin} target="_blank" rel="noopener noreferrer">
+                LinkedIn
+              </a>
+            )}
+          </div>
+        )}
         <div className="dfacts">
           {facts.map(([label, value]) => (
             <span key={label} className="dfact">
@@ -321,6 +357,21 @@ export default function RolesPanel({
             <button className="btn g" onClick={() => onMarkApplied(job)}>
               Mark applied
             </button>
+          )}
+        </div>
+        <div className="djd">
+          <div className="djd-h">The role</div>
+          {detailJdLoading ? (
+            <div className="djd-note">Loading description…</div>
+          ) : detailJd ? (
+            <p className="djd-body">{detailJd}</p>
+          ) : (
+            <div className="djd-note">
+              The full description lives on the posting.{" "}
+              <a href={job.url} target="_blank" rel="noopener noreferrer">
+                View posting
+              </a>
+            </div>
           )}
         </div>
         <div>
