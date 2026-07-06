@@ -15,6 +15,7 @@ import RolesPanel from "@/components/roles/RolesPanel";
 import HeadBar from "@/components/roles/HeadBar";
 import {
   EMPTY_FILTERS,
+  byScore,
   companyCityRoles,
   filterJobs,
   sizeBand,
@@ -55,6 +56,9 @@ export default function RolesMap() {
   const [cityFrame, setCityFrame] = useState<{ coords: [number, number][]; nonce: number } | null>(
     null,
   );
+  // "Hot right now" is a first-impression state: once you've narrowed anything, a
+  // later full clear shows the honest full list, not the curated showcase again.
+  const [hasExplored, setHasExplored] = useState(false);
   const [panelHidden, setPanelHidden] = useState(false);
   // Light is the shipped default (Rober's call, 2026-07-05); dark ink stays
   // as the alternate identity for a future theme setting.
@@ -132,6 +136,15 @@ export default function RolesMap() {
     filters.sectors.length === 0 &&
     filters.sizes.length === 0 &&
     !filters.remoteOnly;
+
+  // Remember the first narrowing so a later full clear shows the honest full list
+  // rather than snapping back to the curated showcase. Only the reset-view control
+  // brings the showcase back (Rober 7-06).
+  useEffect(() => {
+    if (!isDefaultView) setHasExplored(true);
+  }, [isDefaultView]);
+  const showShowcase = isDefaultView && !hasExplored;
+
   const hotJobs = useMemo(() => {
     // Each showcase card must be a FRESH (<=21d) real PM role: skip legal/EA/intern/
     // eng titles that merely contain "Product" (Rober 7-06 — Lovable was leaking
@@ -180,17 +193,21 @@ export default function RolesMap() {
   }, [visible]);
   const panelJobs = useMemo(() => {
     if (isDefaultView) {
-      // The seven hot cards first, then every OTHER company's live roles so the
-      // panel keeps scrolling — no dead space under the showcase, and no repeated
-      // logos right below their hero card (Rober 7-06).
-      const hotSlugs = new Set(hotJobs.map((j) => j.company_id));
-      return [...hotJobs, ...visible.filter((j) => !hotSlugs.has(j.company_id ?? null))];
+      if (showShowcase) {
+        // First-load showcase: the seven hot cards, then every OTHER company's live
+        // roles so the panel keeps scrolling (Rober 7-06).
+        const hotSlugs = new Set(hotJobs.map((j) => j.company_id));
+        return [...hotJobs, ...visible.filter((j) => !hotSlugs.has(j.company_id ?? null))];
+      }
+      // Cleared after exploring → the honest full list, score-ranked. Clearing reads
+      // as "show me everything"; the camera is left where it was (no forced move).
+      return [...visible].sort(byScore);
     }
     let out = visible;
     if (sel.co) out = out.filter((j) => norm(j.company) === norm(sel.co as string));
     if (sel.city) out = out.filter((j) => j.city === sel.city);
     return out;
-  }, [visible, sel, isDefaultView, hotJobs]);
+  }, [visible, sel, isDefaultView, showShowcase, hotJobs]);
 
   // The click-time snapshot goes stale when a background score lands — re-read
   // the live row by id so the detail view matches the card.
@@ -290,6 +307,7 @@ export default function RolesMap() {
           setSel({ co: null, city: null });
           setDetailJob(null);
           setFilters(EMPTY_FILTERS);
+          setHasExplored(false);
         }}
       />
       <div className="vig" />
@@ -308,7 +326,7 @@ export default function RolesMap() {
         <RolesPanel
           jobs={panelJobs}
           allJobs={jobs}
-          defaultView={isDefaultView}
+          defaultView={showShowcase}
           filters={filters}
           onFilters={setFilters}
           selCo={sel.co}
