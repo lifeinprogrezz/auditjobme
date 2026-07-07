@@ -245,15 +245,20 @@ export function useRolesData() {
   ): Promise<boolean> {
     const cvText = payload.cv_text.trim();
     if (!cvText) return false;
-    // Prior hash (score-cache key). A missing column pre-migration returns an
-    // error, not a throw — treat it as "no stored hash" (changed → re-score).
+    // Prior hash (score-cache key) + the stored text. A missing cv_hash column
+    // pre-migration returns an error, not a throw — treat it as "no stored hash".
     const { data: hd, error: he } = await supabase
       .from("profiles")
-      .select("cv_hash")
+      .select("cv_text, cv_hash")
       .eq("id", userId)
       .maybeSingle();
     const storedHash = he ? null : ((hd?.cv_hash as string | null) ?? null);
-    const changed = payload.cv_hash !== storedHash;
+    const storedCvText = he ? null : ((hd?.cv_text as string | null) ?? null);
+    // A non-null stored hash is the fast dirty-check; when it's null (a legacy CV
+    // set via the old Onboarding/Profile flow left cv_hash NULL) fall back to the
+    // actual text so re-dropping the SAME CV doesn't wipe the score cache.
+    const changed =
+      storedHash != null ? payload.cv_hash !== storedHash : storedCvText?.trim() !== cvText;
 
     const { error: upErr } = await supabase
       .from("profiles")
@@ -298,18 +303,27 @@ export function useRolesData() {
       base = jobsSnapshot.map((j) => ({ ...j, score: null, reason: null, fitBullets: null }));
       setJobs(base);
     }
-    // Flip `scored` false→true → the CSS reveal + ScoreValue count-up fire in-session.
+    // Flip `scored` false→true → the CSS reveal + ScoreValue count-up fire
+    // in-session. This flip is what reveals the map, so success resolves HERE —
+    // the ≤40-job scoring pass runs detached below, behind the (now closed)
+    // modal, surfaced by the panel's "Scoring… N to go" bar.
     setProfile(prof);
-    if (runRef.current !== runId) return true;
     // Score the labelled slice first (the deterministic cost lever), top 40 for
     // the instant reveal; the rest fills via scoreMore.
     const slice = pickScoringSlice(base, {
       roles: payload.target_roles,
       sectors: payload.target_sectors,
     });
-    while (scoringRef.current && runRef.current === runId) await sleep(250);
-    if (runRef.current !== runId) return true;
-    await scoreBatch(slice.filter((j) => j.score == null).slice(0, 40), prof, userId, runId);
+    // DETACHED: do NOT await — awaiting kept the full-screen modal open over the
+    // live reveal for the whole pass. The runRef guard still cancels a stale run
+    // and the .catch swallows a background failure so no rejection escapes.
+    void (async () => {
+      while (scoringRef.current && runRef.current === runId) await sleep(250);
+      if (runRef.current !== runId) return;
+      await scoreBatch(slice.filter((j) => j.score == null).slice(0, 40), prof, userId, runId);
+    })().catch(() => {
+      /* background scoring failure must not surface after a successful reveal */
+    });
     return true;
   }
 
