@@ -329,25 +329,37 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         cv_text: (p.cv_text as string | null) ?? null,
       };
 
+      // Score the (≤ NIGHTLY_TOP_N) candidates CONCURRENTLY. Sequential scoring of a
+      // full slice against a real multi-KB CV exceeds Vercel's 60s function cap, and
+      // the upsert runs only AFTER the loop — so a timeout there loses the whole batch
+      // (0 rows persisted despite paid-for scores; the 504 we just hit). Parallel keeps
+      // wall-time ≈ one call. scoreViaProxy never throws, so Promise.all can't reject.
+      const results = await Promise.all(
+        candidates.map((j) =>
+          scoreViaProxy(
+            proxyUrl,
+            serviceKey,
+            userId,
+            SYSTEM,
+            buildScoreUserMessage(profile, {
+              id: j.id,
+              company: j.company,
+              title: j.title,
+              location: j.location ?? null,
+              remote: Boolean(j.remote),
+              seniority: j.seniority ?? null,
+              jd_text: j.jd_text ?? null,
+            }),
+          ).then((r) => ({ j, r })),
+        ),
+      );
       const scored: ScoredMatch[] = [];
-      let capped = false;
-      for (const j of candidates) {
-        const userMsg = buildScoreUserMessage(profile, {
-          id: j.id,
-          company: j.company,
-          title: j.title,
-          location: j.location ?? null,
-          remote: Boolean(j.remote),
-          seniority: j.seniority ?? null,
-          jd_text: j.jd_text ?? null,
-        });
-        const r = await scoreViaProxy(proxyUrl, serviceKey, userId, SYSTEM, userMsg);
+      for (const { j, r } of results) {
         if (r.kind === "capped") {
-          capped = true;
           summary.capped++;
-          break; // stop this user gracefully; the cap is not fatal to the run
+          continue;
         }
-        if (r.kind === "skip") continue;
+        if (r.kind !== "ok") continue;
         scored.push({
           url: j.url,
           company: j.company,
@@ -386,7 +398,6 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       if (resendKey && (await sendBatchEmail(resendKey, userId, today, ranked))) {
         summary.emailed++;
       }
-      void capped;
     } catch (e) {
       console.warn(`[nightly] user ${userId} failed:`, e);
     }
