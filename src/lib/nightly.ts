@@ -124,9 +124,13 @@ export function rankMatches(matches: ScoredMatch[]): RankedMatch[] {
     .map(({ m }, idx) => ({ ...m, rank: idx + 1 }));
 }
 
-/** Notification subject (spec §7 — a hook, not a digest). */
-export function buildEmailSubject(count: number): string {
-  return count === 1 ? "1 role matched to you today" : `${count} roles matched to you today`;
+/** Notification subject — transactional/notification tone (biases Gmail's Updates
+ *  tab; a marketing-style "matched to you today" reads as Promotions). `dateLabel`
+ *  e.g. "Jul 7". Spec §7 — a hook, not a digest. */
+export function buildEmailSubject(count: number, dateLabel?: string): string {
+  const noun = count === 1 ? "match" : "matches";
+  const suffix = dateLabel ? ` (${dateLabel})` : "";
+  return `Your job ${noun} — ${count} new${suffix}`;
 }
 
 /** Escape the chars that matter inside an HTML text node / href attr. */

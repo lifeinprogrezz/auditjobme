@@ -170,9 +170,10 @@ describe("rankMatches", () => {
 });
 
 describe("buildEmailSubject", () => {
-  it("singularizes for one match", () => {
-    expect(buildEmailSubject(1)).toBe("1 role matched to you today");
-    expect(buildEmailSubject(7)).toBe("7 roles matched to you today");
+  it("uses a transactional subject with count + optional date", () => {
+    expect(buildEmailSubject(1)).toBe("Your job match — 1 new");
+    expect(buildEmailSubject(7)).toBe("Your job matches — 7 new");
+    expect(buildEmailSubject(7, "Jul 7")).toBe("Your job matches — 7 new (Jul 7)");
   });
 });
 

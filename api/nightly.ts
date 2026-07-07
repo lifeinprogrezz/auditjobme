@@ -115,7 +115,19 @@ async function sendEmail(
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: EMAIL_FROM, to: [to], subject, text: body.text, html: body.html }),
+      body: JSON.stringify({
+        from: EMAIL_FROM,
+        to: [to],
+        subject,
+        text: body.text,
+        html: body.html,
+        // Notification-sender legitimacy signal (Gmail/Yahoo bulk guidance): a valid
+        // List-Unsubscribe biases the Updates tab over Promotions and keeps us out of
+        // spam. mailto for now; a hosted one-click endpoint is a later slice.
+        headers: {
+          "List-Unsubscribe": "<mailto:hello@lifeinprogrezz.com?subject=Unsubscribe%20AuditJob%20matches>",
+        },
+      }),
     });
     if (!res.ok) {
       console.warn(`[nightly] Resend ${res.status}:`, await res.text().catch(() => ""));
@@ -155,6 +167,12 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   const proxyUrl = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/anthropic-proxy`;
   const admin = createClient(supabaseUrl, serviceKey);
   const today = new Date().toISOString().slice(0, 10);
+  // "Jul 7"-style label for the (transactional) email subject.
+  const dateLabel = new Date(`${today}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
   const nowMs = Date.now();
 
   // Send the "N roles ready" email for a persisted batch and, on send-success,
@@ -170,7 +188,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     const { data: authUser } = await admin.auth.admin.getUserById(userId);
     const to = authUser?.user?.email;
     if (!to) return false;
-    const sent = await sendEmail(key, to, buildEmailSubject(ranked.length), buildEmailBody(ranked, APP_URL));
+    const sent = await sendEmail(key, to, buildEmailSubject(ranked.length, dateLabel), buildEmailBody(ranked, APP_URL));
     if (sent) {
       await admin
         .from("daily_matches")
