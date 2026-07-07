@@ -47,6 +47,28 @@ async function timingSafeEqual(a: string, b: string): Promise<boolean> {
   return diff === 0;
 }
 
+/**
+ * The `role` claim from a JWT payload, WITHOUT re-verifying the signature. Safe
+ * here ONLY because verify_jwt is ON: Supabase's gateway validates the signature
+ * before this function runs, so a token that reaches us carrying role
+ * "service_role" is a genuinely project-signed service-role credential (anon/user
+ * JWTs carry "anon"/"authenticated"). Unlike an exact-string match against the
+ * auto-injected SUPABASE_SERVICE_ROLE_KEY, this accepts a caller holding a
+ * DIFFERENT-but-valid service_role JWT — the dashboard-legacy key and the injected
+ * one diverge after a JWT-secret rotation, which is what 401'd the nightly worker.
+ */
+function jwtRoleClaim(jwt: string): string | null {
+  try {
+    const seg = jwt.split('.')[1];
+    if (!seg) return null;
+    let b64 = seg.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    return JSON.parse(atob(b64))?.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
 type ScoreParams = {
   messages: unknown;
   model?: string;
@@ -150,13 +172,17 @@ Deno.serve(async (req) => {
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceRoleKey);
 
     // ── SERVICE-ROLE PATH (nightly worker) ──────────────────────────────────
-    // Detected by an EXACT match against the service-role key — unforgeable (a
-    // decoded role claim could be spoofed; possession of the actual key cannot).
-    // Compared in constant time (this is the auth boundary) so the match can't be
-    // brute-forced via response timing. ONLY this path may score/meter/cap against
-    // a `target_user_id` other than the caller. A normal user JWT never reaches
-    // here, so it can never impersonate.
-    if (await timingSafeEqual(token, serviceRoleKey)) {
+    // A project-signed service_role JWT. verify_jwt (gateway) has ALREADY validated
+    // the signature before we run, so trusting the decoded role claim is safe — a
+    // forged token never reaches this code. Accept EITHER an exact match against the
+    // injected key (fast path) OR any gateway-validated service_role JWT (robust: the
+    // caller's service_role key and the injected SUPABASE_SERVICE_ROLE_KEY can be
+    // different-but-both-valid JWTs after a JWT-secret rotation). ONLY this path may
+    // score/meter/cap against a `target_user_id` other than the caller; anon/user
+    // JWTs carry role "anon"/"authenticated" and fall through to the user path.
+    const isServiceRole =
+      (await timingSafeEqual(token, serviceRoleKey)) || jwtRoleClaim(token) === 'service_role';
+    if (isServiceRole) {
       const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
       if (!apiKey) return json({ error: 'ANTHROPIC_API_KEY is not configured' }, 500);
       const { messages, model, max_tokens, system, tools, kind, target_user_id } = await req.json();
