@@ -13,11 +13,13 @@ export type HeadBarProps = {
   sizeOptions: FilterOption[];
   view: "map" | "list";
   onView: (v: "map" | "list") => void;
+  /** Opens the CV-unlock modal (Phase A front door). */
+  onAddCv: () => void;
 };
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, cityOptions, sectorOptions, sizeOptions, view, onView }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, cityOptions, sectorOptions, sizeOptions, view, onView, onAddCv }: HeadBarProps) {
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
   const [chipsShown, setChipsShown] = useState(false);
@@ -244,11 +246,11 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
       </div>
 
       {/* The CV is the unlock and the differentiator — anon gets the same jade door
-          (it routes through sign-in); CSS hides it once the root carries .scored. */}
+          (the modal routes through sign-in); CSS hides it once the root carries .scored. */}
       <button
         type="button"
         className="navcv"
-        onClick={() => navigate("/underconstruction")}
+        onClick={onAddCv}
       >
         <span className="sp">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">

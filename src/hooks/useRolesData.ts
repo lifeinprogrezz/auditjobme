@@ -4,6 +4,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
 import { scoreJob, RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
 import { applyLandedScores, byScore, type RoleJob } from "@/lib/roles";
+import { pickScoringSlice, hashCv, readCvStash, clearCvStash } from "@/lib/labels";
 import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
 
@@ -228,6 +229,90 @@ export function useRolesData() {
     }
   }
 
+  /**
+   * Write a submitted/stashed CV + labels to the profile, then reveal + score
+   * in-session (Phase A). Mirrors the re-upload handling: a changed cv_hash
+   * clears the stale scores (in the DB and locally) so the new CV re-scores; the
+   * same hash re-scores nothing. Reads/writes the new profile columns defensively
+   * so a pre-migration prod never crashes here — a failed write just surfaces a
+   * toast and no reveal. Returns true on success.
+   */
+  async function applyCv(
+    userId: string,
+    payload: { cv_text: string; cv_hash: string; target_roles: string[]; target_sectors: string[] },
+    jobsSnapshot: RoleJob[],
+    runId: number,
+  ): Promise<boolean> {
+    const cvText = payload.cv_text.trim();
+    if (!cvText) return false;
+    // Prior hash (score-cache key). A missing column pre-migration returns an
+    // error, not a throw — treat it as "no stored hash" (changed → re-score).
+    const { data: hd, error: he } = await supabase
+      .from("profiles")
+      .select("cv_hash")
+      .eq("id", userId)
+      .maybeSingle();
+    const storedHash = he ? null : ((hd?.cv_hash as string | null) ?? null);
+    const changed = payload.cv_hash !== storedHash;
+
+    const { error: upErr } = await supabase
+      .from("profiles")
+      .update({
+        cv_text: cvText,
+        cv_hash: payload.cv_hash,
+        target_roles: payload.target_roles,
+        target_sectors: payload.target_sectors,
+        onboarded_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+    if (upErr) {
+      // Expected before the Phase-A migration is applied (unknown columns); the
+      // /roles page still works, only the CV-submit flow is blocked until then.
+      toast.error("Couldn't save your CV. Please try again.");
+      return false;
+    }
+
+    if (changed) {
+      // Clear stale scores from the old CV (DB + local) so they re-score fresh.
+      await supabase.from("scores").delete().eq("user_id", userId);
+    }
+
+    // Fresh scoreable profile — OLD columns only, so this read is pre-migration safe.
+    const { data: fresh } = await supabase
+      .from("profiles")
+      .select("target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, cv_text")
+      .eq("id", userId)
+      .maybeSingle();
+    const prof = (fresh ?? {
+      target_seniority: null,
+      target_cities: null,
+      open_to_remote: null,
+      citizenship: null,
+      eu_work_authorized: null,
+      languages: null,
+      cv_text: cvText,
+    }) as ScoreableProfile;
+
+    let base = jobsSnapshot;
+    if (changed) {
+      base = jobsSnapshot.map((j) => ({ ...j, score: null, reason: null, fitBullets: null }));
+      setJobs(base);
+    }
+    // Flip `scored` false→true → the CSS reveal + ScoreValue count-up fire in-session.
+    setProfile(prof);
+    if (runRef.current !== runId) return true;
+    // Score the labelled slice first (the deterministic cost lever), top 40 for
+    // the instant reveal; the rest fills via scoreMore.
+    const slice = pickScoringSlice(base, {
+      roles: payload.target_roles,
+      sectors: payload.target_sectors,
+    });
+    while (scoringRef.current && runRef.current === runId) await sleep(250);
+    if (runRef.current !== runId) return true;
+    await scoreBatch(slice.filter((j) => j.score == null).slice(0, 40), prof, userId, runId);
+    return true;
+  }
+
   useEffect(() => {
     const runId = ++runRef.current;
     async function load() {
@@ -320,7 +405,27 @@ export function useRolesData() {
         .maybeSingle();
       if (runRef.current !== runId) return;
       if (prof) setProfile(prof as ScoreableProfile);
-      if (!prof?.cv_text?.trim()) return; // no CV → no scoring (see hook doc)
+      if (!prof?.cv_text?.trim()) {
+        // Post-OAuth handoff (Phase A): a CV stashed before the sign-in redirect
+        // is written to the profile now, then revealed + scored in-session. Only
+        // when the profile has no CV yet (never clobber an existing one).
+        const stash = readCvStash();
+        if (stash && runRef.current === runId) {
+          clearCvStash();
+          await applyCv(
+            user.id,
+            {
+              cv_text: stash.cv_text,
+              cv_hash: stash.cv_hash,
+              target_roles: stash.target_roles,
+              target_sectors: stash.target_sectors,
+            },
+            merged,
+            runId,
+          );
+        }
+        return; // no CV (and no stash) → no scoring (see hook doc)
+      }
       // If a previous run's batch is still unwinding, wait for it to release.
       while (scoringRef.current && runRef.current === runId) await sleep(250);
       if (runRef.current !== runId) return;
@@ -361,6 +466,31 @@ export function useRolesData() {
     scoreBatch(jobs.filter((j) => j.score == null).slice(0, 40), profile, user.id, runRef.current);
   };
 
+  /**
+   * Signed-in CV submit (from the CV-unlock modal): write the CV + labels to the
+   * profile and reveal + score in-session. The anon path stashes instead and the
+   * load effect hands off after sign-in. Returns true on success.
+   */
+  const submitCv = async (
+    text: string,
+    labels: { roles: string[]; sectors: string[] },
+  ): Promise<boolean> => {
+    if (!user) return false;
+    const cvText = text.trim();
+    if (!cvText) return false;
+    return applyCv(
+      user.id,
+      {
+        cv_text: cvText,
+        cv_hash: hashCv(cvText),
+        target_roles: labels.roles,
+        target_sectors: labels.sectors,
+      },
+      jobs,
+      runRef.current,
+    );
+  };
+
   return {
     jobs,
     loading,
@@ -369,6 +499,7 @@ export function useRolesData() {
     applied,
     markApplied,
     scoreMore,
+    submitCv,
     /** Post-CV state: the score reveal keys on a CV being present. */
     scored: Boolean(profile?.cv_text?.trim()),
     signedIn: Boolean(user),

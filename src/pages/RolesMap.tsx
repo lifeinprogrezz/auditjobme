@@ -13,6 +13,7 @@ import "@/styles/roles.css";
 import GlobeMap from "@/components/roles/GlobeMap";
 import RolesPanel from "@/components/roles/RolesPanel";
 import HeadBar from "@/components/roles/HeadBar";
+import CvUnlockModal from "@/components/roles/CvUnlockModal";
 import {
   EMPTY_FILTERS,
   byScore,
@@ -41,8 +42,10 @@ const HOT_COUNT = 7;
 const FRESH_MS = 21 * 24 * 60 * 60 * 1000;
 
 export default function RolesMap() {
-  const { jobs, loading, scoring, remaining, applied, scoreMore, scored, signedIn } =
+  const { jobs, loading, scoring, remaining, applied, scoreMore, submitCv, scored, signedIn } =
     useRolesData();
+  // CV-unlock modal (Phase A front door). Opened from the "Add your CV" affordances.
+  const [cvModalOpen, setCvModalOpen] = useState(false);
   const [filters, setFilters] = useState<RolesFilters>(EMPTY_FILTERS);
   const [view, setView] = useState<"map" | "list">("map");
   const [detailJob, setDetailJob] = useState<RoleJob | null>(null);
@@ -335,9 +338,11 @@ export default function RolesMap() {
           sizeOptions={sizeOptions}
           view={view}
           onView={setView}
+          onAddCv={() => setCvModalOpen(true)}
         />
         <RolesPanel
           jobs={panelJobs}
+          onAddCv={() => setCvModalOpen(true)}
           allJobs={jobs}
           defaultView={showShowcase}
           filters={filters}
@@ -409,6 +414,13 @@ export default function RolesMap() {
           </span>
         </div>
       </div>
+      <CvUnlockModal
+        open={cvModalOpen}
+        onClose={() => setCvModalOpen(false)}
+        signedIn={signedIn}
+        sectorOptions={sectorOptions}
+        onSubmit={submitCv}
+      />
     </div>
   );
 }
