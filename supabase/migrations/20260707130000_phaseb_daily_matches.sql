@@ -19,10 +19,23 @@ CREATE TABLE IF NOT EXISTS public.daily_matches (
 );
 ALTER TABLE public.daily_matches ENABLE ROW LEVEL SECURITY;
 
--- Own-row only. The nightly worker uses the service-role key (bypasses RLS) to
--- write; this policy governs the in-app read/manage path.
-CREATE POLICY "Users manage own daily matches"
-  ON public.daily_matches FOR ALL TO authenticated
+-- Least-privilege, split-policy style (mirrors the tightened usage_events grants):
+-- the nightly worker writes via the service-role key (bypasses RLS), and NO client
+-- INSERT/DELETE path ships this slice — so deny those at the privilege layer and
+-- give clients only own-row SELECT. Widen when a real client write path exists.
+REVOKE INSERT, UPDATE, DELETE ON public.daily_matches FROM authenticated, anon;
+
+CREATE POLICY "Users read own daily matches"
+  ON public.daily_matches FOR SELECT TO authenticated
+  USING (auth.uid() = user_id);
+
+-- The one client write the app will need (a later slice): mark own rows seen when
+-- the in-app view is opened. Scope it to the seen_at column via a column-level
+-- GRANT, paired with an own-row UPDATE policy — a client can touch nothing else.
+GRANT UPDATE (seen_at) ON public.daily_matches TO authenticated;
+
+CREATE POLICY "Users mark own daily matches seen"
+  ON public.daily_matches FOR UPDATE TO authenticated
   USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 CREATE INDEX IF NOT EXISTS idx_daily_matches_user_batch
