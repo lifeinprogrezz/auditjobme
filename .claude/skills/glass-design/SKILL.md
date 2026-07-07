@@ -170,3 +170,42 @@ either a scrim (token research §scrim) or real refraction — plain clear tint 
 LIVE CAROUSEL landing hero = issue #17 (refraction + glass-type vocabulary above is its palette) ·
 detail-view "Unlock your fit" CTA = issue #18 · reduced-motion/transparency fallbacks on /roles ·
 lock colors (final pass — values live in src/styles/roles.css) · DESIGN.md guide.
+
+## Light liquid glass over nature — validated 2026-07-07 (Verdaura build, esade-mba)
+
+A full LIGHT counterpart to the dark clear-glass system, built and user-tuned across ~8 live iterations on a
+perfume-brand scrollytelling page. The winning recipe, in Rober's own words: *"keep the background vivid,
+diffuse it, reduce the colour on the boxes, make the glass more cristal."*
+
+- **Vivid but DIFFUSED photo, fixed.** One nature photo as a `position:fixed` page background (`inset:-18px`
+  to hide blur bleed), `filter: saturate(1.4) contrast(1.05) brightness(1.02) blur(6px)`. The blur is the key
+  move: a soft vivid wash reads premium AND lets the glass go very crystal without hurting legibility (nothing
+  sharp behind the text). **Plain white between sections was the #1 "AI-made" tell** — the fixed photo must
+  show through everywhere you scroll (Rober: "now is just white and pure white when you scroll").
+- **Crystal glass, not milky.** Panels `rgba(255,255,255,.38–.44)` + `backdrop-filter: blur(20–26px)`, thin
+  white rim, big soft shadow, cursor-follow spotlight (`::after` radial at `--mx/--my`) + hover lift. He pushed
+  opacity DOWN twice ("too opaque, make it more cristal"); crystal beats frosted here.
+- **Colour lives in the PHOTO, not the UI.** Mute the in-box elements to a tonal palette (ink text, ONE muted
+  accent used sparingly, charts in muted greens/sage/one dusty rose). Colourful UI on a colourful photo reads
+  busy; neutral UI on a vivid photo reads premium. This is the runcycle/Outpace lesson made explicit, and the
+  fix when he said "everything looks greyish" (weak) then "too hot" — the answer was neither: vivid bg + calm UI.
+- **Content is HOSTED, never floating.** Every section wrapped in one glass panel (consolidated, compact); nav
+  is a floating glass pill bar; buttons are glass pills. Bare text on the background was the second AI tell.
+- **Type:** a rounded humanist face reads "Apple" and warm; he rejected geometric Space Grotesk as "boxy".
+  Manrope (variable font, one ~24KB woff2 covers every weight) was the pick. Embed base64 for self-containment.
+- **Hero = a FEW big numbers.** 2–3 large figures on their own glass panel; six small ones were unreadable.
+- **Motion in EVERY section** (IntersectionObserver reveal, staggered `transition-delay`), not one static block.
+- **Self-contained:** image (optimized webp), font, data all base64-embedded; zero external requests → works as
+  a claude.ai artifact and offline. Light photos compress far smaller than dark foliage (~60KB vs ~480KB webp).
+
+**Reference set (Rober's own art-direction picks, saved for reuse):** runcycle / Outpace Studios landing shots
+— glass nav + pill buttons over a glass-mug-with-moss hero, and over cherry-blossom-on-blue: light, airy, a
+single nature-in-glass hero, minimal copy, huge breathing room. This is the LIGHT companion to the dark globe.
+The scrim rule still holds over busy photos, but **diffusing the photo (blur) is the lighter-touch alternative
+to a heavy scrim and preserves vividness** — prefer it for light surfaces.
+
+**2026 trend confirmation (web research 7-07):** Apple Liquid Glass (iOS 26 / macOS Tahoe) is now
+"infrastructure"; glassmorphism rose to ~10% of generations by mid-2026; recurring rules: (1) glass needs
+depth/a photo behind it, (2) scrims or diffusion for text contrast, (3) glass for hero + highlights, not
+everywhere. Sources: orizon.co glassmorphism-2026, setproduct liquid-glass-vs-glassmorphism, mycodelesswebsite
+best-glassmorphism-websites.
