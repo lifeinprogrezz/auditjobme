@@ -90,8 +90,25 @@ async function scoreViaProxy(
     console.warn(`[nightly] proxy non-ok ${res.status}`);
     return { kind: "skip" };
   }
-  const data = (await res.json().catch(() => null)) as { content?: { text?: string }[] } | null;
-  const parsed = parseScoreResponse(data?.content?.[0]?.text ?? "");
+  const data = (await res.json().catch(() => null)) as
+    | { content?: { type?: string; text?: string }[] }
+    | null;
+  // Find the first TEXT block (a response can lead with a non-text block); fall
+  // back to content[0] for the plain single-text-block shape.
+  const textBlock = Array.isArray(data?.content)
+    ? (data.content.find((b) => b?.type === "text") ?? data.content[0])
+    : null;
+  const parsed = parseScoreResponse(textBlock?.text ?? "");
+  if (!parsed) {
+    // TEMP DIAGNOSTIC (remove after): a 200 that didn't parse — log the block types
+    // and the raw text head so we can see what the model actually returned.
+    console.warn(
+      "[nightly] parse-miss blocks=" +
+        JSON.stringify((data?.content ?? []).map((b) => b?.type)) +
+        " text=" +
+        JSON.stringify((textBlock?.text ?? "").slice(0, 220)),
+    );
+  }
   return parsed ? { kind: "ok", ...parsed } : { kind: "skip" };
 }
 
