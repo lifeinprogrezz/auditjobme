@@ -266,6 +266,37 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
         onClick={() => navigate("/underconstruction")}
         onKeyDown={keyActivate(() => navigate("/underconstruction"))}
       />
+
+      {/* Creator credit — pinned to the right of the nav band (Rober 7-07). Monochrome
+          brand glyphs match the app's .dico icon language; the text collapses on narrow widths. */}
+      <span className="sep" />
+      <div className="madeby">
+        <span className="mb-by">
+          created by <span className="mb-h">@lifeinprogrezz</span>
+        </span>
+        <a
+          className="mb-ico"
+          href="https://x.com/lifeinprogrezz"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Rober on X"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+          </svg>
+        </a>
+        <a
+          className="mb-ico"
+          href="https://www.linkedin.com/in/robertoquinterodelaiglesia/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Rober on LinkedIn"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M4.98 3.5C4.98 4.88 3.87 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM.25 8h4.5v13H.25V8zm7 0h4.32v1.78h.06c.6-1.07 2.07-2.2 4.26-2.2 4.56 0 5.4 2.9 5.4 6.67V21h-4.5v-5.9c0-1.4-.03-3.2-2-3.2-2 0-2.3 1.53-2.3 3.1V21h-4.5V8z" />
+          </svg>
+        </a>
+      </div>
     </header>
   );
 }
