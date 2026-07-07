@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   hashCv,
   roleArchetypeOf,
@@ -116,14 +116,29 @@ describe("cv stash", () => {
     localStorage.clear();
   });
 
-  it("round-trips a valid stash", () => {
-    writeCvStash({ cv_text: "hello cv", cv_hash: "abc", target_roles: ["Product"], target_sectors: ["Fintech"] });
+  it("round-trips a valid stash and reports success", () => {
+    expect(
+      writeCvStash({ cv_text: "hello cv", cv_hash: "abc", target_roles: ["Product"], target_sectors: ["Fintech"] }),
+    ).toBe(true);
     expect(readCvStash()).toEqual({
       cv_text: "hello cv",
       cv_hash: "abc",
       target_roles: ["Product"],
       target_sectors: ["Fintech"],
     });
+  });
+
+  it("returns false when localStorage rejects the write (private mode / quota)", () => {
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError");
+    });
+    try {
+      expect(
+        writeCvStash({ cv_text: "x", cv_hash: "y", target_roles: [], target_sectors: [] }),
+      ).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("returns null when absent", () => {

@@ -134,11 +134,16 @@ export function readCvStash(): CvStash | null {
   }
 }
 
-export function writeCvStash(stash: CvStash): void {
+/** Persist the stash. Returns false when localStorage rejects the write (Safari
+ *  private browsing / quota) so the caller can abort the OAuth redirect rather
+ *  than send the user through sign-in with a doomed stash that will silently
+ *  vanish across the full-page redirect. */
+export function writeCvStash(stash: CvStash): boolean {
   try {
     localStorage.setItem(CV_STASH_KEY, JSON.stringify(stash));
+    return true;
   } catch {
-    /* localStorage unavailable (private mode / quota) — the direct path still works */
+    return false; // localStorage unavailable (private mode / quota)
   }
 }
 

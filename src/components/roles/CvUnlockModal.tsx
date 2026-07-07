@@ -120,13 +120,20 @@ export default function CvUnlockModal({
       return;
     }
     // Anon: stash the CV + labels so they survive the OAuth full-page redirect,
-    // then hand off to the profile in a post-sign-in effect (useRolesData).
-    writeCvStash({
+    // then hand off to the profile in a post-sign-in effect (useRolesData). If the
+    // stash write fails (Safari private browsing / quota) the CV would vanish
+    // across the redirect — abort sign-in and tell the user instead.
+    const stashed = writeCvStash({
       cv_text: cvText,
       cv_hash: hashCv(cvText),
       target_roles: roles,
       target_sectors: sectors,
     });
+    if (!stashed) {
+      setError("Couldn't save your CV for sign-in — try again, or use a normal browser window.");
+      setSubmitting(false);
+      return;
+    }
     const { error: authErr } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
