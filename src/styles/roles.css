@@ -598,9 +598,11 @@
  * ========================================================================== */
 @media (prefers-reduced-transparency: reduce) {
   /* --glass/--glass-2 drive most surfaces already (.nav via .glass/.liquid,
-   * the maplibre control group, the scope badge, the panel-toggle, the filter
-   * dropdown, the pin tooltip) — fixing the tokens covers all of those in one
-   * shot, dark and light. */
+   * the maplibre control group, the scope badge, the panel-toggle, the pin
+   * tooltip, and the DARK filter dropdown) — fixing the tokens covers all of
+   * those in one shot. The LIGHT theme overrides several of these same
+   * surfaces with hardcoded rgba fills that win on specificity, so each needs
+   * its own opaque replacement below. */
   .roles-theme,
   .roles-theme.light {
     --glass: var(--surface);
@@ -619,6 +621,13 @@
   .roles-theme.light .filterbtn { background: var(--surface-3); }
   .roles-theme .fchip { background: var(--surface-3); }
   .roles-theme.light .fchip { background: var(--surface-3); }
+  /* Light .fdrop hardcodes rgba(255,255,255,0.74) at (0,3,0) — the token fix
+   * only reaches the dark dropdown, so give the light one its own opaque fill,
+   * and drop both themes' ::before sheen (a translucent white gradient) so no
+   * overlay re-introduces see-through. */
+  .roles-theme.light .fdrop { background: var(--surface); }
+  .roles-theme .fdrop::before,
+  .roles-theme.light .fdrop::before { display: none; }
   /* Nothing left to blur once the fill behind it is opaque. */
   .roles-theme .maplibregl-ctrl-group,
   .roles-theme .scope,
