@@ -410,8 +410,11 @@ export type Database = {
           id: string
           languages: string[] | null
           onboarded_at: string | null
+          cv_hash: string | null
           open_to_remote: boolean | null
           target_cities: string[] | null
+          target_roles: string[] | null
+          target_sectors: string[] | null
           target_seniority: string | null
           updated_at: string
           username: string | null
@@ -420,6 +423,7 @@ export type Database = {
           avatar_url?: string | null
           citizenship?: string | null
           created_at?: string
+          cv_hash?: string | null
           cv_text?: string | null
           display_name?: string | null
           email?: string | null
@@ -429,6 +433,8 @@ export type Database = {
           onboarded_at?: string | null
           open_to_remote?: boolean | null
           target_cities?: string[] | null
+          target_roles?: string[] | null
+          target_sectors?: string[] | null
           target_seniority?: string | null
           updated_at?: string
           username?: string | null
@@ -437,6 +443,7 @@ export type Database = {
           avatar_url?: string | null
           citizenship?: string | null
           created_at?: string
+          cv_hash?: string | null
           cv_text?: string | null
           display_name?: string | null
           email?: string | null
@@ -446,6 +453,8 @@ export type Database = {
           onboarded_at?: string | null
           open_to_remote?: boolean | null
           target_cities?: string[] | null
+          target_roles?: string[] | null
+          target_sectors?: string[] | null
           target_seniority?: string | null
           updated_at?: string
           username?: string | null

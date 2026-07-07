@@ -41,6 +41,8 @@ export type RolesPanelProps = {
   onCloseDetail: () => void;
   onScoreMore: () => void;
   onToggleHidden: () => void;
+  /** Opens the CV-unlock modal (Phase A front door). */
+  onAddCv: () => void;
   /** The live headbar filter state (mirrored as removable chips in the panel). */
   filters: RolesFilters;
   onFilters: (f: RolesFilters) => void;
@@ -136,6 +138,7 @@ export default function RolesPanel({
   onCloseDetail,
   onScoreMore,
   onToggleHidden,
+  onAddCv,
   filters,
   onFilters,
   selCo,
@@ -150,10 +153,9 @@ export default function RolesPanel({
     if (detailJob) detailRef.current?.scrollTo(0, 0);
   }, [detailJob]);
 
-  // Coming-soon gate (Rober 7-06): the roles map is the only live surface, so both
-  // "Prepare application" and the "Add your CV" unlock route to /underconstruction.
+  // "Prepare application" is Phase B — still gated to the coming-soon surface.
+  // "Add your CV" opens the Phase-A CV-unlock modal (onAddCv, from RolesMap).
   const goApply = (_j: RoleJob) => navigate("/underconstruction");
-  const onAddCv = () => navigate("/underconstruction");
 
   // Active-filter chips: map selection (co/city) + every headbar filter, each
   // removable. They read/write the SAME filter state the headbar uses, so the two
