@@ -27,6 +27,26 @@ function json(obj: unknown, status: number) {
   return new Response(JSON.stringify(obj), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
+/**
+ * Constant-time string equality for the service-role auth boundary. Hashing both
+ * inputs to a fixed 32-byte SHA-256 digest first means the byte-compare loop runs
+ * for a fixed length regardless of the inputs (no length- or content-dependent
+ * early exit), so a timing side-channel can't be used to recover the key. Same
+ * behaviour as `===`: equal strings → true (equal digests), unequal → false.
+ */
+async function timingSafeEqual(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const [da, db] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(a)),
+    crypto.subtle.digest('SHA-256', enc.encode(b)),
+  ]);
+  const va = new Uint8Array(da);
+  const vb = new Uint8Array(db);
+  let diff = 0;
+  for (let i = 0; i < va.length; i++) diff |= va[i] ^ vb[i];
+  return diff === 0;
+}
+
 type ScoreParams = {
   messages: unknown;
   model?: string;
@@ -132,9 +152,11 @@ Deno.serve(async (req) => {
     // ── SERVICE-ROLE PATH (nightly worker) ──────────────────────────────────
     // Detected by an EXACT match against the service-role key — unforgeable (a
     // decoded role claim could be spoofed; possession of the actual key cannot).
-    // ONLY this path may score/meter/cap against a `target_user_id` other than the
-    // caller. A normal user JWT never reaches here, so it can never impersonate.
-    if (token === serviceRoleKey) {
+    // Compared in constant time (this is the auth boundary) so the match can't be
+    // brute-forced via response timing. ONLY this path may score/meter/cap against
+    // a `target_user_id` other than the caller. A normal user JWT never reaches
+    // here, so it can never impersonate.
+    if (await timingSafeEqual(token, serviceRoleKey)) {
       const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
       if (!apiKey) return json({ error: 'ANTHROPIC_API_KEY is not configured' }, 500);
       const { messages, model, max_tokens, system, tools, kind, target_user_id } = await req.json();
