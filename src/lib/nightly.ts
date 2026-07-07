@@ -9,6 +9,23 @@ export const NIGHTLY_TOP_N = 10;
 /** Look-back window when a user has no prior batch (first night): ~24h. */
 export const NIGHTLY_FALLBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Cron-caller authorization check (pure). Returns the error response to send, or
+ * `null` when the caller is authorized. The endpoint fails CLOSED: a MISSING
+ * CRON_SECRET is a misconfiguration (500), NOT a bypass — so the worker can never
+ * be publicly triggerable. When the secret is set, only `Bearer <secret>` passes.
+ * Vercel Cron invokes over GET with this exact header; the HTTP method is not part
+ * of the auth decision.
+ */
+export function cronAuthResult(
+  cronSecret: string | undefined | null,
+  authHeader: string | string[] | undefined | null,
+): { status: number; error: string } | null {
+  if (!cronSecret) return { status: 500, error: "CRON_SECRET not configured" };
+  if (authHeader !== `Bearer ${cronSecret}`) return { status: 401, error: "Unauthorized" };
+  return null;
+}
+
 export type NightlyJob = {
   id: string;
   company: string;
@@ -48,6 +65,43 @@ export function selectNewJobsSince<
   const parsed = sinceIso ? Date.parse(sinceIso) : NaN;
   const cutoff = Number.isNaN(parsed) ? nowMs - windowMs : parsed;
   return jobs.filter((j) => jobSeenMs(j) > cutoff).sort((a, b) => jobSeenMs(b) - jobSeenMs(a));
+}
+
+/**
+ * The full "what to score tonight" decision (pure): jobs new since the cutoff
+ * (`selectNewJobsSince`) MINUS any URL the user has already been matched on in a
+ * prior batch. `sinceIso` MUST be the prior batch's `created_at` (a real
+ * timestamptz), NOT its `batch_date` (a bare date parsed as 00:00 UTC) — the cron
+ * runs at 06:00 UTC, so a batch_date cutoff would re-select every job first seen in
+ * the 00:00–06:00 window as "new" the next night. The `seenUrls` set is the
+ * belt-and-suspenders guard: even a cutoff regression (or a schedule change) can
+ * never re-notify a role the user has already seen. First-run behaviour (null
+ * `sinceIso` → the ~24h fallback window) is inherited from `selectNewJobsSince`.
+ */
+export function selectNightlyCandidates<
+  T extends { url: string; first_seen_at?: string | null; posted_at?: string | null },
+>(
+  jobs: T[],
+  sinceIso: string | null,
+  nowMs: number,
+  seenUrls: ReadonlySet<string> = new Set(),
+  windowMs: number = NIGHTLY_FALLBACK_WINDOW_MS,
+): T[] {
+  return selectNewJobsSince(jobs, sinceIso, nowMs, windowMs).filter((j) => !seenUrls.has(j.url));
+}
+
+/** What to do for one user this run (pure). Splits "already matched today" from
+ *  "already notified today":
+ *   - no batch today            → "score"       (run the full scoring pass)
+ *   - batch today, not notified → "retry-email" (email failed soft before → resend
+ *                                                 the existing batch; do NOT re-score)
+ *   - batch today, notified     → "skip"        (fully done for the day)
+ *  `notified_at` (written only on send-success) is what gates the same-day early
+ *  exit, so a soft email failure never strands a user without their one email. */
+export type NightlyAction = "score" | "retry-email" | "skip";
+export function decideNightlyAction(todaysRows: { notified_at?: string | null }[]): NightlyAction {
+  if (todaysRows.length === 0) return "score";
+  return todaysRows.some((r) => r.notified_at != null) ? "skip" : "retry-email";
 }
 
 export type ScoredMatch = {

@@ -92,7 +92,10 @@ export type Labels = { roles: string[]; sectors: string[] };
  * mirroring filterJobs). With no labels, or when the filter would empty the slice,
  * fall back to the full list so the reveal always has something to score.
  */
-export function pickScoringSlice(jobs: RoleJob[], labels: Labels): RoleJob[] {
+export function pickScoringSlice<T extends Pick<RoleJob, "title" | "sector">>(
+  jobs: T[],
+  labels: Labels,
+): T[] {
   const roles = labels.roles ?? [];
   const sectors = labels.sectors ?? [];
   if (roles.length === 0 && sectors.length === 0) return jobs;

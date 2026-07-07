@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   jobSeenMs,
   selectNewJobsSince,
+  selectNightlyCandidates,
+  decideNightlyAction,
+  cronAuthResult,
   rankMatches,
   buildEmailSubject,
   buildEmailBody,
@@ -55,6 +58,83 @@ describe("selectNewJobsSince", () => {
     const jobs = [j("fresh", now - 3_600_000), j("old", now - NIGHTLY_FALLBACK_WINDOW_MS - 1)];
     const out = selectNewJobsSince(jobs, "garbage", now);
     expect(out.map((x) => x.id)).toEqual(["fresh"]);
+  });
+});
+
+describe("selectNightlyCandidates (B2)", () => {
+  const now = Date.parse("2026-07-07T06:00:00Z");
+  const j = (id: string, url: string, isoT: string) => ({ id, url, first_seen_at: isoT, posted_at: null });
+
+  it("uses a real created_at timestamp as the cutoff, not the bare batch_date", () => {
+    // Last night's cron actually ran at 06:00 UTC.
+    const priorRunAt = "2026-07-06T06:00:00Z";
+    const preRun = j("preRun", "u1", "2026-07-06T03:00:00Z"); // seen in the 00:00–06:00 window, BEFORE last run
+    const postRun = j("postRun", "u2", "2026-07-06T09:00:00Z"); // seen AFTER last run
+    const jobs = [preRun, postRun];
+
+    // created_at cutoff correctly excludes the already-handled pre-run job.
+    const out = selectNightlyCandidates(jobs, priorRunAt, now);
+    expect(out.map((x) => x.id)).toEqual(["postRun"]);
+
+    // Regression guard: the OLD batch_date cutoff (parsed as 00:00 UTC) re-selects it.
+    const buggy = selectNewJobsSince(jobs, "2026-07-06", now);
+    expect(buggy.map((x) => x.id)).toContain("preRun");
+  });
+
+  it("excludes any URL already matched in a prior batch (belt-and-suspenders)", () => {
+    const a = j("a", "https://x/a", "2026-07-07T05:00:00Z");
+    const b = j("b", "https://x/b", "2026-07-07T05:30:00Z");
+    const seen = new Set(["https://x/a"]);
+    const out = selectNightlyCandidates([a, b], "2026-07-07T00:00:00Z", now, seen);
+    expect(out.map((x) => x.url)).toEqual(["https://x/b"]);
+  });
+
+  it("keeps first-run fallback-window behaviour when there is no prior batch", () => {
+    const stale = j("stale", "u1", iso(now - NIGHTLY_FALLBACK_WINDOW_MS - 60_000));
+    const fresh = j("fresh", "u2", iso(now - 3_600_000));
+    const out = selectNightlyCandidates([stale, fresh], null, now);
+    expect(out.map((x) => x.id)).toEqual(["fresh"]);
+  });
+});
+
+describe("decideNightlyAction (B3 — notified vs matched split)", () => {
+  it("scores when there is no batch today", () => {
+    expect(decideNightlyAction([])).toBe("score");
+  });
+
+  it("skips only when today's batch exists AND was notified", () => {
+    expect(decideNightlyAction([{ notified_at: "2026-07-07T06:01:00Z" }])).toBe("skip");
+    // any notified row → done (notified_at is stamped across the whole batch)
+    expect(decideNightlyAction([{ notified_at: "2026-07-07T06:01:00Z" }, { notified_at: null }])).toBe("skip");
+  });
+
+  it("retries the email when today's batch exists but was never notified", () => {
+    expect(decideNightlyAction([{ notified_at: null }, { notified_at: null }])).toBe("retry-email");
+    expect(decideNightlyAction([{}])).toBe("retry-email");
+  });
+});
+
+describe("cronAuthResult (B1 — fail closed)", () => {
+  it("fails CLOSED with 500 when CRON_SECRET is unset", () => {
+    expect(cronAuthResult(undefined, "Bearer whatever")).toEqual({
+      status: 500,
+      error: "CRON_SECRET not configured",
+    });
+    expect(cronAuthResult("", "Bearer whatever")).toEqual({
+      status: 500,
+      error: "CRON_SECRET not configured",
+    });
+  });
+
+  it("rejects a wrong, missing, or array Authorization header with 401", () => {
+    expect(cronAuthResult("s3cret", undefined)).toMatchObject({ status: 401 });
+    expect(cronAuthResult("s3cret", "Bearer nope")).toMatchObject({ status: 401 });
+    expect(cronAuthResult("s3cret", "s3cret")).toMatchObject({ status: 401 }); // no "Bearer " prefix
+    expect(cronAuthResult("s3cret", ["Bearer s3cret"])).toMatchObject({ status: 401 }); // array header
+  });
+
+  it("returns null (authorized) for the exact Bearer <secret> header", () => {
+    expect(cronAuthResult("s3cret", "Bearer s3cret")).toBeNull();
   });
 });
 

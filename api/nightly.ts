@@ -11,17 +11,19 @@
 //   RESEND_API_KEY — transactional email. CRON_SECRET — cron-caller auth (Vercel
 //   sends it as `Authorization: Bearer <CRON_SECRET>`).
 import { createClient } from "@supabase/supabase-js";
-import type { RoleJob } from "../src/lib/roles";
 import { pickScoringSlice } from "../src/lib/labels";
 import { SYSTEM, buildScoreUserMessage, parseScoreResponse } from "../src/lib/scorePrompt";
 import {
   NIGHTLY_TOP_N,
-  selectNewJobsSince,
+  cronAuthResult,
+  selectNightlyCandidates,
+  decideNightlyAction,
   rankMatches,
   buildEmailSubject,
   buildEmailBody,
   type NightlyJob,
   type ScoredMatch,
+  type RankedMatch,
 } from "../src/lib/nightly";
 
 // Minimal Vercel Node handler types (avoids a @vercel/node dependency).
@@ -117,21 +119,24 @@ async function sendEmail(
   }
 }
 
+
 export default async function handler(req: Req, res: Res): Promise<void> {
-  // ── Cron-caller auth ──────────────────────────────────────────────────────
-  // Vercel Cron sends `Authorization: Bearer <CRON_SECRET>` when CRON_SECRET is
-  // set in the project env. Reject anything else so the endpoint isn't publicly
-  // triggerable. (If CRON_SECRET is unset the check is skipped — set it in Vercel.)
-  const cronSecret = env("CRON_SECRET");
-  if (cronSecret) {
-    const auth = req.headers["authorization"];
-    if (auth !== `Bearer ${cronSecret}`) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
+  // ── Cron-caller auth (fail CLOSED) ────────────────────────────────────────
+  // Vercel Cron invokes this endpoint over GET with `Authorization: Bearer
+  // <CRON_SECRET>`. A MISSING CRON_SECRET is a misconfiguration (500), NOT a
+  // bypass — otherwise the worker would be publicly triggerable. Method is not
+  // part of the auth check: do NOT restrict to POST or the cron GET breaks.
+  const authError = cronAuthResult(env("CRON_SECRET"), req.headers["authorization"]);
+  if (authError) {
+    res.status(authError.status).json({ error: authError.error });
+    return;
   }
 
-  const supabaseUrl = env("SUPABASE_URL") || env("VITE_SUPABASE_URL");
+  // SUPABASE_URL is a SERVER-side var. There is intentionally no VITE_ fallback:
+  // VITE_-prefixed vars are inlined into the client bundle at build time and are
+  // NEVER present in process.env at Function runtime, so a fallback would only
+  // mask a genuinely-unset var. Fail fast + honestly instead.
+  const supabaseUrl = env("SUPABASE_URL");
   const serviceKey = env("SUPABASE_SERVICE_ROLE_KEY");
   const resendKey = env("RESEND_API_KEY");
   if (!supabaseUrl || !serviceKey) {
@@ -142,6 +147,30 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   const admin = createClient(supabaseUrl, serviceKey);
   const today = new Date().toISOString().slice(0, 10);
   const nowMs = Date.now();
+
+  // Send the "N roles ready" email for a persisted batch and, on send-success,
+  // stamp notified_at so the same-day early-exit (B3) treats the user as done.
+  // Shared by the fresh-score path and the email-retry path. Fail-soft → bool.
+  // Local closure (not module-level) so it captures `admin`'s inferred client type.
+  const sendBatchEmail = async (
+    key: string,
+    userId: string,
+    batchDate: string,
+    ranked: RankedMatch[],
+  ): Promise<boolean> => {
+    const { data: authUser } = await admin.auth.admin.getUserById(userId);
+    const to = authUser?.user?.email;
+    if (!to) return false;
+    const sent = await sendEmail(key, to, buildEmailSubject(ranked.length), buildEmailBody(ranked, APP_URL));
+    if (sent) {
+      await admin
+        .from("daily_matches")
+        .update({ notified_at: new Date().toISOString() })
+        .eq("user_id", userId)
+        .eq("batch_date", batchDate);
+    }
+    return sent;
+  };
 
   // ── Active users: a CV plus at least one role/industry label ──────────────
   const { data: profiles, error: pErr } = await admin
@@ -187,42 +216,76 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     first_seen_at: r.first_seen_at,
     posted_at: r.posted_at,
   }));
+  // url → {company,title} for rebuilding the email preview on the retry-email path
+  // (daily_matches stores only job_url, not the display fields).
+  const jobByUrl = new Map(jobs.map((j) => [j.url, { company: j.company, title: j.title }]));
 
   const summary = { users: active.length, processed: 0, skipped: 0, emailed: 0, capped: 0, matches: 0 };
 
   for (const p of active) {
     const userId = p.id as string;
     try {
-      // Idempotency: if a batch already exists for this user today, skip entirely
-      // (re-run is a no-op and costs nothing). The UNIQUE(user,job_url,date) guards
-      // the row level too, but skipping avoids re-scoring cost.
-      const { data: existing } = await admin
+      // Every prior daily_matches row for this user (small: ≤ NIGHTLY_TOP_N per
+      // night). Drives three decisions: today's batch state (B3 notified-split),
+      // the created_at cutoff (B2), and the already-matched-URL exclusion (B2).
+      const { data: existingRows } = await admin
         .from("daily_matches")
-        .select("id")
+        .select("job_url, rank, score, reason, fit_bullets, batch_date, created_at, notified_at")
         .eq("user_id", userId)
-        .eq("batch_date", today)
-        .limit(1);
-      if (existing && existing.length > 0) {
+        .order("created_at", { ascending: false });
+      const rowsForUser = existingRows ?? [];
+      const todaysRows = rowsForUser.filter((r) => r.batch_date === today);
+      const action = decideNightlyAction(todaysRows);
+
+      // Already matched AND already notified today → fully done, no cost.
+      if (action === "skip") {
         summary.skipped++;
         continue;
       }
 
-      // "New since last batch": the user's most recent prior batch_date, else the
-      // ~24h fallback window.
-      const { data: last } = await admin
-        .from("daily_matches")
-        .select("batch_date")
-        .eq("user_id", userId)
-        .order("batch_date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const sinceIso = (last?.batch_date as string | null) ?? null;
+      // Matched today but the email never confirmed (soft send failure left
+      // notified_at NULL) → retry the send for the EXISTING batch. Do NOT
+      // re-score / re-upsert — email is the only channel this slice.
+      if (action === "retry-email") {
+        summary.skipped++; // the batch already exists; nothing re-processed
+        if (resendKey) {
+          const rankedRetry: RankedMatch[] = todaysRows
+            .slice()
+            .sort((a, b) => (Number(a.rank) || 0) - (Number(b.rank) || 0))
+            .map((r) => {
+              const url = r.job_url as string;
+              const meta = jobByUrl.get(url);
+              return {
+                url,
+                company: meta?.company ?? url,
+                title: meta?.title ?? "New role",
+                score: Number(r.score) || 0,
+                reason: (r.reason as string | null) ?? "",
+                fitBullets: Array.isArray(r.fit_bullets) ? (r.fit_bullets as string[]) : [],
+                rank: Number(r.rank) || 0,
+              };
+            });
+          if (rankedRetry.length > 0 && (await sendBatchEmail(resendKey, userId, today, rankedRetry))) {
+            summary.emailed++;
+          }
+        }
+        continue;
+      }
 
-      const fresh = selectNewJobsSince(jobs, sinceIso, nowMs);
-      const slice = pickScoringSlice(fresh as unknown as RoleJob[], {
+      // action === "score": no batch today → run the full pass.
+      // "New since last batch": the most recent PRIOR batch's created_at (a real
+      // timestamptz — NOT batch_date, whose 00:00-UTC parse would re-select every
+      // job first seen in the 00:00–06:00 window each night). No prior row → the
+      // ~24h fallback window. seenUrls = every URL already matched, ever, so a
+      // cutoff regression or schedule change can never re-notify a seen role.
+      const sinceIso = (rowsForUser[0]?.created_at as string | null) ?? null;
+      const seenUrls = new Set(rowsForUser.map((r) => r.job_url as string));
+
+      const fresh = selectNightlyCandidates(jobs, sinceIso, nowMs, seenUrls);
+      const slice = pickScoringSlice(fresh, {
         roles: (p.target_roles as string[]) ?? [],
         sectors: (p.target_sectors as string[]) ?? [],
-      }) as unknown as NightlyJob[];
+      });
       const candidates = slice.slice(0, NIGHTLY_TOP_N);
       if (candidates.length === 0) {
         summary.processed++;
@@ -290,27 +353,11 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       }
       summary.matches += rows.length;
 
-      // ── Email (fail-soft). Only when we actually persisted ≥1 match and the
-      // caps didn't stop us mid-run for nothing. ──────────────────────────────
-      if (resendKey) {
-        const { data: authUser } = await admin.auth.admin.getUserById(userId);
-        const to = authUser?.user?.email;
-        if (to) {
-          const sent = await sendEmail(
-            resendKey,
-            to,
-            buildEmailSubject(rows.length),
-            buildEmailBody(ranked, APP_URL),
-          );
-          if (sent) {
-            summary.emailed++;
-            await admin
-              .from("daily_matches")
-              .update({ notified_at: new Date().toISOString() })
-              .eq("user_id", userId)
-              .eq("batch_date", today);
-          }
-        }
+      // ── Email (fail-soft). Only when we actually persisted ≥1 match. On a soft
+      // send failure notified_at stays NULL, so a same-day re-run retries the send
+      // (B3) rather than skipping the user forever. ────────────────────────────
+      if (resendKey && (await sendBatchEmail(resendKey, userId, today, ranked))) {
+        summary.emailed++;
       }
       void capped;
     } catch (e) {
