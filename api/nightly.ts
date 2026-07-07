@@ -11,8 +11,8 @@
 //   RESEND_API_KEY — transactional email. CRON_SECRET — cron-caller auth (Vercel
 //   sends it as `Authorization: Bearer <CRON_SECRET>`).
 import { createClient } from "@supabase/supabase-js";
-import { pickScoringSlice } from "../src/lib/labels";
-import { SYSTEM, buildScoreUserMessage, parseScoreResponse } from "../src/lib/scorePrompt";
+import { pickScoringSlice } from "../src/lib/labels.js";
+import { SYSTEM, buildScoreUserMessage, parseScoreResponse } from "../src/lib/scorePrompt.js";
 import {
   NIGHTLY_TOP_N,
   cronAuthResult,
@@ -24,7 +24,7 @@ import {
   type NightlyJob,
   type ScoredMatch,
   type RankedMatch,
-} from "../src/lib/nightly";
+} from "../src/lib/nightly.js";
 
 // Minimal Vercel Node handler types (avoids a @vercel/node dependency).
 type Req = { method?: string; headers: Record<string, string | string[] | undefined> };
