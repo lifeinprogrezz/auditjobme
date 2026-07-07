@@ -19,6 +19,7 @@ import {
   type RolesFilters,
 } from "@/lib/roles";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
+import { prefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 // The pool is unbounded (1000+ live rows); each card mounts a Logo.dev <img>,
 // so cap the DOM and point the user at search/filters for the tail.
@@ -79,8 +80,10 @@ function ScoreValue({ scored, value }: { scored: boolean; value: number | null }
     const was = prevScored.current;
     prevScored.current = scored;
     if (!scored || value == null) return;
-    if (was) {
-      setDisplay(value); // score arrived post-reveal (background pass) — no animation
+    if (was || prefersReducedMotion()) {
+      // score arrived post-reveal (background pass), or the OS/browser asked
+      // for reduced motion — either way, no rAF count-up, just the final value.
+      setDisplay(value);
       return;
     }
     let raf = 0;

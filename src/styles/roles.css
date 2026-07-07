@@ -584,3 +584,70 @@
 .roles-theme.light .detail, .roles-theme.light .cards { scrollbar-color: rgba(11, 31, 38, 0.22) transparent; }
 .roles-theme.light .detail::-webkit-scrollbar-thumb, .roles-theme.light .cards::-webkit-scrollbar-thumb { background: rgba(11, 31, 38, 0.18); }
 .roles-theme.light .detail::-webkit-scrollbar-thumb:hover, .roles-theme.light .cards::-webkit-scrollbar-thumb:hover { background: rgba(11, 31, 38, 0.32); }
+
+/* ============================================================================
+ * ACCESSIBILITY FALLBACKS (issue #19, glass-design skill 7-05 addendum).
+ * Progressive enhancement, no JS: prefers-reduced-transparency flattens every
+ * glass surface to an opaque ink/paper fill (borders + text contrast kept —
+ * only the see-through blur/tint drops). The camera-duration + score count-up
+ * JS work lives in GlobeMap.tsx / RolesPanel.tsx (usePrefersReducedMotion).
+ * Several rules below repeat a selector at `.roles-theme.light` on purpose:
+ * the light theme already overrides these same properties at that specificity
+ * (e.g. `.roles-theme.light .panel`), so ours has to match it to win the tie
+ * (later in the file) rather than lose to the pre-existing light-only rule.
+ * ========================================================================== */
+@media (prefers-reduced-transparency: reduce) {
+  /* --glass/--glass-2 drive most surfaces already (.nav via .glass/.liquid,
+   * the maplibre control group, the scope badge, the panel-toggle, the pin
+   * tooltip, and the DARK filter dropdown) — fixing the tokens covers all of
+   * those in one shot. The LIGHT theme overrides several of these same
+   * surfaces with hardcoded rgba fills that win on specificity, so each needs
+   * its own opaque replacement below. */
+  .roles-theme,
+  .roles-theme.light {
+    --glass: var(--surface);
+    --glass-2: var(--surface-2);
+  }
+  /* Surfaces with a hardcoded (non-token) rgba fill get an explicit opaque
+   * replacement instead. */
+  .roles-theme .attrib { background: var(--surface-2); }
+  .roles-theme .panel { background: var(--surface); }
+  .roles-theme.light .panel { background: var(--surface); }
+  .roles-theme .cmd { background: var(--surface-3); }
+  .roles-theme.light .cmd { background: var(--surface-3); }
+  .roles-theme .seg { background: var(--surface-3); }
+  .roles-theme.light .seg { background: var(--surface-3); }
+  .roles-theme .filterbtn { background: var(--surface-3); }
+  .roles-theme.light .filterbtn { background: var(--surface-3); }
+  .roles-theme .fchip { background: var(--surface-3); }
+  .roles-theme.light .fchip { background: var(--surface-3); }
+  /* Light .fdrop hardcodes rgba(255,255,255,0.74) at (0,3,0) — the token fix
+   * only reaches the dark dropdown, so give the light one its own opaque fill,
+   * and drop both themes' ::before sheen (a translucent white gradient) so no
+   * overlay re-introduces see-through. */
+  .roles-theme.light .fdrop { background: var(--surface); }
+  .roles-theme .fdrop::before,
+  .roles-theme.light .fdrop::before { display: none; }
+  /* Nothing left to blur once the fill behind it is opaque. */
+  .roles-theme .maplibregl-ctrl-group,
+  .roles-theme .scope,
+  .roles-theme .pintip,
+  .roles-theme .panel-toggle {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Conservative, CSS-only: collapses transitions/animations in-scope to
+ * effectively instant, matching the JS-side camera/count-up hard cutoffs
+ * above (the panel slide + chip fades are subtle enough to leave running per
+ * the issue, but shortening them here costs nothing and needs no JS). */
+@media (prefers-reduced-motion: reduce) {
+  .roles-theme *,
+  .roles-theme *::before,
+  .roles-theme *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

@@ -7,6 +7,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, Point as GeoPoint } from "geojson";
 import { clusterTier, hueFor, scoreBucket, type RoleJob } from "@/lib/roles";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
+import { prefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 export type GlobeMapProps = {
   jobs: RoleJob[];
@@ -124,6 +125,16 @@ const LOGO_REVEAL_ZOOM = 9.5;
 const FLIGHT_MS = 800;
 const CONTINENT_MS = 1200;
 const GREAT = "#1FD8B8";
+
+// Single source of truth for every camera move's duration: reduced-motion asks
+// for an instant jump (0ms), read live at call time so an OS toggle mid-session
+// takes effect on the very next flight (maplibre's own easeTo/flyTo already
+// skip animation under reduced-motion unless `essential: true` is set — none
+// of our calls set it — so this is a correctness-explicit belt-and-suspenders,
+// not a workaround for missing library behavior).
+function dur(ms: number): number {
+  return prefersReducedMotion() ? 0 : ms;
+}
 
 type PinProps = {
   id: string;
@@ -745,7 +756,7 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
                   [loMin, laMin],
                   [loMax, laMax],
                 ],
-                { padding: fitPad(map, EUROPE_PADDING), maxZoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS },
+                { padding: fitPad(map, EUROPE_PADDING), maxZoom: CITY_REVEAL_ZOOM, duration: dur(FLIGHT_MS) },
               );
             })
             .catch(() => {});
@@ -758,7 +769,7 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
         el = buildCluster(pin.count, pin.score == null ? -1 : pin.score);
         const cty = pin.city ? String(pin.city) : null;
         el.addEventListener("click", () => {
-          map.easeTo({ center: coords, zoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS });
+          map.easeTo({ center: coords, zoom: CITY_REVEAL_ZOOM, duration: dur(FLIGHT_MS) });
           if (cty) onCityClickRef.current?.(cty);
         });
       } else {
@@ -818,7 +829,7 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
             const m = mapRef.current;
             if (m) {
               try {
-                m.fitBounds(EUROPE_BOUNDS, { padding: fitPad(m, EUROPE_PADDING), duration: CONTINENT_MS });
+                m.fitBounds(EUROPE_BOUNDS, { padding: fitPad(m, EUROPE_PADDING), duration: dur(CONTINENT_MS) });
               } catch {
                 /* ignore */
               }
@@ -853,7 +864,7 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
         const fitEurope = () => {
           if (mapRef.current !== map || focusRef.current) return;
           try {
-            map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: CONTINENT_MS });
+            map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: dur(CONTINENT_MS) });
           } catch {
             /* ignore */
           }
@@ -995,7 +1006,7 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
     const map = mapRef.current;
     if (!map || !loadedRef.current) return;
     flyNonceRef.current = flyTo.nonce;
-    map.easeTo({ center: flyTo.center, zoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS });
+    map.easeTo({ center: flyTo.center, zoom: CITY_REVEAL_ZOOM, duration: dur(FLIGHT_MS) });
   }, [flyTo]);
 
   // Headbar City filter frames the map: one city eases in at city zoom, several fit
@@ -1009,14 +1020,14 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
     if (cs.length === 0) return;
     cityFrameRef.current = cityFrame.nonce;
     if (cs.length === 1) {
-      map.easeTo({ center: cs[0], zoom: CITY_REVEAL_ZOOM, duration: FLIGHT_MS });
+      map.easeTo({ center: cs[0], zoom: CITY_REVEAL_ZOOM, duration: dur(FLIGHT_MS) });
     } else {
       const b = new maplibregl.LngLatBounds(cs[0], cs[0]);
       for (const c of cs) b.extend(c);
       map.fitBounds(b, {
         padding: fitPad(map, EUROPE_PADDING),
         maxZoom: CITY_REVEAL_ZOOM,
-        duration: FLIGHT_MS,
+        duration: dur(FLIGHT_MS),
       });
     }
   }, [cityFrame]);
@@ -1028,7 +1039,7 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
     const map = mapRef.current;
     if (!map || !loadedRef.current) return;
     europeFrameRef.current = europeFrame;
-    map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: CONTINENT_MS });
+    map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: dur(CONTINENT_MS) });
   }, [europeFrame]);
 
   return (
