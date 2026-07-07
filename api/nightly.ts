@@ -87,7 +87,11 @@ async function scoreViaProxy(
   }
   if (res.status === 429) return { kind: "capped" };
   if (!res.ok) {
-    console.warn(`[nightly] proxy non-ok ${res.status}`);
+    // TEMP DIAGNOSTIC (remove after): log the edge fn's error body so we can tell a
+    // gateway reject (verify_jwt: {"message":"Invalid JWT"}) from a function reject
+    // ({"error":"Unauthorized"}) — pinpoints WHERE the 401 comes from.
+    const bodyTxt = await res.text().catch(() => "");
+    console.warn(`[nightly] proxy non-ok ${res.status} body=${bodyTxt.slice(0, 140)}`);
     return { kind: "skip" };
   }
   const data = (await res.json().catch(() => null)) as { content?: { text?: string }[] } | null;
@@ -145,6 +149,19 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   }
   const proxyUrl = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/anthropic-proxy`;
   const admin = createClient(supabaseUrl, serviceKey);
+
+  // TEMP DIAGNOSTIC (remove after): shape of the service key + host — reveals whether
+  // SUPABASE_SERVICE_ROLE_KEY is a legacy JWT ("eyJ", ~219 chars) or a new sb_secret_
+  // key (which verify_jwt rejects). Prefix + length only, never the secret itself.
+  console.log(
+    "[nightly] env-shape " +
+      JSON.stringify({
+        host: supabaseUrl.replace(/^https?:\/\//, "").slice(0, 24),
+        svcLen: serviceKey.length,
+        svcPfx: serviceKey.slice(0, 3),
+        resend: !!resendKey,
+      }),
+  );
   const today = new Date().toISOString().slice(0, 10);
   const nowMs = Date.now();
 
