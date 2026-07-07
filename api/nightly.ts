@@ -99,16 +99,8 @@ async function scoreViaProxy(
     ? (data.content.find((b) => b?.type === "text") ?? data.content[0])
     : null;
   const parsed = parseScoreResponse(textBlock?.text ?? "");
-  if (!parsed) {
-    // TEMP DIAGNOSTIC (remove after): a 200 that didn't parse — log the block types
-    // and the raw text head so we can see what the model actually returned.
-    console.warn(
-      "[nightly] parse-miss blocks=" +
-        JSON.stringify((data?.content ?? []).map((b) => b?.type)) +
-        " text=" +
-        JSON.stringify((textBlock?.text ?? "").slice(0, 220)),
-    );
-  }
+  // Observability: a 200 that doesn't parse is a SILENT zero-match otherwise.
+  if (!parsed) console.warn("[nightly] unparseable score response — skipping job");
   return parsed ? { kind: "ok", ...parsed } : { kind: "skip" };
 }
 
