@@ -176,6 +176,23 @@
 .roles-theme .scope { position: absolute; left: 16px; top: 29px; z-index: 12; pointer-events: none; display: inline-flex; align-items: center; gap: 11px; padding: 9px 14px; border-radius: 14px; background: var(--glass-2); -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%); border: 1px solid var(--rim); box-shadow: var(--sh); font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .roles-theme .scope b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 3px; }
 .roles-theme .scope-sep { width: 1px; height: 15px; background: var(--hair); }
+/* Creator credit — a member of the attribution family (Rober 7-07): same treatment as
+   .attrib, anchored bottom-left, so it reads as authorship chrome rather than a data pill
+   competing with the scope numbers. Pill ignores pointer events (map stays draggable); only
+   the icon links are live. */
+.roles-theme .madeby { position: absolute; left: 16px; bottom: 16px; z-index: 12; pointer-events: none; display: flex; align-items: center; gap: 8px; padding: 6px 13px; border-radius: 12px; background: rgba(22, 38, 46, 0.6); border: 1px solid var(--rim); box-shadow: var(--sh); font-size: 10.5px; font-weight: 500; color: var(--subtle); white-space: nowrap; }
+.roles-theme .madeby::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent 44%); mix-blend-mode: screen; }
+.roles-theme .madeby > * { position: relative; z-index: 1; }
+.roles-theme .madeby .mb-h { color: var(--muted); font-weight: 600; }
+.roles-theme .madeby .mb-sep { width: 1px; height: 12px; background: var(--hair); opacity: 0.6; }
+.roles-theme .madeby .mb-ico { pointer-events: auto; display: grid; place-items: center; width: 18px; height: 18px; color: #9fb4b9; transition: color 0.18s; }
+.roles-theme .madeby .mb-ico svg { display: block; }
+.roles-theme .madeby .mb-ico:hover { color: #fff; }
+.roles-theme.light .madeby { color: var(--muted); background: var(--glass-2); }
+.roles-theme.light .madeby::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), transparent 46%); mix-blend-mode: normal; }
+.roles-theme.light .madeby .mb-ico { color: #3a6470; }
+.roles-theme.light .madeby .mb-ico:hover { color: #0b1f26; }
+@media (max-width: 920px) { .roles-theme .madeby .mb-by, .roles-theme .madeby .mb-sep { display: none; } }
 
 /* In-panel search (inside a city/company list) — Rober 7-06. */
 .roles-theme .psearch { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 0 11px; height: 38px; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); flex: none; }
@@ -611,6 +628,7 @@
   /* Surfaces with a hardcoded (non-token) rgba fill get an explicit opaque
    * replacement instead. */
   .roles-theme .attrib { background: var(--surface-2); }
+  .roles-theme .madeby { background: var(--surface-2); }
   .roles-theme .panel { background: var(--surface); }
   .roles-theme.light .panel { background: var(--surface); }
   .roles-theme .cmd { background: var(--surface-3); }
