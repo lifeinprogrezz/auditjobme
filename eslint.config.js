@@ -23,4 +23,12 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    // The Vercel serverless worker runs in Node, not the browser — give it Node
+    // globals (process, etc.) so no-undef doesn't fire on server-only code.
+    files: ["api/**/*.ts"],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 );
