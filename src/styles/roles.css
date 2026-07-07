@@ -669,3 +669,87 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+/* ── CV-unlock modal (Phase A) ──────────────────────────────────────────────
+ * The /roles front door. Token-driven so it adapts to both the light (shipped)
+ * and ink identities; glass shell via .glass/.liquid + --glass-2/--rim/--sh. */
+.roles-theme .cvmask {
+  position: fixed; inset: 0; z-index: 200; display: grid; place-items: center;
+  padding: 22px; background: rgba(4, 10, 14, 0.5);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  animation: cvfade 0.22s ease;
+}
+@keyframes cvfade { from { opacity: 0; } to { opacity: 1; } }
+.roles-theme .cvmodal {
+  position: relative; width: min(560px, 100%); max-height: calc(100vh - 44px);
+  overflow-y: auto; border-radius: 24px; padding: 30px 30px 26px;
+  border: 1px solid var(--rim); box-shadow: var(--sh-hero);
+  -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%);
+  animation: cvrise 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+@keyframes cvrise { from { transform: translateY(14px) scale(0.985); opacity: 0; } to { transform: none; opacity: 1; } }
+.roles-theme .cvclose {
+  position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; display: grid;
+  place-items: center; border-radius: 9px; border: 1px solid var(--hair);
+  background: var(--act-tint); color: var(--muted); cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.roles-theme .cvclose:hover { color: var(--text); background: rgba(255, 255, 255, 0.14); }
+.roles-theme .cvclose:disabled { opacity: 0.4; cursor: default; }
+.roles-theme .cvh {
+  font-family: var(--font-d); font-weight: 600; font-size: 23px; letter-spacing: -0.02em;
+  color: var(--text); margin: 0 0 8px;
+}
+.roles-theme .cvsub { font-size: 13.5px; line-height: 1.6; color: var(--muted); margin: 0 0 20px; }
+.roles-theme .cvdrop {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+  padding: 34px 20px; border-radius: 18px; cursor: pointer;
+  border: 1.5px dashed var(--act-border); background: var(--act-tint);
+  color: var(--text); transition: border-color 0.2s, background 0.2s;
+}
+.roles-theme .cvdrop.over { border-color: var(--great); background: rgba(31, 216, 184, 0.1); }
+.roles-theme .cvdrop.busy { cursor: wait; }
+.roles-theme .cvdrop-i { color: var(--muted); margin-bottom: 4px; }
+.roles-theme .cvdrop-t { font-size: 14px; font-weight: 600; color: var(--text); }
+.roles-theme .cvdrop-s { font-size: 11.5px; color: var(--subtle); }
+.roles-theme .cvread {
+  display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600;
+  color: var(--text); padding: 11px 14px; border-radius: 12px; margin-bottom: 18px;
+  background: rgba(31, 216, 184, 0.1); border: 1px solid rgba(31, 216, 184, 0.28);
+}
+.roles-theme .cvread svg { color: var(--great-deep); flex: none; }
+.roles-theme .cvread-n { font-family: var(--font-m); font-size: 11px; color: var(--muted); font-weight: 600; }
+.roles-theme .cvread-x {
+  margin-left: auto; border: none; background: none; color: var(--muted); font: inherit;
+  font-size: 12px; font-weight: 600; cursor: pointer; padding: 2px 4px; border-radius: 6px;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.roles-theme .cvread-x:hover { color: var(--text); }
+.roles-theme .cvsec { margin-bottom: 18px; }
+.roles-theme .cvlbl {
+  display: flex; align-items: baseline; gap: 8px; font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px;
+}
+.roles-theme .cvcap { font-weight: 500; letter-spacing: 0; text-transform: none; font-size: 11px; color: var(--subtle); }
+.roles-theme .cvchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.roles-theme .cvchip {
+  padding: 7px 13px; border-radius: 999px; font: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--muted); background: rgba(255, 255, 255, 0.05); border: 1px solid var(--hair);
+  cursor: pointer; transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.roles-theme.light .cvchip { background: rgba(11, 31, 38, 0.045); }
+.roles-theme .cvchip:hover { color: var(--text); border-color: var(--rim); }
+.roles-theme .cvchip.on {
+  color: var(--act-strong-ink); background: var(--act-strong); border-color: var(--act-strong);
+}
+.roles-theme .cverr { color: var(--low); font-size: 12.5px; line-height: 1.5; margin: 4px 0 14px; }
+.roles-theme .cvcta {
+  width: 100%; padding: 13px; border-radius: 13px; font-family: var(--font-d); font-size: 14px;
+  font-weight: 600; letter-spacing: -0.01em; cursor: pointer; margin-top: 4px;
+  color: var(--act-strong-ink); background: var(--act-strong); border: 1px solid var(--act-strong);
+  box-shadow: var(--sh); transition: opacity 0.2s, transform 0.12s;
+}
+.roles-theme .cvcta:hover { opacity: 0.92; }
+.roles-theme .cvcta:active { transform: translateY(1px); }
+.roles-theme .cvcta:disabled { opacity: 0.55; cursor: wait; }
+.roles-theme .cvfoot { text-align: center; font-size: 11.5px; color: var(--subtle); margin: 10px 0 0; }
