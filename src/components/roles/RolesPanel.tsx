@@ -213,23 +213,27 @@ export default function RolesPanel({
       <h1 className="ptitle">{defaultView ? "Hot right now" : "Your matches"}</h1>
       {activeChips.length > 0 && (
         <div className="selhdr">
-          {activeChips.map((c) => (
-            <button
-              key={c.key}
-              className="selchip"
-              onClick={c.onX}
-              aria-label={`Remove ${c.label} filter`}
-            >
-              {c.bold ? <b>{c.label}</b> : c.label}
-              <span className="x">×</span>
-            </button>
-          ))}
-          <span className="selcount">{shown.length} roles</span>
-          {activeChips.length > 1 && (
-            <button className="selclear" onClick={clearAllFilters}>
-              Clear all
-            </button>
-          )}
+          <div className="selchips">
+            {activeChips.map((c) => (
+              <button
+                key={c.key}
+                className="selchip"
+                onClick={c.onX}
+                aria-label={`Remove ${c.label} filter`}
+              >
+                {c.bold ? <b>{c.label}</b> : c.label}
+                <span className="x">×</span>
+              </button>
+            ))}
+          </div>
+          <div className="selmeta">
+            <span className="selcount">{shown.length} roles</span>
+            {activeChips.length > 1 && (
+              <button className="selclear" onClick={clearAllFilters}>
+                Clear all
+              </button>
+            )}
+          </div>
         </div>
       )}
       {listContext && jobs.length > 0 && (
