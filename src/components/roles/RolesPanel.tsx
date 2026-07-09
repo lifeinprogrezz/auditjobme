@@ -14,7 +14,6 @@ import {
   hueFor,
   postedAgo,
   scoreBucket,
-  showsUkSponsorBadge,
   websiteUrl,
   type RoleJob,
   type RolesFilters,
@@ -384,10 +383,8 @@ export default function RolesPanel({
     if (job.remote) roleFacts.push(["Remote", "Yes"]);
     if (ago) roleFacts.push(["Posted", ago]);
     if (comp) roleFacts.push(["Comp", comp]);
+    // Role-level, from the JD: does THIS posting offer to sponsor a visa (slice 2).
     if (ex?.visa_sponsorship === "offered") roleFacts.push(["Visa", "Sponsors"]);
-    // Ground truth from the UK Home Office register (slice 4): shown on a UK role when
-    // the company holds a Skilled-Worker licence — the fact an EU seeker needs post-Brexit.
-    if (showsUkSponsorBadge(job)) roleFacts.push(["UK visa", "Licensed sponsor"]);
     const others = allJobs.filter((j) => j.company === job.company && j.url !== job.url);
     // Hero: a CV holder sees their fit (or a pending state); everyone else sees the
     // unlock prompt — the pre-CV conversion moment (absorbs issue #18).
@@ -432,7 +429,7 @@ export default function RolesPanel({
           )}
         </div>
         {job.description && <p className="ddesc">{job.description}</p>}
-        {(stage || size || job.foundedYear) && (
+        {(stage || size || job.foundedYear || job.ukSponsorStatus === "licensed") && (
           <div className="dcmeta">
             {stage && (
               <span className="dcm">
@@ -460,6 +457,17 @@ export default function RolesPanel({
                   <path d="M3 10h18M8 3v4M16 3v4" />
                 </svg>
                 {job.foundedYear}
+              </span>
+            )}
+            {/* Company-level (Home Office register): this company holds a UK Skilled-Worker
+                sponsor licence. Distinct from the role-level "Visa: Sponsors" JD fact above. */}
+            {job.ukSponsorStatus === "licensed" && (
+              <span className="dcm">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+                  <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+                  <path d="m9 12 2 2 4-4" />
+                </svg>
+                Licensed UK sponsor
               </span>
             )}
           </div>

@@ -57,7 +57,8 @@ export type RoleJob = {
   foundedYear?: number | null;
   /** companies.uk_sponsor_status from the Home Office register match (Phase B slice 4):
    *  'licensed' = holds a Skilled-Worker sponsor licence · 'unmatched' = absent from the
-   *  register · null = unchecked/uncertain. Surfaced as a badge only on a UK role. */
+   *  register · null = unchecked/uncertain. A COMPANY attribute — shown in the company-info
+   *  row (with stage/size/founded), distinct from the role-level JD visa-sponsorship fact. */
   ukSponsorStatus?: string | null;
   /** JD-extracted structured facts (jobs.extraction); null when not extracted yet. */
   extraction?: RoleExtraction | null;
@@ -125,10 +126,10 @@ export type RolesFilters = {
   cities: string[];
   sectors: string[];
   sizes: string[]; // canonical size bands (sizeBand); ~84% company coverage
-  // Non-English languages the user reads. POSITIVE facet (Rober 7-09): selecting
-  // German surfaces English-only roles PLUS German-required ones; a role with no
-  // language wall is never excluded. Optional so filter fixtures that omit it
-  // still typecheck.
+  // Non-English languages a role requires. DISCOVERY facet (Rober 7-09): selecting
+  // German narrows the view to ONLY roles that wall on German (map + panel); an
+  // English-only role is hidden while a language is selected. Optional so filter
+  // fixtures that omit it still typecheck.
   languages?: string[];
   remoteOnly: boolean;
 };
@@ -160,22 +161,6 @@ export function requiredLanguages(job: RoleJob): string[] {
   );
 }
 
-// UK-location signal (mirrors scripts/sponsor-lib.mjs UK_RE for the client side).
-const UK_RE =
-  /\b(london|manchester|birmingham|bristol|leeds|edinburgh|glasgow|cambridge|oxford|u\.?k\.?|united kingdom|england|scotland|wales|northern ireland)\b/i;
-
-/** Is this role UK-based? (its city/location or title names a UK place.) Gates the
- *  "Licensed UK visa sponsor" badge — a licensed company's non-UK role doesn't show it. */
-export function isUkRole(job: RoleJob): boolean {
-  return UK_RE.test(job.city ?? "") || UK_RE.test(job.location ?? "") || UK_RE.test(job.title ?? "");
-}
-
-/** Show the UK-sponsor badge for this role? Only when it's a UK role AND its company
- *  is a confirmed register match. Everything else (unmatched, unchecked) shows nothing. */
-export function showsUkSponsorBadge(job: RoleJob): boolean {
-  return job.ukSponsorStatus === "licensed" && isUkRole(job);
-}
-
 export function filterJobs(jobs: RoleJob[], f: RolesFilters): RoleJob[] {
   const q = f.query.trim().toLowerCase();
   return jobs.filter((j) => {
@@ -187,12 +172,14 @@ export function filterJobs(jobs: RoleJob[], f: RolesFilters): RoleJob[] {
       const band = sizeBand(j.headcount);
       if (!band || !f.sizes.includes(band)) return false;
     }
-    // Positive Language facet: a role passes if it needs no extra language (English
-    // implicit → never hidden) OR the user reads EVERY language it requires.
+    // Language facet = a DISCOVERY filter (Rober 7-09): selecting German narrows the
+    // map + panel to ONLY the roles that wall on German. An English-only role has no
+    // wall, so it's hidden while any language is selected; multi-select is a union
+    // (German OR French → roles requiring either).
     if (f.languages && f.languages.length) {
       const sel = f.languages;
       const req = requiredLanguages(j);
-      if (req.length && !req.every((l) => sel.includes(l))) return false;
+      if (!req.some((l) => sel.includes(l))) return false;
     }
     if (!q) return true;
     return [j.company, j.title].join(" ").toLowerCase().includes(q);

@@ -84,28 +84,26 @@ describe("requiredLanguages", () => {
   });
 });
 
-describe("filterJobs — positive Language facet", () => {
+describe("filterJobs — Language discovery facet", () => {
   const jobs = [
     mk({ id: "en", extraction: null }), // English-only, no wall
     mk({ id: "de", extraction: { languages_required: ["German"] } }),
     mk({ id: "deen", extraction: { languages_required: ["German", "English"] } }), // English implicit
-    mk({ id: "denl", extraction: { languages_required: ["German", "Dutch"] } }), // needs both
+    mk({ id: "denl", extraction: { languages_required: ["German", "Dutch"] } }),
     mk({ id: "fr", extraction: { languages_required: ["French"] } }),
   ];
 
   it("no language selected → everything shows (fail-open)", () => {
     expect(filterJobs(jobs, EMPTY_FILTERS)).toHaveLength(5);
   });
-  it("selecting German never hides the wall-free role, includes German (English implicit), excludes the rest", () => {
+  it("selecting German narrows to ONLY roles that wall on German (English-only hidden)", () => {
     const got = filterJobs(jobs, { ...EMPTY_FILTERS, languages: ["German"] }).map((j) => j.id);
-    expect(got).toContain("en"); // no wall → always shown
-    expect(got).toContain("de"); // German required + selected
-    expect(got).toContain("deen"); // English is implicit → German-only in effect
-    expect(got).not.toContain("fr"); // French required, not selected
-    expect(got).not.toContain("denl"); // also needs Dutch → hidden
+    expect(got).toEqual(["de", "deen", "denl"]); // every German-walled role, and only those
+    expect(got).not.toContain("en"); // no wall → hidden while a language is selected
+    expect(got).not.toContain("fr"); // French wall, German not among its languages
   });
-  it("a multi-language role needs ALL its non-English languages selected", () => {
-    const got = filterJobs(jobs, { ...EMPTY_FILTERS, languages: ["German", "Dutch"] }).map((j) => j.id);
-    expect(got).toEqual(["en", "de", "deen", "denl"]); // fr still excluded
+  it("multi-select is a union (German OR French)", () => {
+    const got = filterJobs(jobs, { ...EMPTY_FILTERS, languages: ["German", "French"] }).map((j) => j.id);
+    expect(got).toEqual(["de", "deen", "denl", "fr"]); // any role walling on German or French
   });
 });
