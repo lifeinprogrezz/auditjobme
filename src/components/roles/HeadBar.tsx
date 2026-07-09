@@ -27,8 +27,8 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
   const [chipsShown, setChipsShown] = useState(false);
-  // Two-step overflow (mockup 330): .show slides chips in with overflow hidden,
-  // .expanded (after the 600ms slide) frees overflow so dropdowns can escape.
+  // Smooth width reveal via grid-template-columns 0fr→1fr (.show); .expanded (after
+  // the 550ms slide) frees the inner overflow so dropdowns can escape.
   const [chipsExpanded, setChipsExpanded] = useState(false);
   const [openChip, setOpenChip] = useState<"level" | "city" | "sector" | "size" | "language" | null>(null);
   const expandTimer = useRef<number | null>(null);
@@ -75,7 +75,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
       expandTimer.current = window.setTimeout(() => {
         setChipsExpanded(true);
         expandTimer.current = null;
-      }, 600);
+      }, 550);
     }
   };
 
@@ -131,7 +131,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
           value={filters.query}
           onChange={(e) => onFilters({ ...filters, query: e.target.value })}
         />
-        {filters.query ? (
+        {filters.query && (
           <button
             type="button"
             className="cmd-clear"
@@ -145,8 +145,6 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
-        ) : (
-          <kbd>⌘K</kbd>
         )}
       </div>
 
@@ -163,6 +161,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
       </button>
 
       <div className={`fchips${chipsShown ? " show" : ""}${chipsExpanded ? " expanded" : ""}`}>
+        <div className="fchips-inner">
         <FilterChip
           label="Level"
           options={levelOptions}
@@ -233,10 +232,20 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
         </div>
 
         {anyActive && (
-          <button type="button" className="fclear" onClick={onClearAll}>
-            Clear all
+          <button
+            type="button"
+            className="fclear"
+            onClick={onClearAll}
+            aria-label="Clear all filters"
+            title="Clear all filters"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
           </button>
         )}
+        </div>
       </div>
 
       <span className="spacer" />
