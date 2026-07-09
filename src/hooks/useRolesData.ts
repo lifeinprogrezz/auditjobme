@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
 import { scoreJob, RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
-import { applyLandedScores, byScore, type RoleJob } from "@/lib/roles";
+import { applyLandedScores, byScore, type RoleJob, type RoleExtraction } from "@/lib/roles";
 import { pickScoringSlice, hashCv, readCvStash, clearCvStash } from "@/lib/labels";
 import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
@@ -19,6 +19,7 @@ type JobsRow = {
   seniority: string | null;
   posted_at: string | null;
   company_id: string | null;
+  extraction: RoleExtraction | null;
 };
 
 const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page past it.
@@ -337,7 +338,7 @@ export function useRolesData() {
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await supabase
           .from("jobs")
-          .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id")
+          .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id, extraction")
           .eq("is_live", true)
           .range(from, from + PAGE - 1);
         if (error || !data) break;

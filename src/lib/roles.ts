@@ -1,6 +1,25 @@
 // Shared contracts for the /roles globe page (issue #14).
 // Design authority: .claude/skills/glass-design/SKILL.md + the v43 mockup.
 
+/** Role-level structured facts extracted from the JD (jobs.extraction JSONB,
+ *  written by scripts/extract-jd.mjs). Every field nullable; null = unknown →
+ *  the role stays eligible/shown (fail-open). */
+export type RoleExtraction = {
+  yoe_min?: number | null;
+  languages_required?: string[] | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  salary_currency?: string | null;
+  salary_period?: string | null;
+  visa_sponsorship?: "offered" | "not_offered" | null;
+  geo_eligibility?: string | null;
+  is_product_role?: boolean | null;
+  remote_policy?: "onsite" | "hybrid" | "remote" | null;
+  onsite_days_per_week?: number | null;
+  customer_type?: string | null;
+  company_stage?: string | null;
+};
+
 export type RoleJob = {
   id: string;
   company: string;
@@ -36,6 +55,8 @@ export type RoleJob = {
   linkedin?: string | null;
   description?: string | null;
   foundedYear?: number | null;
+  /** JD-extracted structured facts (jobs.extraction); null when not extracted yet. */
+  extraction?: RoleExtraction | null;
 };
 
 export type ScoreBucket = "great" | "mid" | "low";
@@ -100,6 +121,11 @@ export type RolesFilters = {
   cities: string[];
   sectors: string[];
   sizes: string[]; // canonical size bands (sizeBand); ~84% company coverage
+  // Non-English languages the user reads. POSITIVE facet (Rober 7-09): selecting
+  // German surfaces English-only roles PLUS German-required ones; a role with no
+  // language wall is never excluded. Optional so filter fixtures that omit it
+  // still typecheck.
+  languages?: string[];
   remoteOnly: boolean;
 };
 
@@ -109,6 +135,7 @@ export const EMPTY_FILTERS: RolesFilters = {
   cities: [],
   sectors: [],
   sizes: [],
+  languages: [],
   remoteOnly: false,
 };
 
@@ -118,6 +145,17 @@ export const EMPTY_FILTERS: RolesFilters = {
  *  city is among the selected cities AND its sector is among the selected sectors AND
  *  its size band is selected (each ignored when its selection is empty). A role
  *  missing the field can't match a chosen value. */
+/** Non-English languages a role EXPLICITLY requires (English is implicit, so it's
+ *  filtered out). Drives the positive Language facet + the detail badge. Empty when
+ *  the role has no extra-language wall → it always passes the filter. */
+export function requiredLanguages(job: RoleJob): string[] {
+  const langs = job.extraction?.languages_required;
+  if (!Array.isArray(langs)) return [];
+  return langs.filter(
+    (l): l is string => typeof l === "string" && l.trim() !== "" && l.trim().toLowerCase() !== "english",
+  );
+}
+
 export function filterJobs(jobs: RoleJob[], f: RolesFilters): RoleJob[] {
   const q = f.query.trim().toLowerCase();
   return jobs.filter((j) => {
@@ -128,6 +166,13 @@ export function filterJobs(jobs: RoleJob[], f: RolesFilters): RoleJob[] {
     if (f.sizes.length) {
       const band = sizeBand(j.headcount);
       if (!band || !f.sizes.includes(band)) return false;
+    }
+    // Positive Language facet: a role passes if it needs no extra language (English
+    // implicit → never hidden) OR the user reads EVERY language it requires.
+    if (f.languages && f.languages.length) {
+      const sel = f.languages;
+      const req = requiredLanguages(j);
+      if (req.length && !req.every((l) => sel.includes(l))) return false;
     }
     if (!q) return true;
     return [j.company, j.title].join(" ").toLowerCase().includes(q);

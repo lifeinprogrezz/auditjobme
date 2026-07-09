@@ -345,6 +345,11 @@ export type Database = {
           first_seen_at: string
           id: string
           is_live: boolean
+          extracted_at: string | null
+          extraction: Json | null
+          extraction_version: string | null
+          jd_hash: string | null
+          jd_source_detail: string | null
           jd_text: string | null
           location: string | null
           posted_at: string | null

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sizeBand, sizeBandOrder, filterJobs, EMPTY_FILTERS, type RoleJob } from "@/lib/roles";
+import { sizeBand, sizeBandOrder, filterJobs, requiredLanguages, EMPTY_FILTERS, type RoleJob } from "@/lib/roles";
 
 const base: RoleJob = {
   id: "1",
@@ -72,5 +72,40 @@ describe("filterJobs", () => {
   it("free-text query matches company + title only, NOT city", () => {
     expect(filterJobs(jobs, { ...EMPTY_FILTERS, query: "beta" }).map((j) => j.id)).toEqual(["b"]);
     expect(filterJobs(jobs, { ...EMPTY_FILTERS, query: "berlin" })).toHaveLength(0);
+  });
+});
+
+describe("requiredLanguages", () => {
+  it("drops English (implicit) + blanks, keeps real non-English requirements", () => {
+    expect(requiredLanguages(mk({ extraction: { languages_required: ["German", "English", " "] } }))).toEqual(["German"]);
+    expect(requiredLanguages(mk({ extraction: { languages_required: ["English"] } }))).toEqual([]);
+    expect(requiredLanguages(mk({ extraction: null }))).toEqual([]);
+    expect(requiredLanguages(mk({}))).toEqual([]);
+  });
+});
+
+describe("filterJobs — positive Language facet", () => {
+  const jobs = [
+    mk({ id: "en", extraction: null }), // English-only, no wall
+    mk({ id: "de", extraction: { languages_required: ["German"] } }),
+    mk({ id: "deen", extraction: { languages_required: ["German", "English"] } }), // English implicit
+    mk({ id: "denl", extraction: { languages_required: ["German", "Dutch"] } }), // needs both
+    mk({ id: "fr", extraction: { languages_required: ["French"] } }),
+  ];
+
+  it("no language selected → everything shows (fail-open)", () => {
+    expect(filterJobs(jobs, EMPTY_FILTERS)).toHaveLength(5);
+  });
+  it("selecting German never hides the wall-free role, includes German (English implicit), excludes the rest", () => {
+    const got = filterJobs(jobs, { ...EMPTY_FILTERS, languages: ["German"] }).map((j) => j.id);
+    expect(got).toContain("en"); // no wall → always shown
+    expect(got).toContain("de"); // German required + selected
+    expect(got).toContain("deen"); // English is implicit → German-only in effect
+    expect(got).not.toContain("fr"); // French required, not selected
+    expect(got).not.toContain("denl"); // also needs Dutch → hidden
+  });
+  it("a multi-language role needs ALL its non-English languages selected", () => {
+    const got = filterJobs(jobs, { ...EMPTY_FILTERS, languages: ["German", "Dutch"] }).map((j) => j.id);
+    expect(got).toEqual(["en", "de", "deen", "denl"]); // fr still excluded
   });
 });

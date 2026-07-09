@@ -128,6 +128,19 @@ export default function RolesMap() {
       .sort((a, b) => sizeBandOrder(a[0]) - sizeBandOrder(b[0]))
       .map(([value, count]) => ({ value, label: value, count }));
   }, [jobs]);
+  // Non-English languages a role explicitly requires (English is implicit). Powers
+  // the positive Language facet — only appears once ≥1 role carries a language wall.
+  const languageOptions = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const j of jobs)
+      for (const l of j.extraction?.languages_required ?? []) {
+        const s = typeof l === "string" ? l.trim() : "";
+        if (s && s.toLowerCase() !== "english") m.set(s, (m.get(s) ?? 0) + 1);
+      }
+    return [...m.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([value, count]) => ({ value, label: value, count }));
+  }, [jobs]);
 
   // Default landing (nothing searched / filtered / selected) shows a curated
   // "hot companies" showcase — one Product role from each (Rober 7-06). The reset
@@ -140,6 +153,7 @@ export default function RolesMap() {
     filters.cities.length === 0 &&
     filters.sectors.length === 0 &&
     filters.sizes.length === 0 &&
+    !filters.languages?.length &&
     !filters.remoteOnly;
 
   // Remember the first narrowing so a later full clear shows the honest full list
@@ -336,6 +350,7 @@ export default function RolesMap() {
           cityOptions={cityOptions}
           sectorOptions={sectorOptions}
           sizeOptions={sizeOptions}
+          languageOptions={languageOptions}
           view={view}
           onView={setView}
           onAddCv={() => setCvModalOpen(true)}

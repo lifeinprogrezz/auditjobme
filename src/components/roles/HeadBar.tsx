@@ -11,6 +11,7 @@ export type HeadBarProps = {
   cityOptions: FilterOption[];
   sectorOptions: FilterOption[];
   sizeOptions: FilterOption[];
+  languageOptions: FilterOption[];
   view: "map" | "list";
   onView: (v: "map" | "list") => void;
   /** Opens the CV-unlock modal (Phase A front door). */
@@ -19,14 +20,14 @@ export type HeadBarProps = {
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, cityOptions, sectorOptions, sizeOptions, view, onView, onAddCv }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, cityOptions, sectorOptions, sizeOptions, languageOptions, view, onView, onAddCv }: HeadBarProps) {
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
   const [chipsShown, setChipsShown] = useState(false);
   // Two-step overflow (mockup 330): .show slides chips in with overflow hidden,
   // .expanded (after the 340ms slide) frees overflow so dropdowns can escape.
   const [chipsExpanded, setChipsExpanded] = useState(false);
-  const [openChip, setOpenChip] = useState<"level" | "city" | "sector" | "size" | null>(null);
+  const [openChip, setOpenChip] = useState<"level" | "city" | "sector" | "size" | "language" | null>(null);
   const expandTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -83,12 +84,12 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
   };
 
   // City / Sector / Size are string multi-selects — one generic toggler.
-  const toggleIn = (key: "cities" | "sectors" | "sizes", v: string) => {
-    const cur = filters[key];
+  const toggleIn = (key: "cities" | "sectors" | "sizes" | "languages", v: string) => {
+    const cur = filters[key] ?? [];
     const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
     onFilters({ ...filters, [key]: next });
   };
-  const chipOpen = (key: "city" | "sector" | "size") => () =>
+  const chipOpen = (key: "city" | "sector" | "size" | "language") => () =>
     setOpenChip(openChip === key ? null : key);
 
   const levelOpen = openChip === "level";
@@ -212,6 +213,18 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
           onOpenToggle={chipOpen("size")}
           onClearAll={() => onFilters({ ...filters, sizes: [] })}
         />
+        {languageOptions.length > 0 && (
+          <FilterChip
+            label="Language"
+            searchable
+            options={languageOptions}
+            selected={filters.languages ?? []}
+            onToggle={(v) => toggleIn("languages", v)}
+            open={openChip === "language"}
+            onOpenToggle={chipOpen("language")}
+            onClearAll={() => onFilters({ ...filters, languages: [] })}
+          />
+        )}
 
         <div
           className={`fchip${filters.remoteOnly ? " active" : ""}`}
