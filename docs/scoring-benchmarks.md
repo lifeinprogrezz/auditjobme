@@ -55,11 +55,18 @@ test scores. Kept for context; use the v3 row above for planning.
 |---|---|---|---|
 | 602 (p50 373) | 77 (p50 64) | ~$0.00099 | $1.24 (1,259 scores) |
 
-### Latency
+### Latency — MEASURED (`usage_events.latency_ms`, 25 scores, 2026-07-09)
 
-Now captured in `usage_events.latency_ms` (rows before 2026-07-09 are NULL). Query it after the
-next scoring pass runs for the real per-score inference time. Prior working estimate: ~1.5–3 s/score
-(serial, Haiku); ~1.5–2 min per 40-role load; ~30 min for a full 764-role catalog across ~19 loads.
+Real proxy→Anthropic inference round-trip (excludes the client↔edge hop, which varies by network):
+
+| avg | p50 | p90 | min | max |
+|---|---|---|---|---|
+| **3,061 ms** | 2,950 | 3,482 | 2,411 | 4,493 |
+
+So **~3 s/score**. Scoring is serial, so wall-clock ≈ N × ~3 s + per-batch JD fetch + upserts:
+**~2 min per 40-role load**, **~38 min of inference for a full 764-role catalog** (before client
+round-trips). This is the strongest argument for the server-side pass (issue #33) — 30–40 min of
+foreground page time per user is the thing to remove. Rows before 2026-07-09 are NULL.
 
 > Scoring **stops when the user leaves `/roles`** (the effect cleanup cancels the loop) — it does
 > NOT continue server-side for that account. Computed scores are persisted, so returning resumes
@@ -87,6 +94,7 @@ Append one row per measurement pass. Keep it terse; detail goes in the prose abo
 |---|---|---|---|---|---|---|---|
 | 2026-07-09 | `usage_events` (v3-era, 108 scores) | haiku-4-5 | 1,195 avg | 203 avg | ~$0.0022 | ~$1.69 (764) | REAL. Current grounded prompt; CV cap 2k / JD cap 3k; serial client-side, 40/load |
 | 2026-07-09 | `usage_events` (all-time, 1,259 scores) | haiku-4-5 | 602 avg | 77 avg | ~$0.00099 | — | REAL but mixes v1/v2 (shorter prompts) + empty-JD test scores |
+| 2026-07-09 | `usage_events.latency_ms` (25 scores) | haiku-4-5 | 1,243 avg | 194 avg | ~$0.0022 | — | REAL latency now live: **~3,061 ms/score avg** (p50 2,950 · p90 3,482 · 2,411–4,493). Proxy→Anthropic round-trip |
 
 > Re-measure (v3-era slice): `select round(avg(input_tokens)) in_avg, round(avg(output_tokens)) out_avg,`
 > `round(avg(cost_usd)::numeric,5) cost_avg, round(avg(latency_ms)) ms_avg, count(*) n`
