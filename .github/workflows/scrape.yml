@@ -36,6 +36,20 @@ jobs:
           # Optional: residential/rotating proxy for the datacenter-IP-blocked sources
           # (startupmap, Meta). Unset = those two fetch direct (and get blocked from CI).
           SCRAPE_PROXY_URL: ${{ secrets.SCRAPE_PROXY_URL }}
+      - name: Backfill missing JD bodies via ATS detail APIs (LLM-free)
+        continue-on-error: true # additive; a hiccup must never fail the core scrape
+        run: node scripts/jd-backfill.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Extract structured facts from jd_text (jobs.extraction)
+        continue-on-error: true # additive; fail-open, never blocks the chain
+        run: node scripts/extract-jd.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Optional: enables the Haiku judgment fields. Unset = heuristic-only (YoE + salary via regex).
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       - name: Enrich company context (description, founded_year, sector/stage gaps)
         run: node scripts/enrich-companies.mjs --limit=150
         env:
