@@ -55,6 +55,10 @@ export type RoleJob = {
   linkedin?: string | null;
   description?: string | null;
   foundedYear?: number | null;
+  /** companies.uk_sponsor_status from the Home Office register match (Phase B slice 4):
+   *  'licensed' = holds a Skilled-Worker sponsor licence · 'unmatched' = absent from the
+   *  register · null = unchecked/uncertain. Surfaced as a badge only on a UK role. */
+  ukSponsorStatus?: string | null;
   /** JD-extracted structured facts (jobs.extraction); null when not extracted yet. */
   extraction?: RoleExtraction | null;
 };
@@ -154,6 +158,22 @@ export function requiredLanguages(job: RoleJob): string[] {
   return langs.filter(
     (l): l is string => typeof l === "string" && l.trim() !== "" && l.trim().toLowerCase() !== "english",
   );
+}
+
+// UK-location signal (mirrors scripts/sponsor-lib.mjs UK_RE for the client side).
+const UK_RE =
+  /\b(london|manchester|birmingham|bristol|leeds|edinburgh|glasgow|cambridge|oxford|u\.?k\.?|united kingdom|england|scotland|wales|northern ireland)\b/i;
+
+/** Is this role UK-based? (its city/location or title names a UK place.) Gates the
+ *  "Licensed UK visa sponsor" badge — a licensed company's non-UK role doesn't show it. */
+export function isUkRole(job: RoleJob): boolean {
+  return UK_RE.test(job.city ?? "") || UK_RE.test(job.location ?? "") || UK_RE.test(job.title ?? "");
+}
+
+/** Show the UK-sponsor badge for this role? Only when it's a UK role AND its company
+ *  is a confirmed register match. Everything else (unmatched, unchecked) shows nothing. */
+export function showsUkSponsorBadge(job: RoleJob): boolean {
+  return job.ukSponsorStatus === "licensed" && isUkRole(job);
 }
 
 export function filterJobs(jobs: RoleJob[], f: RolesFilters): RoleJob[] {

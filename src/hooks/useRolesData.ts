@@ -34,6 +34,7 @@ type CompanyDim = {
   website: string | null; sector: string | null; stage: string | null;
   headcount_bucket: string | null; hq_city: string | null; hq_country: string | null;
   linkedin_url: string | null; description: string | null; founded_year: number | null;
+  uk_sponsor_status: string | null;
 };
 
 // ONE position per company-in-a-city (not per role): every role of a company in
@@ -142,6 +143,7 @@ function enrichAll(
       linkedin: dim?.linkedin_url ?? null,
       description: dim?.description ?? null,
       foundedYear: dim?.founded_year ?? null,
+      ukSponsorStatus: dim?.uk_sponsor_status ?? null,
     };
   });
 }
@@ -357,7 +359,7 @@ export function useRolesData() {
       const { data: cos } = await supabase
         .from("companies")
         .select(
-          "slug, logo_domain, lat, lng, website, sector, stage, headcount_bucket, hq_city, hq_country, linkedin_url, description, founded_year",
+          "slug, logo_domain, lat, lng, website, sector, stage, headcount_bucket, hq_city, hq_country, linkedin_url, description, founded_year, uk_sponsor_status",
         );
       (cos ?? []).forEach((c) =>
         dims.set(c.slug, {
@@ -365,6 +367,7 @@ export function useRolesData() {
           website: c.website, sector: c.sector, stage: c.stage,
           headcount_bucket: c.headcount_bucket, hq_city: c.hq_city, hq_country: c.hq_country,
           linkedin_url: c.linkedin_url, description: c.description, founded_year: c.founded_year,
+          uk_sponsor_status: c.uk_sponsor_status,
         }),
       );
       // Per-city offices: a company hiring in several cities gets each pin on the

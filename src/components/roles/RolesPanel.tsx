@@ -14,6 +14,7 @@ import {
   hueFor,
   postedAgo,
   scoreBucket,
+  showsUkSponsorBadge,
   websiteUrl,
   type RoleJob,
   type RolesFilters,
@@ -384,6 +385,9 @@ export default function RolesPanel({
     if (ago) roleFacts.push(["Posted", ago]);
     if (comp) roleFacts.push(["Comp", comp]);
     if (ex?.visa_sponsorship === "offered") roleFacts.push(["Visa", "Sponsors"]);
+    // Ground truth from the UK Home Office register (slice 4): shown on a UK role when
+    // the company holds a Skilled-Worker licence — the fact an EU seeker needs post-Brexit.
+    if (showsUkSponsorBadge(job)) roleFacts.push(["UK visa", "Licensed sponsor"]);
     const others = allJobs.filter((j) => j.company === job.company && j.url !== job.url);
     // Hero: a CV holder sees their fit (or a pending state); everyone else sees the
     // unlock prompt — the pre-CV conversion moment (absorbs issue #18).

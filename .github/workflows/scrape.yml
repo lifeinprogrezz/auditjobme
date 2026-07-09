@@ -57,3 +57,9 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # Optional: enables the Haiku JD-grounded pass. Unset = free og:description + Wikidata only.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: Match companies to the UK Skilled-Worker sponsor register (companies.uk_sponsor_status)
+        continue-on-error: true # additive; a gov.uk hiccup must never fail the core scrape
+        run: node scripts/enrich-uk-sponsors.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
