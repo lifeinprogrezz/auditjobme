@@ -1,9 +1,21 @@
 {
-  "_comment": "display/short company name (normCo output: lowercased, .,'& -> space) -> UK Home Office legal entity name. Resolves display<->legal gaps the normalizer can't bridge (single-token display names whose legal name has extra tokens). Ported from career-ops/data/uk_sponsor_aliases.json; grow as new UK roles surface.",
+  "_comment": "display/short company name (normCo output: lowercased, .,'& -> space) -> UK Home Office legal entity name. Resolves display<->legal gaps the normalizer can't bridge (single-token display names whose legal name has extra tokens). Every value is VERIFIED to normalize to a Skilled-Worker register entry (validate before adding — no guessing). Grow as new UK roles surface.",
   "fresha": "Fresha.com SV Ltd",
   "plaid": "Plaid Financial Ltd",
   "checkout com": "Checkout Ltd",
   "funding circle": "Funding Circle Ltd",
   "funding circle uk": "Funding Circle Ltd",
-  "bloomberg": "Bloomberg LP"
+  "bloomberg": "Bloomberg LP",
+  "cleo": "Cleo AI Ltd",
+  "chip": "Chip Financial Ltd",
+  "lendable": "Lendable Operations Ltd",
+  "klarna": "Klarna Bank AB Branch",
+  "intercom": "Intercom Software Ltd",
+  "improbable": "Improbable Worlds Ltd",
+  "fyxer": "Fyxer AI Ltd",
+  "bud": "Bud Financial Ltd",
+  "bumper": "Bumper International Ltd",
+  "canva": "Canva Operations Ltd",
+  "monzo": "Monzo Bank Ltd",
+  "harvey": "Harvey AI Ltd"
 }
