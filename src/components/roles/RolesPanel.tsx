@@ -358,12 +358,32 @@ export default function RolesPanel({
     // stay a labeled grid inside the role box.
     const stage = formatStage(job.stage);
     const size = formatHeadcount(job.headcount);
+    // JD-extracted role facts (Rober 7-09): YoE enriches the Level cell in-parens;
+    // comp + visa-sponsorship ride as their own data labels. Each shows ONLY when the
+    // extraction carries the value — a silent JD just omits the label (fail-open).
+    const ex = job.extraction ?? null;
+    const yoe = ex?.yoe_min;
+    const levelLabel = level
+      ? yoe != null
+        ? `${level} (${yoe}+ yrs)`
+        : level
+      : yoe != null
+        ? `${yoe}+ yrs`
+        : null;
+    let comp: string | null = null;
+    if (ex?.salary_min != null) {
+      const sym = ex.salary_currency === "GBP" ? "£" : ex.salary_currency === "USD" ? "$" : "€";
+      const k = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : `${n}`);
+      comp = `${sym}${k(ex.salary_min)}${ex.salary_max != null ? `–${k(ex.salary_max)}` : ""}`;
+    }
     const roleFacts: [string, string][] = [];
     const loc = job.city ?? job.location;
     if (loc) roleFacts.push(["Location", loc]);
-    if (level) roleFacts.push(["Level", level]);
+    if (levelLabel) roleFacts.push(["Level", levelLabel]);
     if (job.remote) roleFacts.push(["Remote", "Yes"]);
     if (ago) roleFacts.push(["Posted", ago]);
+    if (comp) roleFacts.push(["Comp", comp]);
+    if (ex?.visa_sponsorship === "offered") roleFacts.push(["Visa", "Sponsors"]);
     const others = allJobs.filter((j) => j.company === job.company && j.url !== job.url);
     // Hero: a CV holder sees their fit (or a pending state); everyone else sees the
     // unlock prompt — the pre-CV conversion moment (absorbs issue #18).
