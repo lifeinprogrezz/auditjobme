@@ -219,7 +219,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   // ── Candidate jobs (newest first) + company→sector for the label slice ────
   const { data: jobRows, error: jErr } = await admin
     .from("jobs")
-    .select("id, company, company_id, title, url, location, remote, seniority, jd_text, first_seen_at, posted_at")
+    .select("id, company, company_id, title, url, location, remote, seniority, jd_text, extraction, first_seen_at, posted_at")
     .eq("is_live", true)
     .order("first_seen_at", { ascending: false })
     .limit(JOB_FETCH_LIMIT);
@@ -239,6 +239,8 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     remote: r.remote,
     seniority: r.seniority,
     jd_text: r.jd_text,
+    yoe_min: (r.extraction as { yoe_min?: number | null } | null)?.yoe_min ?? null,
+    geo_eligibility: (r.extraction as { geo_eligibility?: string | null } | null)?.geo_eligibility ?? null,
     sector: r.company_id ? (sectorBySlug.get(r.company_id) ?? null) : null,
     first_seen_at: r.first_seen_at,
     posted_at: r.posted_at,
@@ -349,6 +351,8 @@ export default async function handler(req: Req, res: Res): Promise<void> {
               remote: Boolean(j.remote),
               seniority: j.seniority ?? null,
               jd_text: j.jd_text ?? null,
+              yoe_min: j.yoe_min ?? null,
+              geo_eligibility: j.geo_eligibility ?? null,
             }),
           ).then((r) => ({ j, r })),
         ),

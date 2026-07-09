@@ -203,7 +203,12 @@ export function useRolesData() {
       };
       for (const j of batch) {
         if (runRef.current !== runId) return;
-        const result = await scoreJob(prof, { ...j, jd_text: jdById[j.id] ?? null });
+        const result = await scoreJob(prof, {
+          ...j,
+          jd_text: jdById[j.id] ?? null,
+          yoe_min: j.extraction?.yoe_min ?? null,
+          geo_eligibility: j.extraction?.geo_eligibility ?? null,
+        });
         if (!result || runRef.current !== runId) continue;
         await supabase.from("scores").upsert(
           {

@@ -35,6 +35,8 @@ export type NightlyJob = {
   remote?: boolean;
   seniority?: string | null;
   jd_text?: string | null;
+  yoe_min?: number | null;
+  geo_eligibility?: string | null;
   sector?: string | null;
   first_seen_at?: string | null;
   posted_at?: string | null;
