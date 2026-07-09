@@ -170,6 +170,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
           open={openChip === "level"}
           onOpenToggle={chipOpen("level")}
           onClearAll={() => onFilters({ ...filters, levels: [] })}
+          disabled={levelOptions.every((o) => o.count === 0) && filters.levels.length === 0}
         />
         <FilterChip
           label="City"
@@ -180,6 +181,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
           open={openChip === "city"}
           onOpenToggle={chipOpen("city")}
           onClearAll={() => onFilters({ ...filters, cities: [] })}
+          disabled={cityOptions.length === 0 && filters.cities.length === 0}
         />
         <FilterChip
           label="Sector"
@@ -190,6 +192,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
           open={openChip === "sector"}
           onOpenToggle={chipOpen("sector")}
           onClearAll={() => onFilters({ ...filters, sectors: [] })}
+          disabled={sectorOptions.length === 0 && filters.sectors.length === 0}
         />
         <FilterChip
           label="Size"
@@ -199,6 +202,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
           open={openChip === "size"}
           onOpenToggle={chipOpen("size")}
           onClearAll={() => onFilters({ ...filters, sizes: [] })}
+          disabled={sizeOptions.length === 0 && filters.sizes.length === 0}
         />
         <FilterChip
           label="Language"
