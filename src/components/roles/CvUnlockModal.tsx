@@ -163,10 +163,7 @@ export default function CvUnlockModal({
         </button>
 
         <h2 className="cvh">See which roles fit you</h2>
-        <p className="cvsub">
-          Drop your CV and pick what you're after. We read it right here in your browser to match you
-          against every live role. We never rewrite it.
-        </p>
+        <p className="cvsub">Drop your CV and see your fit for every live role.</p>
 
         {stage !== "parsed" ? (
           <label

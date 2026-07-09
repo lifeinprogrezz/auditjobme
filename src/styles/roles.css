@@ -688,6 +688,12 @@
   animation: cvrise 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 @keyframes cvrise { from { transform: translateY(14px) scale(0.985); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Lift the modal's content above the .liquid sheen (same fix as `.panel > *`):
+ * the sheen is a bright top-left→transparent gradient, and without this it painted
+ * OVER the title's top-left, washing it out — the "too bright, hard to read" tell
+ * (Rober 7-09). The close button must stay absolutely positioned, so re-assert it. */
+.roles-theme .cvmodal > * { position: relative; z-index: 1; }
+.roles-theme .cvmodal > .cvclose { position: absolute; }
 .roles-theme .cvclose {
   position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; display: grid;
   place-items: center; border-radius: 9px; border: 1px solid var(--hair);
@@ -698,9 +704,9 @@
 .roles-theme .cvclose:disabled { opacity: 0.4; cursor: default; }
 .roles-theme .cvh {
   font-family: var(--font-d); font-weight: 600; font-size: 23px; letter-spacing: -0.02em;
-  color: var(--text); margin: 0 0 8px;
+  color: var(--text); margin: 0 0 8px; text-align: center;
 }
-.roles-theme .cvsub { font-size: 13.5px; line-height: 1.6; color: var(--muted); margin: 0 0 20px; }
+.roles-theme .cvsub { font-size: 13.5px; line-height: 1.6; color: var(--muted); margin: 0 0 20px; text-align: center; }
 .roles-theme .cvdrop {
   display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
   padding: 34px 20px; border-radius: 18px; cursor: pointer;
