@@ -13,6 +13,9 @@ type Props = {
   onClearAll: () => void;
   /** Show an in-dropdown search box (for long lists — City, Sector). */
   searchable?: boolean;
+  /** Greyed + non-opening when there's nothing to pick under the current filters
+   *  (keeps the chip in place instead of vanishing — steadier headbar). */
+  disabled?: boolean;
 };
 
 // Searchable multi-select filter chip (City / Sector / Size) — same glass voice as
@@ -28,6 +31,7 @@ export default function FilterChip({
   onOpenToggle,
   onClearAll,
   searchable,
+  disabled,
 }: Props) {
   const [q, setQ] = useState("");
   const needle = q.trim().toLowerCase();
@@ -40,17 +44,18 @@ export default function FilterChip({
 
   return (
     <div
-      className={`fchip${selected.length ? " active" : ""}${open ? " open" : ""}`}
+      className={`fchip${selected.length ? " active" : ""}${open ? " open" : ""}${disabled ? " disabled" : ""}`}
       role="button"
-      tabIndex={0}
+      tabIndex={disabled ? -1 : 0}
       aria-expanded={open}
+      aria-disabled={disabled}
       onClick={(e) => {
-        if (insideDrop(e)) return;
+        if (disabled || insideDrop(e)) return;
         onOpenToggle();
       }}
       onKeyDown={(e) => {
         if (e.key !== "Enter" && e.key !== " ") return;
-        if (insideDrop(e)) return;
+        if (disabled || insideDrop(e)) return;
         e.preventDefault();
         onOpenToggle();
       }}

@@ -200,18 +200,17 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
           onOpenToggle={chipOpen("size")}
           onClearAll={() => onFilters({ ...filters, sizes: [] })}
         />
-        {(languageOptions.length > 0 || (filters.languages?.length ?? 0) > 0) && (
-          <FilterChip
-            label="Language"
-            searchable
-            options={languageOptions}
-            selected={filters.languages ?? []}
-            onToggle={(v) => toggleIn("languages", v)}
-            open={openChip === "language"}
-            onOpenToggle={chipOpen("language")}
-            onClearAll={() => onFilters({ ...filters, languages: [] })}
-          />
-        )}
+        <FilterChip
+          label="Language"
+          searchable
+          options={languageOptions}
+          selected={filters.languages ?? []}
+          onToggle={(v) => toggleIn("languages", v)}
+          open={openChip === "language"}
+          onOpenToggle={chipOpen("language")}
+          onClearAll={() => onFilters({ ...filters, languages: [] })}
+          disabled={languageOptions.length === 0 && !(filters.languages?.length ?? 0)}
+        />
 
         <div
           className={`fchip${filters.remoteOnly ? " active" : ""}`}
