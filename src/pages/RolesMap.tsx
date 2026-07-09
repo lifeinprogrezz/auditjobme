@@ -101,38 +101,44 @@ export default function RolesMap() {
     [jobs],
   );
 
-  // Filter option lists, derived from the FULL catalog (not the filtered view) so
-  // options never disappear as you narrow. Counts are live role counts; city/sector
-  // sorted by frequency, size by the canonical ladder. Rober 7-06.
+  // Cross-faceted option counts (Rober 7-09): each facet's counts reflect every OTHER
+  // active headbar filter — pick Paris and the Sector chip now counts the sectors AMONG
+  // Paris roles (descending), the same additive narrowing the panel's role count shows.
+  // A facet never constrains its OWN options (its selection is reset before counting),
+  // so you can always still switch or add that facet's values. Size keeps the canonical
+  // ladder order; city/sector/language rank by count. (Supersedes the old full-catalog
+  // counts — an option with 0 roles under the current filters simply drops out.)
   const cityOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of jobs) if (j.city) m.set(j.city, (m.get(j.city) ?? 0) + 1);
+    for (const j of filterJobs(jobs, { ...filters, cities: [] }))
+      if (j.city) m.set(j.city, (m.get(j.city) ?? 0) + 1);
     return [...m.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([value, count]) => ({ value, label: value, count }));
-  }, [jobs]);
+  }, [jobs, filters]);
   const sectorOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of jobs) if (j.sector) m.set(j.sector, (m.get(j.sector) ?? 0) + 1);
+    for (const j of filterJobs(jobs, { ...filters, sectors: [] }))
+      if (j.sector) m.set(j.sector, (m.get(j.sector) ?? 0) + 1);
     return [...m.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([value, count]) => ({ value, label: value, count }));
-  }, [jobs]);
+  }, [jobs, filters]);
   const sizeOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of jobs) {
+    for (const j of filterJobs(jobs, { ...filters, sizes: [] })) {
       const b = sizeBand(j.headcount);
       if (b) m.set(b, (m.get(b) ?? 0) + 1);
     }
     return [...m.entries()]
       .sort((a, b) => sizeBandOrder(a[0]) - sizeBandOrder(b[0]))
       .map(([value, count]) => ({ value, label: value, count }));
-  }, [jobs]);
-  // Non-English languages a role explicitly requires (English is implicit). Powers
-  // the positive Language facet — only appears once ≥1 role carries a language wall.
+  }, [jobs, filters]);
+  // Non-English languages a role explicitly requires (English is implicit); cross-faceted
+  // like the others — the counts reflect the city/sector/size/etc currently selected.
   const languageOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of jobs)
+    for (const j of filterJobs(jobs, { ...filters, languages: [] }))
       for (const l of j.extraction?.languages_required ?? []) {
         const s = typeof l === "string" ? l.trim() : "";
         if (s && s.toLowerCase() !== "english") m.set(s, (m.get(s) ?? 0) + 1);
@@ -140,7 +146,7 @@ export default function RolesMap() {
     return [...m.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([value, count]) => ({ value, label: value, count }));
-  }, [jobs]);
+  }, [jobs, filters]);
 
   // Default landing (nothing searched / filtered / selected) shows a curated
   // "hot companies" showcase — one Product role from each (Rober 7-06). The reset
@@ -406,10 +412,6 @@ export default function RolesMap() {
           </a>
         </div>
         <div className="attrib">
-          <a href="https://github.com/santifer/career-ops" target="_blank" rel="noopener noreferrer">
-            santifer
-          </a>
-          <span className="sep">|</span>
           <span>
             ©{" "}
             <a href="https://carto.com/" target="_blank" rel="noopener noreferrer">

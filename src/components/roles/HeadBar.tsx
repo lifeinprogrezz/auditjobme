@@ -213,7 +213,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
           onOpenToggle={chipOpen("size")}
           onClearAll={() => onFilters({ ...filters, sizes: [] })}
         />
-        {languageOptions.length > 0 && (
+        {(languageOptions.length > 0 || (filters.languages?.length ?? 0) > 0) && (
           <FilterChip
             label="Language"
             searchable
