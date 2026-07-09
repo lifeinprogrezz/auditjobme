@@ -126,6 +126,7 @@ async function runScoring(admin: SupabaseClient, apiKey: string, userId: string,
   if (system) body.system = system;
   if (tools) body.tools = tools;
 
+  const t0 = Date.now();
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
@@ -133,6 +134,7 @@ async function runScoring(admin: SupabaseClient, apiKey: string, userId: string,
   });
 
   const data = await response.json();
+  const latencyMs = Date.now() - t0; // inference round-trip (proxy→Anthropic), for benchmarks
 
   if (!response.ok) {
     console.error('Anthropic API error:', data);
@@ -151,6 +153,7 @@ async function runScoring(admin: SupabaseClient, apiKey: string, userId: string,
       input_tokens: inTok,
       output_tokens: outTok,
       cost_usd: priceUsd(usedModel, inTok, outTok),
+      latency_ms: latencyMs,
     });
   } catch (e) {
     console.warn('usage metering insert failed:', e);
