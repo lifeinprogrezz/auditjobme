@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { parseScoreResponse } from "@/lib/score";
+import {
+  buildScoreUserMessage,
+  type ScoreableProfile,
+  type ScoreableJob,
+} from "@/lib/scorePrompt";
 
 describe("parseScoreResponse", () => {
   it("parses a clean JSON object", () => {
@@ -58,5 +63,47 @@ describe("parseScoreResponse", () => {
 
   it("tolerates fit_bullets that isn't an array", () => {
     expect(parseScoreResponse('{"score":3,"reason":"ok","fit_bullets":"nope"}')?.fitBullets).toEqual([]);
+  });
+});
+
+// Slice-3 (Rober 2026-07-09): the scorer is GROUNDED on JD-extracted facts — it reads
+// the cite-anchored yoe_min / geo_eligibility instead of re-deriving them from prose.
+// Same builder for the live /roles reveal AND the nightly email, so scores never diverge.
+describe("buildScoreUserMessage — JD-extracted grounding (slice 3)", () => {
+  const profile: ScoreableProfile = {
+    target_seniority: "senior",
+    target_cities: ["London"],
+    open_to_remote: true,
+    citizenship: "Spain",
+    eu_work_authorized: true,
+    languages: ["English"],
+    cv_text: "Product manager CV",
+  };
+  const baseJob: ScoreableJob = {
+    id: "1",
+    company: "Acme",
+    title: "Product Manager",
+    location: "London",
+    remote: false,
+    seniority: "senior",
+    jd_text: "Build product.",
+  };
+
+  it("injects the extracted YoE + geo-eligibility lines when present", () => {
+    const msg = buildScoreUserMessage(profile, { ...baseJob, yoe_min: 12, geo_eligibility: "UK" });
+    expect(msg).toContain("- experience required (extracted from JD): 12+ years");
+    expect(msg).toContain("- work eligibility (extracted from JD): UK");
+  });
+
+  it("FAIL-OPEN: omits both lines when the extraction is silent", () => {
+    const msg = buildScoreUserMessage(profile, { ...baseJob, yoe_min: null, geo_eligibility: null });
+    expect(msg).not.toContain("experience required (extracted");
+    expect(msg).not.toContain("work eligibility (extracted");
+  });
+
+  it("injects each fact independently", () => {
+    const yoeOnly = buildScoreUserMessage(profile, { ...baseJob, yoe_min: 5 });
+    expect(yoeOnly).toContain("- experience required (extracted from JD): 5+ years");
+    expect(yoeOnly).not.toContain("work eligibility (extracted");
   });
 });
