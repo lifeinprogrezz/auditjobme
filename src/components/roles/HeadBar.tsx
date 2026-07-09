@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LEVELS, type Level, type RolesFilters } from "@/lib/roles";
+import { type Level, type RolesFilters } from "@/lib/roles";
 import FilterChip, { type FilterOption } from "./FilterChip";
 
 export type HeadBarProps = {
@@ -8,10 +8,13 @@ export type HeadBarProps = {
   signedIn: boolean;
   filters: RolesFilters;
   onFilters: (f: RolesFilters) => void;
+  levelOptions: FilterOption[];
   cityOptions: FilterOption[];
   sectorOptions: FilterOption[];
   sizeOptions: FilterOption[];
   languageOptions: FilterOption[];
+  /** Reset every filter (and the map pin selection) at once. */
+  onClearAll: () => void;
   view: "map" | "list";
   onView: (v: "map" | "list") => void;
   /** Opens the CV-unlock modal (Phase A front door). */
@@ -20,12 +23,12 @@ export type HeadBarProps = {
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, cityOptions, sectorOptions, sizeOptions, languageOptions, view, onView, onAddCv }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, levelOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, view, onView, onAddCv }: HeadBarProps) {
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
   const [chipsShown, setChipsShown] = useState(false);
   // Two-step overflow (mockup 330): .show slides chips in with overflow hidden,
-  // .expanded (after the 340ms slide) frees overflow so dropdowns can escape.
+  // .expanded (after the 600ms slide) frees overflow so dropdowns can escape.
   const [chipsExpanded, setChipsExpanded] = useState(false);
   const [openChip, setOpenChip] = useState<"level" | "city" | "sector" | "size" | "language" | null>(null);
   const expandTimer = useRef<number | null>(null);
@@ -72,7 +75,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
       expandTimer.current = window.setTimeout(() => {
         setChipsExpanded(true);
         expandTimer.current = null;
-      }, 340);
+      }, 600);
     }
   };
 
@@ -89,11 +92,18 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
     const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
     onFilters({ ...filters, [key]: next });
   };
-  const chipOpen = (key: "city" | "sector" | "size" | "language") => () =>
+  const chipOpen = (key: "level" | "city" | "sector" | "size" | "language") => () =>
     setOpenChip(openChip === key ? null : key);
 
-  const levelOpen = openChip === "level";
-  const levelActive = filters.levels.length > 0;
+  // Any filter active → show the headbar-wide Clear all (Rober 7-09).
+  const anyActive =
+    filters.levels.length > 0 ||
+    filters.cities.length > 0 ||
+    filters.sectors.length > 0 ||
+    filters.sizes.length > 0 ||
+    (filters.languages?.length ?? 0) > 0 ||
+    filters.remoteOnly ||
+    filters.query.trim() !== "";
 
   // div[role=button] chips don't fire click on Enter/Space — wire it explicitly.
   const keyActivate = (fn: () => void) => (e: React.KeyboardEvent) => {
@@ -153,37 +163,15 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
       </button>
 
       <div className={`fchips${chipsShown ? " show" : ""}${chipsExpanded ? " expanded" : ""}`}>
-        <div
-          className={`fchip${levelActive ? " active" : ""}${levelOpen ? " open" : ""}`}
-          role="button"
-          tabIndex={0}
-          aria-expanded={levelOpen}
-          onClick={(e) => {
-            if ((e.target as Element).closest(".fdrop")) return;
-            setOpenChip(levelOpen ? null : "level");
-          }}
-          onKeyDown={keyActivate(() => setOpenChip(levelOpen ? null : "level"))}
-        >
-          <span className="flabel">Level</span>
-          <span className="fcount">{filters.levels.length}</span>
-          <svg className="caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-          <div className="fdrop">
-            {LEVELS.map((l) => (
-              <label key={l.value}>
-                <input
-                  type="checkbox"
-                  value={l.value}
-                  checked={filters.levels.includes(l.value)}
-                  onChange={() => toggleLevel(l.value)}
-                />
-                <span>{l.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
+        <FilterChip
+          label="Level"
+          options={levelOptions}
+          selected={filters.levels}
+          onToggle={(v) => toggleLevel(v as Level)}
+          open={openChip === "level"}
+          onOpenToggle={chipOpen("level")}
+          onClearAll={() => onFilters({ ...filters, levels: [] })}
+        />
         <FilterChip
           label="City"
           searchable
@@ -243,6 +231,12 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, cityOpti
           <span className="flabel">Remote</span>
           <span className="fcount">1</span>
         </div>
+
+        {anyActive && (
+          <button type="button" className="fclear" onClick={onClearAll}>
+            Clear all
+          </button>
+        )}
       </div>
 
       <span className="spacer" />

@@ -16,6 +16,7 @@ import HeadBar from "@/components/roles/HeadBar";
 import CvUnlockModal from "@/components/roles/CvUnlockModal";
 import {
   EMPTY_FILTERS,
+  LEVELS,
   byScore,
   companyCityRoles,
   filterJobs,
@@ -108,6 +109,13 @@ export default function RolesMap() {
   // so you can always still switch or add that facet's values. Size keeps the canonical
   // ladder order; city/sector/language rank by count. (Supersedes the old full-catalog
   // counts — an option with 0 roles under the current filters simply drops out.)
+  const levelOptions = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const j of filterJobs(jobs, { ...filters, levels: [] }))
+      if (j.seniority) m.set(j.seniority, (m.get(j.seniority) ?? 0) + 1);
+    // Keep the fixed ladder order (Junior→Executive), each with its faceted count.
+    return LEVELS.map((l) => ({ value: l.value, label: l.label, count: m.get(l.value) ?? 0 }));
+  }, [jobs, filters]);
   const cityOptions = useMemo(() => {
     const m = new Map<string, number>();
     for (const j of filterJobs(jobs, { ...filters, cities: [] }))
@@ -353,10 +361,15 @@ export default function RolesMap() {
           signedIn={signedIn}
           filters={filters}
           onFilters={setFilters}
+          levelOptions={levelOptions}
           cityOptions={cityOptions}
           sectorOptions={sectorOptions}
           sizeOptions={sizeOptions}
           languageOptions={languageOptions}
+          onClearAll={() => {
+            setFilters(EMPTY_FILTERS);
+            setSel({ co: null, city: null });
+          }}
           view={view}
           onView={setView}
           onAddCv={() => setCvModalOpen(true)}
