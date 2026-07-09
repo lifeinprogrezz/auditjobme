@@ -187,22 +187,33 @@ async function fetchSmartRecruiters(url) {
   }
 }
 
-// workable: apply.workable.com/{account}/j/{shortcode}
-//   → GET apply.workable.com/api/v3/accounts/{account}/jobs/{shortcode}
-//   → stripHtml(description + requirements + benefits)
+// workable: apply.workable.com/{account}/j/{shortcode} OR the account-less
+// apply.workable.com/j/{shortcode} (which 302-redirects to the canonical form).
+// Workable's public detail/list APIs are gated (404 on every account), and the
+// apply page is a client-rendered SPA — the full JD is fetched by JS and is NOT
+// in the initial HTML. The one reliable JD signal is the og:description meta: a
+// real summary paragraph of the role. Partial (not the full JD) but far better
+// than title-only, and it needs no account parsing so it also covers the /j/…
+// account-less URLs. Prefer a JSON-LD JobPosting.description if one is present.
 async function fetchWorkable(url) {
   try {
-    const m = url.match(/workable\.com\/([^/?#]+)\/j\/([^/?#]+)/);
-    if (!m) return null;
-    const [, account, shortcode] = m;
     const res = await fetch(
-      `https://apply.workable.com/api/v3/accounts/${account}/jobs/${shortcode}`,
-      fetchOpts({ headers: { "User-Agent": UA, Accept: "application/json" } }),
+      url,
+      fetchOpts({ redirect: "follow", headers: { "User-Agent": UA, Accept: "text/html" } }),
     );
     if (!res.ok) return null;
-    const j = await res.json();
-    const html = [j.description, j.requirements, j.benefits].filter(Boolean).join("\n");
-    return cap(stripHtml(html));
+    const html = await res.text();
+    const ld = jsonLdDescription(html);
+    if (ld) return cap(stripHtml(ld));
+    const og = (html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)/i) || [])[1];
+    if (!og) return null;
+    const decoded = og
+      .replace(/&amp;/g, "&")
+      .replace(/&#39;/g, "'")
+      .replace(/&quot;/g, '"')
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">");
+    return cap(stripHtml(decoded));
   } catch {
     return null;
   }
