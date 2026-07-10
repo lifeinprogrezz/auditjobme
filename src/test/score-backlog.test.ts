@@ -1,0 +1,101 @@
+import { describe, it, expect } from "vitest";
+import {
+  selectBacklog,
+  runPool,
+  shouldSendReadyEmail,
+  buildReadySubject,
+  buildReadyBody,
+} from "@/lib/scoreBacklog";
+
+describe("selectBacklog", () => {
+  const jobs = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  it("returns only jobs without a score row", () => {
+    expect(selectBacklog(jobs, new Set(["b"])).map((j) => j.id)).toEqual(["a", "c"]);
+  });
+  it("empty scored set → the whole catalog is backlog", () => {
+    expect(selectBacklog(jobs, new Set())).toHaveLength(3);
+  });
+  it("fully scored → empty backlog", () => {
+    expect(selectBacklog(jobs, new Set(["a", "b", "c"]))).toEqual([]);
+  });
+});
+
+describe("runPool", () => {
+  it("processes every item when the deadline is far", async () => {
+    const seen: number[] = [];
+    const { processed, deadlineHit } = await runPool(
+      [1, 2, 3, 4, 5],
+      2,
+      Number.MAX_SAFE_INTEGER,
+      async (n) => {
+        seen.push(n);
+      },
+    );
+    expect(processed).toBe(5);
+    expect(deadlineHit).toBe(false);
+    expect(seen.sort()).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("stops starting new items past the deadline but finishes in-flight ones", async () => {
+    // Fake clock: each fn call advances time past the deadline after the first
+    // wave, so only the first `limit` items start.
+    let t = 0;
+    const started: number[] = [];
+    const { processed, deadlineHit } = await runPool(
+      [1, 2, 3, 4, 5, 6],
+      2,
+      10,
+      async (n) => {
+        started.push(n);
+        t = 100; // past deadline for every subsequent pull
+      },
+      () => t,
+    );
+    // First pull happens pre-deadline; every pull after the clock jump is refused.
+    expect(started.length).toBeGreaterThanOrEqual(1);
+    expect(started.length).toBeLessThanOrEqual(2); // at most the first wave of `limit` workers
+    expect(processed).toBe(started.length); // in-flight work always completes
+    expect(deadlineHit).toBe(true);
+  });
+
+  it("respects the concurrency limit", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    await runPool([1, 2, 3, 4, 5, 6, 7, 8], 3, Number.MAX_SAFE_INTEGER, async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+    });
+    expect(peak).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("shouldSendReadyEmail", () => {
+  it("fires only on empty backlog + unnotified pass", () => {
+    expect(shouldSendReadyEmail(0, null)).toBe(true);
+    expect(shouldSendReadyEmail(3, null)).toBe(false);
+    expect(shouldSendReadyEmail(0, "2026-07-10T12:00:00Z")).toBe(false);
+  });
+  it("re-fires after the CV-change reset (stamp back to null)", () => {
+    expect(shouldSendReadyEmail(0, null)).toBe(true);
+  });
+});
+
+describe("email copy", () => {
+  it("subject pluralizes and handles zero", () => {
+    expect(buildReadySubject(7)).toBe("Your roles are scored — 7 strong matches");
+    expect(buildReadySubject(1)).toBe("Your roles are scored — 1 strong match");
+    expect(buildReadySubject(0)).toBe("Your roles are scored");
+  });
+  it("body links to the map and reports totals", () => {
+    const { text, html } = buildReadyBody(3, 764, "https://auditjob.me/");
+    expect(text).toContain("764");
+    expect(text).toContain("https://auditjob.me/roles");
+    expect(html).toContain('href="https://auditjob.me/roles"');
+  });
+  it("zero-strong body stays honest, no fabricated matches", () => {
+    const { text } = buildReadyBody(0, 100, "https://auditjob.me/");
+    expect(text).toContain("None cleared the strong-match bar");
+  });
+});
