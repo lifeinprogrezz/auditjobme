@@ -329,22 +329,25 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
           disabled={languageOptions.length === 0 && !(filters.languages?.length ?? 0)}
         />
 
-        {anyActive && (
-          <button
-            type="button"
-            className="fclear"
-            onClick={onClearAll}
-            aria-label="Clear all filters"
-            title="Clear all filters"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-            </svg>
-          </button>
-        )}
         </div>
       </div>
+
+      {/* Clear-all lives OUTSIDE the scrollable row — pinned right of the chips so it
+          never scrolls out of reach (Rober 7-10); shown whenever a filter is active. */}
+      {anyActive && (
+        <button
+          type="button"
+          className="fclear"
+          onClick={onClearAll}
+          aria-label="Clear all filters"
+          title="Clear all filters"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+          </svg>
+        </button>
+      )}
 
       <span className="spacer" />
 
