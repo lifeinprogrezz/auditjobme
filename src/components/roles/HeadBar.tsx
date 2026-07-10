@@ -333,12 +333,14 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
       </div>
 
       {/* Clear-all lives OUTSIDE the scrollable row — pinned right of the chips so it
-          never scrolls out of reach (Rober 7-10); shown whenever a filter is active. */}
-      {anyActive && (
+          never scrolls out of reach. ALWAYS rendered while the filter row is open
+          (Rober 7-10: "must be there"); greyed + inert when nothing is active. */}
+      {chipsShown && (
         <button
           type="button"
-          className="fclear"
-          onClick={onClearAll}
+          className={`fclear${anyActive ? "" : " disabled"}`}
+          onClick={anyActive ? onClearAll : undefined}
+          aria-disabled={!anyActive}
           aria-label="Clear all filters"
           title="Clear all filters"
         >
