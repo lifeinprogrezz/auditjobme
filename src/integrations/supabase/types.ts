@@ -354,6 +354,7 @@ export type Database = {
           location: string | null
           posted_at: string | null
           remote: boolean
+          role_family: string | null
           seniority: string | null
           source: string | null
           title: string
