@@ -8,6 +8,7 @@ export type HeadBarProps = {
   signedIn: boolean;
   filters: RolesFilters;
   onFilters: (f: RolesFilters) => void;
+  roleOptions: FilterOption[];
   levelOptions: FilterOption[];
   cityOptions: FilterOption[];
   sectorOptions: FilterOption[];
@@ -23,14 +24,14 @@ export type HeadBarProps = {
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, levelOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, view, onView, onAddCv }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, view, onView, onAddCv }: HeadBarProps) {
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
   const [chipsShown, setChipsShown] = useState(false);
   // Smooth width reveal via grid-template-columns 0fr→1fr (.show); .expanded (after
   // the 550ms slide) frees the inner overflow so dropdowns can escape.
   const [chipsExpanded, setChipsExpanded] = useState(false);
-  const [openChip, setOpenChip] = useState<"level" | "city" | "sector" | "size" | "language" | null>(null);
+  const [openChip, setOpenChip] = useState<"role" | "level" | "city" | "sector" | "size" | "language" | null>(null);
   const expandTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -87,16 +88,17 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
   };
 
   // City / Sector / Size are string multi-selects — one generic toggler.
-  const toggleIn = (key: "cities" | "sectors" | "sizes" | "languages", v: string) => {
+  const toggleIn = (key: "cities" | "sectors" | "sizes" | "languages" | "roles", v: string) => {
     const cur = filters[key] ?? [];
     const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
     onFilters({ ...filters, [key]: next });
   };
-  const chipOpen = (key: "level" | "city" | "sector" | "size" | "language") => () =>
+  const chipOpen = (key: "role" | "level" | "city" | "sector" | "size" | "language") => () =>
     setOpenChip(openChip === key ? null : key);
 
   // Any filter active → show the headbar-wide Clear all (Rober 7-09).
   const anyActive =
+    (filters.roles?.length ?? 0) > 0 ||
     filters.levels.length > 0 ||
     filters.cities.length > 0 ||
     filters.sectors.length > 0 ||
@@ -162,6 +164,18 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
 
       <div className={`fchips${chipsShown ? " show" : ""}${chipsExpanded ? " expanded" : ""}`}>
         <div className="fchips-inner">
+        {/* Chip order: what → where → company (spec 2026-07-10). Role leads — one
+            "Product Manager" bucket until the engine goes all-vertical (#34). */}
+        <FilterChip
+          label="Role"
+          options={roleOptions}
+          selected={filters.roles ?? []}
+          onToggle={(v) => toggleIn("roles", v)}
+          open={openChip === "role"}
+          onOpenToggle={chipOpen("role")}
+          onClearAll={() => onFilters({ ...filters, roles: [] })}
+          disabled={roleOptions.length === 0 && !(filters.roles?.length ?? 0)}
+        />
         <FilterChip
           label="Level"
           options={levelOptions}
@@ -183,6 +197,23 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
           onClearAll={() => onFilters({ ...filters, cities: [] })}
           disabled={cityOptions.length === 0 && filters.cities.length === 0}
         />
+        <div
+          className={`fchip${filters.remoteOnly ? " active" : ""}`}
+          role="button"
+          tabIndex={0}
+          aria-pressed={filters.remoteOnly}
+          onClick={() => {
+            setOpenChip(null);
+            onFilters({ ...filters, remoteOnly: !filters.remoteOnly });
+          }}
+          onKeyDown={keyActivate(() => {
+            setOpenChip(null);
+            onFilters({ ...filters, remoteOnly: !filters.remoteOnly });
+          })}
+        >
+          <span className="flabel">Remote</span>
+          <span className="fcount">1</span>
+        </div>
         <FilterChip
           label="Sector"
           searchable
@@ -215,24 +246,6 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, levelOpt
           onClearAll={() => onFilters({ ...filters, languages: [] })}
           disabled={languageOptions.length === 0 && !(filters.languages?.length ?? 0)}
         />
-
-        <div
-          className={`fchip${filters.remoteOnly ? " active" : ""}`}
-          role="button"
-          tabIndex={0}
-          aria-pressed={filters.remoteOnly}
-          onClick={() => {
-            setOpenChip(null);
-            onFilters({ ...filters, remoteOnly: !filters.remoteOnly });
-          }}
-          onKeyDown={keyActivate(() => {
-            setOpenChip(null);
-            onFilters({ ...filters, remoteOnly: !filters.remoteOnly });
-          })}
-        >
-          <span className="flabel">Remote</span>
-          <span className="fcount">1</span>
-        </div>
 
         {anyActive && (
           <button

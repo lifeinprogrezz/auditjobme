@@ -20,6 +20,7 @@ import {
   byScore,
   companyCityRoles,
   filterJobs,
+  roleFamily,
   sizeBand,
   sizeBandOrder,
   type RoleJob,
@@ -109,6 +110,16 @@ export default function RolesMap() {
   // so you can always still switch or add that facet's values. Size keeps the canonical
   // ladder order; city/sector/language rank by count. (Supersedes the old full-catalog
   // counts — an option with 0 roles under the current filters simply drops out.)
+  // Role vertical facet — one bucket ("Product Manager") until the engine goes
+  // all-vertical (#34); cross-faceted like the rest, count-desc.
+  const roleOptions = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const j of filterJobs(jobs, { ...filters, roles: [] }))
+      m.set(roleFamily(j), (m.get(roleFamily(j)) ?? 0) + 1);
+    return [...m.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([value, count]) => ({ value, label: value, count }));
+  }, [jobs, filters]);
   const levelOptions = useMemo(() => {
     const m = new Map<string, number>();
     for (const j of filterJobs(jobs, { ...filters, levels: [] }))
@@ -164,6 +175,7 @@ export default function RolesMap() {
     !sel.city &&
     !filters.query &&
     filters.levels.length === 0 &&
+    !filters.roles?.length &&
     filters.cities.length === 0 &&
     filters.sectors.length === 0 &&
     filters.sizes.length === 0 &&
@@ -361,6 +373,7 @@ export default function RolesMap() {
           signedIn={signedIn}
           filters={filters}
           onFilters={setFilters}
+          roleOptions={roleOptions}
           levelOptions={levelOptions}
           cityOptions={cityOptions}
           sectorOptions={sectorOptions}
