@@ -34,6 +34,10 @@ export type RoleJob = {
   /** Role vertical (jobs.role_family). Null = pre-all-vertical row → roleFamily()
    *  maps it to "Product Manager" while the pipeline is PM-gated (issue #34). */
   role_family?: string | null;
+  /** Workplace mode (jobs.workplace, scrape-owned): remote | hybrid | onsite.
+   *  Null = unknown → workplaceOf() falls back to extraction.remote_policy, then
+   *  the remote flag. Drives the headbar Workplace facet. */
+  workplace?: string | null;
   posted_at: string | null;
   /** Per-user fit score 0–5 (score.ts rubric), null = not scored yet. */
   score: number | null;
@@ -136,7 +140,11 @@ export type RolesFilters = {
   languages?: string[];
   // Role vertical (roleFamily). Optional like languages so filter fixtures typecheck.
   roles?: string[];
-  remoteOnly: boolean;
+  // Workplace modes (workplaceOf). DISCOVERY facet like languages: selecting a mode
+  // shows only roles KNOWN to match; unknown rows hide while a selection is active
+  // (~60% of the catalog is honestly unlabeled — "unknown matches everything" would
+  // fill a Hybrid view with unlabeled roles). Optional so fixtures typecheck.
+  workplaces?: string[];
 };
 
 export const EMPTY_FILTERS: RolesFilters = {
@@ -147,7 +155,7 @@ export const EMPTY_FILTERS: RolesFilters = {
   sizes: [],
   languages: [],
   roles: [],
-  remoteOnly: false,
+  workplaces: [],
 };
 
 /** Client-side filter, honest to the data. Free-text query matches company + title
@@ -175,10 +183,29 @@ export function roleFamily(job: RoleJob): string {
   return job.role_family ?? "Product Manager";
 }
 
+/** Fixed option order + display labels for the Workplace facet. */
+export const WORKPLACES: { value: string; label: string }[] = [
+  { value: "remote", label: "Remote" },
+  { value: "hybrid", label: "Hybrid" },
+  { value: "onsite", label: "On-site" },
+];
+
+/** Workplace mode for the Workplace facet: the scrape-owned jobs.workplace wins,
+ *  then the JD-extracted remote_policy, then the legacy remote flag. Null = unknown
+ *  (shown by default, hidden only while a Workplace selection is active). */
+export function workplaceOf(job: RoleJob): string | null {
+  return job.workplace ?? job.extraction?.remote_policy ?? (job.remote ? "remote" : null);
+}
+
 export function filterJobs(jobs: RoleJob[], f: RolesFilters): RoleJob[] {
   const q = f.query.trim().toLowerCase();
   return jobs.filter((j) => {
-    if (f.remoteOnly && !j.remote) return false;
+    // Workplace = a DISCOVERY filter (like languages): only roles KNOWN to match a
+    // selected mode pass; unknown-mode rows hide while a selection is active.
+    if (f.workplaces && f.workplaces.length) {
+      const w = workplaceOf(j);
+      if (!w || !f.workplaces.includes(w)) return false;
+    }
     if (f.levels.length && !f.levels.includes((j.seniority ?? "") as Level)) return false;
     if (f.roles && f.roles.length && !f.roles.includes(roleFamily(j))) return false;
     if (f.cities.length && !(j.city != null && f.cities.includes(j.city))) return false;

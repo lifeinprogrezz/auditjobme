@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import {
   EMPTY_FILTERS,
   LEVELS,
+  WORKPLACES,
   fitLabel,
   formatHeadcount,
   formatStage,
@@ -173,9 +174,11 @@ export default function RolesPanel({
     ...filters.cities.map((v) => ({ key: `ci-${v}`, label: v, onX: () => remove("cities", v) })),
     ...filters.sectors.map((v) => ({ key: `se-${v}`, label: v, onX: () => remove("sectors", v) })),
     ...filters.sizes.map((v) => ({ key: `sz-${v}`, label: v, onX: () => remove("sizes", v) })),
-    ...(filters.remoteOnly
-      ? [{ key: "remote", label: "Remote", onX: () => onFilters({ ...filters, remoteOnly: false }) }]
-      : []),
+    ...(filters.workplaces ?? []).map((v) => ({
+      key: `wp-${v}`,
+      label: WORKPLACES.find((w) => w.value === v)?.label ?? v,
+      onX: () => onFilters({ ...filters, workplaces: (filters.workplaces ?? []).filter((x) => x !== v) }),
+    })),
   ];
   const clearAllFilters = () => {
     onFilters(EMPTY_FILTERS);

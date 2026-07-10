@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sizeBand, sizeBandOrder, filterJobs, requiredLanguages, roleFamily, EMPTY_FILTERS, type RoleJob } from "@/lib/roles";
+import { sizeBand, sizeBandOrder, filterJobs, requiredLanguages, roleFamily, workplaceOf, EMPTY_FILTERS, type RoleJob } from "@/lib/roles";
 
 const base: RoleJob = {
   id: "1",
@@ -72,6 +72,37 @@ describe("filterJobs", () => {
   it("free-text query matches company + title only, NOT city", () => {
     expect(filterJobs(jobs, { ...EMPTY_FILTERS, query: "beta" }).map((j) => j.id)).toEqual(["b"]);
     expect(filterJobs(jobs, { ...EMPTY_FILTERS, query: "berlin" })).toHaveLength(0);
+  });
+});
+
+describe("workplaceOf", () => {
+  it("workplace column wins over extraction and the remote flag", () => {
+    expect(workplaceOf(mk({ workplace: "hybrid", remote: true }))).toBe("hybrid");
+    expect(workplaceOf(mk({ workplace: "onsite", extraction: { remote_policy: "remote" } }))).toBe("onsite");
+  });
+  it("falls back to extraction.remote_policy, then the remote flag, then null", () => {
+    expect(workplaceOf(mk({ extraction: { remote_policy: "hybrid" } }))).toBe("hybrid");
+    expect(workplaceOf(mk({ remote: true }))).toBe("remote");
+    expect(workplaceOf(mk({}))).toBeNull();
+  });
+});
+
+describe("filterJobs — Workplace discovery facet", () => {
+  const jobs = [
+    mk({ id: "r", workplace: "remote" }),
+    mk({ id: "h", extraction: { remote_policy: "hybrid" } }),
+    mk({ id: "o", workplace: "onsite" }),
+    mk({ id: "u" }), // unknown
+  ];
+  it("no selection → everything shows, unknowns included", () => {
+    expect(filterJobs(jobs, EMPTY_FILTERS)).toHaveLength(4);
+  });
+  it("selecting a mode shows ONLY known matches (unknown hides — discovery semantics)", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, workplaces: ["hybrid"] }).map((j) => j.id)).toEqual(["h"]);
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, workplaces: ["remote", "onsite"] }).map((j) => j.id)).toEqual(["r", "o"]);
+  });
+  it("fixtures without a workplaces key still filter (optional field)", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, cities: ["Berlin"] })).toHaveLength(4);
   });
 });
 

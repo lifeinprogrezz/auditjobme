@@ -10,6 +10,7 @@ export type HeadBarProps = {
   onFilters: (f: RolesFilters) => void;
   roleOptions: FilterOption[];
   levelOptions: FilterOption[];
+  workplaceOptions: FilterOption[];
   cityOptions: FilterOption[];
   sectorOptions: FilterOption[];
   sizeOptions: FilterOption[];
@@ -24,14 +25,14 @@ export type HeadBarProps = {
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, view, onView, onAddCv }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, view, onView, onAddCv }: HeadBarProps) {
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
   const [chipsShown, setChipsShown] = useState(false);
   // Smooth width reveal via grid-template-columns 0fr→1fr (.show); .expanded (after
   // the 550ms slide) frees the inner overflow so dropdowns can escape.
   const [chipsExpanded, setChipsExpanded] = useState(false);
-  const [openChip, setOpenChip] = useState<"role" | "level" | "city" | "sector" | "size" | "language" | null>(null);
+  const [openChip, setOpenChip] = useState<"role" | "level" | "city" | "workplace" | "sector" | "size" | "language" | null>(null);
   const expandTimer = useRef<number | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   // The chip row hides its scrollbar, so give mouse users two ways to move it:
@@ -157,12 +158,12 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
   };
 
   // City / Sector / Size are string multi-selects — one generic toggler.
-  const toggleIn = (key: "cities" | "sectors" | "sizes" | "languages" | "roles", v: string) => {
+  const toggleIn = (key: "cities" | "sectors" | "sizes" | "languages" | "roles" | "workplaces", v: string) => {
     const cur = filters[key] ?? [];
     const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
     onFilters({ ...filters, [key]: next });
   };
-  const chipOpen = (key: "role" | "level" | "city" | "sector" | "size" | "language") => () =>
+  const chipOpen = (key: "role" | "level" | "city" | "workplace" | "sector" | "size" | "language") => () =>
     setOpenChip(openChip === key ? null : key);
 
   // Any filter active → show the headbar-wide Clear all (Rober 7-09).
@@ -173,7 +174,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
     filters.sectors.length > 0 ||
     filters.sizes.length > 0 ||
     (filters.languages?.length ?? 0) > 0 ||
-    filters.remoteOnly ||
+    (filters.workplaces?.length ?? 0) > 0 ||
     filters.query.trim() !== "";
 
   // div[role=button] chips don't fire click on Enter/Space — wire it explicitly.
@@ -279,23 +280,16 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
           onClearAll={() => onFilters({ ...filters, cities: [] })}
           disabled={cityOptions.length === 0 && filters.cities.length === 0}
         />
-        <div
-          className={`fchip${filters.remoteOnly ? " active" : ""}`}
-          role="button"
-          tabIndex={0}
-          aria-pressed={filters.remoteOnly}
-          onClick={() => {
-            setOpenChip(null);
-            onFilters({ ...filters, remoteOnly: !filters.remoteOnly });
-          }}
-          onKeyDown={keyActivate(() => {
-            setOpenChip(null);
-            onFilters({ ...filters, remoteOnly: !filters.remoteOnly });
-          })}
-        >
-          <span className="flabel">Remote</span>
-          <span className="fcount">1</span>
-        </div>
+        <FilterChip
+          label="Workplace"
+          options={workplaceOptions.filter((o) => o.count > 0)}
+          selected={filters.workplaces ?? []}
+          onToggle={(v) => toggleIn("workplaces", v)}
+          open={openChip === "workplace"}
+          onOpenToggle={chipOpen("workplace")}
+          onClearAll={() => onFilters({ ...filters, workplaces: [] })}
+          disabled={workplaceOptions.every((o) => o.count === 0) && !(filters.workplaces?.length ?? 0)}
+        />
         <FilterChip
           label="Sector"
           searchable

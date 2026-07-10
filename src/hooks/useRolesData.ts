@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
-import { scoreJob, RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
+import { RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
 import { applyLandedScores, byScore, type RoleJob, type RoleExtraction } from "@/lib/roles";
-import { pickScoringSlice, hashCv, readCvStash, clearCvStash } from "@/lib/labels";
+import { hashCv, readCvStash, clearCvStash } from "@/lib/labels";
 import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
 
@@ -21,6 +21,7 @@ type JobsRow = {
   company_id: string | null;
   extraction: RoleExtraction | null;
   role_family: string | null;
+  workplace: string | null;
 };
 
 const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page past it.
@@ -149,93 +150,52 @@ function enrichAll(
   });
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-// Landed scores reach the UI at most this often during a pass (#26): every
-// setJobs re-tiles the whole map source, so per-landing updates (~40/pass)
-// churned the globe while the user browsed.
-const SCORE_FLUSH_MS = 2000;
+// The server-side backlog worker (api/score-backlog.ts, issue #33) is the only
+// scorer now; the page POLLS landed scores at this cadence while any visible
+// role is unscored, so the map fills in live without the page doing the paying.
+const SCORE_POLL_MS = 20_000;
 
 /**
- * Data plane for the /roles page. Mirrors Digest's load/score/apply flow with two
- * changes: the initial fetch omits jd_text (heavy; pulled only for the ≤40 rows
- * about to be scored) and pages past PostgREST's 1000-row cap. Scoring only runs
- * for users with a CV — CV-less scores would be cached at this rubric version
- * forever and burn the sponsored budget on results the UI never shows.
+ * Data plane for the /roles page. The initial fetch omits jd_text (heavy) and
+ * pages past PostgREST's 1000-row cap. Scoring is SERVER-SIDE (the backlog
+ * worker, issue #33): this hook only reads `scores`, polling while unscored
+ * roles remain so results land in front of the user — leaving the page never
+ * stops a pass.
  */
 export function useRolesData() {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<RoleJob[]>([]);
   const [loading, setLoading] = useState(true);
-  const [scoring, setScoring] = useState(false);
   const [profile, setProfile] = useState<ScoreableProfile | null>(null);
   const [applied, setApplied] = useState<Set<string>>(new Set());
   // Per-run cancellation: each effect run gets its own id; async loops compare
   // against the current id (a shared boolean would be re-armed by the next run,
   // resurrecting a cancelled loop and leaking user A's scores into user B's view).
   const runRef = useRef(0);
-  const scoringRef = useRef(false);
 
-  async function scoreBatch(batch: RoleJob[], prof: ScoreableProfile, userId: string, runId: number) {
-    if (batch.length === 0 || scoringRef.current) return;
-    scoringRef.current = true;
-    setScoring(true);
-    try {
-      const { data: jdRows, error: jdError } = await supabase
-        .from("jobs")
-        .select("id, jd_text")
-        .in("id", batch.map((j) => j.id));
-      // A failed jd fetch must ABORT the batch: scoring JD-blind would cache
-      // degraded scores permanently (the null-score filter never revisits them).
-      if (jdError || !jdRows) return;
-      const jdById: Record<string, string | null> = {};
-      jdRows.forEach((r) => (jdById[r.id] = r.jd_text));
-      // Batched flushes (#26): a per-landing setJobs + re-sort fired a full map
-      // re-index up to 40x per pass, and every re-sort remapped supercluster ids
-      // wholesale (marker churn mid-gesture). Landed scores now reach the UI at
-      // most every SCORE_FLUSH_MS with row order STABLE; the byScore sort runs
-      // once, when the pass completes. Cancelled runs never flush (stale scores
-      // must not leak into the next user's view).
-      const pending = new Map<string, { score: number; reason: string | null; fitBullets: string[] }>();
-      let landedAny = false;
-      let lastFlush = Date.now();
-      const flush = (sort: boolean) => {
-        if (pending.size === 0 && !sort) return;
-        const landed = new Map(pending);
-        pending.clear();
-        setJobs((prev) => applyLandedScores(prev, landed, sort));
-      };
-      for (const j of batch) {
-        if (runRef.current !== runId) return;
-        const result = await scoreJob(prof, {
-          ...j,
-          jd_text: jdById[j.id] ?? null,
-          yoe_min: j.extraction?.yoe_min ?? null,
-          geo_eligibility: j.extraction?.geo_eligibility ?? null,
-        });
-        if (!result || runRef.current !== runId) continue;
-        await supabase.from("scores").upsert(
+  /** Pull the user's landed scores and merge them into the map (sorted). The
+   *  server worker writes them continuously; this is the read side of the poll. */
+  async function refreshScores(userId: string, runId: number) {
+    const { data } = await supabase
+      .from("scores")
+      .select("job_id, score, signals")
+      .eq("user_id", userId)
+      .eq("rubric_version", RUBRIC_VERSION);
+    if (!data || runRef.current !== runId) return;
+    const landed = new Map(
+      data.map((s) => {
+        const sig = s.signals as { reason?: string; fit_bullets?: string[] } | null;
+        return [
+          s.job_id as string,
           {
-            user_id: userId,
-            job_id: j.id,
-            score: result.score,
-            rubric_version: RUBRIC_VERSION,
-            signals: { reason: result.reason, fit_bullets: result.fitBullets },
+            score: Number(s.score),
+            reason: sig?.reason ?? null,
+            fitBullets: sig?.fit_bullets ?? [],
           },
-          { onConflict: "user_id,job_id,rubric_version" },
-        );
-        if (runRef.current !== runId) return;
-        pending.set(j.id, { score: result.score, reason: result.reason, fitBullets: result.fitBullets });
-        landedAny = true;
-        if (Date.now() - lastFlush >= SCORE_FLUSH_MS) {
-          flush(false);
-          lastFlush = Date.now();
-        }
-      }
-      if (landedAny) flush(true);
-    } finally {
-      scoringRef.current = false;
-      if (runRef.current === runId) setScoring(false);
-    }
+        ] as const;
+      }),
+    );
+    if (landed.size > 0) setJobs((prev) => applyLandedScores(prev, landed, true));
   }
 
   /**
@@ -250,7 +210,6 @@ export function useRolesData() {
     userId: string,
     payload: { cv_text: string; cv_hash: string; target_roles: string[]; target_sectors: string[] },
     jobsSnapshot: RoleJob[],
-    runId: number,
   ): Promise<boolean> {
     const cvText = payload.cv_text.trim();
     if (!cvText) return false;
@@ -289,6 +248,10 @@ export function useRolesData() {
     if (changed) {
       // Clear stale scores from the old CV (DB + local) so they re-score fresh.
       await supabase.from("scores").delete().eq("user_id", userId);
+      // New pass ⇒ new completion email (issue #33): reset the exactly-once
+      // stamp the backlog worker checks. Separate best-effort update so a
+      // pre-migration prod (column missing) can't block the CV write above.
+      await supabase.from("profiles").update({ scores_ready_notified_at: null }).eq("id", userId);
     }
 
     // Fresh scoreable profile — OLD columns only, so this read is pre-migration safe.
@@ -307,32 +270,14 @@ export function useRolesData() {
       cv_text: cvText,
     }) as ScoreableProfile;
 
-    let base = jobsSnapshot;
     if (changed) {
-      base = jobsSnapshot.map((j) => ({ ...j, score: null, reason: null, fitBullets: null }));
-      setJobs(base);
+      setJobs(jobsSnapshot.map((j) => ({ ...j, score: null, reason: null, fitBullets: null })));
     }
     // Flip `scored` false→true → the CSS reveal + ScoreValue count-up fire
-    // in-session. This flip is what reveals the map, so success resolves HERE —
-    // the ≤40-job scoring pass runs detached below, behind the (now closed)
-    // modal, surfaced by the panel's "Scoring… N to go" bar.
+    // in-session. This flip is what reveals the map, so success resolves HERE.
+    // Scores arrive from the SERVER worker (issue #33) — the poll effect
+    // surfaces them as they land; the panel's "Scoring… N to go" bar tracks it.
     setProfile(prof);
-    // Score the labelled slice first (the deterministic cost lever), top 40 for
-    // the instant reveal; the rest fills via scoreMore.
-    const slice = pickScoringSlice(base, {
-      roles: payload.target_roles,
-      sectors: payload.target_sectors,
-    });
-    // DETACHED: do NOT await — awaiting kept the full-screen modal open over the
-    // live reveal for the whole pass. The runRef guard still cancels a stale run
-    // and the .catch swallows a background failure so no rejection escapes.
-    void (async () => {
-      while (scoringRef.current && runRef.current === runId) await sleep(250);
-      if (runRef.current !== runId) return;
-      await scoreBatch(slice.filter((j) => j.score == null).slice(0, 40), prof, userId, runId);
-    })().catch(() => {
-      /* background scoring failure must not surface after a successful reveal */
-    });
     return true;
   }
 
@@ -346,7 +291,7 @@ export function useRolesData() {
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await supabase
           .from("jobs")
-          .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id, extraction, role_family")
+          .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id, extraction, role_family, workplace")
           .eq("is_live", true)
           .range(from, from + PAGE - 1);
         if (error || !data) break;
@@ -431,8 +376,9 @@ export function useRolesData() {
       if (prof) setProfile(prof as ScoreableProfile);
       if (!prof?.cv_text?.trim()) {
         // Post-OAuth handoff (Phase A): a CV stashed before the sign-in redirect
-        // is written to the profile now, then revealed + scored in-session. Only
-        // when the profile has no CV yet (never clobber an existing one).
+        // is written to the profile now, then revealed. Only when the profile
+        // has no CV yet (never clobber an existing one). Scoring itself is the
+        // server worker's job; the poll effect below surfaces its results.
         const stash = readCvStash();
         if (stash && runRef.current === runId) {
           clearCvStash();
@@ -445,20 +391,9 @@ export function useRolesData() {
               target_sectors: stash.target_sectors,
             },
             merged,
-            runId,
           );
         }
-        return; // no CV (and no stash) → no scoring (see hook doc)
       }
-      // If a previous run's batch is still unwinding, wait for it to release.
-      while (scoringRef.current && runRef.current === runId) await sleep(250);
-      if (runRef.current !== runId) return;
-      await scoreBatch(
-        merged.filter((j) => j.score == null).slice(0, 40),
-        prof as ScoreableProfile,
-        user.id,
-        runId,
-      );
     }
     load();
     return () => {
@@ -466,8 +401,20 @@ export function useRolesData() {
       // own increment keeps every runId unique.
       runRef.current++;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // ── Score poll (issue #33): while the signed-in user has a CV and any role is
+  // still unscored, pull landed scores every SCORE_POLL_MS so the server pass
+  // fills the map in front of them. Stops on its own when nothing is unscored
+  // (interval not re-armed) and on signout/unmount (cleanup).
+  const hasUnscored = jobs.some((j) => j.score == null);
+  const hasCv = Boolean(profile?.cv_text?.trim());
+  useEffect(() => {
+    if (!user || !hasCv || !hasUnscored || loading) return;
+    const runId = runRef.current;
+    const t = setInterval(() => void refreshScores(user.id, runId), SCORE_POLL_MS);
+    return () => clearInterval(t);
+  }, [user, hasCv, hasUnscored, loading]);
 
   const markApplied = async (job: RoleJob) => {
     if (!user) return;
@@ -485,9 +432,11 @@ export function useRolesData() {
     }
   };
 
+  /** Manual "check now" — an immediate scores pull, ahead of the next poll tick.
+   *  Kept for the RolesPanel prop surface; scoring itself is server-side. */
   const scoreMore = () => {
-    if (!user || !profile?.cv_text?.trim() || scoringRef.current) return;
-    scoreBatch(jobs.filter((j) => j.score == null).slice(0, 40), profile, user.id, runRef.current);
+    if (!user || !profile?.cv_text?.trim()) return;
+    void refreshScores(user.id, runRef.current);
   };
 
   /**
@@ -511,14 +460,15 @@ export function useRolesData() {
         target_sectors: labels.sectors,
       },
       jobs,
-      runRef.current,
     );
   };
 
   return {
     jobs,
     loading,
-    scoring,
+    // "Scoring" now means the SERVER pass hasn't drained this user's backlog yet
+    // (the worker runs regardless; this drives the panel's progress bar).
+    scoring: Boolean(user) && hasCv && hasUnscored && !loading,
     remaining: jobs.filter((j) => j.score == null).length,
     applied,
     markApplied,

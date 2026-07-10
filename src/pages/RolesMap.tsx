@@ -21,6 +21,8 @@ import {
   companyCityRoles,
   filterJobs,
   roleFamily,
+  workplaceOf,
+  WORKPLACES,
   sizeBand,
   sizeBandOrder,
   type RoleJob,
@@ -127,6 +129,16 @@ export default function RolesMap() {
     // Keep the fixed ladder order (Junior→Executive), each with its faceted count.
     return LEVELS.map((l) => ({ value: l.value, label: l.label, count: m.get(l.value) ?? 0 }));
   }, [jobs, filters]);
+  // Workplace facet — fixed Remote/Hybrid/On-site order (like the Level ladder),
+  // counts over roles with a KNOWN mode (discovery semantics; unknown ≈60% excluded).
+  const workplaceOptions = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const j of filterJobs(jobs, { ...filters, workplaces: [] })) {
+      const w = workplaceOf(j);
+      if (w) m.set(w, (m.get(w) ?? 0) + 1);
+    }
+    return WORKPLACES.map((w) => ({ value: w.value, label: w.label, count: m.get(w.value) ?? 0 }));
+  }, [jobs, filters]);
   const cityOptions = useMemo(() => {
     const m = new Map<string, number>();
     for (const j of filterJobs(jobs, { ...filters, cities: [] }))
@@ -180,7 +192,7 @@ export default function RolesMap() {
     filters.sectors.length === 0 &&
     filters.sizes.length === 0 &&
     !filters.languages?.length &&
-    !filters.remoteOnly;
+    !filters.workplaces?.length;
 
   // Remember the first narrowing so a later full clear shows the honest full list
   // rather than snapping back to the curated showcase. Only the reset-view control
@@ -375,6 +387,7 @@ export default function RolesMap() {
           onFilters={setFilters}
           roleOptions={roleOptions}
           levelOptions={levelOptions}
+          workplaceOptions={workplaceOptions}
           cityOptions={cityOptions}
           sectorOptions={sectorOptions}
           sizeOptions={sizeOptions}
