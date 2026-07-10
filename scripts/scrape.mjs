@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { isPM, isEU, inferSeniority, stripHtml } from "./job-filters.mjs";
+import { resolveWorkplace } from "./workplace-lib.mjs";
 import { sources as atsExtraSources } from "./sources/ats-extra.mjs";
 import { sources as bigtechSources } from "./sources/bigtech.mjs";
 import { sources as vcSources } from "./sources/vc-startupmap.mjs";
@@ -56,6 +57,7 @@ async function fetchLever(b) {
       return {
         company: b.company, title: p.text, url: p.hostedUrl, location,
         remote: /remote/i.test(location || "") || /remote/i.test(p.text || ""),
+        workplace: p.workplaceType || null, // exact 3-way ("on-site"|"remote"|"hybrid"), normalized centrally
         source: "lever", posted_at: p.createdAt ? new Date(p.createdAt).toISOString() : null,
         jd_text: (p.descriptionPlain || "").slice(0, 8000) || null, seniority: inferSeniority(p.text),
       };
@@ -74,6 +76,7 @@ async function fetchAshby(b) {
       return {
         company: b.company, title: j.title, url: j.jobUrl || j.applyUrl, location,
         remote: !!j.isRemote || /remote/i.test(location || "") || /remote/i.test(j.title || ""),
+        workplace: j.isRemote ? "remote" : null, // isRemote=false ≠ onsite (could be hybrid) → null
         source: "ashby", posted_at: j.publishedAt || null,
         jd_text: stripHtml(j.descriptionHtml || j.descriptionPlain).slice(0, 8000) || null,
         seniority: inferSeniority(j.title),
@@ -106,6 +109,7 @@ async function fetchWorkable(b) {
         url: j.shortcode ? `https://apply.workable.com/${b.token}/j/${j.shortcode}/` : "",
         location,
         remote: !!j.remote || /remote/i.test(location || "") || /remote/i.test(j.title || ""),
+        workplace: j.remote ? "remote" : null,
         source: "workable", posted_at: j.published || null,
         jd_text: null, seniority: inferSeniority(j.title),
       });
@@ -140,6 +144,7 @@ async function fetchSmartRecruiters(b) {
         url: `https://jobs.smartrecruiters.com/${slug}/${j.id}`,
         location,
         remote: (j.location || {}).remote === true || /remote/i.test(location || "") || /remote/i.test(j.name || ""),
+        workplace: (j.location || {}).remote === true ? "remote" : null,
         source: "smartrecruiters", posted_at: j.releasedDate || null,
         jd_text: null, seniority: inferSeniority(j.name),
       });
@@ -209,6 +214,14 @@ async function main() {
     } catch { return u; }
   };
   all = all.map((j) => ({ ...j, url: canonUrl(j.url) }));
+  // Workplace mode (remote|hybrid|onsite) for EVERY source: the adapter's structured
+  // value (Lever workplaceType, Ashby isRemote, …) wins; else location string; else JD
+  // text. Runs centrally so sources/*.mjs rows get the heuristics too. Nightly upsert
+  // keeps jobs.workplace fresh; null = honestly unknown.
+  all = all.map((j) => ({
+    ...j,
+    workplace: resolveWorkplace({ structured: j.workplace, location: j.location, jdText: j.jd_text }),
+  }));
   const seen = new Set();
   all = all.filter((j) => (seen.has(j.url) ? false : seen.add(j.url)));
   // Drop rows missing a required NOT NULL field. Some scraped sources (e.g. startupmap)
@@ -223,9 +236,9 @@ async function main() {
   if (process.argv.includes("--sql")) {
     const esc = (s) => (s == null ? "NULL" : "'" + String(s).replace(/'/g, "''") + "'");
     const rows = all
-      .map((j) => `(${esc(j.company)}, ${esc(j.title)}, ${esc(j.url)}, ${esc(j.location)}, ${j.remote ? "true" : "false"}, ${esc(j.source)}, ${esc(j.seniority)})`)
+      .map((j) => `(${esc(j.company)}, ${esc(j.title)}, ${esc(j.url)}, ${esc(j.location)}, ${j.remote ? "true" : "false"}, ${esc(j.workplace)}, ${esc(j.source)}, ${esc(j.seniority)})`)
       .join(",\n");
-    console.log(`INSERT INTO public.jobs (company, title, url, location, remote, source, seniority) VALUES\n${rows}\nON CONFLICT (url) DO NOTHING;`);
+    console.log(`INSERT INTO public.jobs (company, title, url, location, remote, workplace, source, seniority) VALUES\n${rows}\nON CONFLICT (url) DO NOTHING;`);
     return;
   }
   if (dry) {
