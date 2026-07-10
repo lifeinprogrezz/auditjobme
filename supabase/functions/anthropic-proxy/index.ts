@@ -6,9 +6,10 @@ const corsHeaders = {
 };
 
 // Sponsored-compute guardrails — enforced SERVER-SIDE (the client never enforces). EVERY LLM
-// call in the product routes through this proxy, so these caps bound total spend on our key.
-const MONTHLY_KILL_SWITCH_USD = 54; // global monthly cap (~EUR 50)
-const PER_USER_DAILY_USD = 1.0;     // one account can't drain the monthly pool in a day
+// call in the product routes through this proxy. SPEND CAPS REMOVED 2026-07-10 (Rober's call,
+// pre-ship: don't limit until launch; capping gets redesigned then — planning spec
+// 2026-07-10-server-side-scoring-backlog-design.md). Metering below stays: usage_events is
+// the observability surface a future cap will read.
 const ALLOWED_KINDS = ['score', 'audit', 'cv', 'letter'];
 const MAX_TOKENS_CEILING = 8192;    // hard ceiling: a caller can't request a huge, costly generation
 // priceUsd only knows haiku vs sonnet rates, so an unlisted (e.g. pricier) model would be
@@ -79,44 +80,13 @@ type ScoreParams = {
 };
 
 /**
- * The shared spend-guarded generation tail: caps → Anthropic call → authoritative
- * metering, ALL keyed on `userId`. The user-JWT path passes the session user; the
- * service-role path passes target_user_id. Every guardrail (monthly kill-switch,
- * per-user daily cap, model/kind/token ceilings) is identical on both paths.
+ * The shared generation tail: Anthropic call → authoritative metering, keyed on
+ * `userId`. The user-JWT path passes the session user; the service-role path passes
+ * target_user_id. Spend caps removed 2026-07-10 (see header note); the model/kind/
+ * max-tokens allowlists below remain identical on both paths.
  */
 async function runScoring(admin: SupabaseClient, apiKey: string, userId: string, params: ScoreParams) {
   const { messages, model, max_tokens, system, tools, kind } = params;
-
-  // --- Cost guardrails. ---
-  const now = new Date();
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
-
-  // GLOBAL monthly kill-switch — fails CLOSED: if usage can't be read, pause sponsored
-  // compute rather than open the spend gate (a DB outage must not uncap us).
-  try {
-    const { data: monthRows, error: monthErr } = await admin.from('usage_events').select('cost_usd').gte('created_at', monthStart);
-    if (monthErr) throw monthErr;
-    const monthTotal = (monthRows ?? []).reduce((s: number, r: { cost_usd: number | null }) => s + Number(r.cost_usd || 0), 0);
-    if (monthTotal >= MONTHLY_KILL_SWITCH_USD) {
-      return json({ error: 'The monthly free-compute limit has been reached. It resets at the start of next month.' }, 429);
-    }
-  } catch (e) {
-    console.error('global cap check failed — blocking call (fail-closed):', e);
-    return json({ error: 'Compute is temporarily paused. Please try again shortly.' }, 503);
-  }
-
-  // PER-USER daily cap — fails OPEN: one user's transient read error shouldn't lock them
-  // out, since the global kill-switch above is the hard backstop on total spend.
-  try {
-    const { data: dayRows } = await admin.from('usage_events').select('cost_usd').eq('user_id', userId).gte('created_at', dayStart);
-    const dayTotal = (dayRows ?? []).reduce((s: number, r: { cost_usd: number | null }) => s + Number(r.cost_usd || 0), 0);
-    if (dayTotal >= PER_USER_DAILY_USD) {
-      return json({ error: 'You have reached your daily limit. Please try again tomorrow.' }, 429);
-    }
-  } catch (e) {
-    console.warn('per-user cap check failed, allowing call:', e);
-  }
 
   const body: Record<string, unknown> = {
     model: model || DEFAULT_MODEL,
@@ -194,7 +164,7 @@ Deno.serve(async (req) => {
       }
       if (!messages || !Array.isArray(messages)) return json({ error: 'messages array is required' }, 400);
       if (model && !ALLOWED_MODELS.includes(model)) return json({ error: 'Unsupported model' }, 400);
-      // Metering + every cap keyed on target_user_id (NOT the service key).
+      // Metering keyed on target_user_id (NOT the service key).
       return await runScoring(admin, apiKey, target_user_id, { messages, model, max_tokens, system, tools, kind });
     }
 
