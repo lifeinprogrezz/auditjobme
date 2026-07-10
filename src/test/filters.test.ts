@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sizeBand, sizeBandOrder, filterJobs, requiredLanguages, EMPTY_FILTERS, type RoleJob } from "@/lib/roles";
+import { sizeBand, sizeBandOrder, filterJobs, requiredLanguages, roleFamily, EMPTY_FILTERS, type RoleJob } from "@/lib/roles";
 
 const base: RoleJob = {
   id: "1",
@@ -72,6 +72,37 @@ describe("filterJobs", () => {
   it("free-text query matches company + title only, NOT city", () => {
     expect(filterJobs(jobs, { ...EMPTY_FILTERS, query: "beta" }).map((j) => j.id)).toEqual(["b"]);
     expect(filterJobs(jobs, { ...EMPTY_FILTERS, query: "berlin" })).toHaveLength(0);
+  });
+});
+
+describe("roleFamily", () => {
+  it("falls back to Product Manager while the pipeline is PM-gated (null / absent)", () => {
+    expect(roleFamily(mk({}))).toBe("Product Manager");
+    expect(roleFamily(mk({ role_family: null }))).toBe("Product Manager");
+  });
+  it("a written role_family wins over the fallback", () => {
+    expect(roleFamily(mk({ role_family: "Data" }))).toBe("Data");
+  });
+});
+
+describe("filterJobs — roles facet", () => {
+  const jobs = [mk({ id: "a" }), mk({ id: "b", role_family: "Data" })];
+  it("empty selection shows the full catalog", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: [] })).toHaveLength(2);
+  });
+  it("selecting Product Manager matches null-role_family rows via the fallback", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: ["Product Manager"] }).map((j) => j.id)).toEqual(["a"]);
+  });
+  it("selecting a written family matches only it (OR-within)", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: ["Data"] }).map((j) => j.id)).toEqual(["b"]);
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: ["Data", "Product Manager"] })).toHaveLength(2);
+  });
+  it("ANDs across facets (roles + cities)", () => {
+    const mix = [mk({ id: "a", city: "Berlin" }), mk({ id: "b", city: "Paris", role_family: "Data" })];
+    expect(filterJobs(mix, { ...EMPTY_FILTERS, roles: ["Data"], cities: ["Berlin"] })).toHaveLength(0);
+  });
+  it("fixtures without a roles key still filter (optional field)", () => {
+    expect(filterJobs(jobs, EMPTY_FILTERS)).toHaveLength(2);
   });
 });
 

@@ -31,6 +31,9 @@ export type RoleJob = {
   remote: boolean;
   source: string | null;
   seniority: string | null;
+  /** Role vertical (jobs.role_family). Null = pre-all-vertical row → roleFamily()
+   *  maps it to "Product Manager" while the pipeline is PM-gated (issue #34). */
+  role_family?: string | null;
   posted_at: string | null;
   /** Per-user fit score 0–5 (score.ts rubric), null = not scored yet. */
   score: number | null;
@@ -131,6 +134,8 @@ export type RolesFilters = {
   // English-only role is hidden while a language is selected. Optional so filter
   // fixtures that omit it still typecheck.
   languages?: string[];
+  // Role vertical (roleFamily). Optional like languages so filter fixtures typecheck.
+  roles?: string[];
   remoteOnly: boolean;
 };
 
@@ -141,6 +146,7 @@ export const EMPTY_FILTERS: RolesFilters = {
   sectors: [],
   sizes: [],
   languages: [],
+  roles: [],
   remoteOnly: false,
 };
 
@@ -161,11 +167,20 @@ export function requiredLanguages(job: RoleJob): string[] {
   );
 }
 
+/** Role vertical for the Role facet. Null = pre-all-vertical row (the pipeline is
+ *  PM-gated), mapped to "Product Manager" — the single null→PM source shared by the
+ *  filter clause and the facet counter so they never disagree. Real values win the
+ *  moment the engine writes them (issue #34). */
+export function roleFamily(job: RoleJob): string {
+  return job.role_family ?? "Product Manager";
+}
+
 export function filterJobs(jobs: RoleJob[], f: RolesFilters): RoleJob[] {
   const q = f.query.trim().toLowerCase();
   return jobs.filter((j) => {
     if (f.remoteOnly && !j.remote) return false;
     if (f.levels.length && !f.levels.includes((j.seniority ?? "") as Level)) return false;
+    if (f.roles && f.roles.length && !f.roles.includes(roleFamily(j))) return false;
     if (f.cities.length && !(j.city != null && f.cities.includes(j.city))) return false;
     if (f.sectors.length && !(j.sector != null && f.sectors.includes(j.sector))) return false;
     if (f.sizes.length) {
