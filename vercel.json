@@ -5,7 +5,8 @@
     { "path": "/api/nightly", "schedule": "0 6 * * *" }
   ],
   "functions": {
-    "api/nightly.ts": { "maxDuration": 60 }
+    "api/nightly.ts": { "maxDuration": 60 },
+    "api/score-backlog.ts": { "maxDuration": 60 }
   },
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }

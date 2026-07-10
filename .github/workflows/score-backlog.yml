@@ -1,0 +1,32 @@
+name: Score backlog
+
+# Repeat trigger for the server-side scoring backlog worker (api/score-backlog.ts,
+# issue #33). Vercel Hobby crons are daily-only, so GitHub Actions provides the
+# every-10-minutes tick — same pattern as scrape.yml. Each tick processes one
+# ~45s time-budgeted chunk; a drained backlog makes the tick a cheap no-op
+# (a couple of DB reads, zero LLM calls).
+#
+# Requires repo secret CRON_SECRET = the same value as the Vercel env var
+# CRON_SECRET (the worker and api/nightly.ts both authenticate against it).
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 minutes
+  workflow_dispatch: {} # manual trigger from the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: score-backlog
+  cancel-in-progress: false # let an in-flight chunk finish; the next tick queues
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke the backlog worker
+        run: |
+          curl -fsS --max-time 90 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://auditjob.me/api/score-backlog
