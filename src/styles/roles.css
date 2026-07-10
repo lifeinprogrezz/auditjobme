@@ -138,17 +138,24 @@
 /* Smooth auto-width reveal: grid-template-columns 0fr→1fr animates to the chips' EXACT
    natural width (no max-width overshoot / dead-time), so the slide + fade read as one
    motion at any speed. flex:none keeps it from shrinking (the search is the sponge). */
-.roles-theme .fchips { display: grid; flex: none; grid-template-columns: 0fr; opacity: 0; pointer-events: none; margin-left: 0; transition: grid-template-columns 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.55s cubic-bezier(0.4, 0, 0.2, 1); }
+.roles-theme .fchips { display: grid; flex: 0 1 auto; min-width: 0; grid-template-columns: 0fr; opacity: 0; pointer-events: none; margin-left: 0; transition: grid-template-columns 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.55s cubic-bezier(0.4, 0, 0.2, 1); }
+/* ^ flex-shrink 1 (was none): once the search hits its min-width the chip row is the
+   next shrink-sponge — it clips + scrolls (.fchips-inner) instead of pushing the
+   Add-CV/avatar off the nav. Chips themselves are flex:none so they keep their size
+   and the row scrolls rather than squishing them. */
 /* Row scrolls horizontally when 7+ chips outgrow the bar; edge fades signal the
    clip (no scrollbar chrome). Dropdowns escape the clip via .fdrop-portal below. */
 .roles-theme .fchips-inner { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
 .roles-theme .fchips-inner::-webkit-scrollbar { display: none; }
+/* Press-drag pan (HeadBar pointer handlers) — while panning, kill chip hover cues. */
+.roles-theme .fchips-inner.panning { cursor: grabbing; }
+.roles-theme .fchips-inner.panning .fchip { pointer-events: none; }
 .roles-theme .fchips.show { grid-template-columns: 1fr; opacity: 1; pointer-events: auto; margin-left: 6px; }
 /* Headbar-wide reset — compact icon at the end of the chip row, shown only when a filter
    is active. flex:none so it never shrinks/wraps (keeps the responsive layout intact). */
 .roles-theme .fclear { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); cursor: pointer; transition: color 0.15s, background 0.15s, border-color 0.15s; }
 .roles-theme .fclear:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); border-color: var(--text); }
-.roles-theme .fchip { position: relative; display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 11px; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
+.roles-theme .fchip { position: relative; display: flex; flex: none; align-items: center; gap: 6px; height: 38px; padding: 0 11px; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .fchip:hover { background: rgba(255, 255, 255, 0.1); color: var(--text); }
 /* Nothing to pick under the current filters → greyed + inert, but kept in place so
    the chip row never flickers a chip in/out (Rober 7-09). */

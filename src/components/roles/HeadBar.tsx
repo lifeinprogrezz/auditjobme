@@ -33,6 +33,56 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
   const [chipsExpanded, setChipsExpanded] = useState(false);
   const [openChip, setOpenChip] = useState<"role" | "level" | "city" | "sector" | "size" | "language" | null>(null);
   const expandTimer = useRef<number | null>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
+  // The chip row hides its scrollbar, so give mouse users two ways to move it:
+  // the wheel scrolls it horizontally, and press-drag pans it. A native wheel
+  // listener ({passive:false}) is required — React's delegated onWheel can't
+  // preventDefault. Drag suppresses the trailing click (capture phase) past 5px
+  // so panning never toggles a chip.
+  const drag = useRef<{ startX: number; startLeft: number; moved: boolean } | null>(null);
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (!d) return;
+      e.preventDefault();
+      el.scrollLeft += d;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+  const onRowPointerDown = (e: React.PointerEvent) => {
+    const el = rowRef.current;
+    if (!el || e.pointerType !== "mouse" || el.scrollWidth <= el.clientWidth) return;
+    drag.current = { startX: e.clientX, startLeft: el.scrollLeft, moved: false };
+  };
+  const onRowPointerMove = (e: React.PointerEvent) => {
+    const el = rowRef.current;
+    const d = drag.current;
+    if (!el || !d) return;
+    const dx = e.clientX - d.startX;
+    if (!d.moved && Math.abs(dx) < 5) return;
+    if (!d.moved) {
+      d.moved = true;
+      el.classList.add("panning");
+      el.setPointerCapture(e.pointerId);
+    }
+    el.scrollLeft = d.startLeft - dx;
+  };
+  const onRowPointerUp = () => {
+    rowRef.current?.classList.remove("panning");
+    // Cleared on the next tick so the capture-phase click of THIS gesture still
+    // sees moved=true and gets suppressed.
+    window.setTimeout(() => { drag.current = null; }, 0);
+  };
+  const onRowClickCapture = (e: React.MouseEvent) => {
+    if (drag.current?.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -165,7 +215,16 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
 
       <div className={`fchips${chipsShown ? " show" : ""}${chipsExpanded ? " expanded" : ""}`}>
         {/* Fixed-position portaled dropdowns would detach on scroll — close them. */}
-        <div className="fchips-inner" onScroll={() => setOpenChip(null)}>
+        <div
+          className="fchips-inner"
+          ref={rowRef}
+          onScroll={() => setOpenChip(null)}
+          onPointerDown={onRowPointerDown}
+          onPointerMove={onRowPointerMove}
+          onPointerUp={onRowPointerUp}
+          onPointerCancel={onRowPointerUp}
+          onClickCapture={onRowClickCapture}
+        >
         {/* Chip order: what → where → company (spec 2026-07-10). Role leads — one
             "Product Manager" bucket until the engine goes all-vertical (#34). */}
         <FilterChip
