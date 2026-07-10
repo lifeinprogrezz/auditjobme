@@ -143,10 +143,19 @@
    next shrink-sponge — it clips + scrolls (.fchips-inner) instead of pushing the
    Add-CV/avatar off the nav. Chips themselves are flex:none so they keep their size
    and the row scrolls rather than squishing them. */
-/* Row scrolls horizontally when 7+ chips outgrow the bar; edge fades signal the
-   clip (no scrollbar chrome). Dropdowns escape the clip via .fdrop-portal below. */
-.roles-theme .fchips-inner { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
-.roles-theme .fchips-inner::-webkit-scrollbar { display: none; }
+/* Row scrolls horizontally when 7+ chips outgrow the bar. Affordances: a real thin
+   scrollbar (grab + slide) and scroll-AWARE edge fades — HeadBar toggles .fade-l/.fade-r
+   so only the side actually hiding content fades; at either extreme the end chip reads
+   crisp (a static both-edge mask veiled Role/Language permanently — Rober 7-10 video). */
+.roles-theme .fchips-inner { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.28) transparent; }
+.roles-theme .fchips-inner::-webkit-scrollbar { height: 5px; }
+.roles-theme .fchips-inner::-webkit-scrollbar-track { background: transparent; }
+.roles-theme .fchips-inner::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.28); border-radius: 999px; }
+.roles-theme.light .fchips-inner { scrollbar-color: rgba(11, 31, 38, 0.3) transparent; }
+.roles-theme.light .fchips-inner::-webkit-scrollbar-thumb { background: rgba(11, 31, 38, 0.3); }
+.roles-theme .fchips-inner.fade-r { -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%); mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%); }
+.roles-theme .fchips-inner.fade-l { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 100%); mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 100%); }
+.roles-theme .fchips-inner.fade-l.fade-r { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); }
 /* Press-drag pan (HeadBar pointer handlers) — while panning, kill chip hover cues. */
 .roles-theme .fchips-inner.panning { cursor: grabbing; }
 .roles-theme .fchips-inner.panning .fchip { pointer-events: none; }

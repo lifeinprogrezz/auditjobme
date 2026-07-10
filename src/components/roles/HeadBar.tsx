@@ -40,6 +40,24 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
   // preventDefault. Drag suppresses the trailing click (capture phase) past 5px
   // so panning never toggles a chip.
   const drag = useRef<{ startX: number; startLeft: number; moved: boolean } | null>(null);
+  // Scroll-aware edge fades: only the side actually hiding content gets the mask
+  // (.fade-l / .fade-r), so Role reads crisp at the start and Language at the end.
+  // Re-checked after every render (chip widths change with counts) + on resize.
+  const updateFades = () => {
+    const el = rowRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    el.classList.toggle("fade-l", el.scrollLeft > 2);
+    el.classList.toggle("fade-r", max - el.scrollLeft > 2);
+  };
+  useEffect(updateFades);
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(updateFades);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   useEffect(() => {
     const el = rowRef.current;
     if (!el) return;
@@ -218,7 +236,10 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
         <div
           className="fchips-inner"
           ref={rowRef}
-          onScroll={() => setOpenChip(null)}
+          onScroll={() => {
+            setOpenChip(null);
+            updateFades();
+          }}
           onPointerDown={onRowPointerDown}
           onPointerMove={onRowPointerMove}
           onPointerUp={onRowPointerUp}
