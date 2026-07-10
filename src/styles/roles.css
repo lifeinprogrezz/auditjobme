@@ -139,9 +139,11 @@
    natural width (no max-width overshoot / dead-time), so the slide + fade read as one
    motion at any speed. flex:none keeps it from shrinking (the search is the sponge). */
 .roles-theme .fchips { display: grid; flex: none; grid-template-columns: 0fr; opacity: 0; pointer-events: none; margin-left: 0; transition: grid-template-columns 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.55s cubic-bezier(0.4, 0, 0.2, 1); }
-.roles-theme .fchips-inner { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+/* Row scrolls horizontally when 7+ chips outgrow the bar; edge fades signal the
+   clip (no scrollbar chrome). Dropdowns escape the clip via .fdrop-portal below. */
+.roles-theme .fchips-inner { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
+.roles-theme .fchips-inner::-webkit-scrollbar { display: none; }
 .roles-theme .fchips.show { grid-template-columns: 1fr; opacity: 1; pointer-events: auto; margin-left: 6px; }
-.roles-theme .fchips.expanded .fchips-inner { overflow: visible; }
 /* Headbar-wide reset — compact icon at the end of the chip row, shown only when a filter
    is active. flex:none so it never shrinks/wraps (keeps the responsive layout intact). */
 .roles-theme .fclear { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); cursor: pointer; transition: color 0.15s, background 0.15s, border-color 0.15s; }
@@ -160,6 +162,10 @@
 .roles-theme .fchip.active .fcount { display: inline-flex; }
 .roles-theme .fdrop { position: absolute; top: calc(100% + 9px); left: 0; min-width: 206px; background: var(--glass-2); border: 1px solid var(--rim); border-radius: 14px; box-shadow: var(--sh); padding: 6px; display: flex; flex-direction: column; gap: 1px; z-index: 60; opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.98); transform-origin: top left; pointer-events: none; transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s; }
 .roles-theme .fchip.open .fdrop { opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: auto; }
+/* Portaled chip dropdown — mounts only while open (the .fchip.open descendant
+   selector can't reach it); position comes from the chip's viewport rect. */
+.roles-theme .fdrop-portal { position: fixed; z-index: 80; opacity: 1; visibility: visible; pointer-events: auto; transform: none; animation: fdrop-in 0.18s ease; }
+@keyframes fdrop-in { from { opacity: 0; transform: translateY(-6px) scale(0.98); } }
 .roles-theme .fdrop::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), transparent 44%); mix-blend-mode: screen; }
 .roles-theme .fdrop > * { position: relative; z-index: 1; }
 .roles-theme .fdrop label { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.15s; }

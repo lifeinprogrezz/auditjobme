@@ -49,7 +49,8 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
       const t = e.target as Element | null;
-      if (t && !t.closest(".fchip") && !t.closest(".filterbtn")) setOpenChip(null);
+      // .fdrop is portaled out of the chip (scrollable row) — treat it as inside.
+      if (t && !t.closest(".fchip") && !t.closest(".filterbtn") && !t.closest(".fdrop")) setOpenChip(null);
     };
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
@@ -163,7 +164,8 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
       </button>
 
       <div className={`fchips${chipsShown ? " show" : ""}${chipsExpanded ? " expanded" : ""}`}>
-        <div className="fchips-inner">
+        {/* Fixed-position portaled dropdowns would detach on scroll — close them. */}
+        <div className="fchips-inner" onScroll={() => setOpenChip(null)}>
         {/* Chip order: what → where → company (spec 2026-07-10). Role leads — one
             "Product Manager" bucket until the engine goes all-vertical (#34). */}
         <FilterChip

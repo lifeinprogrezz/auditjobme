@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type FilterOption = { value: string; label: string; count: number };
 
@@ -36,6 +37,12 @@ export default function FilterChip({
   const [q, setQ] = useState("");
   const needle = q.trim().toLowerCase();
   const shown = needle ? options.filter((o) => o.label.toLowerCase().includes(needle)) : options;
+  const chipRef = useRef<HTMLDivElement>(null);
+  // The chip row scrolls horizontally (overflow-x: auto clips descendants) and the
+  // glass .nav's transform + backdrop-filter block the position:fixed escape hatch —
+  // so the open dropdown portals onto the .roles-theme page root (keeps the theme's
+  // CSS variables + light/dark class) anchored below the chip's viewport rect.
+  const rect = open ? chipRef.current?.getBoundingClientRect() : undefined;
 
   // Chip clicks toggle the dropdown, but clicks INSIDE the dropdown (search box,
   // checkboxes) must not — they manage their own state.
@@ -44,6 +51,7 @@ export default function FilterChip({
 
   return (
     <div
+      ref={chipRef}
       className={`fchip${selected.length ? " active" : ""}${open ? " open" : ""}${disabled ? " disabled" : ""}`}
       role="button"
       tabIndex={disabled ? -1 : 0}
@@ -65,7 +73,8 @@ export default function FilterChip({
       <svg className="caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
         <path d="m6 9 6 6 6-6" />
       </svg>
-      <div className="fdrop fdrop-multi">
+      {open && rect && createPortal(
+      <div className="fdrop fdrop-multi fdrop-portal" style={{ top: rect.bottom + 9, left: rect.left }}>
         {searchable && (
           <input
             className="fdrop-search"
@@ -102,7 +111,9 @@ export default function FilterChip({
           ))}
           {shown.length === 0 && <div className="fdrop-empty">No matches</div>}
         </div>
-      </div>
+      </div>,
+      document.querySelector(".roles-theme") ?? document.body,
+      )}
     </div>
   );
 }
