@@ -20,6 +20,7 @@ type JobsRow = {
   posted_at: string | null;
   company_id: string | null;
   extraction: RoleExtraction | null;
+  role_family: string | null;
 };
 
 const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page past it.
@@ -345,7 +346,7 @@ export function useRolesData() {
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await supabase
           .from("jobs")
-          .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id, extraction")
+          .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id, extraction, role_family")
           .eq("is_live", true)
           .range(from, from + PAGE - 1);
         if (error || !data) break;
