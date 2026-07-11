@@ -11,7 +11,7 @@
 // Env: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / RESEND_API_KEY / CRON_SECRET
 // (same contract as api/nightly.ts).
 import { createClient } from "@supabase/supabase-js";
-import { SYSTEM, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION } from "../src/lib/scorePrompt.js";
+import { SYSTEM, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION, type ParsedScore } from "../src/lib/scorePrompt.js";
 import { cronAuthResult } from "../src/lib/nightly.js";
 import {
   RUN_BUDGET_MS,
@@ -49,7 +49,7 @@ async function scoreViaProxy(
   serviceKey: string,
   targetUserId: string,
   userMsg: string,
-): Promise<{ score: number; reason: string; fitBullets: string[] } | null> {
+): Promise<ParsedScore | null> {
   let res: Response;
   try {
     res = await fetch(proxyUrl, {
@@ -62,7 +62,7 @@ async function scoreViaProxy(
       body: JSON.stringify({
         kind: "score",
         model: HAIKU,
-        max_tokens: 500,
+        max_tokens: SCORE_MAX_TOKENS,
         system: SYSTEM,
         target_user_id: targetUserId,
         messages: [{ role: "user", content: userMsg }],
@@ -252,7 +252,12 @@ export default async function handler(req: Req, res: Res): Promise<void> {
                 job_id: j.id,
                 score: result.score,
                 rubric_version: RUBRIC_VERSION,
-                signals: { reason: result.reason, fit_bullets: result.fitBullets },
+                signals: {
+                  reason: result.reason,
+                  fit_bullets: result.fitBullets,
+                  subscores: result.subscores,
+                  evidence: result.evidence,
+                },
               },
               { onConflict: "user_id,job_id,rubric_version" },
             );

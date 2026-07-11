@@ -12,7 +12,7 @@
 //   sends it as `Authorization: Bearer <CRON_SECRET>`).
 import { createClient } from "@supabase/supabase-js";
 import { pickScoringSlice } from "../src/lib/labels.js";
-import { SYSTEM, buildScoreUserMessage, parseScoreResponse } from "../src/lib/scorePrompt.js";
+import { SYSTEM, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse } from "../src/lib/scorePrompt.js";
 import {
   NIGHTLY_TOP_N,
   cronAuthResult,
@@ -75,7 +75,7 @@ async function scoreViaProxy(
       body: JSON.stringify({
         kind: "score",
         model: HAIKU,
-        max_tokens: 500,
+        max_tokens: SCORE_MAX_TOKENS,
         system,
         target_user_id: targetUserId,
         messages: [{ role: "user", content: userMsg }],

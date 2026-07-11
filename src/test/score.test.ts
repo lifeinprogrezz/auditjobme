@@ -12,6 +12,8 @@ describe("parseScoreResponse", () => {
       score: 4.2,
       reason: "strong fit",
       fitBullets: [],
+      subscores: [],
+      evidence: [],
     });
   });
 
@@ -20,6 +22,8 @@ describe("parseScoreResponse", () => {
       score: 3,
       reason: "ok",
       fitBullets: [],
+      subscores: [],
+      evidence: [],
     });
   });
 
@@ -44,7 +48,13 @@ describe("parseScoreResponse", () => {
   });
 
   it("defaults reason to empty string and fitBullets to [] when missing", () => {
-    expect(parseScoreResponse('{"score": 2}')).toEqual({ score: 2, reason: "", fitBullets: [] });
+    expect(parseScoreResponse('{"score": 2}')).toEqual({
+      score: 2,
+      reason: "",
+      fitBullets: [],
+      subscores: [],
+      evidence: [],
+    });
   });
 
   it("parses fit_bullets, trims them, and caps at 5", () => {
@@ -63,6 +73,52 @@ describe("parseScoreResponse", () => {
 
   it("tolerates fit_bullets that isn't an array", () => {
     expect(parseScoreResponse('{"score":3,"reason":"ok","fit_bullets":"nope"}')?.fitBullets).toEqual([]);
+  });
+});
+
+
+// v4 (Track D S2, 2026-07-11): explainable-score data contract — subscores per rubric
+// dimension + cited evidence. Both degrade to [] so pre-v4 responses stay parseable.
+describe("parseScoreResponse — v4 subscores + evidence", () => {
+  it("parses well-formed subscores and clamps each into [0, 5]", () => {
+    const out = parseScoreResponse(
+      '{"score":4,"reason":"ok","subscores":[{"key":"seniority","score":7},{"key":"geography","score":-1},{"key":"background","score":3.5}]}',
+    );
+    expect(out?.subscores).toEqual([
+      { key: "seniority", score: 5 },
+      { key: "geography", score: 0 },
+      { key: "background", score: 3.5 },
+    ]);
+  });
+
+  it("drops unknown subscore keys, non-numeric scores, and duplicate keys", () => {
+    const out = parseScoreResponse(
+      '{"score":3,"reason":"ok","subscores":[{"key":"vibes","score":5},{"key":"language","score":"high"},{"key":"language","score":4},{"key":"language","score":1},"junk",null]}',
+    );
+    expect(out?.subscores).toEqual([{ key: "language", score: 4 }]);
+  });
+
+  it("parses evidence, clamps contribution into [-1, 1], and coerces missing quotes to empty strings", () => {
+    const out = parseScoreResponse(
+      '{"score":4,"reason":"ok","evidence":[{"label":"Marketplace experience","cv_line":" grew GMV to $375M ","jd_phrase":"two-sided marketplace","contribution":3},{"label":"Seniority gap","contribution":-2}]}',
+    );
+    expect(out?.evidence).toEqual([
+      { label: "Marketplace experience", cvLine: "grew GMV to $375M", jdPhrase: "two-sided marketplace", contribution: 1 },
+      { label: "Seniority gap", cvLine: "", jdPhrase: "", contribution: -1 },
+    ]);
+  });
+
+  it("drops label-less evidence items, defaults contribution to 0, and caps at 6", () => {
+    const items = Array.from({ length: 8 }, (_, i) => `{"label":"factor ${i}","contribution":"n/a"}`).join(",");
+    const out = parseScoreResponse(`{"score":2,"reason":"ok","evidence":[{"cv_line":"orphan"},null,${items}]}`);
+    expect(out?.evidence).toHaveLength(6);
+    expect(out?.evidence[0]).toEqual({ label: "factor 0", cvLine: "", jdPhrase: "", contribution: 0 });
+  });
+
+  it("tolerates subscores / evidence that aren't arrays (pre-v4 shape)", () => {
+    const out = parseScoreResponse('{"score":3,"reason":"ok","subscores":"nope","evidence":{"a":1}}');
+    expect(out?.subscores).toEqual([]);
+    expect(out?.evidence).toEqual([]);
   });
 });
 
