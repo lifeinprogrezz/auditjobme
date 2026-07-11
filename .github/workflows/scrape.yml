@@ -68,3 +68,13 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # F3 (issue #37): publish the static dataplane LAST, after every write to the
+      # pool — the /roles map and the GEO feeds fetch these artifacts instead of
+      # querying the DB per visitor. Deliberately NOT continue-on-error: a red run
+      # here means the map is serving yesterday's artifact (visible, not fatal —
+      # the app falls back to live reads if the artifact is missing entirely).
+      - name: Publish the static dataplane (jobs + companies + offices → Storage)
+        run: node scripts/build-dataplane.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

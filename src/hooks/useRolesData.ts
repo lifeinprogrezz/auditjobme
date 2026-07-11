@@ -7,6 +7,7 @@ import { applyLandedScores, byScore, type RoleJob, type RoleExtraction } from "@
 import { hashCv, readCvStash, clearCvStash } from "@/lib/labels";
 import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
+import { fetchDataplane, type DataplaneCompany, type DataplaneOffice } from "@/lib/dataplane";
 
 type JobsRow = {
   id: string;
@@ -284,30 +285,46 @@ export function useRolesData() {
   useEffect(() => {
     const runId = ++runRef.current;
     async function load() {
+      // F3 (issue #37): the three public reads below are served by ONE static
+      // artifact, rebuilt daily after the scrape — zero DB reads per anonymous
+      // visitor. The live queries stay as FALLBACK for a missing/unreachable
+      // artifact (deploy-order safe; the map never breaks on the dataplane).
+      const plane = await fetchDataplane(import.meta.env.VITE_SUPABASE_URL as string);
       // Jobs are public postings (anon SELECT on is_live rows, migration
       // 20260705121000) — fetch them signed-in or not. Everything personalized
       // below stays behind the user check.
       let rows: JobsRow[] = [];
-      for (let from = 0; ; from += PAGE) {
-        const { data, error } = await supabase
-          .from("jobs")
-          .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id, extraction, role_family, workplace")
-          .eq("is_live", true)
-          .range(from, from + PAGE - 1);
-        if (error || !data) break;
-        rows = rows.concat(data as JobsRow[]);
-        if (data.length < PAGE) break;
+      let cosRows: DataplaneCompany[] = [];
+      let offRows: DataplaneOffice[] = [];
+      if (plane) {
+        rows = plane.jobs as unknown as JobsRow[];
+        cosRows = plane.companies;
+        offRows = plane.offices;
+      } else {
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await supabase
+            .from("jobs")
+            .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id, extraction, role_family, workplace")
+            .eq("is_live", true)
+            .range(from, from + PAGE - 1);
+          if (error || !data) break;
+          rows = rows.concat(data as JobsRow[]);
+          if (data.length < PAGE) break;
+        }
+        const { data: cos } = await supabase
+          .from("companies")
+          .select(
+            "slug, logo_domain, lat, lng, website, sector, stage, headcount_bucket, hq_city, hq_country, linkedin_url, description, founded_year, uk_sponsor_status",
+          );
+        cosRows = (cos ?? []) as DataplaneCompany[];
+        const { data: offs } = await supabase.from("company_offices").select("company_slug, lat, lng");
+        offRows = (offs ?? []) as DataplaneOffice[];
       }
-      // Companies dimension (anon-readable, ~550 rows): real logo domains beat
-      // the name-guess, street office coords beat the sunflower scatter.
-      // Failure degrades to guess + centroid, never blocks.
+      // Companies dimension (~600 rows): real logo domains beat the name-guess,
+      // street office coords beat the sunflower scatter. Failure degrades to
+      // guess + centroid, never blocks.
       const dims = new Map<string, CompanyDim>();
-      const { data: cos } = await supabase
-        .from("companies")
-        .select(
-          "slug, logo_domain, lat, lng, website, sector, stage, headcount_bucket, hq_city, hq_country, linkedin_url, description, founded_year, uk_sponsor_status",
-        );
-      (cos ?? []).forEach((c) =>
+      cosRows.forEach((c) =>
         dims.set(c.slug, {
           logo_domain: c.logo_domain, lat: c.lat, lng: c.lng,
           website: c.website, sector: c.sector, stage: c.stage,
@@ -320,8 +337,7 @@ export function useRolesData() {
       // right office (distance-matched). Empty until seeded — degrades to the
       // single companies coord, never blocks.
       const officesBySlug = new Map<string, [number, number][]>();
-      const { data: offs } = await supabase.from("company_offices").select("company_slug, lat, lng");
-      (offs ?? []).forEach((o) => {
+      offRows.forEach((o) => {
         const arr = officesBySlug.get(o.company_slug) ?? [];
         arr.push([o.lng, o.lat]);
         officesBySlug.set(o.company_slug, arr);
