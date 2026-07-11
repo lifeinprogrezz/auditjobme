@@ -797,7 +797,9 @@
   width: 100%; padding: 13px; border-radius: 13px; font-family: var(--font-d); font-size: 14px;
   font-weight: 600; letter-spacing: -0.01em; cursor: pointer; margin-top: 4px;
   color: var(--act-strong-ink); background: var(--act-strong); border: 1px solid var(--act-strong);
-  box-shadow: var(--sh); transition: opacity 0.2s, transform 0.12s;
+  /* Plain drop shadow, NOT --sh: the glass inner-highlight washed this wide
+   * button's top into a grey gradient — flat ink like navcv/dcta (Rober 7-12). */
+  box-shadow: 0 8px 20px -6px var(--act-shadow); transition: opacity 0.2s, transform 0.12s;
 }
 .roles-theme .cvcta:hover { opacity: 0.92; }
 .roles-theme .cvcta:active { transform: translateY(1px); }
