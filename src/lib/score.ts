@@ -24,6 +24,8 @@ export async function scoreJob(
   const userMsg = buildScoreUserMessage(profile, job);
 
   const { data, error } = await supabase.functions.invoke("anthropic-proxy", {
+    // residency pin: edge fns run caller-near by default; CV text must stay on EU compute (S1)
+    headers: { "x-region": "eu-central-1" },
     body: {
       kind: "score",
       model: "claude-haiku-4-5-20251001",

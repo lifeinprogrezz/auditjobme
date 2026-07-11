@@ -34,6 +34,7 @@ async function callProxy(messages: ProxyMessage[], maxTokens: number, kind: "cv"
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
       apikey: key,
+      "x-region": "eu-central-1", // residency pin: edge fns run caller-near by default (S1)
     },
     body: JSON.stringify({ messages, model: HAIKU, max_tokens: maxTokens, kind }),
   });

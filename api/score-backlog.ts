@@ -58,6 +58,7 @@ async function scoreViaProxy(
         Authorization: `Bearer ${serviceKey}`,
         apikey: serviceKey,
         "Content-Type": "application/json",
+        "x-region": "eu-central-1", // residency pin: edge fns run caller-near by default (S1)
       },
       body: JSON.stringify({
         kind: "score",

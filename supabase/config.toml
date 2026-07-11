@@ -1,1 +1,5 @@
 project_id = "roaervdsjejksaeseeov"
+# F9 (Track D): pin the deployed setting so a redeploy can't silently flip it.
+# The proxy's service-role auth path depends on the gateway validating the JWT.
+[functions.anthropic-proxy]
+verify_jwt = true
