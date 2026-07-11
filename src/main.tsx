@@ -29,6 +29,24 @@ if (sentryDsn) {
   });
 }
 
+// Cookieless analytics (Track D S4, Rober 7-11): PostHog EU (Frankfurt) with
+// persistence:"memory" — no cookies, no cross-visit identifier, so no consent
+// banner is required; the full consent-gated setup (CMP) is a launch-time task.
+// No-op unless VITE_POSTHOG_KEY is set (same pattern as Sentry above). Loaded
+// lazily so the analytics bundle never delays the map.
+const posthogKey = import.meta.env.VITE_POSTHOG_KEY;
+if (posthogKey) {
+  import("posthog-js").then(({ default: posthog }) => {
+    posthog.init(posthogKey, {
+      api_host: "https://eu.i.posthog.com",
+      persistence: "memory",
+      capture_pageview: "history_change",
+      autocapture: false,
+      disable_session_recording: true,
+    });
+  });
+}
+
 createRoot(document.getElementById("root")!).render(
   <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
     <App />

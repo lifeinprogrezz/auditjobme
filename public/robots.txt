@@ -1,9 +1,50 @@
+# auditjob.me — everything public is crawlable, and AI crawlers are explicitly
+# welcome (GEO: being cited by answer engines is distribution, not a threat —
+# research bible §GEO-3). Named UAs below are the allow-list an engine checks
+# before crawling; the catch-all keeps everyone else in too.
+
+# Search
 User-agent: Googlebot
 Allow: /
 
 User-agent: Bingbot
 Allow: /
 
+# AI assistants + answer engines
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+# Social link previews
 User-agent: Twitterbot
 Allow: /
 
@@ -12,3 +53,5 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: https://auditjob.me/sitemap.xml
