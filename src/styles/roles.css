@@ -120,15 +120,13 @@
 .roles-theme .spacer { flex: 1; }
 .roles-theme .seg { display: flex; background: rgba(255, 255, 255, 0.06); border-radius: 11px; padding: 3px; position: relative; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.05); }
 .roles-theme:not(.scored) .seg { display: none; }
-/* The jade door (Rober 7-12, third pass): the CV upload wears the score
- * gradient — the color of the world it unlocks (brand dot, score badges, dhs).
- * Ink-on-black read "too strong", 85% slate read muddy; the accent is what
- * makes it the first thing you see without the weight. Softened glow: the
- * full --glow halo is for score moments, a CTA at rest gets a quieter one. */
-.roles-theme .navcv { flex: none; white-space: nowrap; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--great-ink); border: none; background: linear-gradient(135deg, var(--great), #34e3ff); box-shadow: 0 0 22px 0 rgba(31, 216, 184, 0.4); transition: box-shadow 0.25s, transform 0.12s; }
-.roles-theme .navcv:hover { box-shadow: var(--glow); }
+/* Soft-slate fill (Rober 7-12, settled): 60% act-strong over the surface —
+ * filled enough to read as the primary action, without the full-ink weight
+ * (100% "too strong", jade gradient rejected, 85% still too heavy). */
+.roles-theme .navcv { flex: none; white-space: nowrap; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--act-strong-ink); border: 1px solid transparent; background: color-mix(in srgb, var(--act-strong) 60%, var(--surface)); box-shadow: var(--sh); transition: opacity 0.2s, transform 0.12s; }
+.roles-theme .navcv:hover { opacity: 0.92; }
 .roles-theme .navcv:active { transform: translateY(1px); }
-.roles-theme .navcv .sp { width: 22px; height: 22px; flex: none; border-radius: 7px; display: grid; place-items: center; color: var(--great-ink); background: rgba(255, 255, 255, 0.34); }
+.roles-theme .navcv .sp { width: 22px; height: 22px; flex: none; border-radius: 7px; display: grid; place-items: center; color: var(--act-strong); background: var(--act-strong-ink); }
 .roles-theme.scored .navcv { display: none; }
 .roles-theme .seg button { width: 74px; font: inherit; font-size: 12.5px; font-weight: 600; border: 0; background: transparent; color: var(--muted); padding: 7px 0; border-radius: 8px; cursor: pointer; z-index: 1; transition: color 0.25s; }
 .roles-theme .seg button.on { color: var(--act-strong-ink); }
@@ -472,10 +470,10 @@
 .roles-theme .dfit { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .roles-theme .dfit li { position: relative; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: #c6d6db; }
 .roles-theme .dfit li::before { content: ""; position: absolute; left: 4px; top: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--text); }
-/* Drawer primary CTA: same jade-door gradient as .navcv (Rober 7-12) — the
- * drawer's one action wears the score accent. applied-cta re-tints it below. */
-.roles-theme .dcta { width: 100%; padding: 12px; font-size: 13.5px; background: linear-gradient(135deg, var(--great), #34e3ff); color: var(--great-ink); border: none; box-shadow: 0 0 22px 0 rgba(31, 216, 184, 0.35); transition: box-shadow 0.25s, transform 0.15s; }
-.roles-theme .dcta:enabled:hover { box-shadow: var(--glow); }
+/* Drawer primary CTA: same 60% soft-slate as .navcv (Rober 7-12, settled).
+ * applied-cta re-tints it below. */
+.roles-theme .dcta { width: 100%; padding: 12px; font-size: 13.5px; background: color-mix(in srgb, var(--act-strong) 60%, var(--surface)); color: var(--act-strong-ink); border: 1px solid transparent; box-shadow: var(--sh); transition: opacity 0.2s, transform 0.15s; }
+.roles-theme .dcta:enabled:hover { opacity: 0.92; }
 .roles-theme .applied-cta { background: rgba(31, 216, 184, 0.12); color: var(--great); border: 1px solid rgba(31, 216, 184, 0.3); cursor: default; }
 .roles-theme .djd { border-top: 1px solid var(--hair); padding-top: 2px; }
 .roles-theme .djd-sum { display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; padding: 8px 0; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
