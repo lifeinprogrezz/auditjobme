@@ -35,7 +35,26 @@ Allow: /
 User-agent: Perplexity-User
 Allow: /
 
+User-agent: GrokBot
+Allow: /
+
+User-agent: xAI-Grok
+Allow: /
+
+User-agent: Grok-DeepSearch
+Allow: /
+
+User-agent: DeepSeekBot
+Allow: /
+
+# Gemini: Google-Extended = training opt-in; CloudVertexBot = grounding; GoogleOther = R&D
 User-agent: Google-Extended
+Allow: /
+
+User-agent: Google-CloudVertexBot
+Allow: /
+
+User-agent: GoogleOther
 Allow: /
 
 User-agent: Applebot-Extended
