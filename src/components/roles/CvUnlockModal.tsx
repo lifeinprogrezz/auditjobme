@@ -260,9 +260,6 @@ export default function CvUnlockModal({
                 : "Continue with Google"}
           </button>
         )}
-        {stage === "parsed" && !signedIn && (
-          <p className="cvfoot">One tap. We match your CV to every live role, free.</p>
-        )}
       </div>
     </div>
   );
