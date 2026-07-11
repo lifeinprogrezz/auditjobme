@@ -91,8 +91,9 @@ describe("email copy", () => {
   it("body links to the map and reports totals", () => {
     const { text, html } = buildReadyBody(3, 764, "https://auditjob.me/");
     expect(text).toContain("764");
-    expect(text).toContain("https://auditjob.me/roles");
-    expect(html).toContain('href="https://auditjob.me/roles"');
+    // The globe IS the landing at the bare domain (Rober 7-12) — email links the canonical root.
+    expect(text).toContain("https://auditjob.me/");
+    expect(html).toContain('href="https://auditjob.me/"');
   });
   it("zero-strong body stays honest, no fabricated matches", () => {
     const { text } = buildReadyBody(0, 100, "https://auditjob.me/");

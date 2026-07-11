@@ -86,12 +86,12 @@ export function buildReadyBody(
     `We finished scoring all ${totalScored} live roles against your CV.`,
     strongLine,
     ``,
-    `Open your map: ${appUrl}roles`,
+    `Open your map: ${appUrl}`,
   ].join("\n");
   const html = [
     `<p>We finished scoring all <b>${totalScored}</b> live roles against your CV.</p>`,
     `<p>${strongLine}</p>`,
-    `<p><a href="${appUrl}roles">Open your map</a></p>`,
+    `<p><a href="${appUrl}">Open your map</a></p>`,
   ].join("\n");
   return { text, html };
 }

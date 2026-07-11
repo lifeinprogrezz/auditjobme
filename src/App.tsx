@@ -38,7 +38,9 @@ const App = () => (
                   pages, legal, shared audits, unknown URLs — shows the coming-soon
                   placeholder until those pages ship (Rober 7-06). */}
               <Route path="/" element={<RolesMap />} />
-              <Route path="/roles" element={<RolesMap />} />
+              {/* The globe IS the landing at the bare domain (Rober 7-12) —
+                  /roles survives only as a redirect so old links keep working. */}
+              <Route path="/roles" element={<Navigate to="/" replace />} />
               <Route path="/underconstruction" element={<UnderConstruction />} />
               <Route path="*" element={<Navigate to="/underconstruction" replace />} />
             </Routes>
