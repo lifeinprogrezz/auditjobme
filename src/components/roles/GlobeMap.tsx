@@ -512,6 +512,10 @@ function addRolesLayers(map: maplibregl.Map, data: FeatureCollection): void {
     id: "hl",
     type: "circle",
     source: "hl",
+    // City-zoom only (Rober 7-11): the rings mark city CENTROIDS, so they only
+    // line up with pins once the logo cloud has fanned out (clusterMaxZoom 9).
+    // Wider than that they floated over empty map as unlabeled teal circles.
+    minzoom: 9,
     paint: {
       "circle-radius": 17,
       "circle-color": "rgba(31,216,184,.12)",
