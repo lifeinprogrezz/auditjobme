@@ -18,6 +18,7 @@
  *   --limit N cap the number of stale rows processed this run
  */
 import { createClient } from "@supabase/supabase-js";
+import { makeMeter } from "./usage-meter.mjs";
 import {
   EXTRACTION_VERSION,
   MODEL,
@@ -40,9 +41,11 @@ const MIN_JD_LEN = 60;
 const MAX_LLM_CALLS = 1200; // hard ceiling — this key spends outside the proxy kill-switch
 
 const db = SUPABASE_URL && SERVICE_KEY ? createClient(SUPABASE_URL, SERVICE_KEY) : null;
+const meter = makeMeter(db, "extract"); // S10: system spend lands in usage_events
 
 async function haikuExtract(jdText, heur) {
   const { system, user } = buildExtractionMessages(jdText, heur);
+  const t0 = Date.now();
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -60,7 +63,9 @@ async function haikuExtract(jdText, heur) {
       signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) return {};
-    return parseExtraction(await res.json());
+    const data = await res.json();
+    meter.record(MODEL, data?.usage, Date.now() - t0);
+    return parseExtraction(data);
   } catch {
     return {};
   }
@@ -165,6 +170,7 @@ async function main() {
   for (const s of samples) {
     console.error(`  sample ${s.id}: ${JSON.stringify(s.extraction)}`);
   }
+  if (!DRY) await meter.flush(); // S10: one bulk insert into usage_events
 }
 
 main().catch((e) => {

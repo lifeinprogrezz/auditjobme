@@ -47,7 +47,12 @@ async function fetchGreenhouse(b) {
 }
 
 async function fetchLever(b) {
-  const res = await fetch(`https://api.lever.co/v0/postings/${b.token}?mode=json`, fetchOpts());
+  // EU-residency Lever boards live on api.eu.lever.co and 404 on the global host
+  // (Track D S5 — they were silently missed). Try global first, fall back to EU.
+  let res = await fetch(`https://api.lever.co/v0/postings/${b.token}?mode=json`, fetchOpts());
+  if (res.status === 404) {
+    res = await fetch(`https://api.eu.lever.co/v0/postings/${b.token}?mode=json`, fetchOpts());
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   return (Array.isArray(data) ? data : [])

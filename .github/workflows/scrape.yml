@@ -12,7 +12,12 @@ name: Scrape jobs
 
 on:
   schedule:
-    - cron: "0 6 * * *" # daily, 06:00 UTC
+    # 05:00 UTC, ONE HOUR BEFORE the Vercel nightly scorer (vercel.json: /api/nightly
+    # at 06:00) — both used to fire at 06:00, so scoring raced the scrape and could
+    # read yesterday's pool (Track D S6). Scrape+extract+enrich finish well inside
+    # the hour; if this ever slips past 06:00 the scorer just sees yesterday's jobs
+    # once, it never breaks.
+    - cron: "0 5 * * *"
   workflow_dispatch: {} # manual trigger from the Actions tab
 
 permissions:

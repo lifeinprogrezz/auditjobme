@@ -19,6 +19,7 @@
  * Usage: node scripts/enrich-companies.mjs [--limit=150] [--dry-run]
  */
 import { createClient } from "@supabase/supabase-js";
+import { makeMeter } from "./usage-meter.mjs";
 import {
   MODEL,
   parseEnrichment,
@@ -40,9 +41,11 @@ const CONCURRENCY = 4;
 const JD_CAP = 6000;
 
 const db = SUPABASE_URL && SERVICE_KEY ? createClient(SUPABASE_URL, SERVICE_KEY) : null;
+const meter = makeMeter(db, "enrich"); // S10: system spend lands in usage_events
 
 async function haikuExtract(company, jd) {
   if (!ANTHROPIC_KEY || !jd) return {};
+  const t0 = Date.now();
   const prompt = `From the job description(s) below for the company "${company}", extract ONLY facts that are EXPLICITLY stated. Do not guess or infer beyond the text. Return one JSON object, no prose:
 {"description": "<one plain sentence on what the company does, <=200 chars, or null>",
  "sector": "<short industry label e.g. Fintech, or null>",
@@ -65,6 +68,7 @@ ${jd.slice(0, JD_CAP)}`;
     });
     if (!res.ok) return {};
     const data = await res.json();
+    meter.record(MODEL, data?.usage, Date.now() - t0);
     return parseEnrichment(data?.content?.[0]?.text || "");
   } catch {
     return {};
@@ -179,6 +183,7 @@ async function main() {
     }
   }
   console.log(`enrich: done — wrote ${wrote}/${targets.length}.`);
+  if (!DRY) await meter.flush(); // S10: one bulk insert into usage_events
 }
 
 main().catch((e) => {
