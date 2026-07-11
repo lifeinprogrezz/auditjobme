@@ -2,95 +2,110 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* auditjob.me design tokens — THE product-wide token layer (Track D S3, 2026-07-11).
+ *
+ * Source of truth for every screen OUTSIDE the /roles map. Values are lifted from
+ * the live map system (src/styles/roles.css, which stays self-scoped under
+ * .roles-theme): a monochrome ink-glass world — white/off-white glass surfaces
+ * with near-black ink in light, deep ink-teal surfaces with pale text in dark.
+ * Color appears ONLY as data semantics (score buckets) and company logos; there
+ * is no decorative brand accent. See BRAND.md.
+ *
+ * All colors MUST be HSL (shadcn convention).
+ */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* stage + surfaces (map light: #f7f9fa page, #ffffff / #f0f4f6 / #e4ebee surfaces) */
+    --background: 200 23.1% 97.5%;
+    --foreground: 195.6 55.1% 9.6%; /* ink #0b1f26 */
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 195.6 55.1% 9.6%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 195.6 55.1% 9.6%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* primary = the "strong action" ink (map --act-strong #15232c on #f4f8f9) */
+    --primary: 203.5 35.4% 12.7%;
+    --primary-foreground: 192 29.4% 96.7%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 200 25% 95.3%; /* surface-2 #f0f4f6 */
+    --secondary-foreground: 195 22.2% 31.8%; /* muted ink #3f5a63 */
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 200 25% 95.3%;
+    --muted-foreground: 193.7 13.8% 50.4%; /* subtle #6f8a92 */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 198 22.7% 91.4%; /* surface-3 #e4ebee */
+    --accent-foreground: 195.6 55.1% 9.6%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* destructive = the score "low" coral, our only warm semantic */
+    --destructive: 11.5 100% 65.1%;
+    --destructive-foreground: 195.6 55.1% 9.6%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 200 15.3% 88.4%; /* hair rgba(11,31,38,.1) flattened */
+    --input: 200 15.3% 88.4%;
+    --ring: 195.6 55.1% 9.6%;
 
-    --radius: 0.5rem;
+    /* score semantics (identical in both themes; jade is DATA, not brand chrome) */
+    --score-great: 169.6 74.9% 48.4%; /* #1fd8b8 */
+    --score-great-deep: 173.1 80.3% 35.9%; /* #12a594 */
+    --score-great-ink: 170.6 80% 7.8%; /* #04241f */
+    --score-mid: 40.1 100% 65.1%; /* #ffc44d */
+    --score-low: 11.5 100% 65.1%; /* #ff6f4d */
 
-    --sidebar-background: 0 0% 98%;
+    /* map control radius language is 11px buttons / 14-18px cards */
+    --radius: 0.75rem;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 200 23.1% 97.5%;
+    --sidebar-foreground: 195 22.2% 31.8%;
+    --sidebar-primary: 203.5 35.4% 12.7%;
+    --sidebar-primary-foreground: 192 29.4% 96.7%;
+    --sidebar-accent: 200 25% 95.3%;
+    --sidebar-accent-foreground: 195.6 55.1% 9.6%;
+    --sidebar-border: 200 15.3% 88.4%;
+    --sidebar-ring: 195.6 55.1% 9.6%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* stage + surfaces (map dark: ink-teal #0f1d24 / #16262e / #1c2f38) */
+    --background: 202.5 44.4% 7.1%; /* #0a141a */
+    --foreground: 186.7 27.3% 93.5%; /* #eaf2f3 */
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 200 41.2% 10%; /* surface #0f1d24 */
+    --card-foreground: 186.7 27.3% 93.5%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 200 35.3% 13.3%; /* surface-2 #16262e */
+    --popover-foreground: 186.7 27.3% 93.5%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* act-strong inverts in dark: pale text block with ink lettering */
+    --primary: 186.7 27.3% 93.5%;
+    --primary-foreground: 195.6 55.1% 9.6%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 200 35.3% 13.3%;
+    --secondary-foreground: 195.6 16% 66.9%; /* muted #9db1b8 */
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 200 35.3% 13.3%;
+    --muted-foreground: 195.6 16% 66.9%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 199.3 33.3% 16.5%; /* surface-3 #1c2f38 */
+    --accent-foreground: 186.7 27.3% 93.5%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 11.5 100% 65.1%;
+    --destructive-foreground: 195.6 55.1% 9.6%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 200 19.6% 21%; /* rim rgba(255,255,255,.14) flattened */
+    --input: 197.1 23.1% 17.8%;
+    --ring: 186.7 27.3% 93.5%;
+
+    --sidebar-background: 200 41.2% 10%;
+    --sidebar-foreground: 195.6 16% 66.9%;
+    --sidebar-primary: 186.7 27.3% 93.5%;
+    --sidebar-primary-foreground: 195.6 55.1% 9.6%;
+    --sidebar-accent: 200 35.3% 13.3%;
+    --sidebar-accent-foreground: 186.7 27.3% 93.5%;
+    --sidebar-border: 200 19.6% 21%;
+    --sidebar-ring: 186.7 27.3% 93.5%;
   }
 }
 
@@ -100,7 +115,7 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
-    background-color: #0f0e0c;
+    @apply bg-background text-foreground font-sans antialiased;
+    letter-spacing: -0.006em;
   }
 }

@@ -83,7 +83,8 @@ A Node command-line system, file-based, single-user today. What it does:
 A Vite + React single-page app (TypeScript), styled with Tailwind + shadcn/ui,
 built in Lovable, backed by Supabase (Postgres + Google sign-in). What's already
 built and working:
-- Landing page, brand/color system (sage `#8a9a8a` on dark charcoal), **Google
+- Landing page, brand/color system (monochrome ink-glass, tokens in `src/index.css`
+  + `BRAND.md`; the old sage-on-charcoal palette is retired), **Google
   sign-in**, public audit display at `/a/:username/:slug`, legal pages.
 - Database schema already present: `audits`, `profiles`, `purchases` (Stripe),
   `whitelisted_emails`, `device_fingerprints`, `feedback`.

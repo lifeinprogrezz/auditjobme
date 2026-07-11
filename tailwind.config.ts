@@ -14,7 +14,21 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        // Same stack the /roles map uses (roles.css --font-d / --font-s / --font-m);
+        // @fontsource imports live in src/main.tsx so every page gets them.
+        display: ['"Space Grotesk"', '"Geist Sans"', "system-ui", "sans-serif"],
+        sans: ['"Geist Sans"', "system-ui", "-apple-system", "sans-serif"],
+        mono: ['"Geist Mono"', "ui-monospace", "Menlo", "monospace"],
+      },
       colors: {
+        score: {
+          great: "hsl(var(--score-great))",
+          "great-deep": "hsl(var(--score-great-deep))",
+          "great-ink": "hsl(var(--score-great-ink))",
+          mid: "hsl(var(--score-mid))",
+          low: "hsl(var(--score-low))",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
