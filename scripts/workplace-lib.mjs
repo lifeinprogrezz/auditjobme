@@ -45,7 +45,17 @@ export function workplaceFromJd(jdText) {
   return null;
 }
 
-/** The write-time chain: structured ATS field ?? location ?? JD. Every input optional. */
-export function resolveWorkplace({ structured, location, jdText } = {}) {
-  return normWorkplace(structured) ?? workplaceFromLocation(location) ?? workplaceFromJd(jdText);
+/** The write-time chain: structured ATS field ?? location ?? JD ?? weak remote flag.
+ *  `structured` is for AUTHORITATIVE 3-way fields only (Lever workplaceType).
+ *  `weakRemote` is for loose booleans (Ashby isRemote, Workable remote,
+ *  SmartRecruiters location.remote) that mean "remote allowed", not "fully remote" —
+ *  live data showed Ashby isRemote=true on city-office roles whose JD says hybrid,
+ *  so they must never override a location/JD classification. */
+export function resolveWorkplace({ structured, location, jdText, weakRemote } = {}) {
+  return (
+    normWorkplace(structured) ??
+    workplaceFromLocation(location) ??
+    workplaceFromJd(jdText) ??
+    (weakRemote ? "remote" : null)
+  );
 }

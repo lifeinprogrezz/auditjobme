@@ -48,10 +48,14 @@ test("workplaceFromJd — unambiguous JD phrasing only", () => {
   assert.equal(workplaceFromJd(null), null);
 });
 
-test("resolveWorkplace — structured beats location beats JD", () => {
+test("resolveWorkplace — structured beats location beats JD beats weak remote flag", () => {
   assert.equal(resolveWorkplace({ structured: "hybrid", location: "Remote", jdText: "fully remote" }), "hybrid");
   assert.equal(resolveWorkplace({ structured: null, location: "Remote - EU", jdText: "hybrid" }), "remote");
   assert.equal(resolveWorkplace({ location: "Berlin", jdText: "We work a hybrid schedule." }), "hybrid");
   assert.equal(resolveWorkplace({ location: "Berlin", jdText: "Nice role." }), null);
   assert.equal(resolveWorkplace({}), null);
+  // Ashby isRemote on a city-office role whose JD says hybrid → hybrid wins (live bug).
+  assert.equal(resolveWorkplace({ location: "London Office", jdText: "We work a hybrid schedule.", weakRemote: true }), "hybrid");
+  assert.equal(resolveWorkplace({ location: "Berlin", jdText: "Nice role.", weakRemote: true }), "remote");
+  assert.equal(resolveWorkplace({ weakRemote: false }), null);
 });

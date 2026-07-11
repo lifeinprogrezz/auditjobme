@@ -76,7 +76,7 @@ async function fetchAshby(b) {
       return {
         company: b.company, title: j.title, url: j.jobUrl || j.applyUrl, location,
         remote: !!j.isRemote || /remote/i.test(location || "") || /remote/i.test(j.title || ""),
-        workplace: j.isRemote ? "remote" : null, // isRemote=false ≠ onsite (could be hybrid) → null
+        weak_remote: !!j.isRemote, // "remote allowed", not "fully remote" — weakest signal
         source: "ashby", posted_at: j.publishedAt || null,
         jd_text: stripHtml(j.descriptionHtml || j.descriptionPlain).slice(0, 8000) || null,
         seniority: inferSeniority(j.title),
@@ -109,7 +109,7 @@ async function fetchWorkable(b) {
         url: j.shortcode ? `https://apply.workable.com/${b.token}/j/${j.shortcode}/` : "",
         location,
         remote: !!j.remote || /remote/i.test(location || "") || /remote/i.test(j.title || ""),
-        workplace: j.remote ? "remote" : null,
+        weak_remote: !!j.remote,
         source: "workable", posted_at: j.published || null,
         jd_text: null, seniority: inferSeniority(j.title),
       });
@@ -144,7 +144,7 @@ async function fetchSmartRecruiters(b) {
         url: `https://jobs.smartrecruiters.com/${slug}/${j.id}`,
         location,
         remote: (j.location || {}).remote === true || /remote/i.test(location || "") || /remote/i.test(j.name || ""),
-        workplace: (j.location || {}).remote === true ? "remote" : null,
+        weak_remote: (j.location || {}).remote === true,
         source: "smartrecruiters", posted_at: j.releasedDate || null,
         jd_text: null, seniority: inferSeniority(j.name),
       });
@@ -214,13 +214,20 @@ async function main() {
     } catch { return u; }
   };
   all = all.map((j) => ({ ...j, url: canonUrl(j.url) }));
-  // Workplace mode (remote|hybrid|onsite) for EVERY source: the adapter's structured
-  // value (Lever workplaceType, Ashby isRemote, …) wins; else location string; else JD
-  // text. Runs centrally so sources/*.mjs rows get the heuristics too. Nightly upsert
-  // keeps jobs.workplace fresh; null = honestly unknown.
-  all = all.map((j) => ({
+  // Workplace mode (remote|hybrid|onsite) for EVERY source: authoritative structured
+  // value (Lever workplaceType) ?? location string ?? JD text ?? weak remote flag
+  // (Ashby isRemote & co — "remote allowed", never overrides location/JD). Runs
+  // centrally so sources/*.mjs rows get the heuristics too. Nightly upsert keeps
+  // jobs.workplace fresh; null = honestly unknown. weak_remote is stripped — it is
+  // not a jobs column.
+  all = all.map(({ weak_remote, ...j }) => ({
     ...j,
-    workplace: resolveWorkplace({ structured: j.workplace, location: j.location, jdText: j.jd_text }),
+    workplace: resolveWorkplace({
+      structured: j.workplace,
+      location: j.location,
+      jdText: j.jd_text,
+      weakRemote: weak_remote,
+    }),
   }));
   const seen = new Set();
   all = all.filter((j) => (seen.has(j.url) ? false : seen.add(j.url)));
