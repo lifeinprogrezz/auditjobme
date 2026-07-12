@@ -1,0 +1,42 @@
+name: Nightly matches
+
+# Repeat trigger for the nightly matches worker (api/nightly.ts, F6 durable
+# execution). The worker is time-budgeted (NIGHTLY_RUN_BUDGET_MS): each invocation
+# processes a bounded chunk of users and exits inside Vercel's 60s function cap,
+# and the next tick RESUMES — a user already scored + notified today is a cheap
+# "skip" (decideNightlyAction), so many users drain across ticks without any work
+# being redone or lost. A single daily Vercel cron can't do this (one 60s call,
+# and Vercel Hobby crons are daily-only), so the trigger lives here — same pattern
+# as score-backlog.yml.
+#
+# WINDOW: every 10 minutes from 06:00 UTC (the first tick KICKS OFF the day's
+# batches; there is no batch for the new UTC "today" until then) through ~09:50 UTC
+# (the drain tail). It deliberately does NOT run before 06:00: the scrape workflow
+# refreshes the shared jobs pool at 05:00 UTC, so an earlier tick would score
+# against yesterday's pool (Track D S6). Once every user is done the remaining
+# ticks are cheap no-ops (a couple of DB reads, zero LLM calls).
+#
+# Requires repo secret CRON_SECRET = the same value as the Vercel env var
+# CRON_SECRET (the worker authenticates the caller against it, failing closed).
+
+on:
+  schedule:
+    - cron: "*/10 6-9 * * *" # every 10 min, 06:00–09:50 UTC (morning drain window)
+  workflow_dispatch: {} # manual trigger from the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false # let an in-flight chunk finish; the next tick queues
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke the nightly matches worker
+        run: |
+          curl -fsS --max-time 90 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://auditjob.me/api/nightly

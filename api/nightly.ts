@@ -1,24 +1,37 @@
 // Phase B (overnight-job-hunter, spec 2026-07-07 §7) — the nightly matches loop.
-// A Vercel cron serverless function (Node runtime), SEPARATE from the Vite bundle
-// (nothing under src/ imports this; it is never pulled into the client). It:
+// A Node serverless function (Vercel), SEPARATE from the Vite bundle (nothing under
+// src/ imports this; it is never pulled into the client). It:
 //   active users → new jobs since their last batch → labelled slice → score the
 //   top-N via the anthropic-proxy edge fn (service-role, target_user_id) → rank →
 //   upsert daily_matches (idempotent) → one Resend "N roles ready" email.
 // Slice 1 = SCORING ONLY. No CV/cover/audit generation, no in-app /matches view.
 //
+// DURABLE EXECUTION (F6): the outer user loop is TIME-BUDGETED. A many-user night
+// can't fit in one 60s function, so the loop stops starting new users once
+// NIGHTLY_RUN_BUDGET_MS is spent and the repeat trigger resumes on the next tick.
+// The trigger is .github/workflows/nightly.yml (every 10 min across the morning
+// drain window, kicking off at 06:00 UTC — AFTER the 05:00 scrape refreshes the
+// pool), NOT a Vercel daily cron: Vercel Hobby crons are daily-only and a single
+// daily invocation can't drain many users. Resumption is idempotent — a user
+// already scored + notified today is a "skip" (decideNightlyAction), so each tick
+// picks up exactly where the last left off. Same pattern as api/score-backlog.ts.
+//
 // Env (from the Supabase↔Vercel integration + Rober's Vercel env):
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY — Supabase server access (service role).
-//   RESEND_API_KEY — transactional email. CRON_SECRET — cron-caller auth (Vercel
-//   sends it as `Authorization: Bearer <CRON_SECRET>`).
+//   RESEND_API_KEY — transactional email. CRON_SECRET — repeat-trigger auth (the
+//   GitHub Action sends it as `Authorization: Bearer <CRON_SECRET>`).
 import { createClient } from "@supabase/supabase-js";
 import { pickScoringSlice } from "../src/lib/labels.js";
 import { SYSTEM, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION } from "../src/lib/scorePrompt.js";
 import {
   NIGHTLY_TOP_N,
+  NIGHTLY_RUN_BUDGET_MS,
+  nightlyBudgetExhausted,
   cronAuthResult,
   selectNightlyCandidates,
   decideNightlyAction,
   isMissingRubricColumn,
+  classifyHistoryRead,
   rankMatches,
   buildEmailSubject,
   buildEmailBody,
@@ -254,9 +267,17 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   // (daily_matches stores only job_url, not the display fields).
   const jobByUrl = new Map(jobs.map((j) => [j.url, { company: j.company, title: j.title }]));
 
-  const summary = { users: active.length, processed: 0, skipped: 0, emailed: 0, capped: 0, matches: 0 };
+  const summary = { users: active.length, processed: 0, skipped: 0, emailed: 0, capped: 0, matches: 0, deadlineHit: false };
 
+  // F6 durable execution: budget the user loop. When time runs out we exit cleanly
+  // (in-flight user already finished — the check is between users) and the next
+  // repeat-trigger tick resumes; done users skip, so no work is redone or lost.
+  const startedMs = Date.now();
   for (const p of active) {
+    if (nightlyBudgetExhausted(startedMs, Date.now(), NIGHTLY_RUN_BUDGET_MS)) {
+      summary.deadlineHit = true;
+      break;
+    }
     const userId = p.id as string;
     try {
       // Every prior daily_matches row for this user (small: ≤ NIGHTLY_TOP_N per
@@ -272,7 +293,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // seenUrls and re-notify previously seen roles. Fall back to the pre-F7
       // column set; rows then read rubric_version=undefined → "stale" → a bounded
       // once-daily rescore until the migration lands. Loud on purpose.
-      if (sel.error && isMissingRubricColumn(sel.error)) {
+      if (classifyHistoryRead(sel.error) === "fallback") {
         console.warn("[nightly] daily_matches.rubric_version missing — pre-F7 schema; apply migration 20260712123000. Falling back.");
         // Cast: fallback rows genuinely lack rubric_version; downstream reads treat
         // it as optional (undefined = stale rubric), which is the intended degrade.
@@ -281,6 +302,17 @@ export default async function handler(req: Req, res: Res): Promise<void> {
           .select("job_url, rank, score, reason, fit_bullets, batch_date, created_at, notified_at")
           .eq("user_id", userId)
           .order("created_at", { ascending: false })) as typeof sel;
+      }
+      // #54 general sel.error guard: ANY residual read error here — a non-column
+      // error on the first select, or a failure of the fallback select itself —
+      // leaves sel.data null → empty seenUrls → we'd re-notify roles this user has
+      // already seen. Skip the user (loud) rather than proceed on empty history.
+      if (sel.error) {
+        console.warn(
+          `[nightly] daily_matches history read failed for ${userId} (${sel.error.code ?? "?"}: ${sel.error.message}) — skipping to protect exactly-once notifications`,
+        );
+        summary.skipped++;
+        continue;
       }
       const rowsForUser = sel.data ?? [];
       const todaysRows = rowsForUser.filter((r) => r.batch_date === today);

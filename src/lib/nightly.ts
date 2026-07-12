@@ -10,6 +10,29 @@ export const NIGHTLY_TOP_N = 10;
 export const NIGHTLY_FALLBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * F6 durable execution: wall-clock budget for ONE nightly invocation's user loop.
+ * A many-user night can't fit in a single 60s function (vercel.json maxDuration),
+ * so the outer loop STOPS starting new users once the budget is spent and the
+ * repeat trigger (.github/workflows/nightly.yml, every 10 min in the morning drain
+ * window) resumes on the next tick. Kept comfortably under 60s so the in-flight
+ * user finishes + the response flushes. Resumption is idempotent for free:
+ * `decideNightlyAction` returns "skip"/"retry-email" for users already done today,
+ * so the next tick picks up exactly where this one left off. Matches the
+ * score-backlog worker's RUN_BUDGET_MS.
+ */
+export const NIGHTLY_RUN_BUDGET_MS = 45_000;
+
+/** True once the invocation has spent its time budget and must stop the outer user
+ *  loop (the next repeat-trigger tick resumes). Pure — testable without a clock. */
+export function nightlyBudgetExhausted(
+  startedMs: number,
+  nowMs: number,
+  budgetMs: number = NIGHTLY_RUN_BUDGET_MS,
+): boolean {
+  return nowMs - startedMs >= budgetMs;
+}
+
+/**
  * Cron-caller authorization check (pure). Returns the error response to send, or
  * `null` when the caller is authorized. The endpoint fails CLOSED: a MISSING
  * CRON_SECRET is a misconfiguration (500), NOT a bypass — so the worker can never
@@ -126,6 +149,27 @@ export function isMissingRubricColumn(err: { code?: string | null; message?: str
   const msg = err.message ?? "";
   if (!msg.includes("rubric_version")) return false;
   return err.code === "PGRST204" || err.code === "42703" || /column/i.test(msg);
+}
+
+/**
+ * #54: classify the daily_matches HISTORY read that seeds `seenUrls` (the
+ * exactly-once guard). The nightly worker MUST know every URL the user has already
+ * been matched on; a read that fails but yields `data = null` would empty that set
+ * and re-notify roles the user has already seen. Three outcomes:
+ *   - "ok"       → no error, use the rows.
+ *   - "fallback" → the rubric_version column is missing (pre-F7 schema); retry the
+ *                  read without that column (isMissingRubricColumn).
+ *   - "skip"     → ANY other read error. The caller skips the user (loud warn)
+ *                  rather than proceeding on empty history and re-notifying.
+ * Pure. A residual error AFTER the fallback attempt is handled by the caller's own
+ * null-check, so this only drives the FIRST decision. */
+export type HistoryReadDecision = "ok" | "fallback" | "skip";
+export function classifyHistoryRead(
+  err: { code?: string | null; message?: string | null } | null | undefined,
+): HistoryReadDecision {
+  if (!err) return "ok";
+  if (isMissingRubricColumn(err)) return "fallback";
+  return "skip";
 }
 
 export type ScoredMatch = {

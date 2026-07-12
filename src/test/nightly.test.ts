@@ -5,11 +5,14 @@ import {
   selectNightlyCandidates,
   decideNightlyAction,
   isMissingRubricColumn,
+  classifyHistoryRead,
+  nightlyBudgetExhausted,
   cronAuthResult,
   rankMatches,
   buildEmailSubject,
   buildEmailBody,
   NIGHTLY_FALLBACK_WINDOW_MS,
+  NIGHTLY_RUN_BUDGET_MS,
   type ScoredMatch,
 } from "@/lib/nightly";
 
@@ -246,5 +249,57 @@ describe("isMissingRubricColumn", () => {
     expect(isMissingRubricColumn({ code: "PGRST204", message: "Could not find the 'other_col' column" })).toBe(false);
     expect(isMissingRubricColumn({ code: "23505", message: "duplicate key value violates unique constraint" })).toBe(false);
     expect(isMissingRubricColumn({ message: "network error while writing rubric_version" })).toBe(false);
+  });
+});
+
+// #54 general sel.error guard: the daily_matches history read seeds seenUrls (the
+// exactly-once guard). "ok" → use rows; "fallback" → pre-F7 missing column, retry
+// column-less; "skip" → any OTHER error, so the handler skips the user rather than
+// proceeding on empty history and re-notifying already-seen roles.
+describe("classifyHistoryRead (#54 sel.error guard)", () => {
+  it("returns 'ok' when there is no error", () => {
+    expect(classifyHistoryRead(null)).toBe("ok");
+    expect(classifyHistoryRead(undefined)).toBe("ok");
+  });
+
+  it("returns 'fallback' ONLY for the missing rubric_version column (pre-F7)", () => {
+    expect(
+      classifyHistoryRead({ code: "42703", message: "column daily_matches.rubric_version does not exist" }),
+    ).toBe("fallback");
+    expect(
+      classifyHistoryRead({ code: "PGRST204", message: "Could not find the 'rubric_version' column of 'daily_matches' in the schema cache" }),
+    ).toBe("fallback");
+  });
+
+  it("returns 'skip' for any other read error (would empty seenUrls → re-notify)", () => {
+    // A generic transient/permission failure — NOT the handled missing-column case.
+    expect(classifyHistoryRead({ code: "PGRST301", message: "JWT expired" })).toBe("skip");
+    expect(classifyHistoryRead({ code: "08006", message: "connection failure" })).toBe("skip");
+    expect(classifyHistoryRead({ message: "fetch failed" })).toBe("skip");
+    // An unrelated missing column (not rubric_version) is NOT a safe fallback → skip.
+    expect(classifyHistoryRead({ code: "42703", message: "column daily_matches.other_col does not exist" })).toBe("skip");
+  });
+});
+
+// F6 durable execution: the outer user loop stops starting new users once the time
+// budget is spent; the repeat trigger resumes on the next tick.
+describe("nightlyBudgetExhausted (F6 durable execution)", () => {
+  it("keeps going while inside the budget", () => {
+    expect(nightlyBudgetExhausted(1000, 1000)).toBe(false);
+    expect(nightlyBudgetExhausted(1000, 1000 + NIGHTLY_RUN_BUDGET_MS - 1)).toBe(false);
+  });
+
+  it("stops once the budget is spent (resume on the next tick)", () => {
+    expect(nightlyBudgetExhausted(1000, 1000 + NIGHTLY_RUN_BUDGET_MS)).toBe(true);
+    expect(nightlyBudgetExhausted(1000, 1000 + NIGHTLY_RUN_BUDGET_MS + 5_000)).toBe(true);
+  });
+
+  it("stays comfortably under the 60s Vercel function cap", () => {
+    expect(NIGHTLY_RUN_BUDGET_MS).toBeLessThan(60_000);
+  });
+
+  it("honours a custom budget", () => {
+    expect(nightlyBudgetExhausted(0, 29_999, 30_000)).toBe(false);
+    expect(nightlyBudgetExhausted(0, 30_000, 30_000)).toBe(true);
   });
 });
