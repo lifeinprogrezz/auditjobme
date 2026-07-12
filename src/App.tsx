@@ -1,16 +1,24 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/AuthProvider";
+import RequireAuth from "@/components/app/RequireAuth";
 
-// Route-level code-splitting. Pre-launch, the app serves ONLY the interactive map
-// and the coming-soon placeholder; the rest of the product (digest/apply/audit/
-// profile/…) is built but not routed yet — re-add routes here to bring a page back.
+// Route-level code-splitting. The interactive map owns the root domain; the dark
+// product surfaces (Today / Tracker / Apply, issue #42) hang off it, auth-gated,
+// and the legal pages are public. Everything else still shows the coming-soon page.
 const RolesMap = lazy(() => import("./pages/RolesMap.tsx"));
 const UnderConstruction = lazy(() => import("./pages/UnderConstruction.tsx"));
+const Today = lazy(() => import("./pages/Today.tsx"));
+const Tracker = lazy(() => import("./pages/Tracker.tsx"));
+const Apply = lazy(() => import("./pages/Apply.tsx"));
+const Privacy = lazy(() => import("./pages/Privacy.tsx"));
+const Terms = lazy(() => import("./pages/Terms.tsx"));
+
+const gated = (node: ReactNode) => <RequireAuth>{node}</RequireAuth>;
 
 const queryClient = new QueryClient();
 
@@ -41,6 +49,15 @@ const App = () => (
               {/* The globe IS the landing at the bare domain (Rober 7-12) —
                   /roles survives only as a redirect so old links keep working. */}
               <Route path="/roles" element={<Navigate to="/" replace />} />
+              {/* Dark product surfaces (issue #42) — auth-gated, reachable from the
+                  map shell (role card → /apply, avatar → Today/Applications). */}
+              <Route path="/today" element={gated(<Today />)} />
+              <Route path="/digest" element={<Navigate to="/today" replace />} />
+              <Route path="/tracker" element={gated(<Tracker />)} />
+              <Route path="/apply" element={gated(<Apply />)} />
+              {/* Public legal pages (the noscript footer links these). */}
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
               <Route path="/underconstruction" element={<UnderConstruction />} />
               <Route path="*" element={<Navigate to="/underconstruction" replace />} />
             </Routes>

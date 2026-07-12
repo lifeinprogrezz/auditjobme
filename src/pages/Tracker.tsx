@@ -1,24 +1,37 @@
-import { useEffect, useState } from "react";
+// Tracker — the application kanban (issue #42). Rebuilds the old list+dropdown draft
+// into a real column board (applied → responded → interview → offer → rejected) while
+// keeping the existing Supabase write-back. Moves are explicit prev/next controls
+// (no drag dependency), each an optimistic update rolled back on error. Ink-glass
+// token layer, no inline hex.
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
+import { toast } from "@/components/ui/sonner";
+import AppShell from "@/components/app/AppShell";
+import { cn } from "@/lib/utils";
 
-const BG = "#0f0e0c";
-const TEXT = "#f0ede8";
-const MUTED = "#8a8780";
-const ACCENT = "#8a9a8a";
-const BORDER = "#2a2825";
-const SURFACE = "#1a1916";
-
-const STATUSES = ["applied", "responded", "interview", "offer", "rejected"];
+const COLUMNS = [
+  { value: "applied", label: "Applied" },
+  { value: "responded", label: "Responded" },
+  { value: "interview", label: "Interview" },
+  { value: "offer", label: "Offer" },
+  { value: "rejected", label: "Rejected" },
+] as const;
+type Status = (typeof COLUMNS)[number]["value"];
+const ORDER: Status[] = COLUMNS.map((c) => c.value);
 
 interface AppRow {
   id: string;
-  status: string;
+  status: Status;
   applied_at: string;
   job_id: string;
   company: string;
   title: string;
   url: string;
+}
+
+function normStatus(s: string): Status {
+  return (ORDER as string[]).includes(s) ? (s as Status) : "applied";
 }
 
 export default function Tracker() {
@@ -48,7 +61,7 @@ export default function Tracker() {
       }
       const rows: AppRow[] = (appsData ?? []).map((a) => ({
         id: a.id,
-        status: a.status,
+        status: normStatus(a.status),
         applied_at: a.applied_at,
         job_id: a.job_id,
         company: jobsById[a.job_id]?.company ?? "Unknown",
@@ -66,60 +79,116 @@ export default function Tracker() {
     };
   }, [user]);
 
-  const updateStatus = async (id: string, status: string) => {
-    setApps((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
-    await supabase.from("applications").update({ status }).eq("id", id);
+  const byColumn = useMemo(() => {
+    const map: Record<Status, AppRow[]> = { applied: [], responded: [], interview: [], offer: [], rejected: [] };
+    for (const a of apps) map[a.status].push(a);
+    return map;
+  }, [apps]);
+
+  const move = async (id: string, dir: -1 | 1) => {
+    const row = apps.find((a) => a.id === id);
+    if (!row) return;
+    const idx = ORDER.indexOf(row.status);
+    const nextIdx = idx + dir;
+    if (nextIdx < 0 || nextIdx >= ORDER.length) return;
+    const next = ORDER[nextIdx];
+    const prev = row.status;
+    setApps((cur) => cur.map((a) => (a.id === id ? { ...a, status: next } : a)));
+    const { error } = await supabase.from("applications").update({ status: next }).eq("id", id);
+    if (error) {
+      setApps((cur) => cur.map((a) => (a.id === id ? { ...a, status: prev } : a)));
+      toast.error("Couldn't move that application. Please try again.");
+    }
   };
 
-  return (
-    <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: "'Plus Jakarta Sans', sans-serif", padding: "3rem 1.5rem" }}>
-      <div style={{ maxWidth: 760, margin: "0 auto" }}>
-        <h1 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 400, fontSize: "clamp(1.7rem, 4vw, 2.6rem)", letterSpacing: "-.03em", marginBottom: ".5rem" }}>
-          Applications.
-        </h1>
-        <p style={{ fontSize: ".8rem", color: MUTED, lineHeight: 1.7, marginBottom: "2rem" }}>
-          Every role you've marked applied, newest first. Move the status as things progress.{" "}
-          <a href="/" style={{ color: ACCENT, textDecoration: "underline", textUnderlineOffset: "2px" }}>Back to your digest</a>.
-        </p>
+  if (loading) {
+    return (
+      <AppShell title="Applications">
+        <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
+      </AppShell>
+    );
+  }
 
-        {loading ? (
-          <p style={{ fontSize: ".75rem", color: MUTED }}>Loading...</p>
-        ) : apps.length === 0 ? (
-          <p style={{ fontSize: ".8rem", color: MUTED }}>
-            No applications yet. Open a role from your digest, apply, then hit "Mark applied" and it shows up here.
-          </p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: ".8rem" }}>
-            {apps.map((a) => (
-              <div
-                key={a.id}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", padding: "1rem 1.2rem", borderRadius: 10, border: `1px solid ${BORDER}`, background: SURFACE }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: ".88rem", marginBottom: ".2rem" }}>{a.company}</div>
-                  <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: ".8rem", color: TEXT, textDecoration: "none" }}>
-                    {a.title}
-                  </a>
-                  <div style={{ fontSize: ".64rem", color: MUTED, marginTop: ".3rem" }}>
-                    Applied {new Date(a.applied_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                  </div>
-                </div>
-                <select
-                  value={a.status}
-                  onChange={(e) => updateStatus(a.id, e.target.value)}
-                  style={{ background: BG, color: TEXT, border: `1px solid ${BORDER}`, borderRadius: 8, padding: ".5rem .6rem", fontFamily: "inherit", fontSize: ".72rem", cursor: "pointer", flexShrink: 0 }}
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s.charAt(0).toUpperCase() + s.slice(1)}
-                    </option>
-                  ))}
-                </select>
+  if (apps.length === 0) {
+    return (
+      <AppShell title="Applications">
+        <p className="mt-6 text-sm text-muted-foreground">
+          No applications yet. Open a role from Today, prepare it, then mark it applied and it shows up on this board.
+        </p>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell title="Applications">
+      <p className="mt-1 text-sm text-muted-foreground">
+        Every role you've marked applied. Move a card as things progress.
+      </p>
+      <div className="mt-8 overflow-x-auto pb-4">
+        <div className="flex min-w-max gap-4">
+          {COLUMNS.map((col, colIdx) => (
+            <section key={col.value} className="w-64 shrink-0" aria-label={col.label}>
+              <div className="mb-3 flex items-center justify-between px-1">
+                <h2 className="text-sm font-semibold text-foreground">{col.label}</h2>
+                <span className="font-mono text-xs text-muted-foreground">{byColumn[col.value].length}</span>
               </div>
-            ))}
-          </div>
-        )}
+              <div className="flex flex-col gap-2 rounded-lg border border-border bg-secondary/40 p-2">
+                {byColumn[col.value].length === 0 ? (
+                  <p className="px-2 py-6 text-center text-xs text-muted-foreground">Nothing here</p>
+                ) : (
+                  byColumn[col.value].map((a) => (
+                    <article key={a.id} className="rounded-md border border-border bg-card p-3">
+                      <div className="text-sm font-semibold">{a.company}</div>
+                      <a
+                        href={a.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-0.5 block truncate text-xs text-foreground underline-offset-2 hover:underline"
+                      >
+                        {a.title}
+                      </a>
+                      <div className="mt-2 text-[0.65rem] text-muted-foreground">
+                        Applied{" "}
+                        {new Date(a.applied_at).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </div>
+                      <div className="mt-2 flex items-center justify-between">
+                        <button
+                          type="button"
+                          aria-label="Move back a stage"
+                          disabled={colIdx === 0}
+                          onClick={() => move(a.id, -1)}
+                          className={cn(
+                            "rounded px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground",
+                            colIdx === 0 && "invisible",
+                          )}
+                        >
+                          ← Back
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Move forward a stage"
+                          disabled={colIdx === COLUMNS.length - 1}
+                          onClick={() => move(a.id, 1)}
+                          className={cn(
+                            "rounded px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground",
+                            colIdx === COLUMNS.length - 1 && "invisible",
+                          )}
+                        >
+                          Next →
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

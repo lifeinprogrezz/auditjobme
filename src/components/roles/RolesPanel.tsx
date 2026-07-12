@@ -12,6 +12,7 @@ import {
   fitLabel,
   formatHeadcount,
   formatStage,
+  geoVerdict,
   hueFor,
   postedAgo,
   scoreBucket,
@@ -155,9 +156,10 @@ export default function RolesPanel({
     if (detailJob) detailRef.current?.scrollTo(0, 0);
   }, [detailJob]);
 
-  // "Prepare application" is Phase B — still gated to the coming-soon surface.
-  // "Add your CV" opens the Phase-A CV-unlock modal (onAddCv, from RolesMap).
-  const goApply = (_j: RoleJob) => navigate("/underconstruction");
+  // "Prepare application" routes into the apply bundle (issue #42); RequireAuth on
+  // /apply handles the signed-out case. "Add your CV" opens the Phase-A CV-unlock
+  // modal (onAddCv, from RolesMap).
+  const goApply = (j: RoleJob) => navigate(`/apply?job=${encodeURIComponent(j.url)}`);
 
   // Active-filter chips: map selection (co/city) + every headbar filter, each
   // removable. They read/write the SAME filter state the headbar uses, so the two
@@ -291,6 +293,9 @@ export default function RolesPanel({
           )}
           {shown.slice(0, CARD_CAP).map((job, i) => {
             const ago = postedAgo(job.posted_at);
+            // Geo / work-auth badge (issue #42): only a high-confidence, actionable
+            // verdict shows on the card; an unstated JD renders nothing (never a guess).
+            const geo = geoVerdict(job);
             const open = (e: React.SyntheticEvent) => {
               if ((e.target as HTMLElement).closest(".acts")) return;
               onOpenDetail(job);
@@ -321,6 +326,7 @@ export default function RolesPanel({
                         {ago}
                       </>
                     )}
+                    {geo.onCard && <span className={`geo-badge geo-${geo.kind}`}>{geo.label}</span>}
                   </div>
                 </div>
                 <div className={scorePillClass(job.score)}>
@@ -391,8 +397,11 @@ export default function RolesPanel({
     if (job.remote) roleFacts.push(["Remote", "Yes"]);
     if (ago) roleFacts.push(["Posted", ago]);
     if (comp) roleFacts.push(["Comp", comp]);
-    // Role-level, from the JD: does THIS posting offer to sponsor a visa (slice 2).
-    if (ex?.visa_sponsorship === "offered") roleFacts.push(["Visa", "Sponsors"]);
+    // Work-eligibility cell (issue #42): ALWAYS shown, including the honest "Not
+    // stated" state, so an ambiguous / login-walled JD never silently omits it and
+    // never shows a wrong verdict (geoVerdict's safety property).
+    const geo = geoVerdict(job);
+    roleFacts.push(["Work eligibility", geo.kind === "unverified" ? "Not stated" : geo.label]);
     const others = allJobs.filter((j) => j.company === job.company && j.url !== job.url);
     // Hero: a CV holder sees their fit (or a pending state); everyone else sees the
     // unlock prompt — the pre-CV conversion moment (absorbs issue #18).

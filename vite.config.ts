@@ -123,7 +123,7 @@ export default defineConfig(({ mode }) => {
         output: {
           // Split the big, stable vendors into their own cacheable chunks so the
           // app chunk stays small and a deploy doesn't re-ship react/radix/etc.
-          // pdfjs is dynamically imported (see Onboarding/Profile) so it auto-splits.
+          // pdfjs is dynamically imported (see CvUnlockModal) so it auto-splits.
           // Order matters: scoped packages whose paths contain "react" are matched
           // before the bare-react catch.
           manualChunks(id) {
