@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
 import { RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
+import type { ScoreSubscore, ScoreEvidence } from "@/lib/scorePrompt";
 import { applyLandedScores, byScore, type RoleJob, type RoleExtraction } from "@/lib/roles";
 import { hashCv, readCvStash, clearCvStash } from "@/lib/labels";
 import { cityOf, coordsOf } from "@/lib/geo";
@@ -36,6 +37,15 @@ export type ProfileMeta = {
   targetSectors: string[];
   cvUpdatedAt: string | null;
 };
+
+/** Shape of the scores.signals jsonb the /roles surface reads (v4). subscores +
+ *  evidence feed the score-breakdown viz; both absent on pre-v4 rows. */
+type ScoreSignals = {
+  reason?: string;
+  fit_bullets?: string[];
+  subscores?: ScoreSubscore[];
+  evidence?: ScoreEvidence[];
+} | null;
 
 /**
  * City + map-position + logo-domain enrichment. Same-city jobs get a stable
@@ -196,13 +206,15 @@ export function useRolesData() {
     if (!data || runRef.current !== runId) return;
     const landed = new Map(
       data.map((s) => {
-        const sig = s.signals as { reason?: string; fit_bullets?: string[] } | null;
+        const sig = s.signals as ScoreSignals;
         return [
           s.job_id as string,
           {
             score: Number(s.score),
             reason: sig?.reason ?? null,
             fitBullets: sig?.fit_bullets ?? [],
+            subscores: sig?.subscores ?? null,
+            evidence: sig?.evidence ?? null,
           },
         ] as const;
       }),
@@ -288,7 +300,9 @@ export function useRolesData() {
     }) as ScoreableProfile;
 
     if (changed) {
-      setJobs(jobsSnapshot.map((j) => ({ ...j, score: null, reason: null, fitBullets: null })));
+      setJobs(
+        jobsSnapshot.map((j) => ({ ...j, score: null, reason: null, fitBullets: null, subscores: null, evidence: null })),
+      );
     }
     // Flip `scored` false→true → the CSS reveal + ScoreValue count-up fire
     // in-session. This flip is what reveals the map, so success resolves HERE.
@@ -378,14 +392,22 @@ export function useRolesData() {
         .eq("rubric_version", RUBRIC_VERSION);
       const scoreByJob: Record<
         string,
-        { score: number | null; reason: string | null; fitBullets: string[] | null }
+        {
+          score: number | null;
+          reason: string | null;
+          fitBullets: string[] | null;
+          subscores: ScoreSubscore[] | null;
+          evidence: ScoreEvidence[] | null;
+        }
       > = {};
       (scoresData ?? []).forEach((s) => {
-        const sig = s.signals as { reason?: string; fit_bullets?: string[] } | null;
+        const sig = s.signals as ScoreSignals;
         scoreByJob[s.job_id] = {
           score: s.score,
           reason: sig?.reason ?? null,
           fitBullets: sig?.fit_bullets ?? null,
+          subscores: sig?.subscores ?? null,
+          evidence: sig?.evidence ?? null,
         };
       });
       const merged = enrichAll(rows, dims, officesBySlug).map((j) => ({
@@ -393,6 +415,8 @@ export function useRolesData() {
         score: scoreByJob[j.id]?.score ?? null,
         reason: scoreByJob[j.id]?.reason ?? null,
         fitBullets: scoreByJob[j.id]?.fitBullets ?? null,
+        subscores: scoreByJob[j.id]?.subscores ?? null,
+        evidence: scoreByJob[j.id]?.evidence ?? null,
       }));
       merged.sort(byScore);
       if (runRef.current !== runId) return;

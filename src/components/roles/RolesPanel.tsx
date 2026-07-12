@@ -21,6 +21,7 @@ import {
 } from "@/lib/roles";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { prefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import ScoreBreakdown from "./ScoreBreakdown";
 
 // The pool is unbounded (1000+ live rows); each card mounts a Logo.dev <img>,
 // so cap the DOM and point the user at search/filters for the tail.
@@ -521,6 +522,9 @@ export default function RolesPanel({
               <li key={i}>{b}</li>
             ))}
           </ul>
+        )}
+        {hasCv && job.score != null && (
+          <ScoreBreakdown subscores={job.subscores} evidence={job.evidence} />
         )}
         {!hasCv && (
           <div className="dfit-teaser">

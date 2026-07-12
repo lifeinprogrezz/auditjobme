@@ -36,5 +36,10 @@ export async function scoreJob(
   });
   if (error || !data) return null;
 
-  return parseScoreResponse(data?.content?.[0]?.text ?? "");
+  // Stage-2: ground the cited evidence against the exact CV + JD this score was built
+  // from, so a hallucinated quote is blanked before it can reach the breakdown viz.
+  return parseScoreResponse(data?.content?.[0]?.text ?? "", {
+    cvText: profile.cv_text,
+    jdText: job.jd_text,
+  });
 }

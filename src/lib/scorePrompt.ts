@@ -36,7 +36,11 @@ export interface ScoreableJob {
 // contract — per-dimension subscores + cited evidence (verbatim CV line ↔ JD phrase,
 // signed contribution), stored as additive keys in scores.signals; the score viz
 // consumes them later. Bumping the version re-scores cached rows lazily on next load.
-export const RUBRIC_VERSION = "v4";
+// v5 (2026-07-12, F1 two-layer): the persisted score becomes the deterministic
+// blendSubscores() output (raw model 0-5 only as fallback) — a semantics change, so
+// cached v4 rows (raw score persisted) re-score lazily via the in-app, backlog, and
+// nightly paths rather than mixing raw and blended scores in one ranking.
+export const RUBRIC_VERSION = "v5";
 
 /** The five rubric dimensions, in weighing order — subscores cover exactly these. */
 export const SUBSCORE_KEYS = ["seniority", "geography", "work_auth", "language", "background"] as const;
@@ -45,6 +49,39 @@ export type SubscoreKey = (typeof SUBSCORE_KEYS)[number];
 export interface ScoreSubscore {
   key: SubscoreKey;
   score: number; // 0-5, same scale as the blended score
+}
+
+// F1 Layer-1 (2026-07-12): the deterministic display weights for the five rubric
+// dimensions — background (the CV↔role substance) heaviest, then the rubric's
+// stated priority order. They sum to 1.0 so a weighted blend of five 0-5 subscores
+// lands back in [0, 5]. The blend is computed AT SCORE TIME and persisted — no read
+// path recomputes it. Changing a weight therefore changes scoring semantics: bump
+// RUBRIC_VERSION alongside it so cached rows re-score (in-app + backlog + nightly).
+// Pinned by src/test/score.test.ts (blendSubscores). Rule + code move together.
+export const SUBSCORE_WEIGHTS: Record<SubscoreKey, number> = {
+  background: 0.3,
+  seniority: 0.22,
+  geography: 0.2,
+  work_auth: 0.18,
+  language: 0.1,
+};
+
+/**
+ * Layer-1 deterministic recompute: blend the five v4 subscores into one 0-5 display
+ * score with the fixed SUBSCORE_WEIGHTS, INSTEAD of trusting the model's single
+ * holistic 0-5. Returns null unless ALL five dimensions are present — a partial or
+ * pre-v4 response has no trustworthy breakdown, so the caller falls back to the raw
+ * model score. One decimal, clamped to [0, 5]. Pure.
+ */
+export function blendSubscores(subscores: ScoreSubscore[]): number | null {
+  const byKey = new Map(subscores.map((s) => [s.key, s.score]));
+  let sum = 0;
+  for (const key of SUBSCORE_KEYS) {
+    const v = byKey.get(key);
+    if (v == null) return null; // require the full rubric to recompute
+    sum += v * SUBSCORE_WEIGHTS[key];
+  }
+  return Math.round(Math.max(0, Math.min(5, sum)) * 10) / 10;
 }
 
 export interface ScoreEvidence {
@@ -92,20 +129,74 @@ export interface ParsedScore {
   evidence: ScoreEvidence[];
 }
 
+/** Normalize a quote/source for substring comparison: fold smart quotes + dashes,
+ *  lowercase, collapse whitespace. So a verbatim citation still verifies through the
+ *  model's harmless case/whitespace/typography drift, while a genuine fabrication
+ *  (a phrase that never appears in the source) still fails. */
+function normalizeForMatch(s: string): string {
+  return s
+    .replace(/[‘’‛′]/g, "'")
+    .replace(/[“”″]/g, '"')
+    .replace(/[–—]/g, "-")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Stage-2 grounding check: is `quote` a real (normalized) substring of `source`?
+ *  An empty quote is trivially grounded (nothing claimed); a non-empty quote against
+ *  an empty source is NOT (can't verify → treat as ungrounded). Pure. */
+export function isGroundedQuote(quote: string, source: string): boolean {
+  const q = normalizeForMatch(quote);
+  if (!q) return true;
+  const src = normalizeForMatch(source);
+  if (!src) return false;
+  return src.includes(q);
+}
+
+/**
+ * Stage-2 extractive citation grounding: blank any cited quote that is NOT a verbatim
+ * (normalized) substring of its source, killing hallucinated citations while keeping
+ * the honest factor label + contribution. A side is only verified when its source is
+ * actually provided (a `string`); an absent source (undefined/null) leaves that side
+ * untouched — we can't verify, so we don't destroy a possibly-real quote. Pure.
+ */
+export function groundEvidence(
+  evidence: ScoreEvidence[],
+  sources: { cvText?: string | null; jdText?: string | null },
+): ScoreEvidence[] {
+  const cv = typeof sources.cvText === "string" ? sources.cvText : null;
+  const jd = typeof sources.jdText === "string" ? sources.jdText : null;
+  return evidence.map((e) => ({
+    ...e,
+    cvLine: cv == null || isGroundedQuote(e.cvLine, cv) ? e.cvLine : "",
+    jdPhrase: jd == null || isGroundedQuote(e.jdPhrase, jd) ? e.jdPhrase : "",
+  }));
+}
+
 /**
  * Pull the {score, reason, fit_bullets, subscores, evidence} out of the model's raw
  * text and clamp it to a sane range: grabs the first {...} block, coerces score (and
  * each subscore) into [0, 5] and contribution into [-1, 1], drops malformed entries,
  * and returns null on any missing-JSON / malformed / non-numeric response. The v4
  * fields degrade to [] — a response without them still yields a usable score.
+ *
+ * F1 Layer-1: when the full five-dimension subscore set is present, the returned
+ * `score` is the DETERMINISTIC blend (blendSubscores), not the model's raw 0-5.
+ * F1 Stage-2: pass `sources` (the CV/JD text this score was produced from) to ground
+ * the evidence quotes — hallucinated citations are blanked. Omitting `sources` leaves
+ * evidence exactly as the model returned it (used where the source isn't at hand).
  */
-export function parseScoreResponse(text: string): ParsedScore | null {
+export function parseScoreResponse(
+  text: string,
+  sources?: { cvText?: string | null; jdText?: string | null },
+): ParsedScore | null {
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) return null;
   try {
     const parsed = JSON.parse(match[0]);
-    const score = Math.max(0, Math.min(5, Number(parsed.score)));
-    if (Number.isNaN(score)) return null;
+    const rawScore = Math.max(0, Math.min(5, Number(parsed.score)));
+    if (Number.isNaN(rawScore)) return null;
     const fitBullets = Array.isArray(parsed.fit_bullets)
       ? parsed.fit_bullets
           .filter((b: unknown) => typeof b === "string" && b.trim())
@@ -119,11 +210,12 @@ export function parseScoreResponse(text: string): ParsedScore | null {
           !!s &&
           typeof s === "object" &&
           (SUBSCORE_KEYS as readonly string[]).includes((s as { key?: unknown }).key as string) &&
-          !Number.isNaN(Number((s as { score?: unknown }).score)),
+          typeof (s as { score?: unknown }).score === "number" &&
+          Number.isFinite((s as { score: number }).score),
       )
       .filter((s) => !seen.has(s.key) && seen.add(s.key))
       .map((s) => ({ key: s.key as SubscoreKey, score: Math.max(0, Math.min(5, Number(s.score))) }));
-    const evidence: ScoreEvidence[] = (Array.isArray(parsed.evidence) ? parsed.evidence : [])
+    const rawEvidence: ScoreEvidence[] = (Array.isArray(parsed.evidence) ? parsed.evidence : [])
       .filter(
         (e: unknown): e is { label: string } =>
           !!e && typeof e === "object" && typeof (e as { label?: unknown }).label === "string" && !!(e as { label: string }).label.trim(),
@@ -139,6 +231,11 @@ export function parseScoreResponse(text: string): ParsedScore | null {
           contribution: Number.isNaN(contribution) ? 0 : Math.max(-1, Math.min(1, contribution)),
         };
       });
+    // Stage-2: ground the citations against the CV/JD when the caller supplies them.
+    const evidence = sources ? groundEvidence(rawEvidence, sources) : rawEvidence;
+    // Layer-1: the deterministic blend wins when the full rubric is present; else the
+    // model's raw holistic score (partial/pre-v4 responses have no trustworthy split).
+    const score = blendSubscores(subscores) ?? rawScore;
     return { score, reason: String(parsed.reason ?? ""), fitBullets, subscores, evidence };
   } catch {
     return null;

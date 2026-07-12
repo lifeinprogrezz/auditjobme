@@ -4,6 +4,7 @@ import {
   selectNewJobsSince,
   selectNightlyCandidates,
   decideNightlyAction,
+  isMissingRubricColumn,
   cronAuthResult,
   rankMatches,
   buildEmailSubject,
@@ -98,19 +99,34 @@ describe("selectNightlyCandidates (B2)", () => {
 });
 
 describe("decideNightlyAction (B3 — notified vs matched split)", () => {
+  const V = "v4";
   it("scores when there is no batch today", () => {
-    expect(decideNightlyAction([])).toBe("score");
+    expect(decideNightlyAction([], V)).toBe("score");
   });
 
-  it("skips only when today's batch exists AND was notified", () => {
-    expect(decideNightlyAction([{ notified_at: "2026-07-07T06:01:00Z" }])).toBe("skip");
+  it("skips only when today's batch exists at the current rubric AND was notified", () => {
+    expect(decideNightlyAction([{ notified_at: "2026-07-07T06:01:00Z", rubric_version: V }], V)).toBe("skip");
     // any notified row → done (notified_at is stamped across the whole batch)
-    expect(decideNightlyAction([{ notified_at: "2026-07-07T06:01:00Z" }, { notified_at: null }])).toBe("skip");
+    expect(
+      decideNightlyAction(
+        [{ notified_at: "2026-07-07T06:01:00Z", rubric_version: V }, { notified_at: null, rubric_version: V }],
+        V,
+      ),
+    ).toBe("skip");
   });
 
-  it("retries the email when today's batch exists but was never notified", () => {
-    expect(decideNightlyAction([{ notified_at: null }, { notified_at: null }])).toBe("retry-email");
-    expect(decideNightlyAction([{}])).toBe("retry-email");
+  it("retries the email when today's current-rubric batch exists but was never notified", () => {
+    expect(
+      decideNightlyAction([{ notified_at: null, rubric_version: V }, { notified_at: null, rubric_version: V }], V),
+    ).toBe("retry-email");
+  });
+
+  it("F7: rescores when today's batch was scored under a superseded (or null) rubric", () => {
+    // stale rubric, even if already notified → re-score under the new rubric
+    expect(decideNightlyAction([{ notified_at: "2026-07-07T06:01:00Z", rubric_version: "v3" }], V)).toBe("rescore");
+    // pre-migration rows (null/absent rubric_version) read as stale → rescore once
+    expect(decideNightlyAction([{ notified_at: null, rubric_version: null }], V)).toBe("rescore");
+    expect(decideNightlyAction([{}], V)).toBe("rescore");
   });
 });
 
@@ -214,5 +230,21 @@ describe("buildEmailBody", () => {
     const { html } = buildEmailBody(rows, "https://auditjob.me/");
     expect(html).toContain("A &amp; B &lt;Inc&gt;");
     expect(html).toContain("PM &quot;lead&quot;");
+  });
+});
+
+// F7 pre-migration degrade: the handler falls back to column-less select/upsert
+// ONLY on the specific unknown-column error for rubric_version.
+describe("isMissingRubricColumn", () => {
+  it("matches PostgREST unknown-column errors for rubric_version on write and read", () => {
+    expect(isMissingRubricColumn({ code: "PGRST204", message: "Could not find the 'rubric_version' column of 'daily_matches' in the schema cache" })).toBe(true);
+    expect(isMissingRubricColumn({ code: "42703", message: "column daily_matches.rubric_version does not exist" })).toBe(true);
+  });
+
+  it("does not match unrelated errors", () => {
+    expect(isMissingRubricColumn(null)).toBe(false);
+    expect(isMissingRubricColumn({ code: "PGRST204", message: "Could not find the 'other_col' column" })).toBe(false);
+    expect(isMissingRubricColumn({ code: "23505", message: "duplicate key value violates unique constraint" })).toBe(false);
+    expect(isMissingRubricColumn({ message: "network error while writing rubric_version" })).toBe(false);
   });
 });
