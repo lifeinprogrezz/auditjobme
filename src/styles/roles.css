@@ -15,6 +15,10 @@
   --text: #eaf2f3; --muted: #9db1b8; --subtle: #6e858e;
   --great: #1fd8b8; --great-deep: #12a594; --great-ink: #04241f;
   --mid: #ffc44d; --low: #ff6f4d;
+  /* FitChip ink (fitchip.css consumes these; the page world defaults to
+   * --foreground). The bucket hue rides the shared --score-* tokens, inherited
+   * from :root into this scope, so there is no second colour copy here. */
+  --fc-ink: var(--text); --fc-muted: var(--muted);
   /* Interaction accent = NEUTRAL INK (Rober 7-05): interactions are quiet,
    * logos + the score carry all the color. Swap these five to re-accent the app. */
   --act-tint: rgba(255, 255, 255, 0.1);
@@ -118,7 +122,7 @@
 .roles-theme .cmd-clear { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; transition: color 0.15s, background 0.15s; }
 .roles-theme .cmd-clear:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
 .roles-theme .spacer { flex: 1; }
-.roles-theme .seg { display: flex; background: rgba(255, 255, 255, 0.06); border-radius: 11px; padding: 3px; position: relative; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.05); }
+.roles-theme .seg { display: flex; background: rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 3px; position: relative; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.05); }
 .roles-theme:not(.scored) .seg { display: none; }
 /* Full act-strong fill (Rober 7-12, settled after trying 85%/jade/60%): the
  * CV upload is THE conversion action — committed ink, same as the modal cvcta. */
@@ -127,10 +131,16 @@
 .roles-theme .navcv:active { transform: translateY(1px); }
 .roles-theme .navcv .sp { width: 22px; height: 22px; flex: none; border-radius: 7px; display: grid; place-items: center; color: var(--act-strong); background: var(--act-strong-ink); }
 .roles-theme.scored .navcv { display: none; }
-.roles-theme .seg button { width: 74px; font: inherit; font-size: 12.5px; font-weight: 600; border: 0; background: transparent; color: var(--muted); padding: 7px 0; border-radius: 8px; cursor: pointer; z-index: 1; transition: color 0.25s; }
-.roles-theme .seg button.on { color: var(--act-strong-ink); }
-.roles-theme .seg .ind { position: absolute; top: 3px; left: 3px; height: calc(100% - 6px); width: 74px; background: var(--act-strong); border-radius: 8px; box-shadow: 0 2px 8px -2px var(--act-shadow); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-.roles-theme .seg.list .ind { transform: translateX(74px); }
+/* Segmented Map/List toggle demoted to CHROME (design direction §4.3): the thumb
+ * is surface glass, NOT an --act-strong block; the active label is ink (--text),
+ * inactive is --muted. Buttons are equal-width (flex:1) so the thumb position
+ * derives from the grid, not a magic 74px. */
+.roles-theme .seg button { flex: 1 1 0; min-width: 54px; font: inherit; font-size: 12.5px; font-weight: 600; border: 0; background: transparent; color: var(--muted); padding: 7px 14px; cursor: pointer; z-index: 1; transition: color 0.25s; }
+.roles-theme .seg button.on { color: var(--text); }
+/* Thumb radius = the concentric inner (track 10 − 3px inset ≈ 8, design
+ * direction §2.4 nested-radii law); glass surface, never an --act-strong block. */
+.roles-theme .seg .ind { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 8px; background: color-mix(in srgb, var(--text) 12%, transparent); border: 1px solid var(--rim); box-shadow: 0 1px 3px -1px var(--act-shadow); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s; }
+.roles-theme .seg.list .ind { transform: translateX(100%); }
 .roles-theme .filterbtn { display: flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .filterbtn:hover { background: rgba(255, 255, 255, 0.1); }
 .roles-theme .filterbtn.on { background: var(--act-tint); border-color: var(--act-border); color: var(--text); }
@@ -216,6 +226,13 @@
 .roles-theme .scope { position: absolute; left: 16px; top: 29px; z-index: 12; pointer-events: none; display: inline-flex; align-items: center; gap: 11px; padding: 9px 14px; border-radius: 14px; background: var(--glass-2); -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%); border: 1px solid var(--rim); box-shadow: var(--sh); font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .roles-theme .scope b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 3px; }
 .roles-theme .scope-sep { width: 1px; height: 15px; background: var(--hair); }
+/* Overlap fix (design direction §4.5, ledger #5): the centred nav (max 1220px)
+ * only clears the corner scope pill on very wide viewports; below ~1640px the
+ * nav's left edge crosses the pill (measured overlap at 1366×800), so drop the
+ * scope BELOW the nav (nav bottom ≈ 76px) instead of over it. */
+@media (max-width: 1639px) {
+  .roles-theme .scope { top: 84px; }
+}
 /* Creator credit — a member of the attribution family (Rober 7-07): same treatment as
    .attrib, anchored bottom-left, so it reads as authorship chrome rather than a data pill
    competing with the scope numbers. Pill ignores pointer events (map stays draggable); only
@@ -295,16 +312,25 @@
 .roles-theme .pintip .tiprow { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .roles-theme .pintip .tr { font-family: var(--font-d); font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .roles-theme .pintip .tco { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Fit pill: built only for scored rows, shown only in scored mode. */
-.roles-theme .pintip .tsc { display: none; flex: none; font-family: var(--font-m); font-size: 10px; font-weight: 600; color: #04241f; background: var(--great); padding: 1px 5px; border-radius: 7px; }
+/* Tooltip fit = ink-on-wash chip (design direction §4.7), bucket-tinted to match
+ * the pin ring — never the old jade-filled pill. Built only for scored rows. */
+.roles-theme .pintip .tsc { display: none; flex: none; font-family: var(--font-m); font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 700; letter-spacing: -0.04em; color: var(--text); background: color-mix(in srgb, var(--great) 16%, transparent); border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); padding: 1px 6px; border-radius: 4px; }
+.roles-theme .pintip .tsc.mid { background: color-mix(in srgb, var(--mid) 16%, transparent); }
+.roles-theme .pintip .tsc.low { background: color-mix(in srgb, var(--low) 16%, transparent); }
 .roles-theme.scored .pintip .tsc { display: inline-block; }
 .roles-theme .pin img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .roles-theme .pin .fallback { font-family: var(--font-d); font-weight: 700; font-size: 15px; color: #fff; width: 100%; height: 100%; display: grid; place-items: center; border-radius: 50%; }
-.roles-theme.scored .pin.great { border-color: var(--great); box-shadow: 0 8px 22px -4px rgba(0, 0, 0, 0.7), 0 0 20px rgba(31, 216, 184, 0.85); }
-.roles-theme.scored .pin.mid { border-color: var(--mid); box-shadow: 0 8px 22px -4px rgba(0, 0, 0, 0.7), 0 0 18px rgba(255, 196, 77, 0.7); }
-.roles-theme.scored .pin.low { border-color: var(--low); box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.7), 0 0 16px rgba(255, 111, 77, 0.6); }
-.roles-theme .pin .sc { position: absolute; bottom: -7px; right: -7px; font-family: var(--font-m); font-size: 10px; font-weight: 600; color: #04241f; background: var(--great); padding: 1px 5px; border-radius: 7px; opacity: 0; transform: scale(0.4); transition: 0.4s; box-shadow: 0 0 12px rgba(31, 216, 184, 0.8); }
-.roles-theme.scored .pin .sc { opacity: 1; transform: scale(1); }
+/* Scored map pins carry a calm bucket-hued RING (border-color) in steady state;
+ * the glow is a HOVER reveal only (design direction §4.7). No numeral chip on the
+ * logo cloud — the .pin .sc mini-chip is deleted (built in GlobeMap too). */
+.roles-theme.scored .pin.great { border-color: var(--great); }
+.roles-theme.scored .pin.mid { border-color: var(--mid); }
+.roles-theme.scored .pin.low { border-color: var(--low); }
+@media (hover: hover) {
+  .roles-theme.scored .pinwrap:hover .pin.great { box-shadow: 0 10px 24px -4px var(--act-shadow), 0 0 20px color-mix(in srgb, var(--great) 55%, transparent); }
+  .roles-theme.scored .pinwrap:hover .pin.mid { box-shadow: 0 10px 24px -4px var(--act-shadow), 0 0 18px color-mix(in srgb, var(--mid) 50%, transparent); }
+  .roles-theme.scored .pinwrap:hover .pin.low { box-shadow: 0 10px 24px -4px var(--act-shadow), 0 0 16px color-mix(in srgb, var(--low) 45%, transparent); }
+}
 
 /* PANEL */
 .roles-theme .panel { position: absolute; right: 18px; top: 88px; bottom: 22px; width: 358px; border-radius: 24px; padding: 18px 8px 14px 16px; display: flex; flex-direction: column; background: rgba(15, 27, 33, 0.72); border: 1px solid var(--rim); transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
@@ -352,7 +378,7 @@
 .roles-theme.view-list.panel-hidden .panel-toggle { right: 14px; }
 
 /* CARDS */
-.roles-theme .card { position: relative; border-radius: 18px; padding: 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px 13px; align-items: center; background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02)); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 3px 14px -8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 10px 20px -16px rgba(170, 225, 240, 0.16), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.3); transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; cursor: pointer; }
+.roles-theme .card { position: relative; border-radius: 16px; padding: 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px 13px; align-items: center; background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02)); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 3px 14px -8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 10px 20px -16px rgba(170, 225, 240, 0.16), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.3); transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; cursor: pointer; }
 .roles-theme .card::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0; opacity: 0; transition: opacity 0.35s ease; background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0px), rgba(255, 255, 255, 0.1), transparent 60%); }
 .roles-theme .card > * { position: relative; z-index: 1; }
 .roles-theme .card:hover { transform: translateY(-1px); border-color: var(--act-border); box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 10px 20px -16px rgba(170, 225, 240, 0.18), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.3); }
@@ -370,35 +396,29 @@
  * Uses theme tokens, so one rule covers both light + dark. */
 .roles-theme .geo-badge { display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 600; line-height: 1; padding: 3px 7px; border-radius: 999px; border: 1px solid var(--rim); background: var(--act-tint); color: var(--muted); letter-spacing: 0.01em; }
 .roles-theme .geo-badge.geo-barrier { color: var(--subtle); }
-.roles-theme .card .why { display: none; grid-column: 1 / -1; font-size: 12px; line-height: 1.5; color: #c6d6db; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--hair); border-radius: 11px; padding: 9px 11px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
-.roles-theme.scored .card .why { display: block; }
-.roles-theme .card .acts { grid-column: 1 / -1; display: flex; gap: 8px; }
-.roles-theme .btn { font: inherit; font-size: 12px; font-weight: 600; border: 0; border-radius: 11px; padding: 9px 13px; cursor: pointer; transition: transform 0.15s, filter 0.15s, box-shadow 0.2s; }
-.roles-theme .btn:active { transform: scale(0.97); }
+/* Reason is a card CITIZEN, not a boxed embed (design direction §3.2): muted ink,
+ * 12/1.5, clamp-2, no background / border / italic. */
+.roles-theme .card .why { display: none; grid-column: 1 / -1; margin-top: 6px; font-size: 12px; line-height: 1.5; color: var(--muted); overflow: hidden; }
+.roles-theme.scored .card .why { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* Footer actions sit behind a hairline top divider, inside the same padding — a
+ * divider, never a tinted strip (§3.2). Rendered only when scored (RolesPanel). */
+.roles-theme .card .acts { grid-column: 1 / -1; margin-top: 4px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--text) 10%, transparent); display: flex; gap: 8px; }
+.roles-theme .btn { font: inherit; font-size: 13px; font-weight: 600; border: 0; border-radius: 10px; padding: 9px 13px; cursor: pointer; transition: transform 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.2s; }
+.roles-theme .btn:active { transform: translateY(1px); }
+/* Button system — ONE idiom, two strengths (design direction §3.3). */
 .roles-theme .btn.p { background: var(--act-strong); color: var(--act-strong-ink); box-shadow: 0 8px 20px -6px var(--act-shadow); }
 .roles-theme .btn.p:hover { filter: brightness(1.08); box-shadow: 0 12px 26px -7px var(--act-shadow); }
-.roles-theme .btn.g { background: rgba(255, 255, 255, 0.07); color: var(--text); border: 1px solid var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.24); }
-.roles-theme .btn.g:hover { background: rgba(255, 255, 255, 0.13); }
-.roles-theme .btn.applied { background: var(--act-tint); color: var(--muted); border: 1px solid var(--act-border); cursor: default; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.24); }
-
-/* score pill — pure light */
-.roles-theme .score { width: 54px; height: 54px; border-radius: 15px; display: grid; place-items: center; position: relative; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.22); }
-.roles-theme .score .v { font-family: var(--font-m); font-weight: 700; font-size: 20px; line-height: 1; letter-spacing: -0.04em; color: var(--subtle); transition: color 0.5s, filter 0.5s; }
-.roles-theme .score .l { font-size: 7.5px; font-weight: 700; letter-spacing: 0.12em; color: var(--subtle); margin-top: 3px; transition: color 0.5s; }
-.roles-theme:not(.scored) .score, .roles-theme:not(.scored) .acts { display: none; }
-.roles-theme .card.hero .score { width: 62px; height: 62px; }
-.roles-theme .card.hero .score .v { font-size: 24px; }
-.roles-theme.scored .score { background: linear-gradient(150deg, var(--great), #34e3ff); border-color: transparent; box-shadow: var(--glow); }
-.roles-theme.scored .score .v { color: var(--great-ink); filter: none; }
-.roles-theme.scored .score .l { color: rgba(4, 36, 31, 0.7); }
-.roles-theme.scored .score.s-mid { background: linear-gradient(150deg, #ffd884, var(--mid)); box-shadow: 0 0 26px rgba(255, 196, 77, 0.65); }
-.roles-theme.scored .score.s-mid .v { color: #3a2600; }
-.roles-theme.scored .score.s-mid .l { color: rgba(58, 38, 0, 0.7); }
-.roles-theme.scored .score.s-low { background: linear-gradient(150deg, #ff9a7d, var(--low)); box-shadow: 0 0 22px rgba(255, 111, 77, 0.55); }
-.roles-theme.scored .score.s-low .v { color: #3a1200; }
-.roles-theme.scored .score.s-low .l { color: rgba(58, 18, 0, 0.7); }
-.roles-theme .score.pending { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--hair); box-shadow: none; }
-.roles-theme .score.pending .v, .roles-theme .score.pending .l { color: var(--subtle); }
+/* Secondary = transparent + ink-hairline 20%, hover deepens to 30% (colour shift
+ * only, no fill jump). The rail row's "Prepare application" is the secondary form;
+ * the detail panel owns the single primary (kills the ghost-vs-ink split, #7). */
+.roles-theme .btn.g { background: transparent; color: var(--text); border: 1px solid color-mix(in srgb, var(--text) 20%, transparent); box-shadow: none; }
+.roles-theme .btn.g:hover { background: transparent; border-color: color-mix(in srgb, var(--text) 30%, transparent); }
+.roles-theme .btn.applied { background: transparent; color: var(--muted); border: 1px solid transparent; cursor: default; box-shadow: none; }
+.roles-theme:not(.scored) .acts { display: none; }
+/* Pre-CV cards are logo + company + role + city only — no FitChip (the score is
+ * the post-CV reveal). FitChip is always mounted so it can observe the scored
+ * flip for the count-up; CSS hides it until then. */
+.roles-theme:not(.scored) .card .fitchip { display: none; }
 
 /* DETAIL VIEW */
 .roles-theme .detail { display: none; flex: 1; min-height: 0; overflow-y: auto; flex-direction: column; gap: 14px; padding-right: 8px; }
@@ -423,12 +443,8 @@
 .roles-theme .drole .rm { font-size: 12px; color: var(--subtle); margin-top: 6px; display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
 .roles-theme .drole .rm b { color: #fff; font-weight: 600; }
 .roles-theme .drole .rm .d { width: 3px; height: 3px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); }
-.roles-theme .dwhy { font-size: 12.5px; line-height: 1.5; color: #c6d6db; background: rgba(31, 216, 184, 0.07); border: 1px solid rgba(31, 216, 184, 0.2); border-radius: 11px; padding: 9px 11px; margin-top: 11px; display: none; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
-.roles-theme.scored .dwhy { display: block; }
-.roles-theme .dscore { display: none; float: right; margin-left: 10px; width: 50px; height: 50px; border-radius: 14px; place-items: center; text-align: center; background: linear-gradient(150deg, var(--great), #34e3ff); color: var(--great-ink); font-family: var(--font-m); font-weight: 700; font-size: 18px; box-shadow: var(--glow); }
-.roles-theme.scored .dscore { display: grid; }
-.roles-theme .dscore.s-mid { background: linear-gradient(150deg, #ffd884, var(--mid)); color: #3a2600; box-shadow: 0 0 26px rgba(255, 196, 77, 0.65); }
-.roles-theme .dscore.s-low { background: linear-gradient(150deg, #ff9a7d, var(--low)); color: #3a1200; box-shadow: 0 0 22px rgba(255, 111, 77, 0.55); }
+/* .dwhy / .dscore removed — legacy jade-gradient detail score elements, replaced
+ * by the FitChip lg hero (design direction §3.1, jade-as-chrome ledger #9). */
 .roles-theme .dacts { display: flex; gap: 8px; flex-wrap: wrap; }
 .roles-theme .dmore-h { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
 .roles-theme .dmore-list { display: flex; flex-direction: column; gap: 7px; }
@@ -467,22 +483,24 @@
 .roles-theme .drole .rt:hover { text-decoration: underline; text-underline-offset: 3px; }
 .roles-theme .drole .rm .rmi { display: inline-flex; align-items: center; gap: 7px; }
 .roles-theme .dhero { display: flex; align-items: center; gap: 13px; }
-.roles-theme .dhs { display: flex; align-items: center; justify-content: center; gap: 1px; width: 66px; height: 66px; border-radius: 16px; flex: none; background: linear-gradient(150deg, var(--great), #34e3ff); color: var(--great-ink); box-shadow: var(--glow); }
-.roles-theme .dhs.s-mid { background: linear-gradient(150deg, #ffd884, var(--mid)); color: #3a2600; box-shadow: 0 0 26px rgba(255, 196, 77, 0.6); }
-.roles-theme .dhs.s-low { background: linear-gradient(150deg, #ff9a7d, var(--low)); color: #3a1200; box-shadow: 0 0 22px rgba(255, 111, 77, 0.5); }
-.roles-theme .dhs .hn { font-family: var(--font-m); font-weight: 700; font-size: 26px; letter-spacing: -0.04em; line-height: 1; }
-.roles-theme .dhs .hx { font-family: var(--font-m); font-weight: 600; font-size: 12px; opacity: 0.7; align-self: flex-end; margin-bottom: 6px; }
+/* .dhs removed — the detail hero score is now FitChip lg (design direction §3.1);
+ * the .dhl copy block below carries the fit label + bullets-header matrix (§3.5). */
 .roles-theme .dhl { min-width: 0; }
 .roles-theme .dhl .hlt { font-family: var(--font-d); font-size: 16px; font-weight: 600; color: #fff; letter-spacing: -0.01em; }
 .roles-theme .dhl .hls { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
 .roles-theme .dfit { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.roles-theme .dfit li { position: relative; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: #c6d6db; }
+/* Fit bullets: verb-led claims, clamped to 2 lines (render-side belt for the
+ * prompt's 12-word cap, design direction §5.2). Muted ink, no jade. */
+.roles-theme .dfit li { position: relative; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .roles-theme .dfit li::before { content: ""; position: absolute; left: 4px; top: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--text); }
-/* Drawer primary CTA: same full act-strong as .navcv (Rober 7-12, settled).
- * applied-cta re-tints it below. */
+/* Drawer PRIMARY CTA (the single primary per viewport, design direction §3.3):
+ * full act-strong ink, same as .navcv. The rail row's "Prepare application" is
+ * the secondary hairline form; applied-cta below removes the affordance. */
 .roles-theme .dcta { width: 100%; padding: 12px; font-size: 13.5px; background: var(--act-strong); color: var(--act-strong-ink); border: 1px solid var(--act-strong); box-shadow: var(--sh); transition: opacity 0.2s, transform 0.15s; }
 .roles-theme .dcta:enabled:hover { opacity: 0.92; }
-.roles-theme .applied-cta { background: rgba(31, 216, 184, 0.12); color: var(--great); border: 1px solid rgba(31, 216, 184, 0.3); cursor: default; }
+/* Actioned state = affordance removed, not recoloured (design direction §3.3):
+ * plain muted text + check, no jade fill. */
+.roles-theme .applied-cta { background: transparent; color: var(--muted); border: 1px solid transparent; box-shadow: none; cursor: default; }
 .roles-theme .djd { border-top: 1px solid var(--hair); padding-top: 2px; }
 .roles-theme .djd-sum { display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; padding: 8px 0; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .roles-theme .djd-sum::-webkit-details-marker { display: none; }
@@ -501,29 +519,39 @@
 /* F1 explainable-score breakdown (#38): per-dimension rubric bars + cited
  * cv_line↔jd_phrase evidence rows. Bar fill = the score bucket colors
  * (jade / amber / coral); everything else stays neutral ink-glass. */
-.roles-theme .dbreak { display: flex; flex-direction: column; gap: 12px; padding-top: 2px; }
+/* The breakdown + evidence list is CARDED under one "What drove it" eyebrow
+ * (design direction §3.6 / §5.3): radius 16, hairline, calm ink-tint surface. */
+.roles-theme .dbreak { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); background: color-mix(in srgb, var(--text) 3%, transparent); }
 .roles-theme .dbreak-h { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .roles-theme .dbreak-h2 { margin-top: 4px; }
 .roles-theme .dbars { display: flex; flex-direction: column; gap: 8px; }
-.roles-theme .dbar-row { display: grid; grid-template-columns: 118px 1fr 30px; align-items: center; gap: 10px; }
-.roles-theme .dbar-k { font-size: 11.5px; font-weight: 600; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.roles-theme .dbar-track { position: relative; height: 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
-.roles-theme .dbar-fill { position: absolute; left: 0; top: 0; bottom: 0; min-width: 3px; border-radius: 4px; background: linear-gradient(90deg, var(--great-deep), var(--great)); transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
-.roles-theme .dbar-fill.s-mid { background: linear-gradient(90deg, #f0a92e, var(--mid)); }
-.roles-theme .dbar-fill.s-low { background: linear-gradient(90deg, #e5502e, var(--low)); }
-.roles-theme .dbar-v { font-size: 11.5px; font-weight: 700; color: var(--text); text-align: right; }
-.roles-theme .devlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-.roles-theme .dev-row { display: flex; gap: 9px; align-items: flex-start; }
-.roles-theme .dev-sign { flex: none; width: 17px; height: 17px; margin-top: 1px; display: grid; place-items: center; border-radius: 6px; font-family: var(--font-m); font-size: 12px; font-weight: 700; background: rgba(31, 216, 184, 0.16); color: var(--great); }
-.roles-theme .dev-sign.down { background: rgba(255, 111, 77, 0.16); color: var(--low); }
+/* Breakdown bars (design direction §5.3): label column is max-content (all five
+ * labels render un-truncated at 358px, killing the fixed 118px column, ledger #4),
+ * the bar owns the 1fr middle so it is ≥55% of the row, value is 32px. Track = 4px
+ * ink-8% pill; fill = FLAT single bucket token, no gradient, no glow. */
+.roles-theme .dbar-row { display: grid; grid-template-columns: minmax(0, max-content) 1fr 32px; align-items: center; gap: 10px; }
+.roles-theme .dbar-k { font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.roles-theme .dbar-track { position: relative; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--text) 8%, transparent); overflow: hidden; }
+.roles-theme .dbar-fill { position: absolute; left: 0; top: 0; bottom: 0; min-width: 3px; border-radius: 999px; background: var(--great); transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+.roles-theme .dbar-fill.s-mid { background: var(--mid); }
+.roles-theme .dbar-fill.s-low { background: var(--low); }
+.roles-theme .dbar-v { font-family: var(--font-m); font-size: 11px; font-weight: 700; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+.roles-theme .devlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+/* Quote-pair rows on a fixed baseline grid (design direction §3.6), separated by
+ * hairline dividers. */
+.roles-theme .dev-row { display: grid; grid-template-columns: 16px 1fr; gap: 9px; align-items: start; padding: 9px 0; }
+.roles-theme .dev-row + .dev-row { border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
+/* Mono +/- glyph in muted ink — NO coloured square (kills .dev-sign jade/coral, #9). */
+.roles-theme .dev-sign { width: 16px; font-family: var(--font-m); font-size: 12px; font-weight: 700; line-height: 1.5; color: var(--muted); text-align: center; }
 .roles-theme .dev-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.roles-theme .dev-label { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.roles-theme .dev-label { font-size: 12px; font-weight: 600; color: var(--text); }
 .roles-theme .dev-cites { display: flex; flex-direction: column; gap: 3px; }
-.roles-theme .dev-cite { display: flex; gap: 7px; align-items: baseline; font-size: 11.5px; line-height: 1.45; }
-.roles-theme .dev-cite-k { flex: none; width: 46px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--subtle); padding-top: 1px; }
-.roles-theme .dev-cite-q { min-width: 0; color: #c6d6db; font-style: italic; }
-.roles-theme.light .dbar-track { background: rgba(11, 31, 38, 0.09); }
-.roles-theme.light .dev-cite-q { color: #1e4753; }
+/* Definition-list grid: max-content key (nowrap, no fixed 46px wrap → ledger #3) +
+ * the quote governor (clamp-2 + overflow-wrap:anywhere + min-width:0). */
+.roles-theme .dev-cite { display: grid; grid-template-columns: max-content 1fr; gap: 8px; align-items: baseline; line-height: 1.5; }
+.roles-theme .dev-cite-k { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--subtle); white-space: nowrap; }
+.roles-theme .dev-cite-q { min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; color: var(--muted); }
+.roles-theme .dev-empty { font-size: 12px; color: var(--subtle); }
 .roles-theme .detail, .roles-theme .cards { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
 .roles-theme .detail::-webkit-scrollbar, .roles-theme .cards::-webkit-scrollbar { width: 7px; }
 .roles-theme .detail::-webkit-scrollbar-track, .roles-theme .cards::-webkit-scrollbar-track { background: transparent; }
@@ -534,7 +562,9 @@
 .roles-theme .panel-note { margin: auto 8px; text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.6; padding: 22px 16px; background: rgba(255, 255, 255, 0.035); border: 1px solid var(--hair); border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 10px 20px -16px rgba(170, 225, 240, 0.14), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.28); }
 .roles-theme .panel-note b { color: #fff; font-family: var(--font-d); font-weight: 600; display: block; font-size: 15.5px; margin-bottom: 6px; }
 .roles-theme .panel-note .btn { display: block; margin: 14px auto 0; }
-.roles-theme .scorebar { font-size: 12px; color: var(--muted); padding: 8px 10px; margin-bottom: 10px; border-radius: 10px; background: rgba(31, 216, 184, 0.07); border: 1px solid rgba(31, 216, 184, 0.2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+/* Status = whisper (design direction §3.4): an inline system line, mono muted
+ * caption — NOT a jade banner. The pending FitChips carry the progress shimmer. */
+.roles-theme .scorebar { font-family: var(--font-m); font-size: 11px; color: var(--muted); padding: 6px 2px 10px; margin-bottom: 4px; }
 .roles-theme .morebtn { margin-top: 10px; width: calc(100% - 8px); }
 
 /* ============================================================================
@@ -606,7 +636,11 @@
    tick so a ticked filter reads clearly. */
 .roles-theme.light .fdrop input:checked { background: var(--act-strong); border-color: var(--act-strong); }
 .roles-theme.light .seg { background: rgba(11, 31, 38, 0.06); box-shadow: inset 0 1px 2px rgba(11, 31, 38, 0.12), inset 0 -1px 0 rgba(255, 255, 255, 0.7); }
-.roles-theme.light .seg button { color: var(--muted); }
+/* Light thumb: white surface + ink-hairline 12% (design direction §4.3). The
+ * redundant `.light .seg button { color: muted }` that de-coloured the active
+ * label (the WCAG ~2.2:1 tie, ledger #2) is removed — the base rule already
+ * sets muted, and .seg button.on wins with --text in both themes. */
+.roles-theme.light .seg .ind { background: var(--surface); border-color: color-mix(in srgb, var(--text) 12%, transparent); }
 
 /* panel */
 .roles-theme.light .panel { background: rgba(247, 250, 251, 0.66);
@@ -634,13 +668,11 @@
 .roles-theme.light .card .meta { color: var(--subtle); }
 .roles-theme.light .card .meta b { color: var(--muted); }
 .roles-theme.light .card .meta .d { background: rgba(11, 31, 38, 0.2); }
-.roles-theme.light .card .why { color: #1e4753; background: rgba(11, 31, 38, 0.035); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7); }
-.roles-theme.light .score { background: rgba(11, 31, 38, 0.05); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -1px 0 rgba(11, 31, 38, 0.05); }
-.roles-theme.light .btn.g { background: rgba(11, 31, 38, 0.05); color: var(--text); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(11, 31, 38, 0.05); }
-.roles-theme.light .btn.g:hover { background: rgba(11, 31, 38, 0.09); }
+/* .card .why, .score, and .btn.g light overrides removed — reason is now muted
+ * ink both themes, the .score pill is replaced by FitChip, and .btn.g is a
+ * theme-aware ink-hairline secondary (color-mix on --text). */
 .roles-theme.light .panel-note { color: var(--muted); background: rgba(255, 255, 255, 0.6); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9); }
 .roles-theme.light .panel-note b { color: var(--text); }
-.roles-theme.light .scorebar { color: #067a6f; background: rgba(18, 165, 148, 0.08); border-color: rgba(18, 165, 148, 0.25); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7); }
 
 /* detail view */
 .roles-theme.light .dback { color: var(--muted); }
@@ -656,7 +688,6 @@
 .roles-theme.light .drole .rm { color: var(--subtle); }
 .roles-theme.light .drole .rm b { color: var(--text); }
 .roles-theme.light .drole .rm .d { background: rgba(11, 31, 38, 0.2); }
-.roles-theme.light .dwhy { color: #1e4753; background: rgba(18, 165, 148, 0.08); border-color: rgba(18, 165, 148, 0.25); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7); }
 .roles-theme.light .dmore-h { color: var(--muted); }
 .roles-theme.light .dmore-item { background: rgba(11, 31, 38, 0.035); border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -1px 0 rgba(11, 31, 38, 0.04); }
 .roles-theme.light .dmore-item:hover { background: rgba(11, 31, 38, 0.07); border-color: var(--act-border); }
@@ -674,7 +705,6 @@
 .roles-theme.light .dtraits { color: var(--muted); }
 .roles-theme.light .dtrait .dsep { background: rgba(11, 31, 38, 0.28); }
 .roles-theme.light .dhl .hlt { color: var(--text); }
-.roles-theme.light .dfit li { color: #1e4753; }
 .roles-theme.light .djd-sum { color: var(--muted); }
 .roles-theme.light .dg-v { color: var(--text); }
 .roles-theme.light .detail, .roles-theme.light .cards { scrollbar-color: rgba(11, 31, 38, 0.22) transparent; }
@@ -797,7 +827,9 @@
   border: 1.5px dashed var(--act-border); background: var(--act-tint);
   color: var(--text); transition: border-color 0.2s, background 0.2s;
 }
-.roles-theme .cvdrop.over { border-color: var(--great); background: rgba(31, 216, 184, 0.1); }
+/* Drag-over + CV-loaded states are ink chrome, not score-jade (design direction
+ * §3.4, jade-as-chrome ledger #9): score hues stay reserved for data. */
+.roles-theme .cvdrop.over { border-color: var(--act-border); background: var(--act-tint); }
 .roles-theme .cvdrop.busy { cursor: wait; }
 .roles-theme .cvdrop-i { color: var(--muted); margin-bottom: 4px; }
 .roles-theme .cvdrop-t { font-size: 14px; font-weight: 600; color: var(--text); }
@@ -805,9 +837,9 @@
 .roles-theme .cvread {
   display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600;
   color: var(--text); padding: 11px 14px; border-radius: 12px; margin-bottom: 18px;
-  background: rgba(31, 216, 184, 0.1); border: 1px solid rgba(31, 216, 184, 0.28);
+  background: var(--act-tint); border: 1px solid var(--act-border);
 }
-.roles-theme .cvread svg { color: var(--great-deep); flex: none; }
+.roles-theme .cvread svg { color: var(--muted); flex: none; }
 .roles-theme .cvread-n { font-family: var(--font-m); font-size: 11px; color: var(--muted); font-weight: 600; }
 .roles-theme .cvread-x {
   margin-left: auto; border: none; background: none; color: var(--muted); font: inherit;

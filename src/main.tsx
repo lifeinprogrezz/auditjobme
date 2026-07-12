@@ -16,6 +16,9 @@ import "@fontsource/geist-mono/500.css";
 import "@fontsource/geist-mono/600.css";
 import "@fontsource/geist-mono/700.css";
 import "./index.css";
+// FitChip — the one score-presentation block, shared by the page world and the
+// map scope (design direction §3.1). Loaded globally so both consume one copy.
+import "./styles/fitchip.css";
 
 // Production error visibility from day one (v1 spec §3). Errors only — no performance
 // tracing or session replay (product analytics is deferred). No-op unless VITE_SENTRY_DSN

@@ -75,7 +75,7 @@ export default function ScoreBreakdown({
                   </span>
                   <div className="dev-body">
                     <span className="dev-label">{e.label}</span>
-                    {(e.cvLine || e.jdPhrase) && (
+                    {e.cvLine || e.jdPhrase ? (
                       <span className="dev-cites">
                         {e.cvLine && (
                           <span className="dev-cite">
@@ -90,6 +90,9 @@ export default function ScoreBreakdown({
                           </span>
                         )}
                       </span>
+                    ) : (
+                      // Honest empty state — never fabricate a quote (BRAND.md).
+                      <span className="dev-empty">— no signal</span>
                     )}
                   </div>
                 </li>

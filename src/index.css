@@ -57,6 +57,16 @@
     /* map control radius language is 11px buttons / 14-18px cards */
     --radius: 0.75rem;
 
+    /* D-class paper depth (design direction §2.5): a two-layer, ink-tinted page
+     * shadow whose paint stays DARK in both themes, plus a full-page grain tile.
+     * Shipped as tokens/utilities for the D2/D3 page surfaces to consume; the map
+     * keeps its own rim-light stacks. Shadow paint = ink 0B1F26-class as an
+     * rgb triple so the alpha can vary. */
+    --shadow-ink: 11 31 38;
+    --shadow-page: 0 1px 2px 0 rgb(var(--shadow-ink) / 0.04), 0 12px 32px -16px rgb(var(--shadow-ink) / 0.1);
+    --shadow-page-lift: 0 2px 4px 0 rgb(var(--shadow-ink) / 0.04), 0 24px 48px -16px rgb(var(--shadow-ink) / 0.16);
+    --grain-size: 220px;
+
     --sidebar-background: 200 23.1% 97.5%;
     --sidebar-foreground: 195 22.2% 31.8%;
     --sidebar-primary: 203.5 35.4% 12.7%;
@@ -98,6 +108,13 @@
     --input: 197.1 23.1% 17.8%;
     --ring: 186.7 27.3% 93.5%;
 
+    /* Dark D-class depth is VALUE-first (design direction §2.5): the shadow paint
+     * stays the deep stage ink 020407-class (NEVER the flipped pale text — a pale
+     * shadow reads as a halo); alphas ×1.5 assist, card value + hairline carry. */
+    --shadow-ink: 2 4 7;
+    --shadow-page: 0 1px 2px 0 rgb(var(--shadow-ink) / 0.06), 0 12px 32px -16px rgb(var(--shadow-ink) / 0.16);
+    --shadow-page-lift: 0 2px 4px 0 rgb(var(--shadow-ink) / 0.06), 0 24px 48px -16px rgb(var(--shadow-ink) / 0.24);
+
     --sidebar-background: 200 41.2% 10%;
     --sidebar-foreground: 195.6 16% 66.9%;
     --sidebar-primary: 186.7 27.3% 93.5%;
@@ -118,4 +135,20 @@
     @apply bg-background text-foreground font-sans antialiased;
     letter-spacing: -0.006em;
   }
+}
+
+/* Full-page grain — the third D-class depth ingredient (design direction §2.5):
+ * a ~220px feTurbulence tile at 5% opacity (∈ [0.04, 0.06]) in BOTH themes, so a
+ * page reads as paper rather than flat digital. Plain CSS (never purged); the
+ * D2/D3 page shells opt in with the `page-grain` class. Grain is monochrome
+ * (saturate 0) and fixed so it doesn't scroll. */
+.page-grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: var(--grain-size) var(--grain-size);
 }

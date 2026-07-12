@@ -86,10 +86,11 @@ export function scoreBucket(score: number): ScoreBucket {
   return score >= 4 ? "great" : score >= 3 ? "mid" : "low";
 }
 
-/** Short, honest qualitative label for the score hero in the /roles detail panel. */
+/** Fit hero label — the locked copy matrix (design direction §3.5), driven by the
+ *  bucket: great "Strong fit" · mid "Fair fit" · low "Weak fit". */
 export function fitLabel(score: number): string {
   const b = scoreBucket(score);
-  return b === "great" ? "Strong fit" : b === "mid" ? "Solid fit" : "Weak fit";
+  return b === "great" ? "Strong fit" : b === "mid" ? "Fair fit" : "Weak fit";
 }
 
 /** Geo / work-authorization verdict for a role (issue #42, finishing the RolesPanel

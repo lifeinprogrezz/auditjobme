@@ -40,6 +40,9 @@ describe("ScoreBreakdown viz (F1 explainable-score)", () => {
     // the negative factor shows a down sign and, with both quotes blanked, no citations
     expect(rows[1].querySelector(".dev-sign.down")?.textContent).toBe("−");
     expect(rows[1].querySelector(".dev-cites")).toBeNull();
+    // instead it shows the honest empty state (design direction §3.6) — never a
+    // fabricated quote.
+    expect(rows[1].querySelector(".dev-empty")?.textContent).toBe("— no signal");
   });
 
   it("renders nothing when there is neither a subscore nor evidence", () => {
