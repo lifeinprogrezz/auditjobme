@@ -92,6 +92,40 @@ export function fitLabel(score: number): string {
   return b === "great" ? "Strong fit" : b === "mid" ? "Solid fit" : "Weak fit";
 }
 
+/** Geo / work-authorization verdict for a role (issue #42, finishing the RolesPanel
+ *  partial). SAFETY PROPERTY: never show a WRONG verdict — only surface a positive or
+ *  barrier when the JD states it unambiguously; when nothing is stated, fall through to
+ *  'unverified' (the honest "not stated" state) rather than guess. This guards the
+ *  login-walled / sidebar-salary traps memory flags. Pure; pinned by geo-verdict.test.ts. */
+export type GeoVerdictKind = "sponsors" | "eu-eligible" | "barrier" | "unverified";
+export interface GeoVerdict {
+  kind: GeoVerdictKind;
+  /** Short, abbreviation-expanded label for a badge / data cell. */
+  label: string;
+  /** Surface as a prominent card badge? Only high-confidence, actionable verdicts. */
+  onCard: boolean;
+}
+// A US-only / US-work-authorization requirement is a clear barrier for an EU-based
+// job seeker. Deliberately narrow: only unambiguous "US only" phrasings, so an
+// incidental "US" mention (e.g. "US, Europe, APAC") never fabricates a barrier.
+const GEO_US_ONLY_RE =
+  /\b(u\.?s\.?[- ]?only|us[- ]?based only|must (?:be|reside)[^.]{0,30}(?:united states|u\.?s\.?a?\b)|authoriz(?:ed|ation) to work in the (?:us|united states)|green ?card|us citizen(?:ship)?)/i;
+// EU / EEA / Europe-wide eligibility stated in the JD — a positive for the EU target.
+const GEO_EU_RE = /\b(eu|eea|european union|emea|europe|europe-?wide)\b/i;
+
+export function geoVerdict(job: RoleJob): GeoVerdict {
+  const ex = job.extraction ?? null;
+  // 1. Role explicitly offers to sponsor a visa — the strongest positive.
+  if (ex?.visa_sponsorship === "offered") return { kind: "sponsors", label: "Sponsors visa", onCard: true };
+  const geo = (ex?.geo_eligibility ?? "").trim();
+  // 2. Stated US-only barrier — never soften a barrier the JD spells out.
+  if (geo && GEO_US_ONLY_RE.test(geo)) return { kind: "barrier", label: "US work authorization", onCard: true };
+  // 3. Stated EU / EEA / Europe eligibility.
+  if (geo && GEO_EU_RE.test(geo)) return { kind: "eu-eligible", label: "EU eligible", onCard: true };
+  // 4. Nothing trustworthy in the JD → the honest "not stated" state (never a guess).
+  return { kind: "unverified", label: "Work eligibility not stated", onCard: false };
+}
+
 /** Cluster bubble tier — startupmap-matched count breaks (<15 / ≥15 / ≥50 / ≥150).
  *  Light glass below 50, ink above (their light→dark hub split); z-index ladder
  *  so bigger hubs win marker overlaps. No sublabel: the "roles" word under the

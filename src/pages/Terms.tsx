@@ -1,90 +1,89 @@
-const sectionStyle: React.CSSProperties = {
-  marginBottom: "2rem",
-  paddingLeft: "1rem",
-  borderLeft: "2px solid #2a2825",
-};
+// Terms of service (issue #42): real content on the token layer, product-accurate for
+// the job-search product. Warm voice, no em-dashes.
+import LegalLayout, { LegalSection } from "@/components/app/LegalLayout";
 
-const h2Style: React.CSSProperties = {
-  color: "#e8e6e1",
-  fontSize: "1rem",
-  fontWeight: 600,
-  marginBottom: ".6rem",
-  letterSpacing: "-.01em",
-};
-
-const Terms = () => {
+export default function Terms() {
   return (
-    <div style={{ minHeight: "100vh", background: "#000000" }}>
-    <div style={{
-      color: "#c4c0b8",
-      fontFamily: "'Plus Jakarta Sans', sans-serif",
-      padding: "3rem 1.5rem",
-      maxWidth: "720px",
-      margin: "0 auto",
-      lineHeight: 1.8,
-    }}>
-      <a onClick={() => window.history.back()} style={{ color: "#a09a90", fontSize: ".7rem", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", marginBottom: "2rem", padding: "6px 14px", border: "1px solid #2a2825", borderRadius: "6px", letterSpacing: ".04em", textTransform: "uppercase" as const, transition: "border-color .2s" }}>
-        ← Back
-      </a>
-      <h1 style={{ fontFamily: "'DM Sans', sans-serif", color: "#f0ede8", fontSize: "clamp(1.6rem, 4vw, 2.2rem)", fontWeight: 400, letterSpacing: "-0.03em", marginBottom: ".4rem" }}>
-        Terms of Service
-      </h1>
-      <p style={{ fontSize: ".8rem", color: "#6b6860", marginBottom: "2.5rem" }}>
-        Last updated: June 13, 2026
+    <LegalLayout title="Terms of Service" updated="12 July 2026">
+      <p className="text-sm text-muted-foreground">
+        These terms cover your use of auditjob.me. Using the product means you agree to them. If you don't, please
+        don't use it.
       </p>
 
-      <section style={sectionStyle}>
-        <h2 style={h2Style}>1. Acceptance</h2>
-        <p>By using auditjob.me, you agree to these terms. If you do not agree, please do not use the service.</p>
-      </section>
+      <LegalSection heading="1. What the product does">
+        <p>
+          auditjob.me is a free tool for Product Managers job-hunting in Europe. It shows a daily-scraped pool of live
+          roles, scores each against your CV, and helps you prepare an application bundle: a tailored CV summary, a
+          cover letter, and an optional company audit. It also tracks the roles you apply to.
+        </p>
+      </LegalSection>
 
-      <section style={sectionStyle}>
-        <h2 style={h2Style}>2. Service description</h2>
-        <p>auditjob.me is a tool that generates AI-powered audit reports for job applications. Users can create, view, and share audit reports via unique URLs.</p>
-      </section>
+      <LegalSection heading="2. Your account">
+        <p>
+          You sign in with Google. You're responsible for keeping your account secure, and for the accuracy of the CV
+          and details you add. Don't share your account or use someone else's.
+        </p>
+      </LegalSection>
 
-      <section style={sectionStyle}>
-        <h2 style={h2Style}>3. Accounts</h2>
-        <p>You sign in using your Google account. You are responsible for maintaining the security of your account. You must not share your account or use another person's account.</p>
-      </section>
+      <LegalSection heading="3. Free use and fair limits">
+        <p>
+          The product is free, with fair-use limits so the AI features stay sustainable for everyone. We may adjust
+          those limits over time. There's no hidden paywall.
+        </p>
+      </LegalSection>
 
-      <section style={sectionStyle}>
-        <h2 style={h2Style}>4. Free usage</h2>
-        <p>auditjob.me is currently free to use, with fair-use limits per user. We may change these limits at any time to keep the service sustainable.</p>
-      </section>
+      <LegalSection heading="4. We prepare, you submit">
+        <p>
+          We generate application materials and prefill what we can, but you always review and submit the application
+          yourself on the employer's own site. We never submit an application on your behalf.
+        </p>
+      </LegalSection>
 
-      <section style={sectionStyle}>
-        <h2 style={h2Style}>5. Content ownership</h2>
-        <p>You retain ownership of the content you provide (company names, job links, etc.). The generated audit reports are yours to use and share as you see fit.</p>
-      </section>
+      <LegalSection heading="5. Your content">
+        <p>
+          You keep ownership of what you provide, including your CV and the roles you track. The CV summaries, cover
+          letters, and audits you generate are yours to use and send.
+        </p>
+      </LegalSection>
 
-      <section style={sectionStyle}>
-        <h2 style={h2Style}>6. Privacy of your audits</h2>
-        <p>Your audits are private by default. Publishing a shareable link is an explicit action you choose, per audit. When you publish one, anyone with that link can view that audit and your public display name and username (never your email). You can keep audits private and never publish them.</p>
-      </section>
+      <LegalSection heading="6. Privacy of your job hunt">
+        <p>
+          Your job search is private by default. Nothing you do is public unless you choose it. A company audit is
+          private until you publish a shareable link, and publishing is an explicit, per-audit action. When you
+          publish one, anyone with the link can see that audit and your public display name, never your email.
+        </p>
+      </LegalSection>
 
-      <section style={sectionStyle}>
-        <h2 style={h2Style}>7. Prohibited use</h2>
-        <p>You may not use the service for unlawful purposes, to harass others, or to submit misleading or fraudulent information.</p>
-      </section>
+      <LegalSection heading="7. Fair use of the service">
+        <p>
+          Don't use the product for anything unlawful, to harass anyone, or to submit misleading or fraudulent
+          information. We may suspend accounts that abuse the service.
+        </p>
+      </LegalSection>
 
-      <section style={sectionStyle}>
-        <h2 style={h2Style}>8. Limitation of liability</h2>
-        <p>The service is provided "as is" without warranties. We are not responsible for decisions made based on generated audit reports. Use the reports at your own discretion.</p>
-      </section>
+      <LegalSection heading="8. No warranty">
+        <p>
+          The product is provided as is. Scores and generated materials are aids, not guarantees. You decide what to
+          send and where to apply, and those decisions are yours.
+        </p>
+      </LegalSection>
 
-      <section style={sectionStyle}>
-        <h2 style={h2Style}>9. Changes</h2>
-        <p>We may update these terms at any time. Continued use of the service constitutes acceptance of any changes.</p>
-      </section>
+      <LegalSection heading="9. Changes">
+        <p>
+          We may update these terms as the product evolves. Continuing to use it after a change means you accept the
+          update.
+        </p>
+      </LegalSection>
 
-      <section style={sectionStyle}>
-        <h2 style={h2Style}>10. Contact</h2>
-        <p>Questions? Reach out at <a href="mailto:hello@lifeinprogrezz.com" style={{ color: "#c9a461" }}>hello@lifeinprogrezz.com</a>.</p>
-      </section>
-    </div>
-    </div>
+      <LegalSection heading="10. Contact">
+        <p>
+          Questions? Reach us at{" "}
+          <a href="mailto:hello@lifeinprogrezz.com" className="text-foreground underline underline-offset-2">
+            hello@lifeinprogrezz.com
+          </a>
+          .
+        </p>
+      </LegalSection>
+    </LegalLayout>
   );
-};
-
-export default Terms;
+}

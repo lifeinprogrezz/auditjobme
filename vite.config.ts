@@ -1,6 +1,7 @@
-import { defineConfig, loadEnv, type Plugin } from "vite";
+import { defineConfig, loadEnv, searchForWorkspaceRoot, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { realpathSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
 import { renderSite, type SiteInput } from "./src/lib/geo-pages";
@@ -99,6 +100,20 @@ function geoPrerenderPlugin(env: Record<string, string>): Plugin {
   };
 }
 
+// A git-worktree checkout symlinks node_modules to the primary checkout's copy,
+// which sits OUTSIDE this project root. Vite's dev server fs.strict then 403s every
+// asset served through @fs from that real path — notably the @fontsource woff/woff2
+// files (geist-sans, space-grotesk, geist-mono) — flooding the console with errors
+// and failing a strict zero-console-errors verification. Allow the symlink's real
+// target (falls back to the literal path if node_modules is absent).
+const nodeModulesReal = (() => {
+  try {
+    return realpathSync(path.resolve(__dirname, "node_modules"));
+  } catch {
+    return path.resolve(__dirname, "node_modules");
+  }
+})();
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Load VITE_* + the GEO_* build knobs (empty prefix = all keys).
@@ -107,6 +122,11 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "::",
       port: 8080,
+      fs: {
+        // Keep Vite's default workspace-root discovery AND permit the (possibly
+        // symlinked-out) real node_modules so worktree dev/verification serves fonts.
+        allow: [searchForWorkspaceRoot(process.cwd()), nodeModulesReal],
+      },
       hmr: {
         overlay: false,
       },
@@ -123,7 +143,7 @@ export default defineConfig(({ mode }) => {
         output: {
           // Split the big, stable vendors into their own cacheable chunks so the
           // app chunk stays small and a deploy doesn't re-ship react/radix/etc.
-          // pdfjs is dynamically imported (see Onboarding/Profile) so it auto-splits.
+          // pdfjs is dynamically imported (see CvUnlockModal) so it auto-splits.
           // Order matters: scoped packages whose paths contain "react" are matched
           // before the bare-react catch.
           manualChunks(id) {

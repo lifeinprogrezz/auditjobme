@@ -1,23 +1,26 @@
+// Apply — the apply bundle (issue #42). Adds the two missing steps the audit flagged:
+// (1) CV EDIT-BEFORE-DOWNLOAD — the tailored summary lands in an editable box before it
+// prints, so the one LLM-written line is reviewed, never blind; the CV BODY stays
+// verbatim from cv_text (the trust rule, in cvHtml.ts). (2) PREFILL-NEVER-SUBMIT confirm
+// card — we hand you the fields to paste and open the real posting; we never submit for
+// you. Ink-glass token layer, no inline hex.
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { tailorSummary, tailorCover, HAIKU } from "@/lib/tailor";
+import { toast } from "@/components/ui/sonner";
+import AppShell from "@/components/app/AppShell";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { tailorSummary, tailorCover, HAIKU, type CoverJson } from "@/lib/tailor";
 import { buildCvHtml, buildCoverHtml } from "@/lib/cvHtml";
 import type { Json } from "@/integrations/supabase/types";
-
-const BG = "#0f0e0c";
-const TEXT = "#f0ede8";
-const MUTED = "#8a8780";
-const ACCENT = "#8a9a8a";
-const BORDER = "#2a2825";
-const SURFACE = "#1a1916";
 
 /** Open the generated HTML in a new window and trigger the browser's print-to-PDF. */
 function printHtml(html: string) {
   const w = window.open("", "_blank");
   if (!w) {
-    alert("Please allow popups to download the PDF.");
+    toast.error("Please allow popups to download the PDF.");
     return;
   }
   w.document.open();
@@ -28,7 +31,29 @@ function printHtml(html: string) {
 
 type Job = { id: string; company: string; title: string; url: string; jd_text: string | null };
 
-const linkStyle: React.CSSProperties = { color: ACCENT, textDecoration: "underline", textUnderlineOffset: "2px" };
+/** One-tap copy with a toast confirmation (the confirm card's paste helpers). */
+async function copy(text: string, what: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(`${what} copied`);
+  } catch {
+    toast.error("Couldn't copy. Select and copy manually.");
+  }
+}
+
+function CopyRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-border py-2 last:border-0">
+      <div className="min-w-0">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="mt-0.5 break-words text-sm text-foreground">{value}</div>
+      </div>
+      <Button size="sm" variant="ghost" className="shrink-0" onClick={() => copy(value, label)}>
+        Copy
+      </Button>
+    </div>
+  );
+}
 
 export default function Apply() {
   const { user } = useAuth();
@@ -42,13 +67,16 @@ export default function Apply() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<null | "cv" | "cover">(null);
   const [error, setError] = useState("");
-  const [done, setDone] = useState<Set<string>>(new Set());
+  const [summary, setSummary] = useState<string | null>(null); // editable tailored summary
+  const [cover, setCover] = useState<CoverJson | null>(null);
   const [hasApplied, setHasApplied] = useState(false);
 
   useEffect(() => {
     let active = true;
     setError("");
     setBusy(null);
+    setSummary(null);
+    setCover(null);
     async function load() {
       if (!user) {
         setLoading(false);
@@ -63,16 +91,12 @@ export default function Apply() {
       setCvText(profile?.cv_text ?? null);
       setName(profile?.display_name ?? "");
       if (jobData) {
-        const [{ data: arts }, { data: app }] = await Promise.all([
-          supabase.from("artifacts").select("kind").eq("user_id", user.id).eq("job_id", (jobData as Job).id),
-          supabase
-            .from("applications")
-            .select("id")
-            .eq("user_id", user.id)
-            .eq("job_id", (jobData as Job).id)
-            .maybeSingle(),
-        ]);
-        if (active && arts) setDone(new Set(arts.map((a) => a.kind)));
+        const { data: app } = await supabase
+          .from("applications")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("job_id", (jobData as Job).id)
+          .maybeSingle();
         if (active && app) setHasApplied(true);
       }
       if (active) setLoading(false);
@@ -89,15 +113,13 @@ export default function Apply() {
     await supabase.from("artifacts").insert({ user_id: user.id, job_id: job.id, kind, content, model: HAIKU });
   }
 
-  async function genCv() {
+  async function genSummary() {
     if (!job || !cvText) return;
     setBusy("cv");
     setError("");
     try {
-      const summary = await tailorSummary({ role: job.title, company: job.company, jdText: job.jd_text, cvText });
-      printHtml(buildCvHtml({ name, summary, cvText }));
-      await saveArtifact("cv", { summary });
-      setDone((p) => new Set(p).add("cv"));
+      const s = await tailorSummary({ role: job.title, company: job.company, jdText: job.jd_text, cvText });
+      setSummary(s);
     } catch (e) {
       setError(e instanceof Error ? e.message : "CV generation failed");
     } finally {
@@ -105,15 +127,21 @@ export default function Apply() {
     }
   }
 
+  async function downloadCv() {
+    if (!job || !cvText || summary == null) return;
+    printHtml(buildCvHtml({ name, summary, cvText }));
+    // Persist the reviewed summary (the version the user actually downloaded).
+    await saveArtifact("cv", { summary });
+  }
+
   async function genCover() {
     if (!job || !cvText) return;
     setBusy("cover");
     setError("");
     try {
-      const cover = await tailorCover({ role: job.title, company: job.company, jdText: job.jd_text, cvText }, name);
-      printHtml(buildCoverHtml({ name, company: job.company, cover }));
-      await saveArtifact("letter", { cover });
-      setDone((p) => new Set(p).add("letter"));
+      const c = await tailorCover({ role: job.title, company: job.company, jdText: job.jd_text, cvText }, name);
+      setCover(c);
+      await saveArtifact("letter", { cover: c as unknown as Json });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Cover letter generation failed");
     } finally {
@@ -133,78 +161,151 @@ export default function Apply() {
     }
   }
 
-  const page = (inner: React.ReactNode) => (
-    <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: "'Plus Jakarta Sans', sans-serif", padding: "3rem 1.5rem" }}>
-      <div style={{ maxWidth: 640, margin: "0 auto" }}>
-        <a href="/digest" style={{ ...linkStyle, fontSize: ".68rem", textTransform: "uppercase", letterSpacing: ".06em" }}>← Back to your roles</a>
-        {inner}
-      </div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <AppShell title="Prepare application">
+        <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
+      </AppShell>
+    );
+  }
 
-  if (!loading && !user) return page(<p style={{ marginTop: "1.5rem", fontSize: ".85rem", color: MUTED }}>Please <a href="/" style={linkStyle}>sign in</a> to prepare an application.</p>);
-  if (loading) return page(<p style={{ marginTop: "1.5rem", fontSize: ".8rem", color: MUTED }}>Loading...</p>);
-  if (!job) return page(<p style={{ marginTop: "1.5rem", fontSize: ".85rem", color: MUTED }}>Role not found. Open it from <a href="/digest" style={linkStyle}>your roles</a>.</p>);
+  if (!job) {
+    return (
+      <AppShell title="Prepare application">
+        <p className="mt-6 text-sm text-muted-foreground">
+          Role not found. Open it from{" "}
+          <button className="underline underline-offset-2" onClick={() => navigate("/today")}>
+            Today
+          </button>
+          .
+        </p>
+      </AppShell>
+    );
+  }
 
-  const btnStyle = (disabled: boolean): React.CSSProperties => ({
-    width: "100%",
-    textAlign: "left",
-    padding: "1rem 1.2rem",
-    borderRadius: 10,
-    border: `1px solid ${BORDER}`,
-    background: SURFACE,
-    color: TEXT,
-    fontFamily: "inherit",
-    fontSize: ".85rem",
-    cursor: disabled ? "default" : "pointer",
-    opacity: disabled ? 0.6 : 1,
-  });
-
-  return page(
-    <>
-      <h1 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 400, fontSize: "clamp(1.5rem, 4vw, 2.2rem)", letterSpacing: "-.03em", margin: "1.2rem 0 .3rem" }}>
-        {job.company}
-      </h1>
-      <p style={{ fontSize: ".85rem", color: TEXT, marginBottom: ".3rem" }}>{job.title}</p>
-      <p style={{ fontSize: ".72rem", color: MUTED, marginBottom: "1.8rem", lineHeight: 1.6 }}>
-        Your apply bundle. The CV body is rendered exactly from your saved CV; only the summary and the cover letter are tailored to this role.{" "}
-        <a href={job.url} target="_blank" rel="noopener noreferrer" style={linkStyle}>View the original posting</a>.
+  return (
+    <AppShell>
+      <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">{job.company}</h1>
+      <p className="mt-1 text-sm text-foreground">{job.title}</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Your apply bundle. The CV body is rendered exactly from your saved CV. Only the summary and cover letter are
+        tailored to this role, and you review them before anything downloads.{" "}
+        <a href={job.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+          View the original posting
+        </a>
+        .
       </p>
 
       {!cvText ? (
-        <p style={{ fontSize: ".82rem", color: MUTED, lineHeight: 1.6, padding: "1rem 1.2rem", borderRadius: 10, border: `1px solid ${BORDER}`, background: SURFACE }}>
-          Add your CV to your profile first, then come back here to generate a tailored version.{" "}
-          <a href="/profile" style={linkStyle}>Go to your profile</a>.
-        </p>
+        <div className="mt-8 rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
+          Add your CV on the map first, then come back here to prepare a tailored version.{" "}
+          <button className="underline underline-offset-2 text-foreground" onClick={() => navigate("/")}>
+            Go to the map
+          </button>
+          .
+        </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: ".8rem" }}>
-          <button onClick={() => navigate(`/audit?job=${encodeURIComponent(job.url)}`)} disabled={busy !== null} style={btnStyle(busy !== null)}>
-            <span style={{ fontWeight: 700, color: ACCENT }}>Build a company audit</span>
-            <div style={{ fontSize: ".68rem", color: MUTED, marginTop: ".25rem" }}>A short product audit of {job.company} to send with your application — the thing that gets you noticed.</div>
-          </button>
-          <button onClick={genCv} disabled={busy !== null} style={btnStyle(busy !== null)}>
-            <span style={{ fontWeight: 700 }}>{busy === "cv" ? "Tailoring your CV..." : done.has("cv") ? "Regenerate tailored CV" : "Generate tailored CV"}</span>
-            <div style={{ fontSize: ".68rem", color: MUTED, marginTop: ".25rem" }}>Your CV, with a summary written for this role. Opens a print dialog (save as PDF).</div>
-          </button>
-          <button onClick={genCover} disabled={busy !== null} style={btnStyle(busy !== null)}>
-            <span style={{ fontWeight: 700 }}>{busy === "cover" ? "Writing your cover letter..." : done.has("letter") ? "Regenerate cover letter" : "Generate cover letter"}</span>
-            <div style={{ fontSize: ".68rem", color: MUTED, marginTop: ".25rem" }}>A short, warm cover letter drawn from your CV. Opens a print dialog (save as PDF).</div>
-          </button>
-          {hasApplied ? (
-            <button disabled style={{ ...btnStyle(true), color: ACCENT, borderColor: ACCENT, opacity: 1 }}>
-              <span style={{ fontWeight: 700 }}>✓ Marked as applied</span>
-              <div style={{ fontSize: ".68rem", color: MUTED, marginTop: ".25rem" }}>It's in your applications tracker.</div>
-            </button>
-          ) : (
-            <button onClick={markApplied} disabled={busy !== null} style={btnStyle(busy !== null)}>
-              <span style={{ fontWeight: 700 }}>Mark as applied</span>
-              <div style={{ fontSize: ".68rem", color: MUTED, marginTop: ".25rem" }}>Once you've sent it — tracks it in your applications.</div>
-            </button>
-          )}
+        <div className="mt-8 flex flex-col gap-6">
+          {/* 1 — Tailored CV: generate → EDIT → download */}
+          <section className="rounded-lg border border-border bg-card p-5">
+            <h2 className="font-display text-lg font-semibold">Tailored CV</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              We write only the professional summary for this role. Your CV body stays word-for-word as you wrote it.
+            </p>
+            {summary == null ? (
+              <Button className="mt-4" onClick={genSummary} disabled={busy !== null}>
+                {busy === "cv" ? "Tailoring your summary…" : "Generate tailored summary"}
+              </Button>
+            ) : (
+              <>
+                <label className="mt-4 block text-xs uppercase tracking-wide text-muted-foreground">
+                  Professional summary (edit before you download)
+                </label>
+                <Textarea
+                  className="mt-2 min-h-32 font-sans"
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button onClick={downloadCv} disabled={busy !== null || !summary.trim()}>
+                    Download CV (PDF)
+                  </Button>
+                  <Button variant="outline" onClick={genSummary} disabled={busy !== null}>
+                    {busy === "cv" ? "Rewriting…" : "Rewrite summary"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </section>
+
+          {/* 2 — Cover letter (optional) */}
+          <section className="rounded-lg border border-border bg-card p-5">
+            <h2 className="font-display text-lg font-semibold">Cover letter</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              A short, warm letter drawn from your CV. Optional, only if the role asks for one.
+            </p>
+            {cover == null ? (
+              <Button className="mt-4" variant="outline" onClick={genCover} disabled={busy !== null}>
+                {busy === "cover" ? "Writing your cover letter…" : "Generate cover letter"}
+              </Button>
+            ) : (
+              <>
+                <div className="mt-4 space-y-3 rounded-md border border-border bg-secondary/40 p-4 text-sm">
+                  <p>{cover.greeting}</p>
+                  <p>{cover.p1}</p>
+                  <p>{cover.p2}</p>
+                  <p>{cover.p3}</p>
+                  <p>{cover.sign}</p>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button onClick={() => printHtml(buildCoverHtml({ name, company: job.company, cover }))}>
+                    Download letter (PDF)
+                  </Button>
+                  <Button variant="outline" onClick={genCover} disabled={busy !== null}>
+                    Rewrite letter
+                  </Button>
+                </div>
+              </>
+            )}
+          </section>
+
+          {/* 3 — Prefill, never submit: the confirm card */}
+          <section className="rounded-lg border border-border bg-card p-5">
+            <h2 className="font-display text-lg font-semibold">Submit it yourself</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              We prefill what we can and open the real posting. We never submit an application for you. Review every
+              field on their form, then send it.
+            </p>
+            <div className="mt-4 rounded-md border border-border bg-secondary/40 px-4">
+              {name && <CopyRow label="Full name" value={name} />}
+              {user?.email && <CopyRow label="Email" value={user.email} />}
+              {summary && <CopyRow label="Summary to paste" value={summary} />}
+              <CopyRow label="Role link" value={job.url} />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button asChild>
+                <a href={job.url} target="_blank" rel="noopener noreferrer">
+                  Open the application page
+                </a>
+              </Button>
+              <Button variant="outline" disabled={hasApplied} onClick={markApplied}>
+                {hasApplied ? "Marked as applied" : "I've applied"}
+              </Button>
+            </div>
+            {hasApplied && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Tracked on your{" "}
+                <button className="underline underline-offset-2 text-foreground" onClick={() => navigate("/tracker")}>
+                  applications board
+                </button>
+                .
+              </p>
+            )}
+          </section>
         </div>
       )}
 
-      {error && <p style={{ marginTop: "1rem", fontSize: ".75rem", color: "#c98a8a" }}>{error}</p>}
-    </>,
+      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+    </AppShell>
   );
 }

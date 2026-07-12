@@ -188,7 +188,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
 
   return (
     <header className="nav glass liquid">
-      <Link className="brand" to="/underconstruction">auditjob.me</Link>
+      <Link className="brand" to="/">auditjob.me</Link>
       <span className="sep" />
 
       <div className="cmd">

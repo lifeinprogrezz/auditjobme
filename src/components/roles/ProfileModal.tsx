@@ -6,6 +6,7 @@
 // out lives here too. Reuses the CV-unlock modal's shell + token classes verbatim
 // (.cvmask/.cvmodal/.cvread/.cvchip/…) — no new visual language, ink-glass only.
 import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
 import { cvWordCount, formatUploadedDate } from "@/lib/labels";
 
@@ -114,6 +115,19 @@ export default function ProfileModal({
             ) : (
               <span className="cvcap">None picked yet</span>
             )}
+          </div>
+        </div>
+
+        {/* Reach the routed product surfaces from the map shell (issue #42). */}
+        <div className="cvsec">
+          <div className="cvlbl">Your workspace</div>
+          <div className="pf-nav">
+            <Link className="pf-navlink" to="/today" onClick={onClose}>
+              Today
+            </Link>
+            <Link className="pf-navlink" to="/tracker" onClick={onClose}>
+              Applications
+            </Link>
           </div>
         </div>
 
