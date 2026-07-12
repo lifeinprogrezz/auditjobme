@@ -21,6 +21,7 @@ import {
   type RolesFilters,
 } from "@/lib/roles";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
+import { useTheme } from "@/lib/theme";
 import ScoreBreakdown from "./ScoreBreakdown";
 import FitChip from "./FitChip";
 
@@ -66,9 +67,15 @@ export type RolesPanelProps = {
 
 /** Logo.dev → site favicon (DuckDuckGo, then Google) → colored initial. logo.dev
  *  404s when it lacks the brand, so the favicon step shows the real mark instead
- *  of logo.dev's generic pinwheel placeholder (the TravelPerk case). */
+ *  of logo.dev's generic pinwheel placeholder (the TravelPerk case). The logo.dev
+ *  theme follows the ACTIVE app theme (design direction §5.5 / skill Logo.dev rule):
+ *  dark card → theme=dark (light marks), light card → theme=light (dark marks) — a
+ *  hardcoded param breaks on theme switch (the broken-logos bug, both directions). */
 function Logo({ domain, company }: { domain: string | null; company: string }) {
-  const chain = domain ? [logoUrl(domain), ...faviconUrls(domain)].filter(Boolean) : [];
+  const { theme } = useTheme();
+  const chain = domain
+    ? [logoUrl(domain, theme === "dark" ? "dark" : "light"), ...faviconUrls(domain)].filter(Boolean)
+    : [];
   const [stage, setStage] = useState(0);
   const src = chain[stage] ?? null;
   if (!src) {

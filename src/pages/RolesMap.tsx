@@ -21,6 +21,7 @@ import {
 } from "@/lib/roles";
 import { coordsOf } from "@/lib/geo";
 import { useRolesData } from "@/hooks/useRolesData";
+import { useTheme } from "@/lib/theme";
 
 // Curated priority pool for the default "Hot right now" showcase (Rober 7-06):
 // recognizable big-tech + hot young high-growth, cool-first. Each card must be a
@@ -63,21 +64,25 @@ export default function RolesMap() {
   // Bumped to snap an anon visitor back to the Europe landing frame (see below).
   const [europeFrame, setEuropeFrame] = useState(0);
   const [panelHidden, setPanelHidden] = useState(false);
-  // Light is the shipped default (Rober's call, 2026-07-05); dark ink stays
-  // as the alternate identity for a future theme setting.
-  const [light, setLight] = useState(true);
+  // Day/night lives in ONE root theme (src/lib/theme.ts, design direction §9.1); the
+  // map derives its `.light` glass + basemap skin from it, so the HeadBar toggle and
+  // the pages' toggle drive the same source. Initial follows the OS preference / the
+  // stored choice — there is no separate map-only default any more.
+  const { theme, toggle } = useTheme();
+  const light = theme === "light";
 
-  // DEV-only identity comparison: "L" flips the whole page (map + glass skin).
+  // DEV shortcut: "L" flips day/night fast — now routed through the one toggle so it
+  // stays in sync with the persisted theme.
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as Element | null;
       if (t && "closest" in t && t.closest("input,textarea")) return;
-      if (e.key === "l" || e.key === "L") setLight((v) => !v);
+      if (e.key === "l" || e.key === "L") toggle();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  }, [toggle]);
 
   // Map→panel selection, kept OUTSIDE RolesFilters so the globe keeps rendering
   // ALL visible roles (other bubbles stay clickable) while only the PANEL narrows.

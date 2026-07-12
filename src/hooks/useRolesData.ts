@@ -329,7 +329,7 @@ export function useRolesData() {
         jobsSnapshot.map((j) => ({ ...j, score: null, reason: null, fitBullets: null, subscores: null, evidence: null })),
       );
     }
-    // Flip `scored` false→true → the CSS reveal + ScoreValue count-up fire
+    // Flip `scored` false→true → the CSS reveal + FitChip count-up fire
     // in-session. This flip is what reveals the map, so success resolves HERE.
     // Scores arrive from the SERVER worker (issue #33) — the poll effect
     // surfaces them as they land; the panel's "Scoring… N to go" bar tracks it.

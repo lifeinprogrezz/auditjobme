@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import FitChip from "@/components/roles/FitChip";
 import { fitLabel } from "@/lib/roles";
@@ -40,6 +40,27 @@ describe("FitChip — the single score presentation (design direction §3.1)", (
     expect(chip.querySelector(".fitchip-n")?.textContent).toBe("—");
     expect(chip.querySelector(".fitchip-tier")).toBeNull();
     expect(chip.className).not.toContain("fitchip--great");
+  });
+
+  it("shows the final value on an already-revealed mount, no count-up (banked D1 nit a)", () => {
+    // A mount that is already revealed (filter change / show-more after the
+    // reveal fired) must paint the real value, never a one-frame "0.0".
+    const raf = vi.spyOn(window, "requestAnimationFrame");
+    const { container } = render(<FitChip score={4.6} size="md" reveal />);
+    expect(container.querySelector(".fitchip-n")?.textContent).toBe("4.6");
+    expect(raf).not.toHaveBeenCalled();
+    raf.mockRestore();
+  });
+
+  it("fires the count-up only on a live pending→scored reveal transition", () => {
+    const raf = vi.spyOn(window, "requestAnimationFrame");
+    const { container, rerender } = render(<FitChip score={null} reveal={false} />);
+    expect(container.querySelector(".fitchip-n")?.textContent).toBe("—");
+    expect(raf).not.toHaveBeenCalled();
+    // Score lands and the reveal flips on in the same update → count-up plays.
+    rerender(<FitChip score={4.6} reveal />);
+    expect(raf).toHaveBeenCalled();
+    raf.mockRestore();
   });
 
   it("hides the tier word when showTier is false, and the lg hero shows 'out of 5'", () => {
