@@ -117,7 +117,7 @@ export function decideNightlyAction(
 }
 
 /** True when a PostgREST error means daily_matches.rubric_version doesn't exist —
- *  i.e. migration 20260712120000_daily_matches_rubric_version hasn't been applied.
+ *  i.e. migration 20260712123000_daily_matches_rubric_version hasn't been applied.
  *  The nightly handler degrades gracefully on it (re-select/re-upsert without the
  *  stamp) instead of losing the day's batch: PGRST204 = unknown column on write,
  *  42703 = undefined column on read. Pure. */

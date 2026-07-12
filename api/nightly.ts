@@ -267,13 +267,13 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         .select("job_url, rank, score, reason, fit_bullets, batch_date, created_at, notified_at, rubric_version")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
-      // Pre-F7 schema (migration 20260712120000 not yet applied): the column is
+      // Pre-F7 schema (migration 20260712123000 not yet applied): the column is
       // missing, so the select errors and data comes back null — which would empty
       // seenUrls and re-notify previously seen roles. Fall back to the pre-F7
       // column set; rows then read rubric_version=undefined → "stale" → a bounded
       // once-daily rescore until the migration lands. Loud on purpose.
       if (sel.error && isMissingRubricColumn(sel.error)) {
-        console.warn("[nightly] daily_matches.rubric_version missing — pre-F7 schema; apply migration 20260712120000. Falling back.");
+        console.warn("[nightly] daily_matches.rubric_version missing — pre-F7 schema; apply migration 20260712123000. Falling back.");
         // Cast: fallback rows genuinely lack rubric_version; downstream reads treat
         // it as optional (undefined = stale rubric), which is the intended degrade.
         sel = (await admin
