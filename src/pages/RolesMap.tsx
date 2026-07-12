@@ -4,6 +4,7 @@ import GlobeMap from "@/components/roles/GlobeMap";
 import RolesPanel from "@/components/roles/RolesPanel";
 import HeadBar from "@/components/roles/HeadBar";
 import CvUnlockModal from "@/components/roles/CvUnlockModal";
+import ProfileModal from "@/components/roles/ProfileModal";
 import {
   EMPTY_FILTERS,
   LEVELS,
@@ -36,10 +37,13 @@ const HOT_COUNT = 7;
 const FRESH_MS = 21 * 24 * 60 * 60 * 1000;
 
 export default function RolesMap() {
-  const { jobs, loading, scoring, remaining, applied, scoreMore, submitCv, scored, signedIn } =
+  const { jobs, loading, scoring, remaining, applied, scoreMore, submitCv, scored, signedIn, cvText, profileMeta } =
     useRolesData();
-  // CV-unlock modal (Phase A front door). Opened from the "Add your CV" affordances.
+  // CV-unlock modal (Phase A front door). Opened from the "Add your CV" affordances,
+  // and from the profile modal's Replace CV action (issue #43) — one shared instance.
   const [cvModalOpen, setCvModalOpen] = useState(false);
+  // Profile modal (issue #43) — the avatar's real destination for a signed-in user.
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [filters, setFilters] = useState<RolesFilters>(EMPTY_FILTERS);
   const [view, setView] = useState<"map" | "list">("map");
   const [detailJob, setDetailJob] = useState<RoleJob | null>(null);
@@ -389,6 +393,10 @@ export default function RolesMap() {
           view={view}
           onView={setView}
           onAddCv={() => setCvModalOpen(true)}
+          // Signed-in avatar opens the profile view; anon avatar goes through the
+          // same sign-in front door as "Add your CV" (Rober 7-12: no dead-end for
+          // either state, and no second sign-in entry point to maintain).
+          onProfile={() => (signedIn ? setProfileModalOpen(true) : setCvModalOpen(true))}
         />
         <RolesPanel
           jobs={panelJobs}
@@ -466,6 +474,18 @@ export default function RolesMap() {
         signedIn={signedIn}
         sectorOptions={sectorOptions}
         onSubmit={submitCv}
+      />
+      <ProfileModal
+        open={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+        cvText={cvText}
+        targetRoles={profileMeta?.targetRoles ?? []}
+        targetSectors={profileMeta?.targetSectors ?? []}
+        cvUpdatedAt={profileMeta?.cvUpdatedAt ?? null}
+        onReplaceCv={() => {
+          setProfileModalOpen(false);
+          setCvModalOpen(true);
+        }}
       />
     </div>
   );

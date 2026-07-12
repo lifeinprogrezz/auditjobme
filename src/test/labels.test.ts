@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   hashCv,
+  cvWordCount,
+  formatUploadedDate,
   roleArchetypeOf,
   pickScoringSlice,
   readCvStash,
@@ -46,6 +48,38 @@ describe("hashCv", () => {
   it("returns a compact base36 string, empty-safe", () => {
     expect(hashCv("")).toMatch(/^[0-9a-z]+$/);
     expect(typeof hashCv("anything")).toBe("string");
+  });
+});
+
+describe("cvWordCount", () => {
+  it("counts whitespace-separated words", () => {
+    expect(cvWordCount("Senior Product Manager, 6 years")).toBe(5);
+  });
+
+  it("ignores leading/trailing whitespace", () => {
+    expect(cvWordCount("  a  b  c  ")).toBe(3);
+  });
+
+  it("returns 0 for empty / whitespace-only / null / undefined", () => {
+    expect(cvWordCount("")).toBe(0);
+    expect(cvWordCount("   ")).toBe(0);
+    expect(cvWordCount(null)).toBe(0);
+    expect(cvWordCount(undefined)).toBe(0);
+  });
+});
+
+describe("formatUploadedDate", () => {
+  it("formats an ISO timestamp as day/short-month/year", () => {
+    // Midday UTC so the assertion holds regardless of the test runner's local
+    // timezone (avoids a date-boundary flake near midnight in either direction).
+    expect(formatUploadedDate("2026-07-12T12:00:00.000Z")).toBe("12 Jul 2026");
+  });
+
+  it("returns null for null / undefined / empty / malformed input", () => {
+    expect(formatUploadedDate(null)).toBeNull();
+    expect(formatUploadedDate(undefined)).toBeNull();
+    expect(formatUploadedDate("")).toBeNull();
+    expect(formatUploadedDate("not a date")).toBeNull();
   });
 });
 
