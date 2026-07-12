@@ -772,7 +772,12 @@
  * OVER the title's top-left, washing it out — the "too bright, hard to read" tell
  * (Rober 7-09). The close button must stay absolutely positioned, so re-assert it. */
 .roles-theme .cvmodal > * { position: relative; z-index: 1; }
-.roles-theme .cvmodal > .cvclose { position: absolute; }
+/* The close button and the h2 title are both direct children with z-index:1
+ * from the rule above, so DOM order alone decided the stack — the title (later
+ * in markup) painted over the button's top-right corner and swallowed its
+ * clicks (Close silently did nothing, Rober 7-12 Playwright walk). Bump it
+ * above its siblings explicitly. */
+.roles-theme .cvmodal > .cvclose { position: absolute; z-index: 2; }
 .roles-theme .cvclose {
   position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; display: grid;
   place-items: center; border-radius: 9px; border: 1px solid var(--hair);
@@ -826,6 +831,15 @@
 .roles-theme .cvchip:hover { color: var(--text); border-color: var(--rim); }
 .roles-theme .cvchip.on {
   color: var(--act-strong-ink); background: var(--act-strong); border-color: var(--act-strong);
+}
+/* Industries tail search (issue #44) — the headbar FilterChip's .fdrop-search /
+ * .fdrop / .fdrop-list / checkbox pattern reused verbatim (same tokens, same
+ * row shape), but in-flow under the chip row instead of the flyout's absolute +
+ * portal positioning — the modal already provides its own scroll container. */
+.roles-theme .cvmore { margin-top: 10px; }
+.roles-theme .cvmodal .fdrop {
+  position: static; opacity: 1; visibility: visible; transform: none;
+  pointer-events: auto; margin-top: 8px;
 }
 .roles-theme .cverr { color: var(--low); font-size: 12.5px; line-height: 1.5; margin: 4px 0 14px; }
 .roles-theme .cvcta {
