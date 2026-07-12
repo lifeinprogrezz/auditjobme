@@ -116,6 +116,18 @@ export function decideNightlyAction(
   return todaysRows.some((r) => r.notified_at != null) ? "skip" : "retry-email";
 }
 
+/** True when a PostgREST error means daily_matches.rubric_version doesn't exist —
+ *  i.e. migration 20260712120000_daily_matches_rubric_version hasn't been applied.
+ *  The nightly handler degrades gracefully on it (re-select/re-upsert without the
+ *  stamp) instead of losing the day's batch: PGRST204 = unknown column on write,
+ *  42703 = undefined column on read. Pure. */
+export function isMissingRubricColumn(err: { code?: string | null; message?: string | null } | null | undefined): boolean {
+  if (!err) return false;
+  const msg = err.message ?? "";
+  if (!msg.includes("rubric_version")) return false;
+  return err.code === "PGRST204" || err.code === "42703" || /column/i.test(msg);
+}
+
 export type ScoredMatch = {
   url: string;
   company: string;

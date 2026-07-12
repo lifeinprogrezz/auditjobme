@@ -4,6 +4,7 @@ import {
   selectNewJobsSince,
   selectNightlyCandidates,
   decideNightlyAction,
+  isMissingRubricColumn,
   cronAuthResult,
   rankMatches,
   buildEmailSubject,
@@ -229,5 +230,21 @@ describe("buildEmailBody", () => {
     const { html } = buildEmailBody(rows, "https://auditjob.me/");
     expect(html).toContain("A &amp; B &lt;Inc&gt;");
     expect(html).toContain("PM &quot;lead&quot;");
+  });
+});
+
+// F7 pre-migration degrade: the handler falls back to column-less select/upsert
+// ONLY on the specific unknown-column error for rubric_version.
+describe("isMissingRubricColumn", () => {
+  it("matches PostgREST unknown-column errors for rubric_version on write and read", () => {
+    expect(isMissingRubricColumn({ code: "PGRST204", message: "Could not find the 'rubric_version' column of 'daily_matches' in the schema cache" })).toBe(true);
+    expect(isMissingRubricColumn({ code: "42703", message: "column daily_matches.rubric_version does not exist" })).toBe(true);
+  });
+
+  it("does not match unrelated errors", () => {
+    expect(isMissingRubricColumn(null)).toBe(false);
+    expect(isMissingRubricColumn({ code: "PGRST204", message: "Could not find the 'other_col' column" })).toBe(false);
+    expect(isMissingRubricColumn({ code: "23505", message: "duplicate key value violates unique constraint" })).toBe(false);
+    expect(isMissingRubricColumn({ message: "network error while writing rubric_version" })).toBe(false);
   });
 });

@@ -18,6 +18,7 @@ import {
   cronAuthResult,
   selectNightlyCandidates,
   decideNightlyAction,
+  isMissingRubricColumn,
   rankMatches,
   buildEmailSubject,
   buildEmailBody,
@@ -261,12 +262,27 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // Every prior daily_matches row for this user (small: ≤ NIGHTLY_TOP_N per
       // night). Drives three decisions: today's batch state (B3 notified-split),
       // the created_at cutoff (B2), and the already-matched-URL exclusion (B2).
-      const { data: existingRows } = await admin
+      let sel = await admin
         .from("daily_matches")
         .select("job_url, rank, score, reason, fit_bullets, batch_date, created_at, notified_at, rubric_version")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
-      const rowsForUser = existingRows ?? [];
+      // Pre-F7 schema (migration 20260712120000 not yet applied): the column is
+      // missing, so the select errors and data comes back null — which would empty
+      // seenUrls and re-notify previously seen roles. Fall back to the pre-F7
+      // column set; rows then read rubric_version=undefined → "stale" → a bounded
+      // once-daily rescore until the migration lands. Loud on purpose.
+      if (sel.error && isMissingRubricColumn(sel.error)) {
+        console.warn("[nightly] daily_matches.rubric_version missing — pre-F7 schema; apply migration 20260712120000. Falling back.");
+        // Cast: fallback rows genuinely lack rubric_version; downstream reads treat
+        // it as optional (undefined = stale rubric), which is the intended degrade.
+        sel = (await admin
+          .from("daily_matches")
+          .select("job_url, rank, score, reason, fit_bullets, batch_date, created_at, notified_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })) as typeof sel;
+      }
+      const rowsForUser = sel.data ?? [];
       const todaysRows = rowsForUser.filter((r) => r.batch_date === today);
       const action = decideNightlyAction(todaysRows, RUBRIC_VERSION);
 
@@ -401,9 +417,17 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         batch_date: today,
         rubric_version: RUBRIC_VERSION,
       }));
-      const { error: upErr } = await admin
+      let { error: upErr } = await admin
         .from("daily_matches")
         .upsert(rows, { onConflict: "user_id,job_url,batch_date" });
+      // Pre-F7 schema: PostgREST rejects the whole row set over the unknown
+      // column. Retry once without the stamp rather than losing the day's batch.
+      if (upErr && isMissingRubricColumn(upErr)) {
+        console.warn("[nightly] daily_matches.rubric_version missing — retrying upsert without the rubric stamp.");
+        ({ error: upErr } = await admin
+          .from("daily_matches")
+          .upsert(rows.map(({ rubric_version: _rv, ...rest }) => rest), { onConflict: "user_id,job_url,batch_date" }));
+      }
       if (upErr) {
         console.warn(`[nightly] upsert failed for ${userId}:`, upErr.message);
         continue;

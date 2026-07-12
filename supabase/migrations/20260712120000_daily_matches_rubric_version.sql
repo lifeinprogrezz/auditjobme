@@ -5,7 +5,8 @@
 -- under a superseded rubric forever. Record the rubric each batch was scored under;
 -- decideNightlyAction() now re-scores a stale-rubric batch under the current rubric.
 -- Additive + nullable: existing rows read as NULL → "stale" → re-scored once.
--- Written but NOT auto-applied — the orchestrator applies to prod via Supabase MCP.
+-- Written but NOT auto-applied — awaiting explicit human approval (prod DDL). Until
+-- it lands, api/nightly.ts degrades gracefully (isMissingRubricColumn fallback).
 ALTER TABLE public.daily_matches
   ADD COLUMN IF NOT EXISTS rubric_version text;
 
