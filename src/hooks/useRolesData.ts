@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
@@ -9,6 +9,7 @@ import { hashCv, readCvStash, clearCvStash } from "@/lib/labels";
 import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
 import { fetchDataplane, type DataplaneCompany, type DataplaneOffice } from "@/lib/dataplane";
+import { createScoreBuffer, type ScoreBuffer } from "@/lib/scoreCoalescer";
 
 type JobsRow = {
   id: string;
@@ -46,6 +47,16 @@ type ScoreSignals = {
   subscores?: ScoreSubscore[];
   evidence?: ScoreEvidence[];
 } | null;
+
+/** A single landed score as merged into the jobs array — the value type buffered by
+ *  the score coalescer (issue #54) and consumed by applyLandedScores. */
+type LandedScore = {
+  score: number;
+  reason: string | null;
+  fitBullets: string[] | null;
+  subscores: ScoreSubscore[] | null;
+  evidence: ScoreEvidence[] | null;
+};
 
 /**
  * City + map-position + logo-domain enrichment. Same-city jobs get a stable
@@ -195,6 +206,20 @@ export function useRolesData() {
   // resurrecting a cancelled loop and leaking user A's scores into user B's view).
   const runRef = useRef(0);
 
+  // Score-arrival coalescer (issue #54). Each poll pushes its landed-score snapshot
+  // here instead of committing directly; the buffer merges snapshots that bunch up
+  // (initial-load handoff + a manual "check now" + a poll can fire in the same tick)
+  // into ONE commit, and startTransition marks that commit non-urgent so the heavy
+  // derived-list rebuild (Today queue + map facets/markers) yields to clicks instead
+  // of stalling the main thread. Cancelled on the run boundary below so a batch
+  // buffered for user A never lands in user B's freshly-loaded view.
+  const scoreBufferRef = useRef<ScoreBuffer<LandedScore> | null>(null);
+  if (scoreBufferRef.current === null) {
+    scoreBufferRef.current = createScoreBuffer<LandedScore>((merged) =>
+      startTransition(() => setJobs((prev) => applyLandedScores(prev, merged, true))),
+    );
+  }
+
   /** Pull the user's landed scores and merge them into the map (sorted). The
    *  server worker writes them continuously; this is the read side of the poll. */
   async function refreshScores(userId: string, runId: number) {
@@ -204,7 +229,7 @@ export function useRolesData() {
       .eq("user_id", userId)
       .eq("rubric_version", RUBRIC_VERSION);
     if (!data || runRef.current !== runId) return;
-    const landed = new Map(
+    const landed = new Map<string, LandedScore>(
       data.map((s) => {
         const sig = s.signals as ScoreSignals;
         return [
@@ -219,7 +244,7 @@ export function useRolesData() {
         ] as const;
       }),
     );
-    if (landed.size > 0) setJobs((prev) => applyLandedScores(prev, landed, true));
+    if (landed.size > 0) scoreBufferRef.current?.push(landed);
   }
 
   /**
@@ -469,6 +494,9 @@ export function useRolesData() {
       // Cancels this run's loops on unmount AND on dep change; the next run's
       // own increment keeps every runId unique.
       runRef.current++;
+      // Drop any score batch buffered for this run so it can't flush into the
+      // next user's freshly-loaded view (the same leak the runRef guard prevents).
+      scoreBufferRef.current?.cancel();
     };
   }, [user]);
 

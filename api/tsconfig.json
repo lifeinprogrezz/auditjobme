@@ -9,6 +9,8 @@
     "moduleDetection": "force",
     "noEmit": true,
     "strict": true,
+    "noUnusedLocals": true,
+    "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "types": ["node"],
     "baseUrl": ".",
