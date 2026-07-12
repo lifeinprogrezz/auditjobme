@@ -9,16 +9,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
 import AppShell from "@/components/app/AppShell";
 import { cn } from "@/lib/utils";
-
-const COLUMNS = [
-  { value: "applied", label: "Applied" },
-  { value: "responded", label: "Responded" },
-  { value: "interview", label: "Interview" },
-  { value: "offer", label: "Offer" },
-  { value: "rejected", label: "Rejected" },
-] as const;
-type Status = (typeof COLUMNS)[number]["value"];
-const ORDER: Status[] = COLUMNS.map((c) => c.value);
+import { TRACKER_COLUMNS as COLUMNS, STATUS_ORDER as ORDER, normStatus, type Status } from "@/lib/tracker";
 
 interface AppRow {
   id: string;
@@ -28,10 +19,6 @@ interface AppRow {
   company: string;
   title: string;
   url: string;
-}
-
-function normStatus(s: string): Status {
-  return (ORDER as string[]).includes(s) ? (s as Status) : "applied";
 }
 
 export default function Tracker() {
@@ -59,15 +46,32 @@ export default function Tracker() {
           jobsById[j.id] = { company: j.company, title: j.title, url: j.url };
         });
       }
-      const rows: AppRow[] = (appsData ?? []).map((a) => ({
-        id: a.id,
-        status: normStatus(a.status),
-        applied_at: a.applied_at,
-        job_id: a.job_id,
-        company: jobsById[a.job_id]?.company ?? "Unknown",
-        title: jobsById[a.job_id]?.title ?? "Unknown role",
-        url: jobsById[a.job_id]?.url ?? "#",
-      }));
+      // Drop rows whose DB status isn't one of our columns instead of coercing them to
+      // "applied" (issue #54) — a fabricated stage would misplace the card. Warn once so
+      // an unexpected value is visible in the console rather than swallowed.
+      const unknownStatuses = new Set<string>();
+      const rows: AppRow[] = [];
+      for (const a of appsData ?? []) {
+        const status = normStatus(a.status);
+        if (status === null) {
+          unknownStatuses.add(a.status);
+          continue;
+        }
+        rows.push({
+          id: a.id,
+          status,
+          applied_at: a.applied_at,
+          job_id: a.job_id,
+          company: jobsById[a.job_id]?.company ?? "Unknown",
+          title: jobsById[a.job_id]?.title ?? "Unknown role",
+          url: jobsById[a.job_id]?.url ?? "#",
+        });
+      }
+      if (unknownStatuses.size > 0) {
+        console.warn(
+          `Tracker: hid ${unknownStatuses.size} application(s) with an unrecognised status: ${[...unknownStatuses].join(", ")}`,
+        );
+      }
       if (active) {
         setApps(rows);
         setLoading(false);
