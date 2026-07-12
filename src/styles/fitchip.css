@@ -1,0 +1,141 @@
+/* FitChip — the SINGLE score presentation, one global block consumed by every
+ * post-CV surface (design direction 2026-07-12 §3.1). Ink numeral on a
+ * subliminal bucket wash, radius 4, no glow / gradient object.
+ *
+ * Works in BOTH worlds off ONE definition:
+ *   - the page world (D-class /today, /apply, /tracker) via `--foreground` ink;
+ *   - the `.roles-theme` map scope, which overrides `--fc-ink` / `--fc-muted`
+ *     to its own pale-ink tokens (see roles.css).
+ * The bucket hue rides the shared `--score-*` tokens (defined at :root in
+ * index.css, inherited into the map scope), so there is no second colour copy.
+ */
+
+:root {
+  --fc-ink: hsl(var(--foreground));
+  --fc-muted: hsl(var(--muted-foreground));
+}
+
+.fitchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--fc-ink) 8%, transparent);
+  color: var(--fc-ink);
+  line-height: 1;
+  white-space: nowrap;
+  font-feature-settings: "tnum" 1;
+  box-sizing: border-box;
+}
+.fitchip-n {
+  font-family: "Geist Mono", ui-monospace, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: var(--fc-ink);
+}
+.fitchip-tier {
+  font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
+  font-weight: 600;
+  color: var(--fc-muted);
+  letter-spacing: 0.01em;
+}
+.fitchip-tier::before {
+  content: "·";
+  margin-right: 5px;
+  opacity: 0.7;
+}
+.fitchip-x {
+  font-family: "Geist Sans", system-ui, -apple-system, sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--fc-muted);
+}
+
+/* Bucket wash: subliminal 18% → 7% of the bucket hue over the local surface. */
+.fitchip--great {
+  --fc-score: var(--score-great);
+}
+.fitchip--mid {
+  --fc-score: var(--score-mid);
+}
+.fitchip--low {
+  --fc-score: var(--score-low);
+}
+.fitchip--great,
+.fitchip--mid,
+.fitchip--low {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, hsl(var(--fc-score)) 18%, transparent),
+    color-mix(in srgb, hsl(var(--fc-score)) 7%, transparent)
+  );
+}
+
+/* Sizes: sm list rows / today / tooltips · md rail cards · lg detail hero. */
+.fitchip--sm {
+  height: 20px;
+  padding: 0 6px;
+  gap: 4px;
+}
+.fitchip--sm .fitchip-n {
+  font-size: 12px;
+}
+.fitchip--sm .fitchip-tier {
+  font-size: 11px;
+}
+.fitchip--md {
+  height: 24px;
+  padding: 0 8px;
+}
+.fitchip--md .fitchip-n {
+  font-size: 14px;
+}
+.fitchip--md .fitchip-tier {
+  font-size: 11px;
+}
+.fitchip--lg {
+  align-items: baseline;
+  border-radius: 10px;
+  padding: 8px 12px;
+  gap: 6px;
+}
+.fitchip--lg .fitchip-n {
+  font-size: 28px;
+}
+
+/* Pending: same geometry, ink-tint fill, mono em-dash, shimmer sweep — reads as
+ * a skeleton mid-scoring, never a disabled control. */
+.fitchip--pending {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--fc-ink) 5%, transparent);
+  color: var(--fc-muted);
+}
+.fitchip--pending .fitchip-n {
+  color: var(--fc-muted);
+}
+.fitchip--pending::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--fc-ink) 12%, transparent),
+    transparent
+  );
+  animation: fitchip-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes fitchip-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fitchip--pending::after {
+    animation: none;
+  }
+}

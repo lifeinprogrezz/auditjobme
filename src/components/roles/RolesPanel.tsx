@@ -21,8 +21,16 @@ import {
   type RolesFilters,
 } from "@/lib/roles";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
-import { prefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import ScoreBreakdown from "./ScoreBreakdown";
+import FitChip from "./FitChip";
+
+/** Fit-dependent bullets header (design direction §3.5), driven by the bucket in
+ *  code so a "Weak fit" hero never sits above "Why you fit". */
+const BULLETS_HEADER: Record<string, string> = {
+  great: "Why you fit",
+  mid: "Where you stand",
+  low: "Where it breaks down",
+};
 
 // The pool is unbounded (1000+ live rows); each card mounts a Logo.dev <img>,
 // so cap the DOM and point the user at search/filters for the tail.
@@ -71,50 +79,6 @@ function Logo({ domain, company }: { domain: string | null; company: string }) {
     );
   }
   return <img src={src as string} alt="" onError={() => setStage((s) => s + 1)} />;
-}
-
-/**
- * Count-up numeral for the score pill: animates 0→value only when `scored`
- * flips false→true while mounted; a mount with scored already true renders
- * the static value (no re-animation on remount/scroll). null never animates.
- */
-function ScoreValue({ scored, value }: { scored: boolean; value: number | null }) {
-  const [display, setDisplay] = useState<number>(scored && value != null ? value : 0);
-  const prevScored = useRef(scored);
-  useEffect(() => {
-    const was = prevScored.current;
-    prevScored.current = scored;
-    if (!scored || value == null) return;
-    if (was || prefersReducedMotion()) {
-      // score arrived post-reveal (background pass), or the OS/browser asked
-      // for reduced motion — either way, no rAF count-up, just the final value.
-      setDisplay(value);
-      return;
-    }
-    let raf = 0;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / 900);
-      setDisplay(value * (1 - (1 - t) * (1 - t))); // power2.out
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [scored, value]);
-  return <span className="v num">{value == null ? "—" : display.toFixed(1)}</span>;
-}
-
-/** great bucket carries NO suffix class in roles.css — bare "score". */
-function scorePillClass(score: number | null): string {
-  if (score == null) return "score pending";
-  const b = scoreBucket(score);
-  return b === "great" ? "score" : `score s-${b}`;
-}
-
-/** Fit-score hero color bucket (great = jade, mid = amber, low = coral). */
-function heroClass(score: number): string {
-  const b = scoreBucket(score);
-  return b === "great" ? "dhs" : `dhs s-${b}`;
 }
 
 /** Compact location for the "more roles" list: a many-city list collapses to
@@ -329,22 +293,24 @@ export default function RolesPanel({
                     {geo.onCard && <span className={`geo-badge geo-${geo.kind}`}>{geo.label}</span>}
                   </div>
                 </div>
-                <div className={scorePillClass(job.score)}>
-                  <ScoreValue scored={scored} value={job.score} />
-                  <span className="l">FIT</span>
-                </div>
+                {/* FitChip is the single score render; CSS hides it pre-CV
+                    (.roles-theme:not(.scored) .card .fitchip). `reveal` counts
+                    the numeral up when the score-reveal flips scored on. */}
+                <FitChip score={job.score} size="md" reveal={scored} />
                 {scored && job.reason && <div className="why">{job.reason}</div>}
-                <div className="acts">
-                  <button
-                    className="btn g"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      goApply(job);
-                    }}
-                  >
-                    Prepare application
-                  </button>
-                </div>
+                {scored && (
+                  <div className="acts">
+                    <button
+                      className="btn g"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        goApply(job);
+                      }}
+                    >
+                      Prepare application
+                    </button>
+                  </div>
+                )}
               </article>
             );
           })}
@@ -508,20 +474,22 @@ export default function RolesPanel({
           <div className="dhero">
             {job.score != null ? (
               <>
-                <div className={heroClass(job.score)}>
-                  <span className="hn num">{job.score.toFixed(1)}</span>
-                  <span className="hx">/5</span>
-                </div>
+                <FitChip score={job.score} size="lg" />
                 <div className="dhl">
                   <div className="hlt">{fitLabel(job.score)}</div>
-                  {bullets.length > 0 && <div className="hls">Why you fit</div>}
+                  {bullets.length > 0 && (
+                    <div className="hls">{BULLETS_HEADER[scoreBucket(job.score)]}</div>
+                  )}
                 </div>
               </>
             ) : (
-              <div className="dhl">
-                <div className="hlt">Scoring this role…</div>
-                <div className="hls">Your fit lands in a moment.</div>
-              </div>
+              <>
+                <FitChip score={null} size="lg" />
+                <div className="dhl">
+                  <div className="hlt">Scoring this role…</div>
+                  <div className="hls">Your fit lands in a moment.</div>
+                </div>
+              </>
             )}
           </div>
         )}

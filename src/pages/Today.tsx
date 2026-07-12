@@ -9,29 +9,14 @@ import AppShell from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { useRolesData } from "@/hooks/useRolesData";
 import { buildActionQueue, coverageSummary } from "@/lib/product";
-import { fitLabel, geoVerdict, postedAgo, scoreBucket, type RoleJob } from "@/lib/roles";
-import { cn } from "@/lib/utils";
-
-const SCORE_TEXT: Record<string, string> = {
-  great: "text-score-great-deep",
-  mid: "text-score-mid",
-  low: "text-score-low",
-};
-
-function ScorePill({ score }: { score: number | null }) {
-  if (score == null) return <span className="font-mono text-sm text-muted-foreground">—</span>;
-  return (
-    <span className={cn("font-mono text-lg font-semibold tabular-nums", SCORE_TEXT[scoreBucket(score)])}>
-      {score.toFixed(1)}
-    </span>
-  );
-}
+import { geoVerdict, postedAgo, type RoleJob } from "@/lib/roles";
+import FitChip from "@/components/roles/FitChip";
 
 function GeoBadge({ job }: { job: RoleJob }) {
   const v = geoVerdict(job);
   if (!v.onCard) return null;
   return (
-    <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[0.68rem] font-medium text-secondary-foreground">
+    <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
       {v.label}
     </span>
   );
@@ -123,13 +108,12 @@ export default function Today() {
                       {job.city ?? job.location ?? (job.remote ? "Remote" : "Location unknown")}
                       {ago ? ` · ${ago}` : ""}
                     </div>
-                    {job.reason && <p className="mt-2 text-sm italic text-muted-foreground">{job.reason}</p>}
+                    {job.reason && (
+                      <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{job.reason}</p>
+                    )}
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-0.5">
-                    <ScorePill score={job.score} />
-                    <span className="text-[0.6rem] uppercase tracking-wide text-muted-foreground">
-                      {job.score != null ? fitLabel(job.score) : "fit"}
-                    </span>
+                  <div className="flex shrink-0 items-start">
+                    <FitChip score={job.score} size="sm" />
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
