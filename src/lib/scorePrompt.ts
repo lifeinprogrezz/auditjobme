@@ -36,7 +36,11 @@ export interface ScoreableJob {
 // contract — per-dimension subscores + cited evidence (verbatim CV line ↔ JD phrase,
 // signed contribution), stored as additive keys in scores.signals; the score viz
 // consumes them later. Bumping the version re-scores cached rows lazily on next load.
-export const RUBRIC_VERSION = "v4";
+// v5 (2026-07-12, F1 two-layer): the persisted score becomes the deterministic
+// blendSubscores() output (raw model 0-5 only as fallback) — a semantics change, so
+// cached v4 rows (raw score persisted) re-score lazily via the in-app, backlog, and
+// nightly paths rather than mixing raw and blended scores in one ranking.
+export const RUBRIC_VERSION = "v5";
 
 /** The five rubric dimensions, in weighing order — subscores cover exactly these. */
 export const SUBSCORE_KEYS = ["seniority", "geography", "work_auth", "language", "background"] as const;
@@ -50,8 +54,9 @@ export interface ScoreSubscore {
 // F1 Layer-1 (2026-07-12): the deterministic display weights for the five rubric
 // dimensions — background (the CV↔role substance) heaviest, then the rubric's
 // stated priority order. They sum to 1.0 so a weighted blend of five 0-5 subscores
-// lands back in [0, 5]. Changing a weight re-ranks EVERY cached score for free (no
-// re-inference) on the next read/pass — that is the point of the two-layer split.
+// lands back in [0, 5]. The blend is computed AT SCORE TIME and persisted — no read
+// path recomputes it. Changing a weight therefore changes scoring semantics: bump
+// RUBRIC_VERSION alongside it so cached rows re-score (in-app + backlog + nightly).
 // Pinned by src/test/score.test.ts (blendSubscores). Rule + code move together.
 export const SUBSCORE_WEIGHTS: Record<SubscoreKey, number> = {
   background: 0.3,
@@ -205,7 +210,8 @@ export function parseScoreResponse(
           !!s &&
           typeof s === "object" &&
           (SUBSCORE_KEYS as readonly string[]).includes((s as { key?: unknown }).key as string) &&
-          !Number.isNaN(Number((s as { score?: unknown }).score)),
+          typeof (s as { score?: unknown }).score === "number" &&
+          Number.isFinite((s as { score: number }).score),
       )
       .filter((s) => !seen.has(s.key) && seen.add(s.key))
       .map((s) => ({ key: s.key as SubscoreKey, score: Math.max(0, Math.min(5, Number(s.score))) }));

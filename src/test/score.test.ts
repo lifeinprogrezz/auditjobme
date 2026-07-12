@@ -109,6 +109,17 @@ describe("parseScoreResponse — v4 subscores + evidence", () => {
     expect(out?.subscores).toEqual([{ key: "language", score: 4 }]);
   });
 
+  it("drops null/non-number subscore values instead of coercing them to 0", () => {
+    // Number(null) === 0 would silently drag the blend to the floor for that
+    // dimension; a null score must instead break the full-rubric requirement so
+    // the caller falls back to the raw model score.
+    const out = parseScoreResponse(
+      '{"score":3.7,"reason":"ok","subscores":[{"key":"seniority","score":null},{"key":"geography","score":4},{"key":"work_auth","score":4},{"key":"language","score":4},{"key":"background","score":4}]}',
+    );
+    expect(out?.subscores?.map((s) => s.key)).toEqual(["geography", "work_auth", "language", "background"]);
+    expect(out?.score).toBe(3.7); // partial rubric → raw model score, not a blend over a fake 0
+  });
+
   it("parses evidence, clamps contribution into [-1, 1], and coerces missing quotes to empty strings", () => {
     const out = parseScoreResponse(
       '{"score":4,"reason":"ok","evidence":[{"label":"Marketplace experience","cv_line":" grew GMV to $375M ","jd_phrase":"two-sided marketplace","contribution":3},{"label":"Seniority gap","contribution":-2}]}',
