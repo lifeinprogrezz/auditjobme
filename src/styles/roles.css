@@ -135,7 +135,7 @@
  * is surface glass, NOT an --act-strong block; the active label is ink (--text),
  * inactive is --muted. Buttons are equal-width (flex:1) so the thumb position
  * derives from the grid, not a magic 74px. */
-.roles-theme .seg button { flex: 1 1 0; min-width: 54px; font: inherit; font-size: 12.5px; font-weight: 600; border: 0; background: transparent; color: var(--muted); padding: 7px 14px; cursor: pointer; z-index: 1; transition: color 0.25s; }
+.roles-theme .seg button { flex: 1 1 0; min-width: 54px; font: inherit; font-size: 13px; font-weight: 600; border: 0; background: transparent; color: var(--muted); padding: 7px 14px; cursor: pointer; z-index: 1; transition: color 0.25s; }
 .roles-theme .seg button.on { color: var(--text); }
 /* Thumb radius = the concentric inner (track 10 − 3px inset ≈ 8, design
  * direction §2.4 nested-radii law); glass surface, never an --act-strong block. */
@@ -312,12 +312,13 @@
 .roles-theme .pintip .tiprow { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .roles-theme .pintip .tr { font-family: var(--font-d); font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .roles-theme .pintip .tco { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Tooltip fit = ink-on-wash chip (design direction §4.7), bucket-tinted to match
- * the pin ring — never the old jade-filled pill. Built only for scored rows. */
-.roles-theme .pintip .tsc { display: none; flex: none; font-family: var(--font-m); font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 700; letter-spacing: -0.04em; color: var(--text); background: color-mix(in srgb, var(--great) 16%, transparent); border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); padding: 1px 6px; border-radius: 4px; }
-.roles-theme .pintip .tsc.mid { background: color-mix(in srgb, var(--mid) 16%, transparent); }
-.roles-theme .pintip .tsc.low { background: color-mix(in srgb, var(--low) 16%, transparent); }
-.roles-theme.scored .pintip .tsc { display: inline-block; }
+/* Tooltip fit = the FitChip primitive (fitchip.css, sm) emitted by buildPin —
+ * the ONE score presentation (design direction §3.1 / §4.7). All ink-on-wash
+ * styling lives in that single global block; `.tsc` is now ONLY the .scored
+ * display gate, so unscored rows build no chip. `flex: none` keeps the chip from
+ * shrinking in the tiprow (the role label is the ellipsis sponge). */
+.roles-theme .pintip .tsc { display: none; flex: none; }
+.roles-theme.scored .pintip .tsc { display: inline-flex; }
 .roles-theme .pin img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .roles-theme .pin .fallback { font-family: var(--font-d); font-weight: 700; font-size: 15px; color: #fff; width: 100%; height: 100%; display: grid; place-items: center; border-radius: 50%; }
 /* Scored map pins carry a calm bucket-hued RING (border-color) in steady state;
@@ -491,7 +492,7 @@
 .roles-theme .dfit { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 /* Fit bullets: verb-led claims, clamped to 2 lines (render-side belt for the
  * prompt's 12-word cap, design direction §5.2). Muted ink, no jade. */
-.roles-theme .dfit li { position: relative; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.roles-theme .dfit li { position: relative; padding-left: 18px; font-size: 12px; line-height: 1.5; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .roles-theme .dfit li::before { content: ""; position: absolute; left: 4px; top: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--text); }
 /* Drawer PRIMARY CTA (the single primary per viewport, design direction §3.3):
  * full act-strong ink, same as .navcv. The rail row's "Prepare application" is

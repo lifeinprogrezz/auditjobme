@@ -272,11 +272,15 @@ function buildPin(p: PinProps): HTMLDivElement {
   role.textContent = p.role;
   row.appendChild(role);
   if (typeof p.score === "number") {
-    // Tooltip fit reads as an ink-on-wash chip (design direction §4.7), bucket-tinted
-    // to match the pin ring — never the old jade-filled pill.
+    // Tooltip fit = the FitChip primitive (design direction §3.1 / §4.7): the ONE
+    // score presentation, emitted here as plain DOM since fitchip.css is global
+    // (no React needed). `.tsc` stays only as the .scored display gate (roles.css).
     const ts = document.createElement("span");
-    ts.className = "tsc num" + (p.bucket ? ` ${p.bucket}` : "");
-    ts.textContent = p.score.toFixed(1);
+    ts.className = "tsc fitchip fitchip--sm" + (p.bucket ? ` fitchip--${p.bucket}` : "");
+    const n = document.createElement("span");
+    n.className = "fitchip-n";
+    n.textContent = p.score.toFixed(1);
+    ts.appendChild(n);
     row.appendChild(ts);
   }
   const co = document.createElement("span");
