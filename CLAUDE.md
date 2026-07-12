@@ -21,8 +21,10 @@ Free-cohort AI calls run server-side via the `anthropic-proxy` edge function on 
 capped key, **Haiku only** (target state — the legacy AuditGenerator pipeline still
 calls Sonnet; migrate it when the caps land). Enforcement lives in edge functions + DB (per-user $
 allowance, global monthly kill-switch, device-fingerprint guard) — NEVER in the client
-(this repo is public; client checks are decoration). `src/pages/ConnectProvider.tsx` is
-the PARKED future bring-your-own-key tier: not routed, don't extend it.
+(this repo is public; client checks are decoration). The PARKED future
+bring-your-own-key tier's `ConnectProvider` prototype was deleted in #57
+(commit 9d48a10) — it's preserved in git history, not in the tree; don't
+resurrect it into v1.
 
 ## Hard rules
 1. **CV trust rule:** the user's CV body is never rewritten by an LLM — rendered verbatim
