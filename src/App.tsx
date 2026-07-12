@@ -49,8 +49,11 @@ const App = () => (
               {/* The globe IS the landing at the bare domain (Rober 7-12) —
                   /roles survives only as a redirect so old links keep working. */}
               <Route path="/roles" element={<Navigate to="/" replace />} />
-              {/* Dark product surfaces (issue #42) — auth-gated, reachable from the
-                  map shell (role card → /apply, avatar → Today/Applications). */}
+              {/* Dark product surfaces (issue #42) — auth-gated. Reached from the map
+                  shell: the avatar menu opens Today/Tracker, and a role card links to
+                  /apply only once a CV is stored (RolesPanel.goApply, gated on hasCv).
+                  A logged-out visitor gets the "Add your CV to see your fit" prompt
+                  instead of a /apply link, so there is no dead nav path. */}
               <Route path="/today" element={gated(<Today />)} />
               <Route path="/digest" element={<Navigate to="/today" replace />} />
               <Route path="/tracker" element={gated(<Tracker />)} />
