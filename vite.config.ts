@@ -10,7 +10,8 @@ import { isDataplane } from "./src/lib/dataplane";
 // Public GEO surface prerender (Track D F2, issue #39). SSG-in-Vite: after the SPA
 // build writes dist/, this plugin fetches the F3 static dataplane artifact ONCE and
 // emits real, crawler-visible HTML for the finite city×vertical page set plus
-// sitemap.xml and llms.txt. The authed SPA is untouched (these are standalone
+// sitemap.xml, llms.txt and snippets.json (social-ready text for the #46 distribution
+// loop). The authed SPA is untouched (these are standalone
 // content pages, not React routes) and the Vercel SPA rewrite never shadows them —
 // Vercel serves a matching dist/ file before the (?!api/) → index.html rewrite fires.
 //
@@ -95,7 +96,7 @@ function geoPrerenderPlugin(env: Record<string, string>): Plugin {
         await writeFile(abs, f.content, "utf8");
       }
       const pageCount = files.filter((f) => f.path.startsWith("jobs/") && f.path.endsWith("index.html") && f.path !== "jobs/index.html").length;
-      console.log(`[geo-prerender] wrote ${pageCount} city page(s) + sitemap.xml + llms.txt to ${outDir}/`);
+      console.log(`[geo-prerender] wrote ${pageCount} city page(s) + sitemap.xml + llms.txt + snippets.json to ${outDir}/`);
     },
   };
 }
