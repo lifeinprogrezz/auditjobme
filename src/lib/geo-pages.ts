@@ -27,6 +27,12 @@ export const MAX_JOBPOSTINGS = 50;
 /** How many nearby sibling pages (same vertical, other cities) to cross-link. */
 export const MAX_SIBLINGS = 8;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+/** JobPosting.validThrough window. We don't scrape a real expiry date, so a dated
+ *  posting advertises a conservative, DOCUMENTED window past its posted date; a role
+ *  that closes sooner simply 404s at the ATS and drops from the next daily rebuild.
+ *  validThrough is NEVER emitted without a real posted_at (cite-or-omit). */
+export const POSTING_VALID_DAYS = 60;
 
 const SITE_NAME = "auditjob.me";
 const SITE_TAGLINE =
@@ -61,6 +67,12 @@ export interface GeoPage {
   latestPostedAt: string | null;
   topEmployers: { company: string; count: number }[];
   salary: { currency: string; median: number; n: number } | null;
+  /** Distinct non-empty job sources (ATS/board feeds) behind the group — a
+   *  provenance signal for the market-pulse block. */
+  sourceCount: number;
+  /** Mutually-exclusive freshness mix (sums to jobs.length): posted within a week,
+   *  within a month (8-30d), older, or with no parseable/valid posted date. */
+  freshness: { last7: number; recent: number; older: number; undated: number };
 }
 
 export interface RenderedFile {
@@ -194,6 +206,38 @@ function fmtMoney(currency: string, n: number): string {
   return symbol ? `${symbol}${grouped}` : `${grouped} ${currency}`;
 }
 
+/** A REAL logo image URL from the dataplane logo chain (the runtime map's
+ *  src/lib/logodev.ts faviconUrls head — icon.horse serves a site's high-res
+ *  apple-touch-icon, tokenless and deterministic). Google JobPosting wants an
+ *  actual image for hiringOrganization.logo; the company website is NOT one.
+ *  Returns null for a missing/malformed domain so the caller OMITS the property
+ *  rather than emitting a non-image URL. */
+export function logoImageUrl(logoDomain: string | null | undefined): string | null {
+  if (!logoDomain) return null;
+  // Accept a bare domain; tolerate an accidental scheme/path in the dataplane value.
+  const host = logoDomain
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "")
+    .replace(/^www\./, "");
+  // A real host has a dot and only domain-safe characters — otherwise omit.
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host)) return null;
+  return `https://icon.horse/icon/${host}`;
+}
+
+/** Derive schema.org employmentType from explicit title signals ONLY, so we never
+ *  mislabel a role (a "Contracts Manager" is not a CONTRACTOR). No signal → null →
+ *  the property is omitted (we don't assume FULL_TIME — that would be fabrication). */
+export function employmentTypeOf(title: string): string | null {
+  const t = ` ${title.toLowerCase()} `;
+  if (/\bintern(ship)?\b/.test(t)) return "INTERN";
+  if (/\bworking student\b|\bwerkstudent\b|\bpart[- ]time\b/.test(t)) return "PART_TIME";
+  if (/\btemporary\b|\binterim\b|\bfixed[- ]term\b/.test(t)) return "TEMPORARY";
+  if (/\bcontractor\b|\bfreelancer?\b/.test(t)) return "CONTRACTOR";
+  return null;
+}
+
 // ── page set ─────────────────────────────────────────────────────────────────
 
 /** Build the finite city×vertical page set from the dataplane rows. Deterministic:
@@ -220,12 +264,25 @@ export function buildPages(input: SiteInput, opts: RenderOptions = {}): GeoPage[
     const jobs = [...g.jobs].sort(byFreshest);
     const citySlug = slugify(g.city);
     const companies = new Set(jobs.map((j) => j.company.trim().toLowerCase()));
-    const postedLast7 = jobs.filter((j) => {
+    // Mutually-exclusive freshness buckets (future-dated + unparseable → undated,
+    // consistent with byFreshest sinking them). postedLast7 == freshness.last7.
+    const freshness = { last7: 0, recent: 0, older: 0, undated: 0 };
+    for (const j of jobs) {
       const t = postedMs(j.posted_at);
-      return t != null && t <= now && now - t <= WEEK_MS;
-    }).length;
+      if (t == null || t > now) freshness.undated++;
+      else if (now - t <= WEEK_MS) freshness.last7++;
+      else if (now - t <= MONTH_MS) freshness.recent++;
+      else freshness.older++;
+    }
+    const postedLast7 = freshness.last7;
     const datedIso = jobs.map((j) => j.posted_at).filter((d): d is string => !!postedMs(d)).sort();
     const latestPostedAt = datedIso.length ? datedIso[datedIso.length - 1] : null;
+    // Distinct non-empty sources (provenance signal for the market-pulse block).
+    const sources = new Set<string>();
+    for (const j of jobs) {
+      const s = j.source?.trim().toLowerCase();
+      if (s) sources.add(s);
+    }
     // Top employers by role count (ties → alphabetical, stable).
     const counts = new Map<string, number>();
     for (const j of jobs) counts.set(j.company, (counts.get(j.company) ?? 0) + 1);
@@ -247,6 +304,8 @@ export function buildPages(input: SiteInput, opts: RenderOptions = {}): GeoPage[
       latestPostedAt,
       topEmployers,
       salary: salaryStat(jobs),
+      sourceCount: sources.size,
+      freshness,
     });
   }
   // Stable order: city then vertical.
@@ -331,7 +390,11 @@ function jobPostingLd(
     `Apply directly via ${SITE_NAME}.`;
   const org: Record<string, unknown> = { "@type": "Organization", name: job.company };
   if (co?.website) org.sameAs = co.website;
-  if (co?.logo_domain) org.logo = `https://${co.logo_domain}`;
+  // logo MUST be an image URL (Google JobPosting requirement). The old value was the
+  // company website — a non-image — so we resolve a real mark from the logo chain and
+  // OMIT the property when we can't (never emit a non-image URL). #54.
+  const logo = logoImageUrl(co?.logo_domain);
+  if (logo) org.logo = logo;
 
   const ld: Record<string, unknown> = {
     "@context": "https://schema.org",
@@ -348,6 +411,15 @@ function jobPostingLd(
     identifier: { "@type": "PropertyValue", name: SITE_NAME, value: job.id },
   };
   if (job.remote) ld.jobLocationType = "TELECOMMUTE";
+  // employmentType — derived from explicit title signals only; omitted otherwise. #54.
+  const employmentType = employmentTypeOf(job.title);
+  if (employmentType) ld.employmentType = employmentType;
+  // validThrough — posted_at + a documented conservative window (POSTING_VALID_DAYS);
+  // only when posted_at is a real, parseable date. #54.
+  const posted = postedMs(job.posted_at);
+  if (posted != null) {
+    ld.validThrough = new Date(posted + POSTING_VALID_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  }
 
   const ex = job.extraction as
     | { salary_min?: number | null; salary_max?: number | null; salary_currency?: string | null; salary_period?: string | null }
@@ -485,6 +557,50 @@ function relDays(iso: string, now: number): string {
   return months < 12 ? `${months}mo ago` : `${Math.floor(months / 12)}y ago`;
 }
 
+/** Grammatical list join: ["a"] → "a"; ["a","b"] → "a and b"; ["a","b","c"] → "a, b and c". */
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/** Data-derived market-pulse prose: who's hiring most + the freshness mix, in warm
+ *  voice with no em-dashes. Every clause is dropped when its data is absent (honest:
+ *  never claim "posted this week" when the group carries no fresh, dated roles). */
+export function marketPulseSentence(page: GeoPage): string {
+  const parts: string[] = [];
+  const top = page.topEmployers[0];
+  if (top) {
+    const rw = top.count === 1 ? "role" : "roles";
+    parts.push(`${top.company} is hiring the most, with ${top.count} open ${rw}.`);
+  }
+  const f = page.freshness;
+  const mix: string[] = [];
+  if (f.last7) mix.push(`${f.last7} ${f.last7 === 1 ? "was" : "were"} posted this week`);
+  if (f.recent) mix.push(`${f.recent} in the last month`);
+  if (f.older) mix.push(`${f.older} ${f.older === 1 ? "has" : "have"} been open longer`);
+  if (mix.length) {
+    const sentence = joinList(mix);
+    parts.push(`${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`);
+  }
+  return parts.join(" ");
+}
+
+/** Freshness-mix + provenance chips for the market-pulse block. Only buckets that
+ *  carry a real count render (absent data → absent chip). */
+function marketPulseChips(page: GeoPage): string {
+  const f = page.freshness;
+  const chips: string[] = [];
+  if (f.last7) chips.push(`This week · ${f.last7}`);
+  if (f.recent) chips.push(`This month · ${f.recent}`);
+  if (f.older) chips.push(`Open longer · ${f.older}`);
+  if (f.undated) chips.push(`Undated · ${f.undated}`);
+  if (page.sourceCount) {
+    chips.push(`${page.sourceCount} ${page.sourceCount === 1 ? "source" : "sources"}`);
+  }
+  if (!chips.length) return "";
+  return `<ul class="chips">${chips.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>`;
+}
+
 /** Render one city×vertical page. `siblings` = other pages of the SAME vertical for
  *  cross-linking (hub-and-spoke, click depth ≤3). */
 export function renderPage(
@@ -501,11 +617,25 @@ export function renderPage(
   const description = leadSentence(page, dateIso);
   const canonical = `${origin}${page.path}`;
 
+  // Document the per-page JobPosting ItemList cap right where the schema is emitted
+  // (machine-visible, no user-facing clutter). #54: London has 261 live roles; the
+  // ItemList carries the freshest MAX_JOBPOSTINGS, the full set stays on the map.
+  const datedCount = page.jobs.filter((j) => postedMs(j.posted_at) != null).length;
+  const capNote = `<!-- JobPosting ItemList: ${Math.min(datedCount, MAX_JOBPOSTINGS)} of ${datedCount} dated roles (per-page cap ${MAX_JOBPOSTINGS} for schema payload size; full set on the live map). -->`;
   const jsonLd = [
+    capNote,
     jsonLdScript(organizationLd(origin)),
     jsonLdScript(breadcrumbLd(page, origin)),
     jsonLdScript(itemListLd(page, companiesBySlug)),
   ];
+
+  // Market pulse: data-derived prose + freshness/source chips (both drop absent data).
+  const pulseSentence = marketPulseSentence(page);
+  const pulseChips = marketPulseChips(page);
+  const marketPulse =
+    pulseSentence || pulseChips
+      ? `<h2>Market pulse</h2>${pulseSentence ? `<p class="lead">${escapeHtml(pulseSentence)}</p>` : ""}${pulseChips}`
+      : "";
 
   const shown = page.jobs.slice(0, MAX_ROLES_LISTED);
   const more =
@@ -545,6 +675,7 @@ ${siteHeader(origin)}
   }
 </div>
 <a class="cta" href="${origin}/">Score these against your CV</a>
+${marketPulse}
 <h2>Open roles</h2>
 <div class="tablewrap"><table>
 <thead><tr><th>Role</th><th>Level</th><th>Posted</th></tr></thead>
@@ -648,10 +779,89 @@ export function renderLlmsTxt(pages: GeoPage[], ctx: { origin: string; generated
   return lines.join("\n");
 }
 
+// ── snippets artifact (dist/snippets.json) ───────────────────────────────────
+
+/** One social-ready snippet per generated page, every number drawn from the
+ *  dataplane (never fabricated). The future distribution loop (issue #46, the OTHER
+ *  half — channels/cadence, explicitly out of this PR) consumes this file; here we
+ *  only PRODUCE it, deterministically, from the same pages the site is built from. */
+export interface CitySnippet {
+  city: string;
+  citySlug: string;
+  vertical: string;
+  verticalLabel: string;
+  url: string;
+  roles: number;
+  companies: number;
+  postedLast7: number;
+  topEmployer: string | null;
+  salary: { currency: string; median: number } | null;
+  /** A headline, tweet-sized line. */
+  short: string;
+  /** The fuller, self-citing post (leads with the dated stat, ends with the link). */
+  text: string;
+}
+
+export interface SnippetsArtifact {
+  generated_at: string;
+  site: string;
+  count: number;
+  snippets: CitySnippet[];
+}
+
+/** Build one snippet for a page. Warm voice, no em-dashes, salary line only when
+ *  the group carries a real median (cite-or-omit). Pure + deterministic. */
+export function snippetFor(page: GeoPage, dateIso: string, origin: string): CitySnippet {
+  const url = `${origin}${page.path}`;
+  const roleWord = page.jobs.length === 1 ? "role" : "roles";
+  const coWord = page.companyCount === 1 ? "company" : "companies";
+  const fresh = page.postedLast7 ? `, ${page.postedLast7} new this week` : "";
+  const short =
+    `${page.jobs.length} ${page.verticalLabel} ${roleWord} live in ${page.city} ` +
+    `across ${page.companyCount} ${coWord}${fresh}. ${url}`;
+  // Reuse the page's self-citing lead sentence so the snippet's numbers can never
+  // drift from the page, then add the product line + link.
+  const text = `${leadSentence(page, dateIso)} Every one is scored against your CV, free. ${url}`;
+  return {
+    city: page.city,
+    citySlug: page.citySlug,
+    vertical: page.verticalSlug,
+    verticalLabel: page.verticalLabel,
+    url,
+    roles: page.jobs.length,
+    companies: page.companyCount,
+    postedLast7: page.postedLast7,
+    topEmployer: page.topEmployers[0]?.company ?? null,
+    salary: page.salary ? { currency: page.salary.currency, median: page.salary.median } : null,
+    short,
+    text,
+  };
+}
+
+/** The full snippets artifact for every generated page, JSON-serializable. */
+export function buildSnippets(
+  pages: GeoPage[],
+  ctx: { origin: string; generatedAt: string },
+): SnippetsArtifact {
+  const dateIso = isoDate(ctx.generatedAt, Date.parse(ctx.generatedAt));
+  const snippets = pages.map((p) => snippetFor(p, dateIso, ctx.origin));
+  return { generated_at: ctx.generatedAt, site: SITE_NAME, count: snippets.length, snippets };
+}
+
+/** Serialize the snippets artifact (2-space indent, stable key order from
+ *  snippetFor). */
+export function renderSnippets(
+  pages: GeoPage[],
+  ctx: { origin: string; generatedAt: string },
+): string {
+  return JSON.stringify(buildSnippets(pages, ctx), null, 2) + "\n";
+}
+
 // ── the single entry the Vite plugin calls ────────────────────────────────────
 
 /** Turn the dataplane artifact into the full set of static files for dist/:
- *  the /jobs/ hub, every city×vertical page, sitemap.xml and llms.txt. Pure and
+ *  the /jobs/ hub, every city×vertical page, sitemap.xml, llms.txt and
+ *  snippets.json (social-ready text for the distribution loop). Pure and
  *  deterministic given the same input + options. */
 export function renderSite(input: SiteInput, opts: RenderOptions = {}): RenderedFile[] {
   const origin = (opts.origin ?? DEFAULT_ORIGIN).replace(/\/$/, "");
@@ -681,5 +891,8 @@ export function renderSite(input: SiteInput, opts: RenderOptions = {}): Rendered
   }
   files.push({ path: "sitemap.xml", content: renderSitemap(pages, ctx) });
   files.push({ path: "llms.txt", content: renderLlmsTxt(pages, ctx) });
+  // Always emit snippets.json (even with zero pages → empty array) so the future
+  // distribution loop always finds the file at a stable path.
+  files.push({ path: "snippets.json", content: renderSnippets(pages, ctx) });
   return files;
 }
