@@ -10,6 +10,7 @@ import {
   ROLE_ARCHETYPES,
   FALLBACK_SECTORS,
   LABEL_CAP,
+  cvWordCount,
   hashCv,
   writeCvStash,
 } from "@/lib/labels";
@@ -145,7 +146,7 @@ export default function CvUnlockModal({
     // On success the browser redirects away — no further work here.
   };
 
-  const wordCount = cvText.trim() ? cvText.trim().split(/\s+/).length : 0;
+  const wordCount = cvWordCount(cvText);
 
   return (
     <div

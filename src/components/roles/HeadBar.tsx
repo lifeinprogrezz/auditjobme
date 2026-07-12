@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { type Level, type RolesFilters } from "@/lib/roles";
 import FilterChip, { type FilterOption } from "./FilterChip";
 
@@ -21,12 +21,13 @@ export type HeadBarProps = {
   onView: (v: "map" | "list") => void;
   /** Opens the CV-unlock modal (Phase A front door). */
   onAddCv: () => void;
+  /** Opens the profile view (issue #43) — signed-in avatar's real destination. */
+  onProfile: () => void;
 };
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, view, onView, onAddCv }: HeadBarProps) {
-  const navigate = useNavigate();
+export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, view, onView, onAddCv, onProfile }: HeadBarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const [chipsShown, setChipsShown] = useState(false);
   // Smooth width reveal via grid-template-columns 0fr→1fr (.show); .expanded (after
@@ -373,13 +374,16 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
         Add your CV
       </button>
 
+      {/* CV-on-file state (issue #43): a subtle dot badge, same act-strong token as
+          the rest of the identity chrome — score colors (jade/amber/coral) stay
+          reserved for the map, so this reads as "identity established", not a rank. */}
       <div
-        className="av"
+        className={`av${scored ? " has-cv" : ""}`}
         role="button"
         tabIndex={0}
         aria-label="Profile"
-        onClick={() => navigate("/underconstruction")}
-        onKeyDown={keyActivate(() => navigate("/underconstruction"))}
+        onClick={onProfile}
+        onKeyDown={keyActivate(onProfile)}
       />
     </header>
   );

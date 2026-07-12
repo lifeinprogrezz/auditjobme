@@ -27,6 +27,16 @@ type JobsRow = {
 
 const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page past it.
 
+/** The profile-view slice (issue #43): the labels a returning user picked plus
+ *  when their CV was last written. Kept separate from ScoreableProfile, which
+ *  is the exact shape shared with the nightly scoring worker — display-only
+ *  fields have no business in that contract. */
+export type ProfileMeta = {
+  targetRoles: string[];
+  targetSectors: string[];
+  cvUpdatedAt: string | null;
+};
+
 /**
  * City + map-position + logo-domain enrichment. Same-city jobs get a stable
  * per-city index (sorted by id) that places them on a deterministic sunflower
@@ -168,6 +178,7 @@ export function useRolesData() {
   const [jobs, setJobs] = useState<RoleJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ScoreableProfile | null>(null);
+  const [profileMeta, setProfileMeta] = useState<ProfileMeta | null>(null);
   const [applied, setApplied] = useState<Set<string>>(new Set());
   // Per-run cancellation: each effect run gets its own id; async loops compare
   // against the current id (a shared boolean would be re-armed by the next run,
@@ -229,6 +240,10 @@ export function useRolesData() {
     const changed =
       storedHash != null ? payload.cv_hash !== storedHash : storedCvText?.trim() !== cvText;
 
+    // profiles has no updated_at trigger (checked: only the row's INSERT default
+    // sets it) — stamp it explicitly so the profile view's "uploaded" date reflects
+    // THIS write, not the user's original sign-up time.
+    const nowIso = new Date().toISOString();
     const { error: upErr } = await supabase
       .from("profiles")
       .update({
@@ -236,7 +251,8 @@ export function useRolesData() {
         cv_hash: payload.cv_hash,
         target_roles: payload.target_roles,
         target_sectors: payload.target_sectors,
-        onboarded_at: new Date().toISOString(),
+        onboarded_at: nowIso,
+        updated_at: nowIso,
       })
       .eq("id", userId);
     if (upErr) {
@@ -279,6 +295,9 @@ export function useRolesData() {
     // Scores arrive from the SERVER worker (issue #33) — the poll effect
     // surfaces them as they land; the panel's "Scoring… N to go" bar tracks it.
     setProfile(prof);
+    // Profile view (issue #43): reflect the write we just made, no re-fetch
+    // needed — we already know exactly what landed.
+    setProfileMeta({ targetRoles: payload.target_roles, targetSectors: payload.target_sectors, cvUpdatedAt: nowIso });
     return true;
   }
 
@@ -347,6 +366,7 @@ export function useRolesData() {
         // Anonymous browse (or sign-out: clears the previous session's state).
         setJobs(enrichAll(rows, dims, officesBySlug).sort(byScore));
         setProfile(null);
+        setProfileMeta(null);
         setApplied(new Set());
         setLoading(false);
         return;
@@ -385,11 +405,20 @@ export function useRolesData() {
 
       const { data: prof } = await supabase
         .from("profiles")
-        .select("target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, cv_text")
+        .select(
+          "target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, cv_text, target_roles, target_sectors, updated_at",
+        )
         .eq("id", user.id)
         .maybeSingle();
       if (runRef.current !== runId) return;
-      if (prof) setProfile(prof as ScoreableProfile);
+      if (prof) {
+        setProfile(prof as ScoreableProfile);
+        setProfileMeta({
+          targetRoles: prof.target_roles ?? [],
+          targetSectors: prof.target_sectors ?? [],
+          cvUpdatedAt: prof.updated_at ?? null,
+        });
+      }
       if (!prof?.cv_text?.trim()) {
         // Post-OAuth handoff (Phase A): a CV stashed before the sign-in redirect
         // is written to the profile now, then revealed. Only when the profile
@@ -493,5 +522,9 @@ export function useRolesData() {
     /** Post-CV state: the score reveal keys on a CV being present. */
     scored: Boolean(profile?.cv_text?.trim()),
     signedIn: Boolean(user),
+    /** Stored CV text (profile view, issue #43) — null until a signed-in user has one. */
+    cvText: profile?.cv_text ?? null,
+    /** Picked labels + last-write date (profile view, issue #43). */
+    profileMeta,
   };
 }

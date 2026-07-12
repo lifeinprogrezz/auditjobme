@@ -55,6 +55,22 @@ export function hashCv(text: string): string {
   return h.toString(36);
 }
 
+/** Word count for CV-state display (CV-unlock read state, profile view). Shared
+ *  so "N words" always means the same thing wherever a stored/parsed CV is shown. */
+export function cvWordCount(text: string | null | undefined): number {
+  const t = (text ?? "").trim();
+  return t ? t.split(/\s+/).length : 0;
+}
+
+/** Human "uploaded" date for the profile view (day + short month + year, matching
+ *  Tracker.tsx's applied-date format). Null when there's no timestamp to show. */
+export function formatUploadedDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
 /** Infer a coarse function archetype from a role title. Product wins for any PM
  *  title (the PM-centric catalog); other functions fall out of keyword hits;
  *  null when nothing matches (that role then can't satisfy a role-label filter). */
