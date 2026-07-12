@@ -13,9 +13,15 @@
     "moduleDetection": "force",
     "moduleResolution": "bundler",
     "noEmit": true,
-    "noFallthroughCasesInSwitch": false,
-    "noUnusedLocals": false,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    // Left off deliberately (issue #54): flags vendored shadcn/ui (calendar.tsx `_props`)
+    // and a HeadBar prop — turning it on would need edits to generated components.
     "noUnusedParameters": false,
+    // Left off deliberately (issue #54): allowJs pulls the legacy AuditGenerator.jsx /
+    // audit *.js / scripts *.mjs into the program; checkJs surfaces 168 implicit-any
+    // errors there. Typing that legacy JS is its own task, not this hardening pass.
+    "checkJs": false,
     "paths": {
       "@/*": [
         "./src/*"
