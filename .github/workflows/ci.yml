@@ -51,3 +51,34 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  migrations-rls:
+    name: migrations + RLS check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Ensure psql client
+        run: command -v psql >/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client)
+
+      # Boots the full local Supabase stack (Postgres + Auth + Storage, via Docker) on a
+      # totally fresh checkout and applies every file in supabase/migrations/ to it, in
+      # order -- this IS the "apply all migrations to an ephemeral DB" step (F10, issue
+      # #40). A plain postgres service container isn't enough: several migrations
+      # reference auth.uid()/auth.users and storage.objects/storage.buckets, which only
+      # exist in the real Supabase stack, not vanilla Postgres.
+      - name: Start local Supabase stack (applies all migrations)
+        run: supabase start
+
+      - name: Assert RLS is enabled + policies exist on every public table
+        run: |
+          eval "$(supabase status -o env)"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/assert_rls.sql
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop
