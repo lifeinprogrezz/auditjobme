@@ -98,19 +98,34 @@ describe("selectNightlyCandidates (B2)", () => {
 });
 
 describe("decideNightlyAction (B3 — notified vs matched split)", () => {
+  const V = "v4";
   it("scores when there is no batch today", () => {
-    expect(decideNightlyAction([])).toBe("score");
+    expect(decideNightlyAction([], V)).toBe("score");
   });
 
-  it("skips only when today's batch exists AND was notified", () => {
-    expect(decideNightlyAction([{ notified_at: "2026-07-07T06:01:00Z" }])).toBe("skip");
+  it("skips only when today's batch exists at the current rubric AND was notified", () => {
+    expect(decideNightlyAction([{ notified_at: "2026-07-07T06:01:00Z", rubric_version: V }], V)).toBe("skip");
     // any notified row → done (notified_at is stamped across the whole batch)
-    expect(decideNightlyAction([{ notified_at: "2026-07-07T06:01:00Z" }, { notified_at: null }])).toBe("skip");
+    expect(
+      decideNightlyAction(
+        [{ notified_at: "2026-07-07T06:01:00Z", rubric_version: V }, { notified_at: null, rubric_version: V }],
+        V,
+      ),
+    ).toBe("skip");
   });
 
-  it("retries the email when today's batch exists but was never notified", () => {
-    expect(decideNightlyAction([{ notified_at: null }, { notified_at: null }])).toBe("retry-email");
-    expect(decideNightlyAction([{}])).toBe("retry-email");
+  it("retries the email when today's current-rubric batch exists but was never notified", () => {
+    expect(
+      decideNightlyAction([{ notified_at: null, rubric_version: V }, { notified_at: null, rubric_version: V }], V),
+    ).toBe("retry-email");
+  });
+
+  it("F7: rescores when today's batch was scored under a superseded (or null) rubric", () => {
+    // stale rubric, even if already notified → re-score under the new rubric
+    expect(decideNightlyAction([{ notified_at: "2026-07-07T06:01:00Z", rubric_version: "v3" }], V)).toBe("rescore");
+    // pre-migration rows (null/absent rubric_version) read as stale → rescore once
+    expect(decideNightlyAction([{ notified_at: null, rubric_version: null }], V)).toBe("rescore");
+    expect(decideNightlyAction([{}], V)).toBe("rescore");
   });
 });
 

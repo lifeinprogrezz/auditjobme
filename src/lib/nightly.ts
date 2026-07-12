@@ -93,16 +93,26 @@ export function selectNightlyCandidates<
 }
 
 /** What to do for one user this run (pure). Splits "already matched today" from
- *  "already notified today":
- *   - no batch today            → "score"       (run the full scoring pass)
- *   - batch today, not notified → "retry-email" (email failed soft before → resend
+ *  "already notified today", and (F7) treats a batch scored under a SUPERSEDED
+ *  rubric as stale:
+ *   - no batch today             → "score"       (run the full scoring pass)
+ *   - batch today at OLD rubric  → "rescore"     (re-score today's window under the
+ *                                                 current rubric — F7 parity with the
+ *                                                 in-app + backlog paths, which filter
+ *                                                 cached scores by rubric_version)
+ *   - batch today, not notified  → "retry-email" (email failed soft before → resend
  *                                                 the existing batch; do NOT re-score)
- *   - batch today, notified     → "skip"        (fully done for the day)
+ *   - batch today, notified      → "skip"        (fully done for the day)
  *  `notified_at` (written only on send-success) is what gates the same-day early
- *  exit, so a soft email failure never strands a user without their one email. */
-export type NightlyAction = "score" | "retry-email" | "skip";
-export function decideNightlyAction(todaysRows: { notified_at?: string | null }[]): NightlyAction {
+ *  exit, so a soft email failure never strands a user without their one email. A
+ *  null/absent `rubric_version` (pre-migration rows) reads as stale → rescored once. */
+export type NightlyAction = "score" | "rescore" | "retry-email" | "skip";
+export function decideNightlyAction(
+  todaysRows: { notified_at?: string | null; rubric_version?: string | null }[],
+  currentRubric: string,
+): NightlyAction {
   if (todaysRows.length === 0) return "score";
+  if (todaysRows.some((r) => (r.rubric_version ?? null) !== currentRubric)) return "rescore";
   return todaysRows.some((r) => r.notified_at != null) ? "skip" : "retry-email";
 }
 

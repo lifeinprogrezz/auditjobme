@@ -12,7 +12,7 @@
 //   sends it as `Authorization: Bearer <CRON_SECRET>`).
 import { createClient } from "@supabase/supabase-js";
 import { pickScoringSlice } from "../src/lib/labels.js";
-import { SYSTEM, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse } from "../src/lib/scorePrompt.js";
+import { SYSTEM, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION } from "../src/lib/scorePrompt.js";
 import {
   NIGHTLY_TOP_N,
   cronAuthResult,
@@ -37,7 +37,9 @@ const JOB_FETCH_LIMIT = 800; // recent-jobs candidate window (newest first)
 
 const env = (k: string) => process.env[k];
 
-/** One row per scored role, ready to upsert. */
+/** One row per scored role, ready to upsert. `rubric_version` (F7) stamps which
+ *  rubric produced the score so a version bump re-scores the batch instead of the
+ *  nightly path silently serving stale scores forever. */
 type MatchRow = {
   user_id: string;
   job_url: string;
@@ -46,6 +48,7 @@ type MatchRow = {
   reason: string;
   fit_bullets: string[];
   batch_date: string;
+  rubric_version: string;
 };
 
 /** Discriminated result: a parsed score, a cap (429 → stop the user gracefully),
@@ -260,12 +263,12 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // the created_at cutoff (B2), and the already-matched-URL exclusion (B2).
       const { data: existingRows } = await admin
         .from("daily_matches")
-        .select("job_url, rank, score, reason, fit_bullets, batch_date, created_at, notified_at")
+        .select("job_url, rank, score, reason, fit_bullets, batch_date, created_at, notified_at, rubric_version")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
       const rowsForUser = existingRows ?? [];
       const todaysRows = rowsForUser.filter((r) => r.batch_date === today);
-      const action = decideNightlyAction(todaysRows);
+      const action = decideNightlyAction(todaysRows, RUBRIC_VERSION);
 
       // Already matched AND already notified today → fully done, no cost.
       if (action === "skip") {
@@ -302,14 +305,23 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         continue;
       }
 
-      // action === "score": no batch today → run the full pass.
+      // action === "score" or "rescore": run the full scoring pass.
       // "New since last batch": the most recent PRIOR batch's created_at (a real
       // timestamptz — NOT batch_date, whose 00:00-UTC parse would re-select every
       // job first seen in the 00:00–06:00 window each night). No prior row → the
       // ~24h fallback window. seenUrls = every URL already matched, ever, so a
       // cutoff regression or schedule change can never re-notify a seen role.
-      const sinceIso = (rowsForUser[0]?.created_at as string | null) ?? null;
-      const seenUrls = new Set(rowsForUser.map((r) => r.job_url as string));
+      //
+      // F7 rescore (rubric bumped): exclude today's now-stale batch from the cutoff
+      // AND the seen set, so today's own jobs re-score under the new rubric and the
+      // upsert overwrites the stale rows (rubric_version stamped current). A user
+      // already notified today keeps their ONE email — the upsert preserves
+      // notified_at, so we simply don't send a second (alreadyNotifiedToday below).
+      const isRescore = action === "rescore";
+      const priorRows = isRescore ? rowsForUser.filter((r) => r.batch_date !== today) : rowsForUser;
+      const alreadyNotifiedToday = isRescore && todaysRows.some((r) => r.notified_at != null);
+      const sinceIso = (priorRows[0]?.created_at as string | null) ?? null;
+      const seenUrls = new Set(priorRows.map((r) => r.job_url as string));
 
       const fresh = selectNightlyCandidates(jobs, sinceIso, nowMs, seenUrls);
       const slice = pickScoringSlice(fresh, {
@@ -387,6 +399,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         reason: m.reason,
         fit_bullets: m.fitBullets,
         batch_date: today,
+        rubric_version: RUBRIC_VERSION,
       }));
       const { error: upErr } = await admin
         .from("daily_matches")
@@ -399,8 +412,10 @@ export default async function handler(req: Req, res: Res): Promise<void> {
 
       // ── Email (fail-soft). Only when we actually persisted ≥1 match. On a soft
       // send failure notified_at stays NULL, so a same-day re-run retries the send
-      // (B3) rather than skipping the user forever. ────────────────────────────
-      if (resendKey && (await sendBatchEmail(resendKey, userId, today, ranked))) {
+      // (B3) rather than skipping the user forever. On an F7 rescore of an
+      // already-notified batch we DON'T send a second email — the upsert preserved
+      // notified_at, so the once-a-day guarantee holds. ─────────────────────────
+      if (resendKey && !alreadyNotifiedToday && (await sendBatchEmail(resendKey, userId, today, ranked))) {
         summary.emailed++;
       }
     } catch (e) {

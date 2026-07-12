@@ -1,6 +1,8 @@
 // Shared contracts for the /roles globe page (issue #14).
 // Design authority: .claude/skills/glass-design/SKILL.md + the v43 mockup.
 
+import type { ScoreSubscore, ScoreEvidence } from "@/lib/scorePrompt";
+
 /** Role-level structured facts extracted from the JD (jobs.extraction JSONB,
  *  written by scripts/extract-jd.mjs). Every field nullable; null = unknown →
  *  the role stays eligible/shown (fail-open). */
@@ -45,6 +47,12 @@ export type RoleJob = {
   reason: string | null;
   /** 3-5 grounded "why you fit" bullets (scores.signals.fit_bullets, v2 rubric). */
   fitBullets?: string[] | null;
+  /** Per-dimension rubric subscores (scores.signals.subscores, v4) — the score
+   *  breakdown bars in the detail panel. Null/empty = pre-v4 or unscored. */
+  subscores?: ScoreSubscore[] | null;
+  /** Cited cv_line↔jd_phrase evidence rows (scores.signals.evidence, v4), grounded
+   *  before persistence. Null/empty = pre-v4 or unscored. */
+  evidence?: ScoreEvidence[] | null;
   /** Normalized city (geo.ts), null = unknown → shown in panel, not on map. */
   city: string | null;
   /** Jittered map coords, null when city is unknown. */
@@ -258,13 +266,29 @@ export function byScore(a: RoleJob, b: RoleJob): number {
  * at the end of the scoring pass, once. */
 export function applyLandedScores(
   prev: RoleJob[],
-  landed: ReadonlyMap<string, { score: number; reason: string | null; fitBullets?: string[] | null }>,
+  landed: ReadonlyMap<
+    string,
+    {
+      score: number;
+      reason: string | null;
+      fitBullets?: string[] | null;
+      subscores?: ScoreSubscore[] | null;
+      evidence?: ScoreEvidence[] | null;
+    }
+  >,
   sort: boolean,
 ): RoleJob[] {
   const next = prev.map((x) => {
     const hit = landed.get(x.id);
     return hit
-      ? { ...x, score: hit.score, reason: hit.reason, fitBullets: hit.fitBullets ?? x.fitBullets }
+      ? {
+          ...x,
+          score: hit.score,
+          reason: hit.reason,
+          fitBullets: hit.fitBullets ?? x.fitBullets,
+          subscores: hit.subscores ?? x.subscores,
+          evidence: hit.evidence ?? x.evidence,
+        }
       : x;
   });
   return sort ? next.sort(byScore) : next;

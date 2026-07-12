@@ -43,12 +43,15 @@ type LiveJob = {
   extraction: { yoe_min?: number | null; geo_eligibility?: string | null } | null;
 };
 
-/** Score one job for one user through the proxy's service-role path. Never throws. */
+/** Score one job for one user through the proxy's service-role path. Never throws.
+ *  `sources` (the CV + JD this score is built from) grounds the cited evidence so a
+ *  hallucinated quote is blanked before it is persisted into scores.signals. */
 async function scoreViaProxy(
   proxyUrl: string,
   serviceKey: string,
   targetUserId: string,
   userMsg: string,
+  sources: { cvText: string | null; jdText: string | null },
 ): Promise<ParsedScore | null> {
   let res: Response;
   try {
@@ -83,7 +86,7 @@ async function scoreViaProxy(
   const textBlock = Array.isArray(data?.content)
     ? (data.content.find((b) => b?.type === "text") ?? data.content[0])
     : null;
-  return parseScoreResponse(textBlock?.text ?? "");
+  return parseScoreResponse(textBlock?.text ?? "", sources);
 }
 
 /** Fire one Resend notification. Fail-soft: logs + returns false, never throws. */
@@ -227,6 +230,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
           const jdById = new Map((jdRows ?? []).map((r) => [r.id, r.jd_text as string | null]));
 
           const { deadlineHit } = await runPool(batch, SCORE_CONCURRENCY, deadlineMs, async (j) => {
+            const jdText = jdById.get(j.id) ?? null;
             const result = await scoreViaProxy(
               proxyUrl,
               serviceKey,
@@ -238,10 +242,11 @@ export default async function handler(req: Req, res: Res): Promise<void> {
                 location: j.location ?? null,
                 remote: Boolean(j.remote),
                 seniority: j.seniority ?? null,
-                jd_text: jdById.get(j.id) ?? null,
+                jd_text: jdText,
                 yoe_min: j.extraction?.yoe_min ?? null,
                 geo_eligibility: j.extraction?.geo_eligibility ?? null,
               }),
+              { cvText: profile.cv_text, jdText },
             );
             if (!result) {
               summary.failed++;
