@@ -202,6 +202,27 @@ describe("renderSite bundle", () => {
   });
 });
 
+describe("malformed-artifact resilience (deploy never breaks)", () => {
+  // Prod Vercel builds fetch a daily-refreshed Storage artifact live; one bad
+  // upload must never brick the build. isDataplane() (dataplane.test.ts) rejects
+  // missing jobs/companies arrays before renderSite sees them; here we pin the
+  // one malformed shape that passes isDataplane() — an unparseable generated_at
+  // string — which used to crash isoDate()'s new Date(NaN).toISOString().
+  it("renders without throwing when generated_at is unparseable, dates fall back to now", () => {
+    expect(() => renderSite(input(berlinPool(6), "not-a-date"), opts)).not.toThrow();
+    const files = renderSite(input(berlinPool(6), "not-a-date"), opts);
+    const xml = files.find((f) => f.path === "sitemap.xml")!.content;
+    expect(xml).toContain("<lastmod>2026-07-12</lastmod>"); // opts.now, not NaN
+    const page = files.find((f) => f.path === "jobs/berlin/product/index.html")!.content;
+    expect(page).toContain("As of 12 July 2026");
+    expect(page).not.toContain("Invalid Date");
+  });
+
+  it("tolerates a null generated_at (baseline path)", () => {
+    expect(() => renderSite(input(berlinPool(6), null as unknown as string), opts)).not.toThrow();
+  });
+});
+
 describe("sitemap lastmod", () => {
   it("uses the freshest job date per page", () => {
     const jobs = berlinPool(5).map((j, i) => (i === 0 ? { ...j, posted_at: "2026-07-01T00:00:00Z" } : j));

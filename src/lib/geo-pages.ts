@@ -655,7 +655,15 @@ export function renderLlmsTxt(pages: GeoPage[], ctx: { origin: string; generated
  *  deterministic given the same input + options. */
 export function renderSite(input: SiteInput, opts: RenderOptions = {}): RenderedFile[] {
   const origin = (opts.origin ?? DEFAULT_ORIGIN).replace(/\/$/, "");
-  const generatedAt = input.generated_at ?? new Date(opts.now ?? Date.now()).toISOString();
+  // generated_at is trusted only when it is a parseable timestamp. A malformed
+  // artifact can carry any string ("not-a-date"), and an unparseable one would
+  // crash isoDate()'s `new Date(NaN).toISOString()` and brick the whole build —
+  // so fall back to now (opts.now in tests) instead.
+  const genRaw = input.generated_at;
+  const generatedAt =
+    genRaw && !Number.isNaN(Date.parse(genRaw))
+      ? genRaw
+      : new Date(opts.now ?? Date.now()).toISOString();
   const ctx = { origin, generatedAt };
 
   const pages = buildPages(input, opts);

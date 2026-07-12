@@ -4,6 +4,7 @@ import path from "path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
 import { renderSite, type SiteInput } from "./src/lib/geo-pages";
+import { isDataplane } from "./src/lib/dataplane";
 
 // Public GEO surface prerender (Track D F2, issue #39). SSG-in-Vite: after the SPA
 // build writes dist/, this plugin fetches the F3 static dataplane artifact ONCE and
@@ -21,10 +22,20 @@ function geoPrerenderPlugin(env: Record<string, string>): Plugin {
   const localFile = env.GEO_DATAPLANE_FILE || process.env.GEO_DATAPLANE_FILE;
   const supabaseUrl = env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 
+  // The artifact must pass the SAME structural guard the runtime map uses
+  // (isDataplane) before we trust it over the baseline. Casting raw JSON to
+  // SiteInput was the bug: a valid-JSON upload missing the jobs/companies arrays
+  // sailed through and crashed renderSite ("input.jobs is not iterable"), bricking
+  // every Vercel build until Storage was fixed. A malformed artifact → baseline.
   async function loadDataplane(): Promise<SiteInput | null> {
     if (localFile) {
       try {
-        return JSON.parse(await readFile(localFile, "utf8")) as SiteInput;
+        const parsed: unknown = JSON.parse(await readFile(localFile, "utf8"));
+        if (!isDataplane(parsed)) {
+          console.warn(`[geo-prerender] GEO_DATAPLANE_FILE (${localFile}) is malformed → baseline only.`);
+          return null;
+        }
+        return parsed;
       } catch (e) {
         console.warn(`[geo-prerender] could not read GEO_DATAPLANE_FILE (${localFile}):`, (e as Error).message);
         return null;
@@ -44,7 +55,12 @@ function geoPrerenderPlugin(env: Record<string, string>): Plugin {
         console.warn(`[geo-prerender] dataplane fetch ${res.status} → baseline only.`);
         return null;
       }
-      return (await res.json()) as SiteInput;
+      const body: unknown = await res.json();
+      if (!isDataplane(body)) {
+        console.warn("[geo-prerender] dataplane artifact is malformed → baseline only.");
+        return null;
+      }
+      return body;
     } catch (e) {
       console.warn("[geo-prerender] dataplane fetch failed → baseline only:", (e as Error).message);
       return null;
@@ -59,9 +75,19 @@ function geoPrerenderPlugin(env: Record<string, string>): Plugin {
       outDir = config.build.outDir;
     },
     async closeBundle() {
+      const baseline: SiteInput = { jobs: [], companies: [], generated_at: new Date().toISOString() };
       const plane = await loadDataplane();
-      const input: SiteInput = plane ?? { jobs: [], companies: [], generated_at: new Date().toISOString() };
-      const files = renderSite(input, { origin });
+      // Final backstop for the "on ANY failure the build still succeeds" contract:
+      // even a shaped artifact that slips past isDataplane() (e.g. an unparseable
+      // generated_at, a null field renderSite doesn't expect) must never brick the
+      // deploy — fall back to the baseline sitemap + llms.txt instead of throwing.
+      let files: ReturnType<typeof renderSite>;
+      try {
+        files = renderSite(plane ?? baseline, { origin });
+      } catch (e) {
+        console.warn("[geo-prerender] render failed → baseline only:", (e as Error).message);
+        files = renderSite(baseline, { origin });
+      }
       for (const f of files) {
         const abs = path.resolve(outDir, f.path);
         await mkdir(path.dirname(abs), { recursive: true });
