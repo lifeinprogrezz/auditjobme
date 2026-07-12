@@ -107,10 +107,15 @@ export default function Apply() {
     };
   }, [user, jobUrl]);
 
-  async function saveArtifact(kind: string, content: Json) {
-    if (!user || !job) return;
+  /** Persist a generated artifact. Returns whether the write landed so callers can
+   *  surface a failure instead of losing the ledger row silently (issue #54). */
+  async function saveArtifact(kind: string, content: Json): Promise<boolean> {
+    if (!user || !job) return false;
     await supabase.from("artifacts").delete().match({ user_id: user.id, job_id: job.id, kind });
-    await supabase.from("artifacts").insert({ user_id: user.id, job_id: job.id, kind, content, model: HAIKU });
+    const { error } = await supabase
+      .from("artifacts")
+      .insert({ user_id: user.id, job_id: job.id, kind, content, model: HAIKU });
+    return !error;
   }
 
   async function genSummary() {
@@ -130,8 +135,13 @@ export default function Apply() {
   async function downloadCv() {
     if (!job || !cvText || summary == null) return;
     printHtml(buildCvHtml({ name, summary, cvText }));
-    // Persist the reviewed summary (the version the user actually downloaded).
-    await saveArtifact("cv", { summary });
+    // Persist the reviewed summary (the version the user actually downloaded). If the
+    // write fails, say so — the PDF is fine, but it won't show up in the saved bundle
+    // (issue #54: don't lose the ledger row silently).
+    const saved = await saveArtifact("cv", { summary });
+    if (!saved) {
+      toast.error("Your CV is downloading, but we couldn't save a copy to your bundle. Try again to keep it on file.");
+    }
   }
 
   async function genCover() {
@@ -141,7 +151,10 @@ export default function Apply() {
     try {
       const c = await tailorCover({ role: job.title, company: job.company, jdText: job.jd_text, cvText }, name);
       setCover(c);
-      await saveArtifact("letter", { cover: c as unknown as Json });
+      const saved = await saveArtifact("letter", { cover: c as unknown as Json });
+      if (!saved) {
+        toast.error("We drafted your letter, but couldn't save a copy to your bundle. Try again to keep it on file.");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Cover letter generation failed");
     } finally {
