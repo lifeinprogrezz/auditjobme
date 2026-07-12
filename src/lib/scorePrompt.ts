@@ -213,15 +213,15 @@ export function parseScoreResponse(
           typeof (s as { score?: unknown }).score === "number" &&
           Number.isFinite((s as { score: number }).score),
       )
-      .filter((s) => !seen.has(s.key) && seen.add(s.key))
-      .map((s) => ({ key: s.key as SubscoreKey, score: Math.max(0, Math.min(5, Number(s.score))) }));
+      .filter((s: { key: string; score: unknown }) => !seen.has(s.key) && seen.add(s.key))
+      .map((s: { key: string; score: unknown }) => ({ key: s.key as SubscoreKey, score: Math.max(0, Math.min(5, Number(s.score))) }));
     const rawEvidence: ScoreEvidence[] = (Array.isArray(parsed.evidence) ? parsed.evidence : [])
       .filter(
         (e: unknown): e is { label: string } =>
           !!e && typeof e === "object" && typeof (e as { label?: unknown }).label === "string" && !!(e as { label: string }).label.trim(),
       )
       .slice(0, 6)
-      .map((e) => {
+      .map((e: { label: string }) => {
         const raw = e as { label: string; cv_line?: unknown; jd_phrase?: unknown; contribution?: unknown };
         const contribution = Number(raw.contribution);
         return {
