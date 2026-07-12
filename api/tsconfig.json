@@ -8,10 +8,8 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "strict": false,
+    "strict": true,
     "skipLibCheck": true,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
     "types": ["node"],
     "baseUrl": ".",
     "paths": { "@/*": ["../src/*"] }

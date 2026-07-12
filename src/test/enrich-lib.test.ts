@@ -21,6 +21,8 @@ describe("sanitizeDescription", () => {
   });
   it("caps long text with an ellipsis", () => {
     const out = sanitizeDescription("x".repeat(400));
+    // a 400-char string always sanitizes to a non-null string; narrow so length/endsWith typecheck
+    if (out === null) throw new Error("expected a non-null string");
     expect(out.length).toBe(238);
     expect(out.endsWith("…")).toBe(true);
   });
@@ -49,7 +51,9 @@ describe("parseEnrichment", () => {
   });
   it("extracts team_size when stated, trimmed", () => {
     expect(parseEnrichment('{"team_size":" 51-200 "}')).toEqual({ team_size: "51-200" });
-    expect(parseEnrichment('{"description":"tiny"}').team_size).toBeUndefined();
+    // parseEnrichment's inferred return unions the garbage-path {} with the parsed shape;
+    // cast to the real optional-team_size shape to read the field the runtime can produce
+    expect((parseEnrichment('{"description":"tiny"}') as { team_size?: string }).team_size).toBeUndefined();
   });
 });
 
