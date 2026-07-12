@@ -41,6 +41,50 @@ export const FALLBACK_SECTORS = [
 /** How many label chips of each kind a user may select. */
 export const LABEL_CAP = 3;
 
+/** How many industry chips the CV-unlock modal always shows (top by live-role
+ *  frequency) before the tail's search row (issue #44). A DISPLAY cap, distinct
+ *  from LABEL_CAP (the selection cap, parked at #35) — this one just bounds how
+ *  much of the ~50-sector catalog renders as chips vs. lives behind search. */
+export const TOP_SECTOR_CHIPS = 12;
+
+type SectorOption = { value: string; label: string; count: number };
+
+/**
+ * Chips to render in the CV-unlock modal's industry picker: the top N sectors
+ * by frequency (sectorOptions arrives pre-sorted desc), PLUS any already-
+ * selected sector that falls outside the top N — a picked tail sector can
+ * never disappear from view (issue #44, rule 3). Falls back to
+ * FALLBACK_SECTORS when the live catalog has nothing to derive from.
+ */
+export function visibleSectorChips(
+  sectorOptions: SectorOption[],
+  selected: string[],
+  topN: number = TOP_SECTOR_CHIPS,
+): string[] {
+  if (sectorOptions.length === 0) return FALLBACK_SECTORS;
+  const top = sectorOptions.slice(0, topN).map((o) => o.value);
+  const topSet = new Set(top);
+  const strandedSelected = selected.filter((s) => !topSet.has(s));
+  return [...top, ...strandedSelected];
+}
+
+/**
+ * Typeahead search over the sector catalog for the CV-unlock modal's compact
+ * "more industries" row (issue #44) — matches on label, excludes anything
+ * already shown as a visible chip so results never duplicate the chip row.
+ * Empty query returns no results (keeps the row compact until the user types).
+ */
+export function filterSectorSearch(
+  sectorOptions: SectorOption[],
+  visible: string[],
+  query: string,
+): SectorOption[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  const visibleSet = new Set(visible);
+  return sectorOptions.filter((o) => !visibleSet.has(o.value) && o.label.toLowerCase().includes(needle));
+}
+
 /**
  * Deterministic, dependency-free hash of a CV's trimmed text (djb2 xor variant,
  * base36). Same CV → same hash (a re-submit is a no-op for the score cache); any

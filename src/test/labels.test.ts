@@ -9,6 +9,9 @@ import {
   writeCvStash,
   clearCvStash,
   CV_STASH_KEY,
+  FALLBACK_SECTORS,
+  visibleSectorChips,
+  filterSectorSearch,
 } from "@/lib/labels";
 import type { RoleJob } from "@/lib/roles";
 
@@ -142,6 +145,71 @@ describe("pickScoringSlice", () => {
   it("excludes rows missing a sector when a sector is required", () => {
     const out = pickScoringSlice(jobs, { roles: ["Product"], sectors: ["Consumer"] });
     expect(out).toHaveLength(4); // no Product+Consumer row → fall back to all
+  });
+});
+
+describe("visibleSectorChips", () => {
+  // 15 sectors, pre-sorted desc by frequency (as sectorOptions arrives from RolesMap).
+  const opts = Array.from({ length: 15 }, (_, i) => ({
+    value: `Sector${i}`,
+    label: `Sector${i}`,
+    count: 15 - i,
+  }));
+
+  it("falls back to FALLBACK_SECTORS when the catalog is empty", () => {
+    expect(visibleSectorChips([], [], 12)).toEqual(FALLBACK_SECTORS);
+    expect(visibleSectorChips([], ["Anything"], 12)).toEqual(FALLBACK_SECTORS);
+  });
+
+  it("returns only the top N when nothing outside it is selected", () => {
+    const out = visibleSectorChips(opts, [], 12);
+    expect(out).toHaveLength(12);
+    expect(out).toEqual(opts.slice(0, 12).map((o) => o.value));
+  });
+
+  it("keeps a selected tail sector visible even though it's outside the top N", () => {
+    const out = visibleSectorChips(opts, ["Sector14"], 12);
+    expect(out).toContain("Sector14");
+    expect(out).toHaveLength(13); // top 12 + the one stranded pick
+  });
+
+  it("does not duplicate a selected sector that's already in the top N", () => {
+    const out = visibleSectorChips(opts, ["Sector0"], 12);
+    expect(out.filter((v) => v === "Sector0")).toHaveLength(1);
+    expect(out).toHaveLength(12);
+  });
+
+  it("appends multiple stranded selections, order preserved", () => {
+    const out = visibleSectorChips(opts, ["Sector14", "Sector13"], 12);
+    expect(out.slice(12)).toEqual(["Sector14", "Sector13"]);
+  });
+});
+
+describe("filterSectorSearch", () => {
+  const opts = [
+    { value: "Fintech", label: "Fintech", count: 40 },
+    { value: "Health", label: "Health", count: 30 },
+    { value: "Healthtech", label: "Healthtech", count: 5 },
+    { value: "Climate", label: "Climate", count: 3 },
+  ];
+
+  it("returns nothing for an empty or whitespace-only query", () => {
+    expect(filterSectorSearch(opts, [], "")).toEqual([]);
+    expect(filterSectorSearch(opts, [], "   ")).toEqual([]);
+  });
+
+  it("matches by label, case-insensitive, substring", () => {
+    const out = filterSectorSearch(opts, [], "health");
+    expect(out.map((o) => o.value).sort()).toEqual(["Health", "Healthtech"]);
+  });
+
+  it("excludes options already in the visible set", () => {
+    const out = filterSectorSearch(opts, ["Health"], "health");
+    expect(out.map((o) => o.value)).toEqual(["Healthtech"]);
+  });
+
+  it("returns nothing when there's no match", () => {
+    expect(filterSectorSearch(opts, [], "gaming")).toEqual([]);
   });
 });
 

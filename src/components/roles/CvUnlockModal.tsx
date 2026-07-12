@@ -8,8 +8,10 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ROLE_ARCHETYPES,
-  FALLBACK_SECTORS,
   LABEL_CAP,
+  TOP_SECTOR_CHIPS,
+  visibleSectorChips,
+  filterSectorSearch,
   cvWordCount,
   hashCv,
   writeCvStash,
@@ -47,6 +49,7 @@ export default function CvUnlockModal({
   const [dragging, setDragging] = useState(false);
   const [roles, setRoles] = useState<string[]>([]);
   const [sectors, setSectors] = useState<string[]>([]);
+  const [sectorQuery, setSectorQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -59,6 +62,7 @@ export default function CvUnlockModal({
     setDragging(false);
     setRoles([]);
     setSectors([]);
+    setSectorQuery("");
     setSubmitting(false);
   }, [open]);
 
@@ -76,8 +80,9 @@ export default function CvUnlockModal({
 
   // Industry choices: the real catalog sectors (top by frequency) so the scoring
   // filter matches exactly; fall back to a curated list when the catalog is bare.
-  const industryOptions =
-    sectorOptions.length > 0 ? sectorOptions.slice(0, 12).map((o) => o.value) : FALLBACK_SECTORS;
+  // A picked tail sector always stays visible even once it falls out of the top N.
+  const industryOptions = visibleSectorChips(sectorOptions, sectors, TOP_SECTOR_CHIPS);
+  const sectorSearchResults = filterSectorSearch(sectorOptions, industryOptions, sectorQuery);
 
   const readFile = async (file: File | undefined) => {
     if (!file) return;
@@ -244,6 +249,39 @@ export default function CvUnlockModal({
                   </button>
                 ))}
               </div>
+              {/* Tail search: same fdrop-search/fdrop-list/checkbox pattern as the
+                  headbar's searchable FilterChip dropdown (FilterChip.tsx), reused
+                  in-flow here rather than as a flyout — only shows once the live
+                  catalog outgrows the visible chip row. */}
+              {sectorOptions.length > TOP_SECTOR_CHIPS && (
+                <div className="cvmore">
+                  <input
+                    className="fdrop-search"
+                    type="text"
+                    placeholder="Search more industries…"
+                    value={sectorQuery}
+                    onChange={(e) => setSectorQuery(e.target.value)}
+                  />
+                  {sectorQuery.trim() && (
+                    <div className="fdrop fdrop-list">
+                      {sectorSearchResults.map((o) => (
+                        <label key={o.value}>
+                          <input
+                            type="checkbox"
+                            checked={sectors.includes(o.value)}
+                            onChange={() => setSectors((cur) => toggleCapped(cur, o.value, LABEL_CAP))}
+                          />
+                          <span className="fdrop-lab">{o.label}</span>
+                          <span className="fdrop-n">{o.count}</span>
+                        </label>
+                      ))}
+                      {sectorSearchResults.length === 0 && (
+                        <div className="fdrop-empty">No matches</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </>
         )}
