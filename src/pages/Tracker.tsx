@@ -1,14 +1,21 @@
-// Tracker — the application kanban (issue #42). Rebuilds the old list+dropdown draft
-// into a real column board (applied → responded → interview → offer → rejected) while
-// keeping the existing Supabase write-back. Moves are explicit prev/next controls
-// (no drag dependency), each an optimistic update rolled back on error. Ink-glass
-// token layer, no inline hex.
+// Tracker — the application board (issue #42), rebuilt as a D-class PAPER board
+// (design direction §6.2): quiet `--secondary` column wells (radius 16, no border
+// wall), compact paper tiles (radius 10, the ink page shadow on hover), the §2
+// type/spacing tokens, theme-matched 24px logos as the only colour, and stage
+// identity carried by COLUMN POSITION + a micro eyebrow — never stage hues
+// (monochrome, resolution #5). Moves stay explicit prev/next controls (restyled
+// as secondary icon buttons), each an optimistic update rolled back on error;
+// dnd-kit drag is a scoped follow-up (the move controls already satisfy the §6.2
+// "move updates exactly one row's position" acceptance, and keep the board
+// keyboard-accessible). Keeps the existing Supabase write-back.
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
 import AppShell from "@/components/app/AppShell";
+import PaperLogo from "@/components/app/PaperLogo";
 import { cn } from "@/lib/utils";
+import { domainFor } from "@/lib/logodev";
 import { TRACKER_COLUMNS as COLUMNS, STATUS_ORDER as ORDER, normStatus, type Status } from "@/lib/tracker";
 
 interface AppRow {
@@ -19,6 +26,15 @@ interface AppRow {
   company: string;
   title: string;
   url: string;
+  source: string | null;
+}
+
+function Chevron({ dir }: { dir: -1 | 1 }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {dir === -1 ? <path d="m15 18-6-6 6-6" /> : <path d="m9 18 6-6-6-6" />}
+    </svg>
+  );
 }
 
 export default function Tracker() {
@@ -39,11 +55,11 @@ export default function Tracker() {
         .eq("user_id", user.id)
         .order("applied_at", { ascending: false });
       const ids = (appsData ?? []).map((a) => a.job_id);
-      const jobsById: Record<string, { company: string; title: string; url: string }> = {};
+      const jobsById: Record<string, { company: string; title: string; url: string; source: string | null }> = {};
       if (ids.length) {
-        const { data: jobsData } = await supabase.from("jobs").select("id, company, title, url").in("id", ids);
+        const { data: jobsData } = await supabase.from("jobs").select("id, company, title, url, source").in("id", ids);
         (jobsData ?? []).forEach((j) => {
-          jobsById[j.id] = { company: j.company, title: j.title, url: j.url };
+          jobsById[j.id] = { company: j.company, title: j.title, url: j.url, source: j.source };
         });
       }
       // Drop rows whose DB status isn't one of our columns instead of coercing them to
@@ -65,6 +81,7 @@ export default function Tracker() {
           company: jobsById[a.job_id]?.company ?? "Unknown",
           title: jobsById[a.job_id]?.title ?? "Unknown role",
           url: jobsById[a.job_id]?.url ?? "#",
+          source: jobsById[a.job_id]?.source ?? null,
         });
       }
       if (unknownStatuses.size > 0) {
@@ -108,82 +125,97 @@ export default function Tracker() {
   if (loading) {
     return (
       <AppShell title="Applications">
-        <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
+        <p className="mt-6 text-body text-muted-foreground">Loading your board…</p>
       </AppShell>
     );
   }
 
   if (apps.length === 0) {
+    // First-class empty state (§6.2): a designed paper card, not raw text.
     return (
       <AppShell title="Applications">
-        <p className="mt-6 text-sm text-muted-foreground">
-          No applications yet. Open a role from Today, prepare it, then mark it applied and it shows up on this board.
-        </p>
+        <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-page">
+          <p className="text-body text-muted-foreground text-pretty">
+            No applications yet. Open a role from Today, prepare it, then mark it applied and it shows up on this board.
+          </p>
+        </div>
       </AppShell>
     );
   }
 
   return (
     <AppShell title="Applications">
-      <p className="mt-1 text-sm text-muted-foreground">
+      <p className="mt-1 text-body text-muted-foreground">
         Every role you've marked applied. Move a card as things progress.
       </p>
       <div className="mt-8 overflow-x-auto pb-4">
         <div className="flex min-w-max gap-4">
           {COLUMNS.map((col, colIdx) => (
             <section key={col.value} className="w-64 shrink-0" aria-label={col.label}>
-              <div className="mb-3 flex items-center justify-between px-1">
-                <h2 className="text-sm font-semibold text-foreground">{col.label}</h2>
-                <span className="font-mono text-xs text-muted-foreground">{byColumn[col.value].length}</span>
+              <div className="mb-2 flex items-center justify-between px-1">
+                <h2 className="font-display text-micro uppercase text-muted-foreground">{col.label}</h2>
+                <span className="font-mono text-caption tabular-nums text-muted-foreground">
+                  {byColumn[col.value].length}
+                </span>
               </div>
-              <div className="flex flex-col gap-2 rounded-lg border border-border bg-secondary/40 p-2">
+              {/* Quiet paper well — no border wall; position + eyebrow carry the stage. */}
+              <div className="flex min-h-24 flex-col gap-2 rounded-2xl bg-secondary p-2">
                 {byColumn[col.value].length === 0 ? (
-                  <p className="px-2 py-6 text-center text-xs text-muted-foreground">Nothing here</p>
+                  <p className="px-2 py-6 text-center text-caption text-muted-foreground">Nothing here</p>
                 ) : (
                   byColumn[col.value].map((a) => (
-                    <article key={a.id} className="rounded-md border border-border bg-card p-3">
-                      <div className="text-sm font-semibold">{a.company}</div>
-                      <a
-                        href={a.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-0.5 block truncate text-xs text-foreground underline-offset-2 hover:underline"
-                      >
-                        {a.title}
-                      </a>
-                      <div className="mt-2 text-[0.65rem] text-muted-foreground">
-                        Applied{" "}
-                        {new Date(a.applied_at).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                    <article
+                      key={a.id}
+                      className="rounded-[10px] bg-card p-3 shadow-page transition-shadow duration-150 hover:shadow-page-lift"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <PaperLogo domain={domainFor(a.company, a.source)} company={a.company} size={24} />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-caption font-medium text-muted-foreground">{a.company}</div>
+                          <a
+                            href={a.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-0.5 block truncate text-control font-semibold text-foreground underline-offset-2 hover:underline"
+                          >
+                            {a.title}
+                          </a>
+                        </div>
                       </div>
-                      <div className="mt-2 flex items-center justify-between">
-                        <button
-                          type="button"
-                          aria-label="Move back a stage"
-                          disabled={colIdx === 0}
-                          onClick={() => move(a.id, -1)}
-                          className={cn(
-                            "rounded px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground",
-                            colIdx === 0 && "invisible",
-                          )}
-                        >
-                          ← Back
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Move forward a stage"
-                          disabled={colIdx === COLUMNS.length - 1}
-                          onClick={() => move(a.id, 1)}
-                          className={cn(
-                            "rounded px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground",
-                            colIdx === COLUMNS.length - 1 && "invisible",
-                          )}
-                        >
-                          Next →
-                        </button>
+                      <div className="mt-2.5 flex items-center justify-between">
+                        <span className="font-mono text-caption tabular-nums text-muted-foreground">
+                          {new Date(a.applied_at).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            aria-label="Move back a stage"
+                            disabled={colIdx === 0}
+                            onClick={() => move(a.id, -1)}
+                            className={cn(
+                              "grid h-7 w-7 place-items-center rounded-[10px] border border-foreground/20 text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground",
+                              colIdx === 0 && "invisible",
+                            )}
+                          >
+                            <Chevron dir={-1} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Move forward a stage"
+                            disabled={colIdx === COLUMNS.length - 1}
+                            onClick={() => move(a.id, 1)}
+                            className={cn(
+                              "grid h-7 w-7 place-items-center rounded-[10px] border border-foreground/20 text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground",
+                              colIdx === COLUMNS.length - 1 && "invisible",
+                            )}
+                          >
+                            <Chevron dir={1} />
+                          </button>
+                        </div>
                       </div>
                     </article>
                   ))

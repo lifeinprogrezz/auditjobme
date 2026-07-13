@@ -113,7 +113,7 @@
 .roles-theme .brand { font-family: var(--font-d); font-weight: 700; font-size: 18.5px; letter-spacing: -0.04em; display: flex; align-items: center; gap: 9px; color: #fff; text-decoration: none; }
 .roles-theme .brand .dot { width: 16px; height: 16px; border-radius: 5px; background: linear-gradient(135deg, var(--great), #34e3ff); box-shadow: 0 0 16px rgba(31, 216, 184, 0.9); }
 .roles-theme .nav .sep { width: 1px; height: 22px; background: var(--hair); }
-.roles-theme .cmd { flex: 1 1 auto; min-width: 46px; max-width: 380px; height: 38px; border-radius: 11px; display: flex; align-items: center; gap: 9px; padding: 0 8px 0 13px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--hair); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.05); }
+.roles-theme .cmd { flex: 1 1 auto; min-width: 46px; max-width: 380px; height: 38px; border-radius: 10px; display: flex; align-items: center; gap: 9px; padding: 0 8px 0 13px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--hair); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.05); }
 .roles-theme .cmd:hover, .roles-theme .cmd:focus-within { background: rgba(255, 255, 255, 0.09); }
 .roles-theme .cmd svg { opacity: 0.55; flex: none; }
 .roles-theme .cmd input { flex: 1; min-width: 0; font: inherit; font-size: 13.5px; color: var(--text); background: transparent; border: 0; outline: none; }
@@ -129,13 +129,11 @@
  * §9.2 button convergence: emphasis is NEGATIVE SPACE (ink fill vs the surface)
  * only — NO rim-light `--sh` (its inset top-highlight was the "double line at the
  * top" Rober flagged in dark). A neutral drop-shadow seat, matching cvcta/dcta.
- * Radius stays 11px on purpose — the shared 38px headbar-cluster token
- * (.cmd/.filterbtn/.fclear/.fchip/.psearch/.signin all sit at 11px). §9.2 rewrote
- * this line's box-shadow, so the §8.1 diff-grep now surfaces the PRE-EXISTING 11px;
- * it is NOT on the {4,10,16,24,999} scale, but dropping this one button to 10px
- * would desync the cluster. Cluster-wide radius normalization is a deferred
- * file-wide design call, out of scope for D2. */
-.roles-theme .navcv { flex: none; white-space: nowrap; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--act-strong-ink); border: 1px solid var(--act-strong); background: var(--act-strong); box-shadow: 0 8px 20px -6px var(--act-shadow); transition: opacity 0.2s, transform 0.12s; }
+ * Radius = 10px (§2.4 scale): the whole 38px headbar cluster
+ * (.cmd/.navcv/.filterbtn/.fclear/.fchip/.psearch/.signin) was normalized 11px→10px
+ * together in wave D3, so the token stays shared AND lands on the {4,10,16,24,999}
+ * scale — the deferred D2 cluster-wide normalization, now done. */
+.roles-theme .navcv { flex: none; white-space: nowrap; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: 10px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--act-strong-ink); border: 1px solid var(--act-strong); background: var(--act-strong); box-shadow: 0 8px 20px -6px var(--act-shadow); transition: opacity 0.2s, transform 0.12s; }
 .roles-theme .navcv:hover { opacity: 0.92; }
 .roles-theme .navcv:active { transform: translateY(1px); }
 .roles-theme .navcv .sp { width: 22px; height: 22px; flex: none; border-radius: 7px; display: grid; place-items: center; color: var(--act-strong); background: var(--act-strong-ink); }
@@ -150,7 +148,7 @@
  * direction §2.4 nested-radii law); glass surface, never an --act-strong block. */
 .roles-theme .seg .ind { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 8px; background: color-mix(in srgb, var(--text) 12%, transparent); border: 1px solid var(--rim); box-shadow: 0 1px 3px -1px var(--act-shadow); transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s; }
 .roles-theme .seg.list .ind { transform: translateX(100%); }
-.roles-theme .filterbtn { display: flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
+.roles-theme .filterbtn { display: flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .filterbtn:hover { background: rgba(255, 255, 255, 0.1); }
 .roles-theme .filterbtn.on { background: var(--act-tint); border-color: var(--act-border); color: var(--text); }
 .roles-theme .filterbtn svg { opacity: 0.7; }
@@ -178,7 +176,7 @@
 .roles-theme .fchips.show { grid-template-columns: 1fr; opacity: 1; pointer-events: auto; margin-left: 6px; }
 /* Headbar-wide reset — compact icon at the end of the chip row, shown only when a filter
    is active. flex:none so it never shrinks/wraps (keeps the responsive layout intact). */
-.roles-theme .fclear { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); cursor: pointer; transition: color 0.15s, background 0.15s, border-color 0.15s; }
+.roles-theme .fclear { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); cursor: pointer; transition: color 0.15s, background 0.15s, border-color 0.15s; }
 .roles-theme .fclear:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); border-color: var(--text); }
 /* Nothing to clear → visible but inert (same voice as .fchip.disabled; kept at 0.55
    so the icon still reads — 0.38 vanished on the light map, Rober 7-10). */
@@ -188,7 +186,7 @@
 .roles-theme.light .fclear { border-color: var(--hair); background: rgba(11, 31, 38, 0.045); color: var(--text); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 -1px 0 rgba(11, 31, 38, 0.06); }
 .roles-theme.light .fclear:hover { background: rgba(11, 31, 38, 0.08); border-color: var(--text); }
 .roles-theme.light .fclear.disabled:hover { color: var(--text); background: rgba(11, 31, 38, 0.045); border-color: var(--hair); }
-.roles-theme .fchip { position: relative; display: flex; flex: none; align-items: center; gap: 6px; height: 38px; padding: 0 11px; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
+.roles-theme .fchip { position: relative; display: flex; flex: none; align-items: center; gap: 6px; height: 38px; padding: 0 11px; border-radius: 10px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; transition: background 0.2s, border-color 0.2s, color 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .fchip:hover { background: rgba(255, 255, 255, 0.1); color: var(--text); }
 /* Nothing to pick under the current filters → greyed + inert, but kept in place so
    the chip row never flickers a chip in/out (Rober 7-09). */
@@ -261,7 +259,7 @@
 @media (max-width: 920px) { .roles-theme .madeby .mb-by, .roles-theme .madeby .mb-sep { display: none; } }
 
 /* In-panel search (inside a city/company list) — Rober 7-06. */
-.roles-theme .psearch { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 0 11px; height: 38px; border-radius: 11px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); flex: none; }
+.roles-theme .psearch { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 0 11px; height: 38px; border-radius: 10px; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); color: var(--muted); flex: none; }
 .roles-theme .psearch svg { flex: none; opacity: 0.8; }
 .roles-theme .psearch input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--text); font-family: inherit; font-size: 13px; }
 .roles-theme .psearch input::placeholder { color: var(--muted); }
@@ -283,7 +281,15 @@
 .roles-theme .themetoggle { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; transition: color 0.2s, background 0.2s, border-color 0.2s; }
 .roles-theme .themetoggle:hover { color: var(--text); background: var(--act-tint); border-color: var(--hair); }
 .roles-theme .themetoggle:focus-visible { outline: 2px solid var(--act-border); outline-offset: 2px; }
-.roles-theme .signin { display: flex; align-items: center; height: 38px; padding: 0 16px; border-radius: 11px; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); cursor: pointer; text-decoration: none; transition: background 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
+/* .signin is A-class CHROME GLASS, not a strong-action button: it carries the
+ * EXACT small-chip rim-light recipe shared by its headbar siblings .filterbtn and
+ * .fchip (top hairline + faint icy band + bottom seat). §2.5 keeps the glass-world
+ * rim-light stacks as the map's identity, so §9.2's "no inset-highlight on BUTTONS"
+ * does not reach it — converging .signin alone would desync it from the filter
+ * chips. KEPT on the PR keep-list; only its radius normalizes 11px→10px with the
+ * cluster (§2.4). Distinct from .navcv (the strong CV-upload action), which §9.2
+ * already stripped to a neutral drop-shadow. */
+.roles-theme .signin { display: flex; align-items: center; height: 38px; padding: 0 16px; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); cursor: pointer; text-decoration: none; transition: background 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .signin:hover { background: rgba(255, 255, 255, 0.1); }
 
 /* GLASS CLUSTER BUBBLES (DOM markers — circle layers can't speak the glass system) */
