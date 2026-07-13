@@ -526,8 +526,11 @@
  * the secondary hairline form; applied-cta below removes the affordance.
  * §9.2 convergence: negative-space ink fill only — no rim-light `--sh`; a neutral
  * drop-shadow seat, matching navcv/cvcta. */
-/* Height sits in the §3.3 control band (h-36–38, radius 10 from .btn) — was 45px. */
-.roles-theme .dcta { width: 100%; height: 38px; display: flex; align-items: center; justify-content: center; padding: 0 14px; font-size: 13px; background: var(--act-strong); color: var(--act-strong-ink); border: 1px solid var(--act-strong); box-shadow: 0 8px 20px -6px var(--act-shadow); transition: opacity 0.2s, transform 0.15s; }
+/* Height sits in the §3.3 control band (h-36–38, radius 10 from .btn) — was 45px.
+ * flex-shrink: 0 is load-bearing: .detail is an overflowing flex-COLUMN, so without
+ * it the flex algorithm shrinks this item below height:38px to min-content (~22px) —
+ * the #58 regression the h-38 fix alone couldn't reach (cf. .navcv's flex:none). */
+.roles-theme .dcta { width: 100%; height: 38px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0 14px; font-size: 13px; background: var(--act-strong); color: var(--act-strong-ink); border: 1px solid var(--act-strong); box-shadow: 0 8px 20px -6px var(--act-shadow); transition: opacity 0.2s, transform 0.15s; }
 .roles-theme .dcta:enabled:hover { opacity: 0.92; }
 /* Actioned state = affordance removed, not recoloured (design direction §3.3):
  * plain muted text + check, no jade fill. */
