@@ -60,7 +60,7 @@ export default function AppShell({
           </NavLink>
           {/* Day/night toggle (design direction §9.1): the SAME component the map
               HeadBar renders, so the one control reaches every surface. */}
-          <ThemeToggle className="inline-grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" />
+          <ThemeToggle className="inline-grid h-8 w-8 place-items-center rounded-[10px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" />
           <button
             type="button"
             onClick={handleSignOut}

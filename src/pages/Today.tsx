@@ -15,6 +15,13 @@ import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { useTheme } from "@/lib/theme";
 import FitChip from "@/components/roles/FitChip";
 
+// §3.3 secondary CTA — the ONE idiom for every list-row action on this page (there is
+// no second primary): control type (13/600), radius 10, a hairline ink/20 border that
+// deepens to /30 on hover — a color shift only, never the shadcn `hover:bg-accent` fill
+// jump. Overrides the stock Button variant so zero unmodified-shadcn boilerplate ships.
+const SECONDARY_CTA =
+  "rounded-[10px] border border-foreground/20 bg-transparent text-control font-semibold text-foreground hover:border-foreground/30 hover:bg-transparent hover:text-foreground";
+
 // Paper-card logo (design direction §5.5 + skill Logo.dev rule): the theme param
 // follows the ACTIVE app theme — light card → theme=light, dark card → theme=dark —
 // or the broken-logos bug returns. Logo.dev → site favicon chain → colored initial.
@@ -164,6 +171,7 @@ export default function Today() {
                   <Button
                     variant="outline"
                     size="sm"
+                    className={SECONDARY_CTA}
                     onClick={() => navigate(`/apply?job=${encodeURIComponent(job.url)}`)}
                   >
                     Prepare application
@@ -176,7 +184,7 @@ export default function Today() {
                       Applied
                     </span>
                   ) : (
-                    <Button variant="ghost" size="sm" onClick={() => markApplied(job)}>
+                    <Button variant="ghost" size="sm" className={SECONDARY_CTA} onClick={() => markApplied(job)}>
                       Mark applied
                     </Button>
                   )}
@@ -189,7 +197,7 @@ export default function Today() {
 
       {scored && remaining > 0 && !scoring && (
         <div className="mt-6 flex justify-center">
-          <Button variant="outline" size="sm" onClick={scoreMore}>
+          <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={scoreMore}>
             Check for new scores
           </Button>
         </div>
