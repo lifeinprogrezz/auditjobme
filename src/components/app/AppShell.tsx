@@ -51,7 +51,7 @@ export default function AppShell({
   };
 
   return (
-    <div className="page-grain min-h-screen bg-background text-foreground">
+    <div className="page-grain min-h-screen overflow-x-clip bg-background text-foreground">
       <header
         className={cn(
           "sticky top-0 z-20 border-b border-border bg-background transition-shadow duration-200",

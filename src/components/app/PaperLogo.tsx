@@ -11,7 +11,6 @@
 import { useEffect, useState } from "react";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { useTheme } from "@/lib/theme";
-import { hueFor } from "@/lib/roles";
 
 /** Rendered box sizes (px). Radius stays 10 (§2.4 tile radius) at every size. */
 export type PaperLogoSize = 24 | 40;
@@ -35,10 +34,14 @@ export default function PaperLogo({
   const src = chain[stage] ?? null;
   const box = size === 24 ? "h-6 w-6" : "h-10 w-10";
   if (!src) {
+    // Fallback monogram is INK-TINTED, not hash-coloured (design direction §2.3
+    // zero-decorative-hues + resolution #7 "violet is dead"): an ink wash + ink
+    // letter in both themes. The FitChip wash stays the ONLY data colour on paper
+    // pages. `--foreground` is theme-scoped, so the wash + letter follow the theme.
     return (
       <span
-        className={`${box} grid flex-none place-items-center rounded-[10px] font-display text-body font-bold text-white`}
-        style={{ background: hueFor(company) }}
+        className={`${box} grid flex-none place-items-center rounded-[10px] font-display text-body font-bold text-foreground/75`}
+        style={{ background: "color-mix(in srgb, hsl(var(--foreground)) 9%, transparent)" }}
         aria-hidden="true"
       >
         {company.charAt(0)}

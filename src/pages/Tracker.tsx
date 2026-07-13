@@ -29,6 +29,14 @@ interface AppRow {
   source: string | null;
 }
 
+/** Days since the application was marked applied — staleness is the signal
+ *  (design direction §6.2 "days mono"), rendered mono like "3d" rather than the
+ *  absolute date. The exact date rides along as a hover title. */
+function daysSince(iso: string): string {
+  const d = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
+  return `${d}d`;
+}
+
 function Chevron({ dir }: { dir: -1 | 1 }) {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -148,9 +156,16 @@ export default function Tracker() {
       <p className="mt-1 text-body text-muted-foreground">
         Every role you've marked applied. Move a card as things progress.
       </p>
-      <div className="mt-8 overflow-x-auto pb-4">
-        <div className="flex min-w-max gap-4">
-          {COLUMNS.map((col, colIdx) => (
+      {/* The board breaks OUT of the prose reading column (§6.2 / jj rule 7): a
+          full-bleed scroll region so all five stage columns get real width instead
+          of clipping in the ~720px cage — the prose above stays in the column.
+          Overflow scrolls with a themed thin scrollbar (.tracker-scroll), never the
+          native grey OS track. The AppShell root's overflow-x-clip stops the 100vw
+          bleed from adding a horizontal page scrollbar. */}
+      <div className="mt-8" style={{ width: "100vw", marginInline: "calc(50% - 50vw)" }}>
+        <div className="tracker-scroll overflow-x-auto px-4 pb-4 sm:px-6 lg:px-8">
+          <div className="mx-auto flex min-w-max gap-4">
+            {COLUMNS.map((col, colIdx) => (
             <section key={col.value} className="w-64 shrink-0" aria-label={col.label}>
               <div className="mb-2 flex items-center justify-between px-1">
                 <h2 className="font-display text-micro uppercase text-muted-foreground">{col.label}</h2>
@@ -183,12 +198,15 @@ export default function Tracker() {
                         </div>
                       </div>
                       <div className="mt-2.5 flex items-center justify-between">
-                        <span className="font-mono text-caption tabular-nums text-muted-foreground">
-                          {new Date(a.applied_at).toLocaleDateString("en-GB", {
+                        <span
+                          className="font-mono text-caption tabular-nums text-muted-foreground"
+                          title={`Applied ${new Date(a.applied_at).toLocaleDateString("en-GB", {
                             day: "numeric",
                             month: "short",
                             year: "numeric",
-                          })}
+                          })}`}
+                        >
+                          {daysSince(a.applied_at)}
                         </span>
                         <div className="flex items-center gap-1.5">
                           <button
@@ -222,7 +240,8 @@ export default function Tracker() {
                 )}
               </div>
             </section>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </AppShell>

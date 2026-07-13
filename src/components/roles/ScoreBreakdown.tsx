@@ -43,9 +43,12 @@ export default function ScoreBreakdown({
 
   return (
     <div className="dbreak">
+      {/* ONE eyebrow over the whole card (design direction §5.3): the bars +
+          evidence list are the same story, so "Score breakdown" is merged into
+          the single "What drove it" heading. */}
+      <div className="dbreak-h">What drove it</div>
       {bars.length > 0 && (
         <>
-          <div className="dbreak-h">Score breakdown</div>
           <div className="dbars">
             {bars.map((b) => (
               <div key={b.key} className="dbar-row">
@@ -64,7 +67,6 @@ export default function ScoreBreakdown({
       )}
       {rows.length > 0 && (
         <>
-          <div className="dbreak-h dbreak-h2">What drove it</div>
           <ul className="devlist">
             {rows.map((e, i) => {
               const up = e.contribution >= 0;

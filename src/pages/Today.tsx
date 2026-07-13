@@ -134,8 +134,11 @@ export default function Today() {
                   </div>
                   <FitChip score={job.score} size="sm" />
                 </div>
-                {/* Footer: one secondary CTA + the applied affordance, behind a
-                    hairline divider (design direction §3.2 / §3.3 one-primary law). */}
+                {/* Footer: exactly ONE secondary CTA ("Prepare application") plus a
+                    meta-weight applied affordance — never a second button (design
+                    direction §5.5 "one secondary CTA + meta" / §3.3 one-primary law).
+                    "Mark applied" is a quiet muted text/check affordance, not a
+                    bordered button. */}
                 <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
                   <Button
                     variant="outline"
@@ -146,16 +149,23 @@ export default function Today() {
                     Prepare application
                   </Button>
                   {isApplied ? (
-                    <span className="inline-flex items-center gap-1.5 text-control text-muted-foreground">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+                    <span className="inline-flex items-center gap-1.5 text-caption font-medium text-muted-foreground">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
                         <path d="M20 6 9 17l-5-5" />
                       </svg>
                       Applied
                     </span>
                   ) : (
-                    <Button variant="ghost" size="sm" className={SECONDARY_CTA} onClick={() => markApplied(job)}>
+                    <button
+                      type="button"
+                      onClick={() => markApplied(job)}
+                      className="inline-flex items-center gap-1.5 text-caption font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
                       Mark applied
-                    </Button>
+                    </button>
                   )}
                 </div>
               </li>
