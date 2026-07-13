@@ -141,10 +141,13 @@
  * a ~220px feTurbulence tile at 5% opacity (∈ [0.04, 0.06]) in BOTH themes, so a
  * page reads as paper rather than flat digital. Plain CSS (never purged); the
  * D2/D3 page shells opt in with the `page-grain` class. Grain is monochrome
- * (saturate 0) and fixed so it doesn't scroll. */
+ * (saturate 0). It covers the FULL document height (position: absolute inside a
+ * relative `.page-grain`), NOT the viewport — a viewport-fixed grain left a value
+ * seam at the fold on tall pages (design direction §2.5 acceptance-gap fix). */
+.page-grain { position: relative; }
 .page-grain::before {
   content: "";
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
@@ -164,7 +167,33 @@
    * coloured object. The paper page world consumes this; the map keeps its own
    * self-scoped copy with identical values. */
   .nav-thumb {
-    background: color-mix(in srgb, hsl(var(--foreground)) 12%, transparent);
+    /* LIGHT recipe (design direction §4.3/§6.0 letter): a raised pane of the
+     * surface = white `--card` fill + the border-border ink hairline + the page
+     * shadow. NOT the ink-at-12% wash, which two judges read as the legacy grey
+     * pill. This matches the map's `.seg .ind` light recipe (roles.css) so map
+     * and pages share ONE active-nav idiom. */
+    background: hsl(var(--card));
     box-shadow: var(--shadow-page);
+  }
+  /* DARK stays as shipped: the pane is foreground(pale)-at-12% (= white 12%). */
+  .dark .nav-thumb {
+    background: color-mix(in srgb, hsl(var(--foreground)) 12%, transparent);
+  }
+
+  /* Themed thin overflow scrollbar for D-class boards (design direction §6.2 /
+   * jj rule 10): ink-derived thumb, no track, no native grey OS chrome/arrows.
+   * Both themes via the ink token. Consumed by the /tracker board scroll region. */
+  .tracker-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, hsl(var(--foreground)) 22%, transparent) transparent;
+  }
+  .tracker-scroll::-webkit-scrollbar { height: 8px; }
+  .tracker-scroll::-webkit-scrollbar-track { background: transparent; }
+  .tracker-scroll::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, hsl(var(--foreground)) 20%, transparent);
+    border-radius: 999px;
+  }
+  .tracker-scroll::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, hsl(var(--foreground)) 32%, transparent);
   }
 }

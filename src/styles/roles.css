@@ -136,7 +136,10 @@
 .roles-theme .navcv { flex: none; white-space: nowrap; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: 10px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--act-strong-ink); border: 1px solid var(--act-strong); background: var(--act-strong); box-shadow: 0 8px 20px -6px var(--act-shadow); transition: opacity 0.2s, transform 0.12s; }
 .roles-theme .navcv:hover { opacity: 0.92; }
 .roles-theme .navcv:active { transform: translateY(1px); }
-.roles-theme .navcv .sp { width: 22px; height: 22px; flex: none; border-radius: 7px; display: grid; place-items: center; color: var(--act-strong); background: var(--act-strong-ink); }
+/* The '+' is a BARE glyph — emphasis is negative space, nothing else (design
+ * direction §9.2). No darker badge circle inside the primary button; the glyph
+ * inherits the button's ink lettering (currentColor = --act-strong-ink). */
+.roles-theme .navcv .sp { flex: none; display: grid; place-items: center; }
 .roles-theme.scored .navcv { display: none; }
 /* Segmented Map/List toggle demoted to CHROME (design direction §4.3): the thumb
  * is surface glass, NOT an --act-strong block; the active label is ink (--text),
@@ -523,7 +526,8 @@
  * the secondary hairline form; applied-cta below removes the affordance.
  * §9.2 convergence: negative-space ink fill only — no rim-light `--sh`; a neutral
  * drop-shadow seat, matching navcv/cvcta. */
-.roles-theme .dcta { width: 100%; padding: 12px; font-size: 13px; background: var(--act-strong); color: var(--act-strong-ink); border: 1px solid var(--act-strong); box-shadow: 0 8px 20px -6px var(--act-shadow); transition: opacity 0.2s, transform 0.15s; }
+/* Height sits in the §3.3 control band (h-36–38, radius 10 from .btn) — was 45px. */
+.roles-theme .dcta { width: 100%; height: 38px; display: flex; align-items: center; justify-content: center; padding: 0 14px; font-size: 13px; background: var(--act-strong); color: var(--act-strong-ink); border: 1px solid var(--act-strong); box-shadow: 0 8px 20px -6px var(--act-shadow); transition: opacity 0.2s, transform 0.15s; }
 .roles-theme .dcta:enabled:hover { opacity: 0.92; }
 /* Actioned state = affordance removed, not recoloured (design direction §3.3):
  * plain muted text + check, no jade fill. */
@@ -550,13 +554,16 @@
  * (design direction §3.6 / §5.3): radius 16, hairline, calm ink-tint surface. */
 .roles-theme .dbreak { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); background: color-mix(in srgb, var(--text) 3%, transparent); }
 .roles-theme .dbreak-h { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.roles-theme .dbreak-h2 { margin-top: 4px; }
-.roles-theme .dbars { display: flex; flex-direction: column; gap: 8px; }
+/* ONE grid for all rows (design direction §5.3 acceptance-gap fix): a SHARED
+ * max-content label column so every bar origin aligns; the bar owns the 1fr
+ * middle, value is 32px. `.dbar-row` collapses to `display: contents` so its
+ * three cells join this parent grid. */
+.roles-theme .dbars { display: grid; grid-template-columns: minmax(0, max-content) 1fr 32px; align-items: center; column-gap: 8px; row-gap: 8px; }
 /* Breakdown bars (design direction §5.3): label column is max-content (all five
  * labels render un-truncated at 358px, killing the fixed 118px column, ledger #4),
  * the bar owns the 1fr middle so it is ≥55% of the row, value is 32px. Track = 4px
  * ink-8% pill; fill = FLAT single bucket token, no gradient, no glow. */
-.roles-theme .dbar-row { display: grid; grid-template-columns: minmax(0, max-content) 1fr 32px; align-items: center; gap: 8px; }
+.roles-theme .dbar-row { display: contents; }
 .roles-theme .dbar-k { font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .roles-theme .dbar-track { position: relative; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--text) 8%, transparent); overflow: hidden; }
 .roles-theme .dbar-fill { position: absolute; left: 0; top: 0; bottom: 0; min-width: 3px; border-radius: 999px; background: var(--great); transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
@@ -681,6 +688,16 @@
     inset 0 -1px 0 0 rgba(11, 31, 38, 0.08),
     inset 0 -14px 28px -24px rgba(20, 60, 70, 0.14); }
 .roles-theme.light .panel::before { background: linear-gradient(150deg, rgba(255, 255, 255, 0.85), transparent 26%); mix-blend-mode: normal; }
+
+/* C-class READING GLASS (design direction §1): an OPEN role detail carries many
+ * lines of body text (fit bullets, evidence quotes), so the panel fill goes
+ * near-opaque — the glass identity survives at the RIM (hairline + top
+ * catch-light `::before`) only. This kills basemap labels AND map pins ghosting
+ * through the reading text [authed:§4] — the biggest acceptance-gap finding. The
+ * rail (B-class, cards visible) keeps its translucent default; only detail-open
+ * bumps the fill. `--surface` is theme-scoped so one rule covers dark + light,
+ * placed after the light `.panel` override to win the specificity tie. */
+.roles-theme.detail-open .panel { background: color-mix(in srgb, var(--surface) 96%, transparent); }
 .roles-theme.light .panel-toggle { color: var(--muted); }
 .roles-theme.light .panel-toggle:hover { color: #0b1f26; background: var(--act-tint); }
 .roles-theme.light .ptitle { color: var(--text); }
@@ -902,7 +919,9 @@
 }
 .roles-theme .cverr { color: var(--low); font-size: 12.5px; line-height: 1.5; margin: 4px 0 14px; }
 .roles-theme .cvcta {
-  width: 100%; padding: 13px; border-radius: 13px; font-family: var(--font-d); font-size: 14px;
+  /* §3.3 control band: h-38, radius 10 (was 49px / radius 13). */
+  width: 100%; height: 38px; display: flex; align-items: center; justify-content: center;
+  padding: 0 14px; border-radius: 10px; font-family: var(--font-d); font-size: 14px;
   font-weight: 600; letter-spacing: -0.01em; cursor: pointer; margin-top: 4px;
   color: var(--act-strong-ink); background: var(--act-strong); border: 1px solid var(--act-strong);
   /* Plain drop shadow, NOT --sh: the glass inner-highlight washed this wide

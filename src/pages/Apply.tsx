@@ -133,6 +133,10 @@ export default function Apply() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<null | "cv" | "cover">(null);
   const [error, setError] = useState("");
+  // WHICH step surfaced the error, so the status line renders inline at that
+  // card (design direction §3.4 status-as-whisper) instead of orphaned at the
+  // page bottom.
+  const [errStep, setErrStep] = useState<null | "cv" | "cover" | "apply">(null);
   const [summary, setSummary] = useState<string | null>(null); // editable tailored summary
   const [cover, setCover] = useState<CoverJson | null>(null);
   const [hasApplied, setHasApplied] = useState(false);
@@ -140,6 +144,7 @@ export default function Apply() {
   useEffect(() => {
     let active = true;
     setError("");
+    setErrStep(null);
     setBusy(null);
     setSummary(null);
     setCover(null);
@@ -194,11 +199,13 @@ export default function Apply() {
     if (!job || !cvText) return;
     setBusy("cv");
     setError("");
+    setErrStep(null);
     try {
       const s = await tailorSummary({ role: job.title, company: job.company, jdText: job.jd_text, cvText });
       setSummary(s);
     } catch (e) {
       setError(e instanceof Error ? e.message : "CV generation failed");
+      setErrStep("cv");
     } finally {
       setBusy(null);
     }
@@ -220,6 +227,7 @@ export default function Apply() {
     if (!job || !cvText) return;
     setBusy("cover");
     setError("");
+    setErrStep(null);
     try {
       const c = await tailorCover({ role: job.title, company: job.company, jdText: job.jd_text, cvText }, name);
       setCover(c);
@@ -229,6 +237,7 @@ export default function Apply() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Cover letter generation failed");
+      setErrStep("cover");
     } finally {
       setBusy(null);
     }
@@ -237,12 +246,15 @@ export default function Apply() {
   async function markApplied() {
     if (!user || !job) return;
     setHasApplied(true);
+    setError("");
+    setErrStep(null);
     const { error } = await supabase
       .from("applications")
       .upsert({ user_id: user.id, job_id: job.id }, { onConflict: "user_id,job_id" });
     if (error) {
       setHasApplied(false);
       setError("Couldn't mark as applied. Please try again.");
+      setErrStep("apply");
     }
   }
 
@@ -335,6 +347,11 @@ export default function Apply() {
                 </div>
               </>
             )}
+            {errStep === "cv" && (
+              <p className="mt-3 text-caption text-destructive" role="status">
+                {error}
+              </p>
+            )}
           </Section>
 
           {/* 2 — Cover letter (optional) */}
@@ -364,6 +381,11 @@ export default function Apply() {
                   </Button>
                 </div>
               </>
+            )}
+            {errStep === "cover" && (
+              <p className="mt-3 text-caption text-destructive" role="status">
+                {error}
+              </p>
             )}
           </Section>
 
@@ -406,11 +428,14 @@ export default function Apply() {
                 .
               </p>
             )}
+            {errStep === "apply" && (
+              <p className="mt-3 text-caption text-destructive" role="status">
+                {error}
+              </p>
+            )}
           </Section>
         </div>
       )}
-
-      {error && <p className="mt-4 text-body text-destructive">{error}</p>}
     </AppShell>
   );
 }
