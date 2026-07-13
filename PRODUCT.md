@@ -42,8 +42,8 @@ the Large Language Model (LLM) calls that score roles and write audits — runs 
 **our own capped key (Haiku only)**, enforced server-side: a per-user $ allowance
 (set from a measured economics pilot), a global monthly kill-switch, and a
 device-fingerprint guard. Bring-your-own-provider — each user connecting their own
-AI key — is the **DEFERRED power-user tier** (its `ConnectProvider` prototype is
-preserved in git history, deleted in #57 commit 9d48a10); it returns after the core
+AI key — is the **DEFERRED power-user tier** (prototype parked at
+`src/pages/ConnectProvider.tsx` in the product repo); it returns after the core
 path is validated. Decided 2026-06-12 (brainstorm, strategic call #2) and locked
 in the v1 design spec.
 
@@ -300,9 +300,9 @@ multi-tenant data that doesn't exist yet). Reorderable, but this is the order th
 > **sponsored-compute path** end-to-end (a real user, a real scored role on our
 > capped key, a real digest in the dashboard). It's the load-bearing v1 assumption;
 > if the per-user allowance economics don't work, the model changes. BYO-provider
-> is the deferred power-user tier — its `ConnectProvider` prototype is preserved
-> in git history (2026-05-31 build, deleted in #57 commit 9d48a10; technically
-> validated, not in v1 critical path). Decided 2026-06-12.
+> is the deferred power-user tier — prototype parked at
+> `src/pages/ConnectProvider.tsx` (2026-05-31, technically validated, not in v1
+> critical path). Decided 2026-06-12.
 
 > **v0.1 milestone = parts 1 → 4.** A stranger signs in, onboards (CV + LinkedIn),
 > and sees a personalized scored digest generated on sponsored compute. That single
