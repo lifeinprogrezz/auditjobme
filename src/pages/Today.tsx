@@ -28,7 +28,7 @@ function Logo({ domain, company }: { domain: string | null; company: string }) {
   if (!src) {
     return (
       <span
-        className="grid h-10 w-10 flex-none place-items-center rounded-md font-display text-body font-bold text-white"
+        className="grid h-10 w-10 flex-none place-items-center rounded-[10px] font-display text-body font-bold text-white"
         style={{ background: hueFor(company) }}
       >
         {company.charAt(0)}
@@ -39,7 +39,7 @@ function Logo({ domain, company }: { domain: string | null; company: string }) {
     <img
       src={src as string}
       alt=""
-      className="h-10 w-10 flex-none rounded-md object-contain"
+      className="h-10 w-10 flex-none rounded-[10px] object-contain"
       onError={() => setStage((s) => s + 1)}
     />
   );

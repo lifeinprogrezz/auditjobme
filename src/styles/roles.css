@@ -277,7 +277,6 @@
 .roles-theme .themetoggle { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; transition: color 0.2s, background 0.2s, border-color 0.2s; }
 .roles-theme .themetoggle:hover { color: var(--text); background: var(--act-tint); border-color: var(--hair); }
 .roles-theme .themetoggle:focus-visible { outline: 2px solid var(--act-border); outline-offset: 2px; }
-.roles-theme.light .themetoggle:hover { color: #0b1f26; }
 .roles-theme .signin { display: flex; align-items: center; height: 38px; padding: 0 16px; border-radius: 11px; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.05); cursor: pointer; text-decoration: none; transition: background 0.2s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 6px 12px -10px rgba(170, 225, 240, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.28); }
 .roles-theme .signin:hover { background: rgba(255, 255, 255, 0.1); }
 
