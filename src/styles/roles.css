@@ -128,7 +128,13 @@
  * CV upload is THE conversion action — committed ink, same as the modal cvcta.
  * §9.2 button convergence: emphasis is NEGATIVE SPACE (ink fill vs the surface)
  * only — NO rim-light `--sh` (its inset top-highlight was the "double line at the
- * top" Rober flagged in dark). A neutral drop-shadow seat, matching cvcta/dcta. */
+ * top" Rober flagged in dark). A neutral drop-shadow seat, matching cvcta/dcta.
+ * Radius stays 11px on purpose — the shared 38px headbar-cluster token
+ * (.cmd/.filterbtn/.fclear/.fchip/.psearch/.signin all sit at 11px). §9.2 rewrote
+ * this line's box-shadow, so the §8.1 diff-grep now surfaces the PRE-EXISTING 11px;
+ * it is NOT on the {4,10,16,24,999} scale, but dropping this one button to 10px
+ * would desync the cluster. Cluster-wide radius normalization is a deferred
+ * file-wide design call, out of scope for D2. */
 .roles-theme .navcv { flex: none; white-space: nowrap; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; color: var(--act-strong-ink); border: 1px solid var(--act-strong); background: var(--act-strong); box-shadow: 0 8px 20px -6px var(--act-shadow); transition: opacity 0.2s, transform 0.12s; }
 .roles-theme .navcv:hover { opacity: 0.92; }
 .roles-theme .navcv:active { transform: translateY(1px); }
