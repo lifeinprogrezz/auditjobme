@@ -211,6 +211,13 @@ are THEME-AWARE:** the `theme` param follows the ACTIVE app theme — light them
 `theme=light`, dark theme (ink-teal cards) → `theme=dark`; a hardcoded param breaks on theme switch
 (the broken-logos bug, both directions).
 
+**Prerendered SEO pages (`dist/jobs/**`) are `prefers-color-scheme`-only static snapshots** (accepted,
+documented D3): they render at build time with no live React theme class, so a user's STORED explicit
+theme choice (localStorage, applied pre-paint on the app shell) does NOT reach them — they follow the OS
+scheme. Theme-aware logos and any theme-forked surface on those static pages therefore key off the OS
+preference, not the app toggle. This is by design (they are crawler/first-paint surfaces, not app
+surfaces); do not try to thread the persisted choice into the prerendered HTML.
+
 ## Design tokens (working reference — colors lock last)
 - **Ink (replaces black):** `#0B1F26`. Ramp 50 `#F5F8F8` · 200 `#D6E2E5` · 500 `#5E828C` · 700 `#1E4753`
   · 900 `#0B1F26` · 950 `#081519`.

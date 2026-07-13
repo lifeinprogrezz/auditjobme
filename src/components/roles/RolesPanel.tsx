@@ -77,6 +77,10 @@ function Logo({ domain, company }: { domain: string | null; company: string }) {
     ? [logoUrl(domain, theme === "dark" ? "dark" : "light"), ...faviconUrls(domain)].filter(Boolean)
     : [];
   const [stage, setStage] = useState(0);
+  // Rewind the fallback chain on a theme flip so the new theme's logo is retried
+  // (banked D3 nit 5a): a themed logo that 404'd once must get another shot at its
+  // NEW theme variant instead of staying stuck on a favicon/initial after a switch.
+  useEffect(() => setStage(0), [theme]);
   const src = chain[stage] ?? null;
   if (!src) {
     return (

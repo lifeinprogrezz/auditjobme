@@ -4,15 +4,14 @@
 // FitChip instead of any bare score numeral, theme-matched logos, and secondary row
 // CTAs (one-primary law). Consumes the SHARED useRolesData path (server-written
 // scores, full signals) — no client-side scoring loop. Honest copy kept verbatim.
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "@/components/app/AppShell";
+import PaperLogo from "@/components/app/PaperLogo";
 import { Button } from "@/components/ui/button";
 import { useRolesData } from "@/hooks/useRolesData";
 import { buildActionQueue, coverageSummary } from "@/lib/product";
-import { geoVerdict, hueFor, postedAgo, type RoleJob } from "@/lib/roles";
-import { logoUrl, faviconUrls } from "@/lib/logodev";
-import { useTheme } from "@/lib/theme";
+import { geoVerdict, postedAgo, type RoleJob } from "@/lib/roles";
 import FitChip from "@/components/roles/FitChip";
 
 // §3.3 secondary CTA — the ONE idiom for every list-row action on this page (there is
@@ -21,36 +20,6 @@ import FitChip from "@/components/roles/FitChip";
 // jump. Overrides the stock Button variant so zero unmodified-shadcn boilerplate ships.
 const SECONDARY_CTA =
   "rounded-[10px] border border-foreground/20 bg-transparent text-control font-semibold text-foreground hover:border-foreground/30 hover:bg-transparent hover:text-foreground";
-
-// Paper-card logo (design direction §5.5 + skill Logo.dev rule): the theme param
-// follows the ACTIVE app theme — light card → theme=light, dark card → theme=dark —
-// or the broken-logos bug returns. Logo.dev → site favicon chain → colored initial.
-function Logo({ domain, company }: { domain: string | null; company: string }) {
-  const { theme } = useTheme();
-  const chain = domain
-    ? [logoUrl(domain, theme === "dark" ? "dark" : "light"), ...faviconUrls(domain)].filter(Boolean)
-    : [];
-  const [stage, setStage] = useState(0);
-  const src = chain[stage] ?? null;
-  if (!src) {
-    return (
-      <span
-        className="grid h-10 w-10 flex-none place-items-center rounded-[10px] font-display text-body font-bold text-white"
-        style={{ background: hueFor(company) }}
-      >
-        {company.charAt(0)}
-      </span>
-    );
-  }
-  return (
-    <img
-      src={src as string}
-      alt=""
-      className="h-10 w-10 flex-none rounded-[10px] object-contain"
-      onError={() => setStage((s) => s + 1)}
-    />
-  );
-}
 
 function GeoBadge({ job }: { job: RoleJob }) {
   const v = geoVerdict(job);
@@ -136,7 +105,7 @@ export default function Today() {
                 className="rounded-2xl border border-border bg-card p-6 shadow-page transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-px hover:border-foreground/20 hover:shadow-page-lift"
               >
                 <div className="flex items-start gap-4">
-                  <Logo domain={job.domain} company={job.company} />
+                  <PaperLogo domain={job.domain} company={job.company} size={40} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-display text-micro uppercase text-muted-foreground">{job.company}</span>

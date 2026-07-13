@@ -1,0 +1,69 @@
+// Pins the D-class page chrome (design direction §6.0 / wave D3 item 3): the shell
+// bar is opaque paper (no backdrop-blur), the ONE active-nav idiom is the
+// surface-glass thumb (`.nav-thumb`, NOT a `bg-secondary` pill), and the page h1
+// lands on the §2.1 `page` token (24px) — never the off-scale `sm:text-3xl` (30px).
+// Rule + code move together: this test moves with AppShell.tsx.
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, cleanup } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import AppShell from "@/components/app/AppShell";
+
+const signOut = vi.fn(async () => {});
+vi.mock("@/components/AuthProvider", () => ({
+  useAuth: () => ({ user: { email: "rober@example.com" }, session: null, loading: false, signOut }),
+}));
+
+function renderShell(route = "/today", title?: string) {
+  return render(
+    <MemoryRouter initialEntries={[route]}>
+      <AppShell title={title}>
+        <p>body</p>
+      </AppShell>
+    </MemoryRouter>,
+  );
+}
+
+describe("AppShell — D-class page chrome (§6.0)", () => {
+  afterEach(cleanup);
+
+  it("the shell bar is opaque paper: bg-background, no backdrop-blur, hairline border", () => {
+    const { container } = renderShell();
+    const header = container.querySelector("header") as HTMLElement;
+    expect(header.className).toContain("bg-background");
+    expect(header.className).toContain("border-b");
+    expect(header.className).not.toContain("backdrop-blur");
+    // No translucent fill on the opaque D-class bar.
+    expect(header.className).not.toContain("bg-background/85");
+  });
+
+  it("the active nav item is the surface-glass thumb, never a bg-secondary pill", () => {
+    renderShell("/today");
+    const active = screen.getByRole("link", { name: "Today" });
+    expect(active.className).toContain("nav-thumb");
+    expect(active.className).toContain("text-foreground");
+    // The second active-state idiom (the bg-secondary pill) is dead.
+    expect(active.className).not.toContain("bg-secondary");
+  });
+
+  it("an inactive nav item is a muted label, not the thumb", () => {
+    renderShell("/today");
+    const inactive = screen.getByRole("link", { name: "Applications" });
+    expect(inactive.className).toContain("text-muted-foreground");
+    expect(inactive.className).not.toContain("nav-thumb");
+  });
+
+  it("the back-to-map link is a nav item (muted), not a button/pill", () => {
+    renderShell("/today");
+    const map = screen.getByRole("link", { name: "Map" });
+    expect(map.className).toContain("text-muted-foreground");
+    expect(map.className).not.toContain("nav-thumb");
+  });
+
+  it("the page h1 uses the on-scale `page` token, not sm:text-3xl", () => {
+    renderShell("/today", "Applications");
+    const h1 = screen.getByRole("heading", { level: 1, name: "Applications" });
+    expect(h1.className).toContain("text-page");
+    expect(h1.className).not.toContain("text-3xl");
+    expect(h1.className).not.toContain("text-2xl");
+  });
+});
