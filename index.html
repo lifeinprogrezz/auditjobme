@@ -22,6 +22,24 @@
     <meta name="twitter:title" content="auditjob.me · the live map of tech jobs">
     <meta name="twitter:description" content="The live map of tech jobs. Every opening scraped daily from the companies' own career pages, mapped city by city, and scored against your CV. Free.">
     <meta name="twitter:image" content="https://auditjob.me/og.jpg">
+
+    <!-- Theme pre-paint (design direction §9.1): commit the day/night choice to the
+         root class BEFORE first paint so there is no flash of the wrong theme on
+         reload. Mirrors resolveInitialTheme in src/lib/theme.ts — an explicit stored
+         choice wins, else the OS preference. Keep the two in sync. -->
+    <script>
+      (function () {
+        try {
+          var v = localStorage.getItem("ajm-theme");
+          var t = v === "light" || v === "dark"
+            ? v
+            : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          var r = document.documentElement;
+          if (t === "dark") r.classList.add("dark");
+          r.style.colorScheme = t;
+        } catch (e) {}
+      })();
+    </script>
   </head>
 
   <body>

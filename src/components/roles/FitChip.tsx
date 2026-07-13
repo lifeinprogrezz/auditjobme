@@ -35,9 +35,15 @@ export type FitChipProps = {
 };
 
 /** Numeral that survives the pending→scored transition so the reveal count-up
- *  can play (power2.out, 900ms). Renders an em-dash while the score is null. */
+ *  can play (power2.out, 900ms). Renders an em-dash while the score is null.
+ *
+ *  The initial display is ALWAYS the real value (never 0): a mount never
+ *  animates — only a live pending→scored / reveal transition does, and that path
+ *  drives the count-up from ~0 via requestAnimationFrame below. Seeding 0 here
+ *  painted a one-frame "0.0" on any already-revealed mount (a filter change or
+ *  show-more after the reveal already fired) — the banked D1 nit. */
 function FitNumeral({ value, reveal }: { value: number | null; reveal: boolean }) {
-  const [display, setDisplay] = useState<number | null>(value == null ? null : reveal ? 0 : value);
+  const [display, setDisplay] = useState<number | null>(value);
   const prevReveal = useRef(reveal);
   const prevValue = useRef(value);
   useEffect(() => {

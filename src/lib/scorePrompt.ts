@@ -40,6 +40,10 @@ export interface ScoreableJob {
 // blendSubscores() output (raw model 0-5 only as fallback) — a semantics change, so
 // cached v4 rows (raw score persisted) re-score lazily via the in-app, backlog, and
 // nightly paths rather than mixing raw and blended scores in one ranking.
+// v6 (2026-07-12, design direction §5.2): fit_bullets gain a numeric length cap —
+// "3 to 4 bullets, each at most 12 words" (mirrors the evidence-quote cap in the
+// same prompt) — so the /roles detail one-liners stay scannable; the bump re-scores
+// cached rows lazily so the capped bullets propagate on next load.
 export const RUBRIC_VERSION = "v6";
 
 /** The five rubric dimensions, in weighing order — subscores cover exactly these. */

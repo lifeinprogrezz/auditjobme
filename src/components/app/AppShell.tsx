@@ -5,6 +5,7 @@ import { type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
 import { cn } from "@/lib/utils";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const NAV = [
   { to: "/today", label: "Today" },
@@ -28,7 +29,7 @@ export default function AppShell({
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="page-grain min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-3xl items-center gap-1 px-4 sm:px-6">
           <NavLink to="/" className="font-display text-sm font-semibold tracking-tight">
@@ -57,6 +58,9 @@ export default function AppShell({
           <NavLink to="/" className="rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground">
             Map
           </NavLink>
+          {/* Day/night toggle (design direction §9.1): the SAME component the map
+              HeadBar renders, so the one control reaches every surface. */}
+          <ThemeToggle className="inline-grid h-8 w-8 place-items-center rounded-[10px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" />
           <button
             type="button"
             onClick={handleSignOut}

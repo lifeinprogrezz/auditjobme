@@ -21,6 +21,28 @@ export default {
         sans: ['"Geist Sans"', "system-ui", "-apple-system", "sans-serif"],
         mono: ['"Geist Mono"', "ui-monospace", "Menlo", "monospace"],
       },
+      // The §2.1 type scale as first-class tokens (design direction 2026-07-12) — the
+      // ONLY sizes the page world may use, so a diff never needs an arbitrary
+      // `text-[…]`. Line-height/tracking/weight are baked per the token spec; the
+      // Tailwind defaults (text-xs=12 dense · text-sm=14 body · text-base=16 title ·
+      // text-lg=18 section · text-2xl=24 page) stay available since `extend` merges.
+      fontSize: {
+        micro: ["10px", { lineHeight: "1.3", letterSpacing: "0.08em", fontWeight: "600" }],
+        caption: ["11px", { lineHeight: "1.4", letterSpacing: "0.01em" }],
+        dense: ["12px", { lineHeight: "1.5" }],
+        control: ["13px", { lineHeight: "1.4" }],
+        body: ["14px", { lineHeight: "1.6" }],
+        title: ["16px", { lineHeight: "1.3", letterSpacing: "-0.01em", fontWeight: "600" }],
+        section: ["18px", { lineHeight: "1.25", letterSpacing: "-0.02em", fontWeight: "600" }],
+        page: ["24px", { lineHeight: "1.15", letterSpacing: "-0.025em", fontWeight: "600" }],
+        display: ["32px", { lineHeight: "1.1", letterSpacing: "-0.04em", fontWeight: "600" }],
+      },
+      boxShadow: {
+        // D-class paper elevations (design direction §2.5): two-layer ink-tinted
+        // shadows whose paint stays dark in both themes (src/index.css tokens).
+        page: "var(--shadow-page)",
+        "page-lift": "var(--shadow-page-lift)",
+      },
       colors: {
         score: {
           great: "hsl(var(--score-great))",

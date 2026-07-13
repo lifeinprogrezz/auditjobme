@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { type Level, type RolesFilters } from "@/lib/roles";
 import FilterChip, { type FilterOption } from "./FilterChip";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export type HeadBarProps = {
   scored: boolean;
@@ -373,6 +374,11 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
         </span>
         Add your CV
       </button>
+
+      {/* Day/night toggle (design direction §9.1): one control in the chrome, the
+          same component the pages' AppShell renders — clicking flips the whole app
+          via the single root theme class. */}
+      <ThemeToggle />
 
       {/* CV-on-file state (issue #43): a subtle dot badge, same act-strong token as
           the rest of the identity chrome — score colors (jade/amber/coral) stay
