@@ -15,7 +15,6 @@ import {
   geoVerdict,
   hueFor,
   postedAgo,
-  scoreBucket,
   websiteUrl,
   type RoleJob,
   type RolesFilters,
@@ -24,14 +23,6 @@ import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { useTheme } from "@/lib/theme";
 import ScoreBreakdown from "./ScoreBreakdown";
 import FitChip from "./FitChip";
-
-/** Fit-dependent bullets header (design direction §3.5), driven by the bucket in
- *  code so a "Weak fit" hero never sits above "Why you fit". */
-const BULLETS_HEADER: Record<string, string> = {
-  great: "Why you fit",
-  mid: "Where you stand",
-  low: "Where it breaks down",
-};
 
 // The pool is unbounded (1000+ live rows); each card mounts a Logo.dev <img>,
 // so cap the DOM and point the user at search/filters for the tail.
@@ -383,7 +374,10 @@ export default function RolesPanel({
     // Hero: a CV holder sees their fit (or a pending state); everyone else sees the
     // unlock prompt — the pre-CV conversion moment (absorbs issue #18).
     const hasCv = scored;
-    const bullets = job.fitBullets?.length ? job.fitBullets : job.reason ? [job.reason] : [];
+    // The detail leads with the honest one-line summary (job.reason), not the
+    // positive-only fit_bullets — a Weak-fit label must never sit above "why you fit"
+    // points (Rober 7-15). The signed evidence in ScoreBreakdown carries the specifics.
+    const summary = job.reason?.trim() || null;
 
     return (
       <div className="detail" ref={detailRef}>
@@ -488,9 +482,6 @@ export default function RolesPanel({
                 <FitChip score={job.score} size="lg" />
                 <div className="dhl">
                   <div className="hlt">{fitLabel(job.score)}</div>
-                  {bullets.length > 0 && (
-                    <div className="hls">{BULLETS_HEADER[scoreBucket(job.score)]}</div>
-                  )}
                 </div>
               </>
             ) : (
@@ -504,13 +495,7 @@ export default function RolesPanel({
             )}
           </div>
         )}
-        {hasCv && bullets.length > 0 && (
-          <ul className="dfit">
-            {bullets.map((b, i) => (
-              <li key={i}>{b}</li>
-            ))}
-          </ul>
-        )}
+        {hasCv && summary && <p className="dsum">{summary}</p>}
         {hasCv && job.score != null && (
           <ScoreBreakdown subscores={job.subscores} evidence={job.evidence} />
         )}

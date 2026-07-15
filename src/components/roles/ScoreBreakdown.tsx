@@ -4,6 +4,7 @@
 // cited cv_line↔jd_phrase evidence rows (grounded before persistence). All styling
 // comes from src/styles/roles.css (.roles-theme scope) on the ink-glass token layer;
 // score semantics reuse the existing bucket colors (jade / amber / coral).
+import { useState } from "react";
 import { SUBSCORE_KEYS, type ScoreSubscore, type ScoreEvidence, type SubscoreKey } from "@/lib/scorePrompt";
 import { scoreBucket } from "@/lib/roles";
 
@@ -31,23 +32,33 @@ export default function ScoreBreakdown({
 }) {
   // Order the bars by the rubric's own priority (SUBSCORE_KEYS), keeping only the
   // dimensions the model actually returned.
+  const [open, setOpen] = useState(false);
   const byKey = new Map((subscores ?? []).map((s) => [s.key, s.score]));
   const bars = SUBSCORE_KEYS.filter((k) => byKey.has(k)).map((k) => ({
     key: k,
     label: DIM_LABELS[k],
     score: byKey.get(k) as number,
   }));
-  const rows = (evidence ?? []).filter((e) => e.label);
+  // Order the cited factors by impact — most negative first — so a weak-fit role
+  // leads with what pulled it down and the list reads in a consistent polarity
+  // direction instead of the raw model order (Rober 7-15).
+  const rows = (evidence ?? []).filter((e) => e.label).slice().sort((a, b) => a.contribution - b.contribution);
 
   if (bars.length === 0 && rows.length === 0) return null;
 
   return (
     <div className="dbreak">
       {/* ONE eyebrow over the whole card (design direction §5.3): the bars +
-          evidence list are the same story, so "Score breakdown" is merged into
-          the single "What drove it" heading. */}
-      <div className="dbreak-h">What drove it</div>
-      {bars.length > 0 && (
+          evidence list are the same story under the single "What drove it"
+          heading, which now toggles the detail open/closed — collapsed by
+          default so the panel leads with just the label + summary (Rober 7-15). */}
+      <button type="button" className="dbreak-h" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        What drove it
+        <svg className="dbreak-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+      </button>
+      {open && bars.length > 0 && (
         <>
           <div className="dbars">
             {bars.map((b) => (
@@ -65,7 +76,7 @@ export default function ScoreBreakdown({
           </div>
         </>
       )}
-      {rows.length > 0 && (
+      {open && rows.length > 0 && (
         <>
           <ul className="devlist">
             {rows.map((e, i) => {
