@@ -91,7 +91,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
   return (
     <>
       <dt className="self-center text-micro uppercase text-muted-foreground">{label}</dt>
-      <dd className="flex items-start justify-between gap-3">
+      <dd className="flex min-w-0 items-start justify-between gap-3">
         <span className="min-w-0 break-words font-mono text-dense text-foreground">{value}</span>
         {copied ? (
           <span className="inline-flex shrink-0 items-center gap-1.5 text-caption text-muted-foreground">

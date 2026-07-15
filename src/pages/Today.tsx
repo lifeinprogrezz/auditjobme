@@ -40,9 +40,9 @@ export default function Today() {
 
   const coverageLine = (
     <p className="mt-1 text-body text-muted-foreground text-pretty">
-      Scanning {coverage.roles.toLocaleString()} live roles from {coverage.companies.toLocaleString()} companies
-      across {coverage.sources.toLocaleString()} job sources, refreshed daily. It's a curated pool, not the whole
-      internet.
+      The roles worth your time, refreshed every morning from{" "}
+      {coverage.roles.toLocaleString()} live openings across {coverage.companies.toLocaleString()} companies. A
+      curated pool, not the whole internet.
     </p>
   );
 

@@ -191,7 +191,7 @@ export default function RolesPanel({
 
   const renderCards = () => (
     <>
-      <h1 className="ptitle">{defaultView ? "Hot right now" : "Your matches"}</h1>
+      <h1 className="ptitle">{defaultView ? (scored ? "Best fit" : "Hot right now") : "Your matches"}</h1>
       {activeChips.length > 0 && (
         <div className="selhdr">
           <div className="selchips">

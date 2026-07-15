@@ -154,7 +154,7 @@ export default function Tracker() {
   return (
     <AppShell title="Applications">
       <p className="mt-1 text-body text-muted-foreground">
-        Every role you've marked applied. Move a card as things progress.
+        Every application in one place, so you always know where you stand. Move a card as things progress.
       </p>
       {/* The board breaks OUT of the prose reading column (§6.2 / jj rule 7): a
           full-bleed scroll region so all five stage columns get real width instead
@@ -164,7 +164,7 @@ export default function Tracker() {
           bleed from adding a horizontal page scrollbar. */}
       <div className="mt-8" style={{ width: "100vw", marginInline: "calc(50% - 50vw)" }}>
         <div className="tracker-scroll overflow-x-auto px-4 pb-4 sm:px-6 lg:px-8">
-          <div className="mx-auto flex min-w-max gap-4">
+          <div className="mx-auto flex w-max gap-4">
             {COLUMNS.map((col, colIdx) => (
             <section key={col.value} className="w-64 shrink-0" aria-label={col.label}>
               <div className="mb-2 flex items-center justify-between px-1">

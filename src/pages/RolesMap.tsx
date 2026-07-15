@@ -216,7 +216,11 @@ export default function RolesMap() {
       setEuropeFrame((n) => n + 1);
     }
   }, [isDefaultView, hasExplored, scored]);
-  const showShowcase = isDefaultView && (!scored || !hasExplored);
+  // Scored users (signed in + CV on file) get their genuinely fit-ranked list as the
+  // DEFAULT rail ("Best fit"), not the curated showcase — the showcase is the
+  // anon/no-CV landing only (Rober 7-15). For anon, !scored is always true so this is
+  // unchanged; only scored users skip straight to the byScore ranking below.
+  const showShowcase = isDefaultView && !scored;
 
   const hotJobs = useMemo(() => {
     // Each showcase card must be a FRESH (<=21d) real PM role: skip legal/EA/intern/
@@ -414,7 +418,7 @@ export default function RolesMap() {
           jobs={panelJobs}
           onAddCv={() => setCvModalOpen(true)}
           allJobs={jobs}
-          defaultView={showShowcase}
+          defaultView={isDefaultView}
           filters={filters}
           onFilters={setFilters}
           selCo={sel.co}
