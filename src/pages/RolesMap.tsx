@@ -344,7 +344,6 @@ export default function RolesMap() {
     scored && "scored",
     detailLive && "detail-open",
     panelHidden && "panel-hidden",
-    view === "list" && "view-list",
   ]
     .filter(Boolean)
     .join(" ");

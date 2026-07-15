@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { type Level, type RolesFilters } from "@/lib/roles";
 import FilterChip, { type FilterOption } from "./FilterChip";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -32,6 +32,7 @@ export type HeadBarProps = {
 // .panel-hidden etc live on the page root (.roles-theme), not here.
 export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, view, onView, onAddCv, onProfile, onSignIn }: HeadBarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
   const [chipsShown, setChipsShown] = useState(false);
   // Smooth width reveal via grid-template-columns 0fr→1fr (.show); .expanded (after
   // the 550ms slide) frees the inner overflow so dropdowns can escape.
@@ -351,13 +352,15 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
 
       <span className="spacer" />
 
-      {/* CSS hides the seg pre-scored (.roles-theme:not(.scored) .seg) — always rendered. */}
+      {/* CSS hides the seg pre-scored (.roles-theme:not(.scored) .seg). Map is the
+          in-place view; "List" now navigates to the /today list page (Rober 7-15)
+          rather than resizing the right panel in place. */}
       <div className={`seg${view === "list" ? " list" : ""}`}>
         <span className="ind" />
         <button type="button" className={view === "map" ? "on" : ""} aria-pressed={view === "map"} onClick={() => onView("map")}>
           Map
         </button>
-        <button type="button" className={view === "list" ? "on" : ""} aria-pressed={view === "list"} onClick={() => onView("list")}>
+        <button type="button" onClick={() => navigate("/today")}>
           List
         </button>
       </div>

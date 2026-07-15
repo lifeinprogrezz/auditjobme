@@ -401,9 +401,6 @@
 .roles-theme .cards::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
 
 /* list view (post-CV toggle): panel widens into a full list column */
-.roles-theme.view-list .panel { width: min(560px, calc(100% - 36px)); }
-.roles-theme.view-list .panel-toggle { right: calc(min(560px, calc(100% - 36px)) + 24px); }
-.roles-theme.view-list.panel-hidden .panel-toggle { right: 14px; }
 
 /* CARDS */
 .roles-theme .card { position: relative; border-radius: 16px; padding: 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px 13px; align-items: center; background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02)); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 3px 14px -8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 10px 20px -16px rgba(170, 225, 240, 0.16), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.3); transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; cursor: pointer; }
