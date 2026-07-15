@@ -5,7 +5,7 @@ import RolesPanel from "@/components/roles/RolesPanel";
 import HeadBar from "@/components/roles/HeadBar";
 import CvUnlockModal from "@/components/roles/CvUnlockModal";
 import ProfileModal from "@/components/roles/ProfileModal";
-import { AUTH_BYPASSED } from "@/components/AuthProvider";
+import { AUTH_BYPASSED, useAuth } from "@/components/AuthProvider";
 import {
   EMPTY_FILTERS,
   LEVELS,
@@ -41,6 +41,7 @@ const FRESH_MS = 21 * 24 * 60 * 60 * 1000;
 export default function RolesMap() {
   const { jobs, loading, scoring, remaining, applied, scoreMore, submitCv, scored, signedIn, cvText, profileMeta, needsCv } =
     useRolesData();
+  const { signInWithGoogle } = useAuth();
   // CV-unlock modal (Phase A front door). Opened from the "Add your CV" affordances,
   // and from the profile modal's Replace CV action (issue #43) — one shared instance.
   const [cvModalOpen, setCvModalOpen] = useState(false);
@@ -413,6 +414,7 @@ export default function RolesMap() {
           // same sign-in front door as "Add your CV" (Rober 7-12: no dead-end for
           // either state, and no second sign-in entry point to maintain).
           onProfile={() => (signedIn ? setProfileModalOpen(true) : setCvModalOpen(true))}
+          onSignIn={signInWithGoogle}
         />
         <RolesPanel
           jobs={panelJobs}

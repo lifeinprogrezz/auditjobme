@@ -7,6 +7,7 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -14,6 +15,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
   loading: true,
+  signInWithGoogle: async () => {},
   signOut: async () => {},
 });
 
@@ -70,6 +72,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Returning-user sign-in (Rober 7-15): the header's "Sign in" and the CV modal's
+  // returning-user line both route through Google OAuth. redirectTo lands the user
+  // back on the map; the post-sign-in gate re-opens the CV modal if the profile has
+  // no CV, so the CV-mandatory invariant holds.
+  const signInWithGoogle = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -77,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const user = BYPASS_AUTH ? MOCK_USER : (session?.user ?? null);
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, signOut }}>
+    <AuthContext.Provider value={{ session, user, loading, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   );
