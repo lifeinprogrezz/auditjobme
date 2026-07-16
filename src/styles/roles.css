@@ -381,8 +381,12 @@
 .roles-theme .panel-toggle svg { transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1); }
 .roles-theme.panel-hidden .panel-toggle { right: 14px; }
 .roles-theme.panel-hidden .panel-toggle svg { transform: rotate(180deg); }
-.roles-theme .ptitle { display: none; font-family: var(--font-d); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.035em; color: #fff; margin-bottom: 14px; }
-.roles-theme.scored .ptitle { display: block; }
+/* One header row: title left + the quiet scoring progress right (Rober 7-16). The
+   scored gate moved from .ptitle to the row. */
+.roles-theme .phead { display: none; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.roles-theme.scored .phead { display: flex; }
+.roles-theme .ptitle { font-family: var(--font-d); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.035em; color: #fff; margin: 0; }
+.roles-theme .pprog { font-family: var(--font-m); font-size: 11px; color: var(--muted); white-space: nowrap; }
 /* Map-selection chips (company + city, each independently removable). */
 .roles-theme .selhdr { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 11px; }
 .roles-theme .selchips { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -447,7 +451,7 @@
 
 /* DETAIL VIEW */
 .roles-theme .detail { display: none; flex: 1; min-height: 0; overflow-y: auto; flex-direction: column; gap: 14px; padding-right: 8px; }
-.roles-theme.detail-open .cards, .roles-theme.detail-open .ptitle { display: none; }
+.roles-theme.detail-open .cards, .roles-theme.detail-open .phead { display: none; }
 .roles-theme.detail-open .detail { display: flex; }
 .roles-theme .dback { align-self: flex-start; background: none; border: 0; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 2px 0; display: flex; align-items: center; gap: 5px; transition: color 0.2s; }
 .roles-theme .dback:hover { color: #fff; }
@@ -604,7 +608,6 @@
 .roles-theme .panel-note .btn { display: block; margin: 14px auto 0; }
 /* Status = whisper (design direction §3.4): an inline system line, mono muted
  * caption — NOT a jade banner. The pending FitChips carry the progress shimmer. */
-.roles-theme .scorebar { font-family: var(--font-m); font-size: 11px; color: var(--muted); padding: 6px 2px 10px; margin-bottom: 4px; }
 .roles-theme .morebtn { margin-top: 10px; width: calc(100% - 8px); }
 
 /* ============================================================================

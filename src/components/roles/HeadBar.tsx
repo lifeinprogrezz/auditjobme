@@ -24,11 +24,13 @@ export type HeadBarProps = {
   onProfile: () => void;
   /** Returning-user sign-in — the logged-out header's secondary action (Google OAuth). */
   onSignIn: () => void;
+  /** Brand click = home reset: clears selection/filters and re-frames Europe (Rober 7-16). */
+  onBrand: () => void;
 };
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, onAddCv, onProfile, onSignIn }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, onAddCv, onProfile, onSignIn, onBrand }: HeadBarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [chipsShown, setChipsShown] = useState(false);
@@ -190,7 +192,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
 
   return (
     <header className="nav glass liquid">
-      <Link className="brand" to="/">auditjob.me</Link>
+      <Link className="brand" to="/" onClick={onBrand}>auditjob.me</Link>
       <span className="sep" />
 
       <div className="cmd">

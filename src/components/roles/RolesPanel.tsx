@@ -187,7 +187,16 @@ export default function RolesPanel({
 
   const renderCards = () => (
     <>
-      <h1 className="ptitle">{defaultView ? (scored ? "Best fit" : "Hot right now") : "Your matches"}</h1>
+      {/* One compact header row: title left, the scoring progress as a quiet mono
+          whisper right — no separate banner bar (Rober 7-16). */}
+      <div className="phead">
+        <h1 className="ptitle">{defaultView ? (scored ? "Best fit" : "Hot right now") : "Your matches"}</h1>
+        {scoring && (
+          <span className="pprog num" role="status" aria-live="polite">
+            {remaining} to go
+          </span>
+        )}
+      </div>
       {activeChips.length > 0 && (
         <div className="selhdr">
           <div className="selchips">
@@ -244,9 +253,6 @@ export default function RolesPanel({
           )}
         </div>
       )}
-      {scoring && (
-        <div className="scorebar">Scoring roles against your profile… {remaining} to go</div>
-      )}
       {loading ? (
         <div className="panel-note">Loading roles…</div>
       ) : jobs.length === 0 ? (
@@ -263,7 +269,6 @@ export default function RolesPanel({
             </div>
           )}
           {shown.slice(0, CARD_CAP).map((job, i) => {
-            const ago = postedAgo(job.posted_at);
             // Geo / work-auth badge (issue #42): only a high-confidence, actionable
             // verdict shows on the card; an unstated JD renders nothing (never a guess).
             const geo = geoVerdict(job);
@@ -289,14 +294,10 @@ export default function RolesPanel({
                 <div className="cbody">
                   <div className="co">{job.company}</div>
                   <div className="role">{job.title}</div>
+                  {/* Card meta = location (+ geo badge) only; posted-age lives in the
+                      detail facts, the card was carrying too much (Rober 7-16). */}
                   <div className="meta">
                     <b>{job.city ?? job.location ?? (job.remote ? "Remote" : "Location unknown")}</b>
-                    {ago && (
-                      <>
-                        <span className="d" />
-                        {ago}
-                      </>
-                    )}
                     {geo.onCard && <span className={`geo-badge geo-${geo.kind}`}>{geo.label}</span>}
                   </div>
                 </div>

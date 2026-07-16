@@ -192,12 +192,12 @@ function featureCollection(jobs: RoleJob[]): FeatureCollection {
  *  Wrapped like pins: maplibre owns the wrapper's translate, so the hover scale
  *  lives on the inner .cluster (a transform on the wrapper would fight the marker
  *  positioning). The grow signals "clickable" just like the company pins. */
-function buildCluster(count: number, maxScore: number): HTMLDivElement {
+function buildCluster(count: number, _maxScore: number): HTMLDivElement {
   const root = document.createElement("div");
   root.className = "clusterwrap";
-  // maxScore -1 = every role unscored → neutral glass; bucket classes only show
-  // their colors once the root carries .scored (CSS-gated).
-  const bucket = maxScore >= 0 ? scoreBucket(maxScore) : "";
+  // Clusters stay NEUTRAL glass (Rober 7-16): a score color on an aggregate bubble
+  // encodes "the max of N roles", which reads as noise. Score colors live on the
+  // per-company pins and cards, never on zoomed-out clusters.
   // Tier ladder (startupmap-matched breaks + weights) lives in clusterTier.
   const t = clusterTier(count);
   root.style.width = `${t.size}px`;
@@ -205,7 +205,7 @@ function buildCluster(count: number, maxScore: number): HTMLDivElement {
   // Bigger hubs win marker overlaps (their z ladder: 20/22/24 by count).
   root.style.zIndex = String(t.zIndex);
   const el = document.createElement("div");
-  el.className = "cluster" + (t.light ? " sm" : "") + (bucket ? ` ${bucket}` : "");
+  el.className = "cluster" + (t.light ? " sm" : "");
   const cnt = document.createElement("span");
   cnt.className = "cnt num";
   cnt.style.fontSize = `${t.fontSize}px`;

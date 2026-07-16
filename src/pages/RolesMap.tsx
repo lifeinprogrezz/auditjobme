@@ -411,6 +411,15 @@ export default function RolesMap() {
           // either state, and no second sign-in entry point to maintain).
           onProfile={() => (signedIn ? setProfileModalOpen(true) : setCvModalOpen(true))}
           onSignIn={signInWithGoogle}
+          // Brand = home: same state reset as the map's reset control, plus a camera
+          // re-frame to the Europe landing (europeFrame bump eases the globe back).
+          onBrand={() => {
+            setSel({ co: null, city: null });
+            setDetailJob(null);
+            setFilters(EMPTY_FILTERS);
+            setHasExplored(false);
+            setEuropeFrame((n) => n + 1);
+          }}
         />
         <RolesPanel
           jobs={panelJobs}
