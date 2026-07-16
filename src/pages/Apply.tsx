@@ -56,6 +56,9 @@ type Job = {
   location: string | null;
   remote: boolean;
   source: string | null;
+  /** Embedded companies row — the REAL logo domain (the name-guess fallback misses
+   *  many brands, e.g. Novicap on Personio; Rober 7-16). */
+  companies: { logo_domain: string | null } | null;
 };
 
 /** One-tap copy; returns whether it landed so the row can swap to a check. */
@@ -91,7 +94,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
   return (
     <>
       <dt className="self-center text-micro uppercase text-muted-foreground">{label}</dt>
-      <dd className="flex min-w-0 items-start justify-between gap-3">
+      <dd className="flex min-w-0 items-center justify-between gap-3">
         <span className="min-w-0 break-words font-mono text-dense text-foreground">{value}</span>
         {copied ? (
           <span className="inline-flex shrink-0 items-center gap-1.5 text-caption text-muted-foreground">
@@ -140,6 +143,7 @@ export default function Apply() {
   const [summary, setSummary] = useState<string | null>(null); // editable tailored summary
   const [cover, setCover] = useState<CoverJson | null>(null);
   const [hasApplied, setHasApplied] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -157,7 +161,7 @@ export default function Apply() {
       const [{ data: jobData }, { data: profile }] = await Promise.all([
         supabase
           .from("jobs")
-          .select("id, company, title, url, jd_text, location, remote, source")
+          .select("id, company, title, url, jd_text, location, remote, source, companies:company_id (logo_domain)")
           .eq("url", jobUrl)
           .maybeSingle(),
         supabase.from("profiles").select("cv_text, display_name").eq("id", user.id).maybeSingle(),
@@ -169,12 +173,14 @@ export default function Apply() {
       if (jobData) {
         // The fit score + applied state both key on job_id — fetch them together so
         // the context header can show the FitChip that motivated the apply (§6.1 AP3).
-        const [{ data: app }, { data: scoreRow }] = await Promise.all([
+        const [{ data: app }, { data: scoreRow }, { data: savedRow }] = await Promise.all([
           supabase.from("applications").select("id").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
           supabase.from("scores").select("score").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
+          supabase.from("saved_jobs").select("id").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
         ]);
         if (active && app) setHasApplied(true);
         if (active && scoreRow) setScore(scoreRow.score ?? null);
+        if (active && savedRow) setIsSaved(true);
       }
       if (active) setLoading(false);
     }
@@ -183,6 +189,21 @@ export default function Apply() {
       active = false;
     };
   }, [user, jobUrl]);
+
+  // Save / unsave for later (Rober 7-16): the header bookmark, same optimistic
+  // idiom as useRolesData.toggleSaved (this page loads its own job row).
+  async function toggleSaved() {
+    if (!user || !job) return;
+    const was = isSaved;
+    setIsSaved(!was);
+    const { error } = was
+      ? await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", job.id)
+      : await supabase.from("saved_jobs").upsert({ user_id: user.id, job_id: job.id }, { onConflict: "user_id,job_id" });
+    if (error) {
+      setIsSaved(was);
+      toast.error(was ? "Couldn't remove from saved. Please try again." : "Couldn't save. Please try again.");
+    }
+  }
 
   /** Persist a generated artifact. Returns whether the write landed so callers can
    *  surface a failure instead of losing the ledger row silently (issue #54). */
@@ -282,30 +303,36 @@ export default function Apply() {
     );
   }
 
-  const domain = domainFor(job.company, job.source);
+  // Real logo domain from the companies row; the name-guess is only the fallback.
+  const domain = job.companies?.logo_domain ?? domainFor(job.company, job.source);
   const city = cityOf(job.location) ?? job.location ?? (job.remote ? "Remote" : null);
 
   return (
     <AppShell>
       {/* Context header (§6.1 AP3 fix): the score that motivated the apply travels
-          with the user — logo + company/role + FitChip + city, all in one row. */}
-      <header className="flex items-start gap-4">
+          with the user — logo vertically centered with the company/role/city block
+          (Rober 7-16), FitChip + the bookmark on the right (the X-style save). */}
+      <header className="flex items-center gap-4">
         <PaperLogo domain={domain} company={job.company} size={40} />
         <div className="min-w-0 flex-1">
           <div className="font-display text-micro uppercase text-muted-foreground">{job.company}</div>
-          <h1 className="mt-0.5 text-balance font-display text-page text-foreground">{job.title}</h1>
-          {city && <p className="mt-1 text-caption text-muted-foreground">{city}</p>}
+          <h1 className="text-balance font-display text-page text-foreground">{job.title}</h1>
+          {city && <p className="text-caption text-muted-foreground">{city}</p>}
         </div>
         {score != null && <FitChip score={score} size="sm" />}
+        <button
+          type="button"
+          onClick={toggleSaved}
+          aria-pressed={isSaved}
+          aria-label={isSaved ? "Remove from saved" : "Save for later"}
+          title={isSaved ? "Saved" : "Save for later"}
+          className="inline-flex shrink-0 items-center text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
+          </svg>
+        </button>
       </header>
-      <p className="mt-4 text-body text-muted-foreground text-pretty">
-        Your apply bundle. The CV body is rendered exactly from your saved CV. Only the summary and cover letter are
-        tailored to this role, and you review them before anything downloads.{" "}
-        <a href={job.url} target="_blank" rel="noopener noreferrer" className="text-foreground underline underline-offset-2">
-          View the original posting
-        </a>
-        .
-      </p>
 
       {!cvText ? (
         <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-page">
@@ -320,9 +347,6 @@ export default function Apply() {
         <div className="mt-8 flex flex-col gap-6">
           {/* 1 — Tailored CV: generate → EDIT → download */}
           <Section eyebrow="Step 1" title="Tailored CV">
-            <p className="mt-2 text-body text-muted-foreground text-pretty">
-              We write only the professional summary for this role. Your CV body stays word-for-word as you wrote it.
-            </p>
             {summary == null ? (
               <Button variant="outline" size="sm" className={`mt-4 ${SECONDARY_CTA}`} onClick={genSummary} disabled={busy !== null}>
                 {busy === "cv" ? "Tailoring your summary…" : "Generate tailored summary"}
@@ -356,9 +380,6 @@ export default function Apply() {
 
           {/* 2 — Cover letter (optional) */}
           <Section eyebrow="Step 2" title="Cover letter">
-            <p className="mt-2 text-body text-muted-foreground text-pretty">
-              A short, warm letter drawn from your CV. Optional, only if the role asks for one.
-            </p>
             {cover == null ? (
               <Button variant="outline" size="sm" className={`mt-4 ${SECONDARY_CTA}`} onClick={genCover} disabled={busy !== null}>
                 {busy === "cover" ? "Writing your cover letter…" : "Generate cover letter"}
@@ -392,10 +413,6 @@ export default function Apply() {
           {/* 3 — Prefill, never submit: the confirm card. The page's ONE primary
               action (ink fill) is "Open the application page" — the apply moment. */}
           <Section eyebrow="Step 3" title="Submit it yourself">
-            <p className="mt-2 text-body text-muted-foreground text-pretty">
-              We prefill what we can and open the real posting. We never submit an application for you. Review every
-              field on their form, then send it.
-            </p>
             <dl className="mt-4 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-4 rounded-[10px] border border-border bg-secondary p-4">
               {name && <CopyRow label="Full name" value={name} />}
               {user?.email && <CopyRow label="Email" value={user.email} />}
