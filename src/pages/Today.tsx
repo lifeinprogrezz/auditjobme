@@ -46,7 +46,7 @@ export default function Today() {
   const more = queue.slice(10);
 
   const coverageLine = (
-    <p className="mt-1 text-body text-muted-foreground text-pretty">
+    <p className="text-body text-muted-foreground text-pretty">
       The roles worth your time, refreshed every morning from{" "}
       {coverage.roles.toLocaleString()} live openings across {coverage.companies.toLocaleString()} companies. A
       curated pool, not the whole internet.
@@ -55,15 +55,15 @@ export default function Today() {
 
   if (loading) {
     return (
-      <AppShell title="Today">
-        <p className="mt-6 text-body text-muted-foreground">Loading your roles…</p>
+      <AppShell>
+        <p className="text-body text-muted-foreground">Loading your roles…</p>
       </AppShell>
     );
   }
 
   if (!scored) {
     return (
-      <AppShell title="Today">
+      <AppShell>
         {coverageLine}
         <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-page">
           <h2 className="font-display text-section">See which roles fit you</h2>
@@ -80,11 +80,19 @@ export default function Today() {
   }
 
   return (
-    <AppShell title="Today">
-      {/* No header prose (Rober 7-16): the sections carry the page; the only system
-          line is the scoring whisper below while the pool is still being scored. */}
+    <AppShell>
+      {/* No h1, no tagline (Rober 7-16, direction 1): the nav already says where you
+          are. The page opens with a LIVE status line — data that changes every day,
+          never boilerplate — then goes straight into the sections. */}
+      <p className="text-body text-muted-foreground">
+        <span className="font-semibold text-foreground">
+          {queue.length === 0 ? "No new matches" : `${queue.length} ${queue.length === 1 ? "match" : "matches"}`}
+        </span>{" "}
+        for you today · from {coverage.roles.toLocaleString()} live openings across{" "}
+        {coverage.companies.toLocaleString()} companies, refreshed this morning.
+      </p>
       {scoring && (
-        <p className="mt-6 font-mono text-caption text-muted-foreground" role="status" aria-live="polite">
+        <p className="mt-3 font-mono text-caption text-muted-foreground" role="status" aria-live="polite">
           Scoring the pool against your profile · {remaining} to go. New matches drop in as they land.
         </p>
       )}
@@ -190,7 +198,10 @@ export default function Today() {
                         </>
                       )}
                     </div>
-                    {job.reason && (
+                    {/* The "why you" line is the Top 10's earned privilege; the
+                        More-matches tail stays a scannable index without it, same as
+                        Saved (Rober 7-16). The full reasoning lives on the prep page. */}
+                    {sec.ranked && job.reason && (
                       <p className="mt-2 line-clamp-2 text-dense text-muted-foreground text-pretty">{job.reason}</p>
                     )}
                   </div>
