@@ -33,10 +33,12 @@ function GeoBadge({ job }: { job: RoleJob }) {
 
 export default function Today() {
   const navigate = useNavigate();
-  const { jobs, loading, scored, scoring, remaining, applied, markApplied, scoreMore } = useRolesData();
+  const { jobs, loading, scored, scoring, remaining, applied, markApplied, saved, toggleSaved, scoreMore } =
+    useRolesData();
 
   const coverage = useMemo(() => coverageSummary(jobs), [jobs]);
   const aq = useMemo(() => buildActionQueue(jobs, applied), [jobs, applied]);
+  const savedJobs = useMemo(() => jobs.filter((j) => saved.has(j.id)), [jobs, saved]);
 
   const coverageLine = (
     <p className="mt-1 text-body text-muted-foreground text-pretty">
@@ -89,6 +91,54 @@ export default function Today() {
         </p>
       )}
 
+      {savedJobs.length > 0 && (
+        <section className="mt-8">
+          <h2 className="font-display text-micro uppercase text-muted-foreground">Saved ({savedJobs.length})</h2>
+          <ul className="mt-3 flex flex-col gap-3">
+            {savedJobs.map((job) => (
+              <li
+                key={job.id}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-page"
+              >
+                <PaperLogo domain={job.domain} company={job.company} size={40} />
+                <div className="min-w-0 flex-1">
+                  <div className="font-display text-micro uppercase text-muted-foreground">{job.company}</div>
+                  <a
+                    href={job.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block truncate font-display text-body text-foreground underline-offset-2 hover:underline"
+                  >
+                    {job.title}
+                  </a>
+                  <div className="text-caption text-muted-foreground">
+                    {job.city ?? job.location ?? (job.remote ? "Remote" : "Location unknown")}
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={SECONDARY_CTA}
+                  onClick={() => navigate(`/apply?job=${encodeURIComponent(job.url)}`)}
+                >
+                  Prepare
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => toggleSaved(job)}
+                  aria-label="Remove from saved"
+                  className="inline-flex shrink-0 items-center text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                    <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
+                  </svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {aq.queue.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-border bg-card p-6 text-body text-muted-foreground shadow-page text-pretty">
           Nothing left in your queue right now. Everything scored is either applied or below your bar. Fresh roles
@@ -99,6 +149,7 @@ export default function Today() {
           {aq.queue.map((job) => {
             const ago = postedAgo(job.posted_at);
             const isApplied = applied.has(job.id);
+            const isSaved = saved.has(job.id);
             return (
               <li
                 key={job.id}
@@ -148,25 +199,38 @@ export default function Today() {
                   >
                     Prepare application
                   </Button>
-                  {isApplied ? (
-                    <span className="inline-flex items-center gap-1.5 text-caption font-medium text-muted-foreground">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-                        <path d="M20 6 9 17l-5-5" />
-                      </svg>
-                      Applied
-                    </span>
-                  ) : (
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => markApplied(job)}
+                      onClick={() => toggleSaved(job)}
+                      aria-pressed={isSaved}
                       className="inline-flex items-center gap-1.5 text-caption font-medium text-muted-foreground transition-colors hover:text-foreground"
                     >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-                        <path d="M20 6 9 17l-5-5" />
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                        <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
                       </svg>
-                      Mark applied
+                      {isSaved ? "Saved" : "Save"}
                     </button>
-                  )}
+                    {isApplied ? (
+                      <span className="inline-flex items-center gap-1.5 text-caption font-medium text-muted-foreground">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                        Applied
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => markApplied(job)}
+                        className="inline-flex items-center gap-1.5 text-caption font-medium text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                        Mark applied
+                      </button>
+                    )}
+                  </div>
                 </div>
               </li>
             );

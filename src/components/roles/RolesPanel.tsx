@@ -40,9 +40,12 @@ export type RolesPanelProps = {
   remaining: number;
   detailJob: RoleJob | null;
   applied: Set<string>;
+  saved: Set<string>;
   onOpenDetail: (j: RoleJob) => void;
   onCloseDetail: () => void;
   onScoreMore: () => void;
+  /** Save / unsave the role for later (Rober 7-15). */
+  onToggleSaved: (job: RoleJob) => void;
   onToggleHidden: () => void;
   /** Opens the CV-unlock modal (Phase A front door). */
   onAddCv: () => void;
@@ -103,9 +106,11 @@ export default function RolesPanel({
   remaining,
   detailJob,
   applied,
+  saved,
   onOpenDetail,
   onCloseDetail,
   onScoreMore,
+  onToggleSaved,
   onToggleHidden,
   onAddCv,
   filters,
@@ -520,6 +525,19 @@ export default function RolesPanel({
         ) : (
           <button className="btn dcta" onClick={onAddCv}>
             Add your CV to see your fit
+          </button>
+        )}
+        {signedIn && (
+          <button
+            type="button"
+            className="dsave"
+            aria-pressed={saved.has(job.id)}
+            onClick={() => onToggleSaved(job)}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill={saved.has(job.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+              <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
+            </svg>
+            {saved.has(job.id) ? "Saved for later" : "Save for later"}
           </button>
         )}
         {others.length > 0 && (

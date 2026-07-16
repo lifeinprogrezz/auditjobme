@@ -206,6 +206,7 @@ export function useRolesData() {
   // flashing the CV modal at a user whose CV is still in flight.
   const [profileChecked, setProfileChecked] = useState(false);
   const [applied, setApplied] = useState<Set<string>>(new Set());
+  const [saved, setSaved] = useState<Set<string>>(new Set());
   // Per-run cancellation: each effect run gets its own id; async loops compare
   // against the current id (a shared boolean would be re-armed by the next run,
   // resurrecting a cancelled loop and leaking user A's scores into user B's view).
@@ -413,6 +414,7 @@ export function useRolesData() {
         setProfile(null);
         setProfileMeta(null);
         setApplied(new Set());
+        setSaved(new Set());
         setLoading(false);
         return;
       }
@@ -457,6 +459,10 @@ export function useRolesData() {
       const { data: appsData } = await supabase.from("applications").select("job_id").eq("user_id", user.id);
       if (runRef.current !== runId) return;
       setApplied(new Set((appsData ?? []).map((a) => a.job_id)));
+
+      const { data: savedData } = await supabase.from("saved_jobs").select("job_id").eq("user_id", user.id);
+      if (runRef.current !== runId) return;
+      setSaved(new Set((savedData ?? []).map((s) => s.job_id)));
 
       const { data: prof } = await supabase
         .from("profiles")
@@ -537,6 +543,31 @@ export function useRolesData() {
     }
   };
 
+  // Save / unsave a role for later (Rober 7-15). Optimistic toggle against the
+  // saved_jobs table; rolls back + toasts on failure, same idiom as markApplied.
+  const toggleSaved = async (job: RoleJob) => {
+    if (!user) return;
+    const wasSaved = saved.has(job.id);
+    setSaved((prev) => {
+      const next = new Set(prev);
+      if (wasSaved) next.delete(job.id);
+      else next.add(job.id);
+      return next;
+    });
+    const { error } = wasSaved
+      ? await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", job.id)
+      : await supabase.from("saved_jobs").upsert({ user_id: user.id, job_id: job.id }, { onConflict: "user_id,job_id" });
+    if (error) {
+      setSaved((prev) => {
+        const next = new Set(prev);
+        if (wasSaved) next.add(job.id);
+        else next.delete(job.id);
+        return next;
+      });
+      toast.error(wasSaved ? "Couldn't remove from saved. Please try again." : "Couldn't save. Please try again.");
+    }
+  };
+
   /** Manual "check now" — an immediate scores pull, ahead of the next poll tick.
    *  Kept for the RolesPanel prop surface; scoring itself is server-side. */
   const scoreMore = () => {
@@ -577,6 +608,8 @@ export function useRolesData() {
     remaining: jobs.filter((j) => j.score == null).length,
     applied,
     markApplied,
+    saved,
+    toggleSaved,
     scoreMore,
     submitCv,
     /** Post-CV state: the score reveal keys on a CV being present. */

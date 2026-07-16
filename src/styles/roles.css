@@ -514,6 +514,9 @@
 .roles-theme .dhl .hlt { font-family: var(--font-d); font-size: 16px; font-weight: 600; color: #fff; letter-spacing: -0.01em; }
 .roles-theme .dhl .hls { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
 .roles-theme .dsum { font-size: 13px; line-height: 1.55; color: var(--subtle); margin: 0; }
+.roles-theme .dsave { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 40px; margin-top: 8px; border-radius: 10px; border: 1px solid var(--hair); background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: color 0.2s, border-color 0.2s; }
+.roles-theme .dsave:hover { color: var(--text); border-color: color-mix(in srgb, var(--text) 22%, transparent); }
+.roles-theme .dsave[aria-pressed="true"] { color: var(--text); border-color: color-mix(in srgb, var(--text) 22%, transparent); }
 .roles-theme .dfit { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 /* Fit bullets: verb-led claims, clamped to 2 lines (render-side belt for the
  * prompt's 12-word cap, design direction §5.2). Muted ink, no jade. */
