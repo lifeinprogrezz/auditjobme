@@ -9,6 +9,7 @@
 // "move updates exactly one row's position" acceptance, and keep the board
 // keyboard-accessible). Keeps the existing Supabase write-back.
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
@@ -32,11 +33,11 @@ interface AppRow {
 }
 
 /** Days since the application was marked applied — staleness is the signal
- *  (design direction §6.2 "days mono"), rendered mono like "3d" rather than the
- *  absolute date. The exact date rides along as a hover title. */
-function daysSince(iso: string): string {
+ *  (design direction §6.2), spelled out as "Applied 3d ago" so the number can't
+ *  be read as posted-age (Rober 7-16). The exact date rides along as a hover title. */
+function appliedAgo(iso: string): string {
   const d = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
-  return `${d}d`;
+  return d === 0 ? "Applied today" : `Applied ${d}d ago`;
 }
 
 function Chevron({ dir }: { dir: -1 | 1 }) {
@@ -49,6 +50,7 @@ function Chevron({ dir }: { dir: -1 | 1 }) {
 
 export default function Tracker() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [apps, setApps] = useState<AppRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -202,14 +204,29 @@ export default function Tracker() {
                         <PaperLogo domain={a.logo_domain ?? domainFor(a.company, a.source)} company={a.company} size={24} />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-caption font-medium text-muted-foreground">{a.company}</div>
-                          <a
-                            href={a.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-0.5 block truncate text-control font-semibold text-foreground underline-offset-2 hover:underline"
-                          >
-                            {a.title}
-                          </a>
+                          {/* The role name stays INSIDE the product — it opens the prep
+                              page (Rober 7-16); the external posting is the ↗ beside it. */}
+                          <div className="mt-0.5 flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/apply?job=${encodeURIComponent(a.url)}`)}
+                              className="min-w-0 truncate text-left text-control font-semibold text-foreground underline-offset-2 hover:underline"
+                            >
+                              {a.title}
+                            </button>
+                            <a
+                              href={a.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label="Open the job posting"
+                              title="Open the job posting"
+                              className="inline-flex shrink-0 items-center text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M7 17 17 7M9 7h8v8" />
+                              </svg>
+                            </a>
+                          </div>
                         </div>
                       </div>
                       <div className="mt-2.5 flex items-center justify-between">
@@ -221,7 +238,7 @@ export default function Tracker() {
                             year: "numeric",
                           })}`}
                         >
-                          {daysSince(a.applied_at)}
+                          {appliedAgo(a.applied_at)}
                         </span>
                         <div className="flex items-center gap-1.5">
                           <button
