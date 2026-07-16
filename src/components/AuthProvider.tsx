@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { markSessionSeen } from "@/lib/deviceSession";
 
 interface AuthContextType {
   session: Session | null;
@@ -29,6 +30,12 @@ export const useAuth = () => useContext(AuthContext);
 const BYPASS_AUTH =
   import.meta.env.DEV && import.meta.env.VITE_E2E_BYPASS_AUTH === "1";
 
+// Exported so dev-only consumers (the post-sign-in CV gate) can skip flows that
+// make no sense for the mock user — it has no profile, so the gate would pop the
+// CV modal over every bypassed UI-verification walk.
+// eslint-disable-next-line react-refresh/only-export-components -- dev-only const colocated with its gate
+export const AUTH_BYPASSED = BYPASS_AUTH;
+
 const MOCK_USER = {
   id: "00000000-0000-0000-0000-000000000000",
   aud: "authenticated",
@@ -48,12 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
+        if (session) markSessionSeen();
         setSession(session);
         setLoading(false);
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) markSessionSeen();
       setSession(session);
       setLoading(false);
     });

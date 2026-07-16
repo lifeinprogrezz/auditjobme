@@ -16,6 +16,7 @@ import {
   hashCv,
   writeCvStash,
 } from "@/lib/labels";
+import { hasSeenSession } from "@/lib/deviceSession";
 import type { FilterOption } from "./FilterChip";
 
 type Stage = "idle" | "reading" | "parsed";
@@ -151,6 +152,28 @@ export default function CvUnlockModal({
     // On success the browser redirects away — no further work here.
   };
 
+  // Returning-user shortcut (Rober 7-13): straight to Google OAuth, no CV drop
+  // and no stash — the post-sign-in gate (shouldPromptCv) re-opens this modal if
+  // the profile turns out to have no CV, so the CV-mandatory invariant holds.
+  const handleSignIn = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    setError("");
+    const { error: authErr } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    if (authErr) {
+      setError(authErr.message || "Sign-in failed. Please try again.");
+      setSubmitting(false);
+    }
+    // On success the browser redirects away — no further work here.
+  };
+
+  // Only a device that has held a session before earns the sign-in line; a
+  // brand-new visitor keeps the pure single-purpose CV modal.
+  const offerSignIn = !signedIn && hasSeenSession();
+
   const wordCount = cvWordCount(cvText);
 
   return (
@@ -202,7 +225,16 @@ export default function CvUnlockModal({
             </div>
             <div className="cvdrop-s">PDF only. Stays in your browser.</div>
           </label>
-        ) : (
+        ) : null}
+        {stage !== "parsed" && offerSignIn ? (
+          <p className="cvreturn">
+            Already have a profile?{" "}
+            <button type="button" className="cvreturn-a" onClick={handleSignIn} disabled={submitting}>
+              Sign in
+            </button>
+          </p>
+        ) : null}
+        {stage === "parsed" ? (
           <>
             <div className="cvread">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
@@ -284,7 +316,7 @@ export default function CvUnlockModal({
               )}
             </div>
           </>
-        )}
+        ) : null}
 
         {error && <p className="cverr">{error}</p>}
 

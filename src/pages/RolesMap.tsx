@@ -5,6 +5,7 @@ import RolesPanel from "@/components/roles/RolesPanel";
 import HeadBar from "@/components/roles/HeadBar";
 import CvUnlockModal from "@/components/roles/CvUnlockModal";
 import ProfileModal from "@/components/roles/ProfileModal";
+import { AUTH_BYPASSED } from "@/components/AuthProvider";
 import {
   EMPTY_FILTERS,
   LEVELS,
@@ -38,13 +39,19 @@ const HOT_COUNT = 7;
 const FRESH_MS = 21 * 24 * 60 * 60 * 1000;
 
 export default function RolesMap() {
-  const { jobs, loading, scoring, remaining, applied, scoreMore, submitCv, scored, signedIn, cvText, profileMeta } =
+  const { jobs, loading, scoring, remaining, applied, scoreMore, submitCv, scored, signedIn, cvText, profileMeta, needsCv } =
     useRolesData();
   // CV-unlock modal (Phase A front door). Opened from the "Add your CV" affordances,
   // and from the profile modal's Replace CV action (issue #43) — one shared instance.
   const [cvModalOpen, setCvModalOpen] = useState(false);
   // Profile modal (issue #43) — the avatar's real destination for a signed-in user.
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  // Post-sign-in CV gate (Rober 7-13): a session with no CV on the profile gets
+  // the CV modal opened in front of it — fires once per false→true transition,
+  // so closing it doesn't trap the user in a reopen loop.
+  useEffect(() => {
+    if (needsCv && !AUTH_BYPASSED) setCvModalOpen(true);
+  }, [needsCv]);
   const [filters, setFilters] = useState<RolesFilters>(EMPTY_FILTERS);
   const [view, setView] = useState<"map" | "list">("map");
   const [detailJob, setDetailJob] = useState<RoleJob | null>(null);

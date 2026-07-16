@@ -881,6 +881,17 @@
 .roles-theme .cvdrop-i { color: var(--muted); margin-bottom: 4px; }
 .roles-theme .cvdrop-t { font-size: 14px; font-weight: 600; color: var(--text); }
 .roles-theme .cvdrop-s { font-size: 11.5px; color: var(--subtle); }
+/* Returning-user shortcut (7-13): a quiet footer line, typographically
+ * subordinate to the drop zone — subtle ink, no second button surface. */
+.roles-theme .cvreturn { font-size: 12px; color: var(--subtle); margin: 14px 0 0; text-align: center; }
+.roles-theme .cvreturn-a {
+  padding: 0; border: 0; background: none; font: inherit; font-weight: 600;
+  color: var(--muted); text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-color: var(--hair); cursor: pointer;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+.roles-theme .cvreturn-a:hover { color: var(--text); text-decoration-color: currentColor; }
+.roles-theme .cvreturn-a:disabled { opacity: 0.4; cursor: default; }
 .roles-theme .cvread {
   display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600;
   color: var(--text); padding: 11px 14px; border-radius: 12px; margin-bottom: 18px;

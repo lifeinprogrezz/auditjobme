@@ -6,6 +6,7 @@ import { RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
 import type { ScoreSubscore, ScoreEvidence } from "@/lib/scorePrompt";
 import { applyLandedScores, byScore, type RoleJob, type RoleExtraction } from "@/lib/roles";
 import { hashCv, readCvStash, clearCvStash } from "@/lib/labels";
+import { shouldPromptCv } from "@/lib/deviceSession";
 import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
 import { fetchDataplane, type DataplaneCompany, type DataplaneOffice } from "@/lib/dataplane";
@@ -200,6 +201,10 @@ export function useRolesData() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ScoreableProfile | null>(null);
   const [profileMeta, setProfileMeta] = useState<ProfileMeta | null>(null);
+  // True once THIS session's profile row has been fetched AND any pre-redirect
+  // CV stash handed off — the earliest moment `needsCv` can be trusted without
+  // flashing the CV modal at a user whose CV is still in flight.
+  const [profileChecked, setProfileChecked] = useState(false);
   const [applied, setApplied] = useState<Set<string>>(new Set());
   // Per-run cancellation: each effect run gets its own id; async loops compare
   // against the current id (a shared boolean would be re-armed by the next run,
@@ -342,6 +347,7 @@ export function useRolesData() {
 
   useEffect(() => {
     const runId = ++runRef.current;
+    setProfileChecked(false);
     async function load() {
       // F3 (issue #37): the three public reads below are served by ONE static
       // artifact, rebuilt daily after the scrape — zero DB reads per anonymous
@@ -488,6 +494,8 @@ export function useRolesData() {
           );
         }
       }
+      // Profile + stash handoff settled — `needsCv` may now be trusted.
+      if (runRef.current === runId) setProfileChecked(true);
     }
     load();
     return () => {
@@ -578,5 +586,14 @@ export function useRolesData() {
     cvText: profile?.cv_text ?? null,
     /** Picked labels + last-write date (profile view, issue #43). */
     profileMeta,
+    /** Signed in with a settled profile but NO CV (Rober 7-13): whichever door
+     *  they entered through, the map shell opens the CV modal — CV mandatory as
+     *  an invariant, not a door policy. */
+    needsCv: shouldPromptCv({
+      signedIn: Boolean(user),
+      profileChecked,
+      hasCv,
+      stashPending: Boolean(readCvStash()),
+    }),
   };
 }
