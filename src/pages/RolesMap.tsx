@@ -54,7 +54,6 @@ export default function RolesMap() {
     if (needsCv && !AUTH_BYPASSED) setCvModalOpen(true);
   }, [needsCv]);
   const [filters, setFilters] = useState<RolesFilters>(EMPTY_FILTERS);
-  const [view, setView] = useState<"map" | "list">("map");
   const [detailJob, setDetailJob] = useState<RoleJob | null>(null);
   // A panel-card click flies the map to the role's city (see openDetail); the
   // nonce forces a re-fly even when the same city is reopened.
@@ -406,8 +405,6 @@ export default function RolesMap() {
             setFilters(EMPTY_FILTERS);
             setSel({ co: null, city: null });
           }}
-          view={view}
-          onView={setView}
           onAddCv={() => setCvModalOpen(true)}
           // Signed-in avatar opens the profile view; anon avatar goes through the
           // same sign-in front door as "Add your CV" (Rober 7-12: no dead-end for

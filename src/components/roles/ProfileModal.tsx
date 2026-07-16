@@ -31,8 +31,8 @@ export type ProfileModalProps = {
   onReplaceCv: () => void;
   /** Live catalog sectors (from RolesMap) — the industry picker's options. */
   sectorOptions: FilterOption[];
-  /** Persist edited target roles + industries to the profile. */
-  onSaveTargets: (roles: string[], sectors: string[]) => Promise<void>;
+  /** Persist edited target roles + industries to the profile. Resolves false on failure. */
+  onSaveTargets: (roles: string[], sectors: string[]) => Promise<boolean>;
 };
 
 /** Toggle a value in/out of a capped list — ignores extra picks past the cap. */
@@ -60,7 +60,10 @@ export default function ProfileModal({
   const [sectorQuery, setSectorQuery] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Each (re)open lands on the profile view with edits seeded from the stored labels.
+  // Seed edits only when the modal OPENS. Keying the effect on targetRoles/
+  // targetSectors would re-fire on their identity (recreated as fresh [] when
+  // profileMeta is null), kicking the user out of an in-progress Settings edit on any
+  // parent re-render such as a background score poll (Rober 7-15 review).
   useEffect(() => {
     if (!open) return;
     setView("profile");
@@ -68,7 +71,8 @@ export default function ProfileModal({
     setEditSectors(targetSectors);
     setSectorQuery("");
     setSaving(false);
-  }, [open, targetRoles, targetSectors]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Escape closes (mirrors CvUnlockModal).
   useEffect(() => {
@@ -99,9 +103,10 @@ export default function ProfileModal({
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
-    await onSaveTargets(editRoles, editSectors);
+    const ok = await onSaveTargets(editRoles, editSectors);
     setSaving(false);
-    setView("profile");
+    // Stay in Settings on failure so the user's edits survive the retry.
+    if (ok) setView("profile");
   };
 
   return (

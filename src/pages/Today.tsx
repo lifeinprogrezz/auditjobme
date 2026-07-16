@@ -33,12 +33,14 @@ function GeoBadge({ job }: { job: RoleJob }) {
 
 export default function Today() {
   const navigate = useNavigate();
-  const { jobs, loading, scored, scoring, remaining, applied, markApplied, saved, toggleSaved, scoreMore } =
+  const { jobs, loading, scored, scoring, remaining, applied, markApplied, saved, savedJobs, toggleSaved, scoreMore } =
     useRolesData();
 
   const coverage = useMemo(() => coverageSummary(jobs), [jobs]);
   const aq = useMemo(() => buildActionQueue(jobs, applied), [jobs, applied]);
-  const savedJobs = useMemo(() => jobs.filter((j) => saved.has(j.id)), [jobs, saved]);
+  // Saved roles get their own section; keep them out of the action queue so a
+  // saved-but-not-applied role doesn't render twice on the page (Rober 7-15 review).
+  const queue = useMemo(() => aq.queue.filter((j) => !saved.has(j.id)), [aq.queue, saved]);
 
   const coverageLine = (
     <p className="mt-1 text-body text-muted-foreground text-pretty">
@@ -139,14 +141,14 @@ export default function Today() {
         </section>
       )}
 
-      {aq.queue.length === 0 ? (
+      {queue.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-border bg-card p-6 text-body text-muted-foreground shadow-page text-pretty">
           Nothing left in your queue right now. Everything scored is either applied or below your bar. Fresh roles
           arrive with tomorrow's scan.
         </div>
       ) : (
         <ul className="mt-8 flex flex-col gap-4">
-          {aq.queue.map((job) => {
+          {queue.map((job) => {
             const ago = postedAgo(job.posted_at);
             const isApplied = applied.has(job.id);
             const isSaved = saved.has(job.id);

@@ -18,7 +18,7 @@ vi.mock("@/components/AuthProvider", () => ({
 function renderModal(props: Partial<React.ComponentProps<typeof ProfileModal>> = {}) {
   const onClose = vi.fn();
   const onReplaceCv = vi.fn();
-  const onSaveTargets = vi.fn(async () => {});
+  const onSaveTargets = vi.fn(async () => true);
   const utils = render(
     <MemoryRouter>
       <ProfileModal
@@ -57,7 +57,7 @@ describe("ProfileModal", () => {
           cvUpdatedAt={null}
           onReplaceCv={vi.fn()}
           sectorOptions={[]}
-          onSaveTargets={vi.fn(async () => {})}
+          onSaveTargets={vi.fn(async () => true)}
         />
       </MemoryRouter>,
     );

@@ -18,8 +18,6 @@ export type HeadBarProps = {
   languageOptions: FilterOption[];
   /** Reset every filter (and the map pin selection) at once. */
   onClearAll: () => void;
-  view: "map" | "list";
-  onView: (v: "map" | "list") => void;
   /** Opens the CV-unlock modal (Phase A front door). */
   onAddCv: () => void;
   /** Opens the profile view (issue #43) — signed-in avatar's real destination. */
@@ -30,7 +28,7 @@ export type HeadBarProps = {
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, view, onView, onAddCv, onProfile, onSignIn }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, onAddCv, onProfile, onSignIn }: HeadBarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [chipsShown, setChipsShown] = useState(false);
@@ -355,9 +353,9 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
       {/* CSS hides the seg pre-scored (.roles-theme:not(.scored) .seg). Map is the
           in-place view; "List" now navigates to the /today list page (Rober 7-15)
           rather than resizing the right panel in place. */}
-      <div className={`seg${view === "list" ? " list" : ""}`}>
+      <div className="seg">
         <span className="ind" />
-        <button type="button" className={view === "map" ? "on" : ""} aria-pressed={view === "map"} onClick={() => onView("map")}>
+        <button type="button" className="on" aria-pressed>
           Map
         </button>
         <button type="button" onClick={() => navigate("/today")}>

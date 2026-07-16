@@ -382,7 +382,9 @@ export default function RolesPanel({
     // The detail leads with the honest one-line summary (job.reason), not the
     // positive-only fit_bullets — a Weak-fit label must never sit above "why you fit"
     // points (Rober 7-15). The signed evidence in ScoreBreakdown carries the specifics.
-    const summary = job.reason?.trim() || null;
+    // Fall back to the first fit bullet only when the model left reason empty, so a
+    // scored role never renders with no fit text at all.
+    const summary = job.reason?.trim() || job.fitBullets?.[0]?.trim() || null;
 
     return (
       <div className="detail" ref={detailRef}>
@@ -502,7 +504,9 @@ export default function RolesPanel({
         )}
         {hasCv && summary && <p className="dsum">{summary}</p>}
         {hasCv && job.score != null && (
-          <ScoreBreakdown subscores={job.subscores} evidence={job.evidence} />
+          // key on the job id so switching roles remounts it collapsed (the toggle
+          // state must not carry over from the previous role — Rober 7-15 review).
+          <ScoreBreakdown key={job.id} subscores={job.subscores} evidence={job.evidence} />
         )}
         {!hasCv && (
           <div className="dfit-teaser">
