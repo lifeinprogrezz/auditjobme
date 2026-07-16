@@ -41,6 +41,9 @@ export default function Today() {
   // Saved roles get their own section; keep them out of the action queue so a
   // saved-but-not-applied role doesn't render twice on the page (Rober 7-15 review).
   const queue = useMemo(() => aq.queue.filter((j) => !saved.has(j.id)), [aq.queue, saved]);
+  // Page structure (Rober 7-16): Saved → the 10 to apply TODAY (ranked) → the rest.
+  const top = queue.slice(0, 10);
+  const more = queue.slice(10);
 
   const coverageLine = (
     <p className="mt-1 text-body text-muted-foreground text-pretty">
@@ -78,15 +81,8 @@ export default function Today() {
 
   return (
     <AppShell title="Today">
-      <p className="mt-1 text-body text-muted-foreground">
-        <span className="font-medium text-foreground">{aq.scored.toLocaleString()}</span> roles scored against your
-        profile.{" "}
-        <span className="font-medium text-foreground">{aq.worthApplying.toLocaleString()}</span> look worth applying.
-      </p>
-      {coverageLine}
-
-      {/* Status = whisper (design direction §3.4): an inline mono system line, never
-          a filled banner — no fill, no border, no score hue. */}
+      {/* No header prose (Rober 7-16): the sections carry the page; the only system
+          line is the scoring whisper below while the pool is still being scored. */}
       {scoring && (
         <p className="mt-6 font-mono text-caption text-muted-foreground" role="status" aria-live="polite">
           Scoring the pool against your profile · {remaining} to go. New matches drop in as they land.
@@ -147,8 +143,16 @@ export default function Today() {
           arrive with tomorrow's scan.
         </div>
       ) : (
-        <ul className="mt-8 flex flex-col gap-4">
-          {queue.map((job) => {
+        <>
+          {[
+            { heading: `Top ${Math.min(10, queue.length)} to apply today`, items: top, ranked: true },
+            ...(more.length > 0 ? [{ heading: `More matches (${more.length})`, items: more, ranked: false }] : []),
+          ].map((sec) => (
+            <section key={sec.heading} className="mt-8">
+              <h2 className="font-display text-micro uppercase text-muted-foreground">{sec.heading}</h2>
+              <ol className="mt-3 flex flex-col gap-4">
+                {sec.items.map((job, i) => {
+            const rank = sec.ranked ? i + 1 : null;
             const ago = postedAgo(job.posted_at);
             const isApplied = applied.has(job.id);
             const isSaved = saved.has(job.id);
@@ -158,6 +162,11 @@ export default function Today() {
                 className="rounded-2xl border border-border bg-card p-6 shadow-page transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-px hover:border-foreground/20 hover:shadow-page-lift"
               >
                 <div className="flex items-start gap-4">
+                  {rank != null && (
+                    <span className="w-5 shrink-0 pt-2.5 text-right font-mono text-caption tabular-nums text-muted-foreground" aria-hidden="true">
+                      {rank}
+                    </span>
+                  )}
                   <PaperLogo domain={job.domain} company={job.company} size={40} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -236,8 +245,11 @@ export default function Today() {
                 </div>
               </li>
             );
-          })}
-        </ul>
+                })}
+              </ol>
+            </section>
+          ))}
+        </>
       )}
 
       {scored && remaining > 0 && !scoring && (

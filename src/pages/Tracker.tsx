@@ -27,6 +27,8 @@ interface AppRow {
   title: string;
   url: string;
   source: string | null;
+  /** Real logo domain from the companies row (the name-guess misses many brands). */
+  logo_domain: string | null;
 }
 
 /** Days since the application was marked applied — staleness is the signal
@@ -63,11 +65,23 @@ export default function Tracker() {
         .eq("user_id", user.id)
         .order("applied_at", { ascending: false });
       const ids = (appsData ?? []).map((a) => a.job_id);
-      const jobsById: Record<string, { company: string; title: string; url: string; source: string | null }> = {};
+      const jobsById: Record<
+        string,
+        { company: string; title: string; url: string; source: string | null; logo_domain: string | null }
+      > = {};
       if (ids.length) {
-        const { data: jobsData } = await supabase.from("jobs").select("id, company, title, url, source").in("id", ids);
+        const { data: jobsData } = await supabase
+          .from("jobs")
+          .select("id, company, title, url, source, companies:company_id (logo_domain)")
+          .in("id", ids);
         (jobsData ?? []).forEach((j) => {
-          jobsById[j.id] = { company: j.company, title: j.title, url: j.url, source: j.source };
+          jobsById[j.id] = {
+            company: j.company,
+            title: j.title,
+            url: j.url,
+            source: j.source,
+            logo_domain: (j.companies as { logo_domain: string | null } | null)?.logo_domain ?? null,
+          };
         });
       }
       // Drop rows whose DB status isn't one of our columns instead of coercing them to
@@ -90,6 +104,7 @@ export default function Tracker() {
           title: jobsById[a.job_id]?.title ?? "Unknown role",
           url: jobsById[a.job_id]?.url ?? "#",
           source: jobsById[a.job_id]?.source ?? null,
+          logo_domain: jobsById[a.job_id]?.logo_domain ?? null,
         });
       }
       if (unknownStatuses.size > 0) {
@@ -184,7 +199,7 @@ export default function Tracker() {
                       className="rounded-[10px] bg-card p-3 shadow-page transition-shadow duration-150 hover:shadow-page-lift"
                     >
                       <div className="flex items-start gap-2.5">
-                        <PaperLogo domain={domainFor(a.company, a.source)} company={a.company} size={24} />
+                        <PaperLogo domain={a.logo_domain ?? domainFor(a.company, a.source)} company={a.company} size={24} />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-caption font-medium text-muted-foreground">{a.company}</div>
                           <a

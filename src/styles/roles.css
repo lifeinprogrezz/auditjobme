@@ -592,7 +592,9 @@
 .roles-theme .dev-cites { display: flex; flex-direction: column; gap: 3px; }
 /* Definition-list grid: max-content key (nowrap, no fixed 46px wrap → ledger #3) +
  * the quote governor (clamp-2 + overflow-wrap:anywhere + min-width:0). */
-.roles-theme .dev-cite { display: grid; grid-template-columns: max-content 1fr; gap: 8px; align-items: baseline; line-height: 1.5; }
+/* Label stacked ABOVE the quote so a wrapped quote's every line starts at the same
+   left edge (Rober 7-16: the old side-by-side grid slid continuation lines right). */
+.roles-theme .dev-cite { display: flex; flex-direction: column; gap: 1px; line-height: 1.5; }
 .roles-theme .dev-cite-k { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--subtle); white-space: nowrap; }
 .roles-theme .dev-cite-q { min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; color: var(--muted); }
 .roles-theme .dev-empty { font-size: 12px; color: var(--subtle); }
