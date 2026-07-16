@@ -958,3 +958,4 @@
 .roles-theme .pf-nav { display: flex; gap: 8px; }
 .roles-theme .pf-navlink { flex: 1; text-align: center; padding: 10px 12px; border-radius: 11px; border: 1px solid var(--rim); background: var(--act-tint); color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
 .roles-theme .pf-navlink:hover { border-color: var(--act-border); background: var(--act-strong); color: var(--act-strong-ink); }
+.roles-theme button.pf-navlink { font-family: inherit; cursor: pointer; }

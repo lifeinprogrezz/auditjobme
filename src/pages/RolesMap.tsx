@@ -39,7 +39,7 @@ const HOT_COUNT = 7;
 const FRESH_MS = 21 * 24 * 60 * 60 * 1000;
 
 export default function RolesMap() {
-  const { jobs, loading, scoring, remaining, applied, saved, toggleSaved, scoreMore, submitCv, scored, signedIn, cvText, profileMeta, needsCv } =
+  const { jobs, loading, scoring, remaining, applied, saved, toggleSaved, saveTargets, scoreMore, submitCv, scored, signedIn, cvText, profileMeta, needsCv } =
     useRolesData();
   const { signInWithGoogle } = useAuth();
   // CV-unlock modal (Phase A front door). Opened from the "Add your CV" affordances,
@@ -505,6 +505,8 @@ export default function RolesMap() {
           setProfileModalOpen(false);
           setCvModalOpen(true);
         }}
+        sectorOptions={sectorOptions}
+        onSaveTargets={saveTargets}
       />
     </div>
   );

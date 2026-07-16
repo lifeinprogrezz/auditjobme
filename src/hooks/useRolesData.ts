@@ -568,6 +568,23 @@ export function useRolesData() {
     }
   };
 
+  // Persist edited target labels to the profile (Settings, Rober 7-15). Roles/sectors
+  // don't feed the 5 score subscores, so no re-score is needed — just update the row
+  // + local profile/meta so the profile view reflects the change immediately.
+  const saveTargets = async (roles: string[], sectors: string[]) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ target_roles: roles, target_sectors: sectors })
+      .eq("id", user.id);
+    if (error) {
+      toast.error("Couldn't save your settings. Please try again.");
+      return;
+    }
+    setProfile((p) => (p ? { ...p, target_roles: roles, target_sectors: sectors } : p));
+    setProfileMeta((m) => (m ? { ...m, targetRoles: roles, targetSectors: sectors } : m));
+  };
+
   /** Manual "check now" — an immediate scores pull, ahead of the next poll tick.
    *  Kept for the RolesPanel prop surface; scoring itself is server-side. */
   const scoreMore = () => {
@@ -610,6 +627,7 @@ export function useRolesData() {
     markApplied,
     saved,
     toggleSaved,
+    saveTargets,
     scoreMore,
     submitCv,
     /** Post-CV state: the score reveal keys on a CV being present. */
