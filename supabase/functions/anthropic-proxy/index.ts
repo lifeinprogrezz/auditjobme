@@ -2,7 +2,9 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.5
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  // x-region: every caller pins execution to eu-central-1 (S1 residency); without it in
+  // the allow-list the browser passes preflight but blocks the POST ("Failed to fetch").
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-region, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 // Sponsored-compute guardrails — enforced SERVER-SIDE (the client never enforces). EVERY LLM
