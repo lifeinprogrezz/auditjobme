@@ -7,7 +7,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import CvUnlockModal from "@/components/roles/CvUnlockModal";
 import { markSessionSeen } from "@/lib/deviceSession";
 
-const signInWithOAuth = vi.fn(async () => ({ error: null }));
+const signInWithOAuth = vi.fn(async (..._a: unknown[]) => ({ error: null }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { signInWithOAuth: (...a: unknown[]) => signInWithOAuth(...a) } },
 }));
