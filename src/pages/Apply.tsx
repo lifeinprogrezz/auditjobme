@@ -20,7 +20,7 @@ import PaperLogo from "@/components/app/PaperLogo";
 import FitChip from "@/components/roles/FitChip";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { tailorSummary, tailorCover, HAIKU, type CoverJson } from "@/lib/tailor";
+import { tailorSummary, tailorCover, answerQuestion, HAIKU, MAX_ANSWERS, type CoverJson } from "@/lib/tailor";
 import { buildCvHtml, buildCoverHtml } from "@/lib/cvHtml";
 import { domainFor } from "@/lib/logodev";
 import { cityOf } from "@/lib/geo";
@@ -28,9 +28,9 @@ import type { Json } from "@/integrations/supabase/types";
 
 // §3.3 secondary CTA — the ONE idiom for every non-primary action on the page:
 // control type (13/600), radius 10, a hairline ink/20 border deepening to /30 on
-// hover — a colour shift only, never the shadcn `hover:bg-accent` fill jump. The
-// page's single PRIMARY (ink fill) is "Open the application page" (the actual
-// apply moment); everything else is secondary (§3.3 one-primary-per-viewport).
+// hover — a colour shift only, never the shadcn `hover:bg-accent` fill jump.
+// There is no primary button on this page (Rober 7-16): the apply moment is the
+// role-title link in the header, which opens the real posting.
 const SECONDARY_CTA =
   "rounded-[10px] border border-foreground/20 bg-transparent text-control font-semibold text-foreground hover:border-foreground/30 hover:bg-transparent hover:text-foreground";
 
@@ -111,6 +111,28 @@ function CopyRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Copy affordance for a drafted answer (Step 4) — same copied-state idiom as
+ *  CopyRow: the button swaps to a muted check, never a re-tinted button (§3.3). */
+function AnswerCopy({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = async () => {
+    if (await copy(text)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+  return copied ? (
+    <span className="inline-flex shrink-0 items-center gap-1.5 text-caption text-muted-foreground">
+      <CheckIcon />
+      Copied
+    </span>
+  ) : (
+    <Button variant="outline" size="sm" className={`shrink-0 ${SECONDARY_CTA}`} onClick={onCopy}>
+      Copy
+    </Button>
+  );
+}
+
 /** Card section shell (§3.2 page idiom): opaque `--card`, radius 16, padding 24,
  *  the ink page shadow, a micro eyebrow above the section title. */
 function Section({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
@@ -134,14 +156,17 @@ export default function Apply() {
   const [name, setName] = useState("");
   const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<null | "cv" | "cover">(null);
+  const [busy, setBusy] = useState<null | "cv" | "cover" | "answer">(null);
   const [error, setError] = useState("");
   // WHICH step surfaced the error, so the status line renders inline at that
   // card (design direction §3.4 status-as-whisper) instead of orphaned at the
   // page bottom.
-  const [errStep, setErrStep] = useState<null | "cv" | "cover" | "apply">(null);
+  const [errStep, setErrStep] = useState<null | "cv" | "cover" | "apply" | "answer">(null);
   const [summary, setSummary] = useState<string | null>(null); // editable tailored summary
   const [cover, setCover] = useState<CoverJson | null>(null);
+  // Step 4 — application-form questions, answered one at a time (Rober 7-16).
+  const [question, setQuestion] = useState("");
+  const [qas, setQas] = useState<{ q: string; a: string }[]>([]);
   const [hasApplied, setHasApplied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
@@ -153,6 +178,8 @@ export default function Apply() {
     setSummary(null);
     setCover(null);
     setScore(null);
+    setQuestion("");
+    setQas([]);
     async function load() {
       if (!user) {
         setLoading(false);
@@ -264,6 +291,32 @@ export default function Apply() {
     }
   }
 
+  /** Draft one grounded answer to a pasted application-form question (Step 4).
+   *  One question per call keeps the UI clean and the spend bounded (MAX_ANSWERS
+   *  per role); every claim comes from the CV, never invented (tailor.ts rules). */
+  async function genAnswer() {
+    const q = question.trim();
+    if (!job || !cvText || !q || qas.length >= MAX_ANSWERS) return;
+    setBusy("answer");
+    setError("");
+    setErrStep(null);
+    try {
+      const a = await answerQuestion({ role: job.title, company: job.company, jdText: job.jd_text, cvText }, q);
+      const next = [...qas, { q, a }];
+      setQas(next);
+      setQuestion("");
+      const saved = await saveArtifact("answers", { qa: next as unknown as Json });
+      if (!saved) {
+        toast.error("Answer drafted, but we couldn't save a copy to your bundle.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Answer generation failed");
+      setErrStep("answer");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function markApplied() {
     if (!user || !job) return;
     setHasApplied(true);
@@ -275,6 +328,20 @@ export default function Apply() {
     if (error) {
       setHasApplied(false);
       setError("Couldn't mark as applied. Please try again.");
+      setErrStep("apply");
+    }
+  }
+
+  /** Reversible mark-as-applied (Rober 7-16): undo deletes the board row. */
+  async function unmarkApplied() {
+    if (!user || !job) return;
+    setHasApplied(false);
+    setError("");
+    setErrStep(null);
+    const { error } = await supabase.from("applications").delete().eq("user_id", user.id).eq("job_id", job.id);
+    if (error) {
+      setHasApplied(true);
+      setError("Couldn't undo. Please try again.");
       setErrStep("apply");
     }
   }
@@ -316,8 +383,48 @@ export default function Apply() {
         <PaperLogo domain={domain} company={job.company} size={40} />
         <div className="min-w-0 flex-1">
           <div className="font-display text-micro uppercase text-muted-foreground">{job.company}</div>
-          <h1 className="text-balance font-display text-page text-foreground">{job.title}</h1>
+          {/* The title IS the link to the real posting (Rober 7-16) — the apply
+              moment lives here, not in a step-3 button. */}
+          <h1 className="text-balance font-display text-page text-foreground">
+            <a
+              href={job.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline-offset-4 hover:underline"
+            >
+              {job.title}
+              <svg
+                className="mb-1 ml-2 inline-block text-muted-foreground"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M7 17 17 7M9 7h8v8" />
+              </svg>
+            </a>
+          </h1>
           {city && <p className="text-caption text-muted-foreground">{city}</p>}
+          {/* Post-applied state surfaces in the HEADER, only once you've applied
+              (Rober 7-16): the tracked confirmation + the board link. */}
+          {hasApplied && (
+            <p className="mt-1.5 inline-flex items-center gap-1.5 text-caption font-medium text-muted-foreground">
+              <CheckIcon />
+              Applied · tracked on your{" "}
+              <button
+                type="button"
+                className="text-foreground underline underline-offset-2"
+                onClick={() => navigate("/tracker")}
+              >
+                applications board
+              </button>
+            </p>
+          )}
         </div>
         {score != null && <FitChip score={score} size="sm" />}
         <button
@@ -361,12 +468,12 @@ export default function Apply() {
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                 />
-                <div className="mt-3 flex flex-wrap gap-2">
+                {/* One action after generate: download (which also saves the reviewed
+                    summary to the bundle). No rewrite loop — edit the text directly
+                    (Rober 7-16). */}
+                <div className="mt-3">
                   <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={downloadCv} disabled={busy !== null || !summary.trim()}>
                     Download CV (PDF)
-                  </Button>
-                  <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={genSummary} disabled={busy !== null}>
-                    {busy === "cv" ? "Rewriting…" : "Rewrite summary"}
                   </Button>
                 </div>
               </>
@@ -393,12 +500,10 @@ export default function Apply() {
                   <p>{cover.p3}</p>
                   <p>{cover.sign}</p>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                {/* One action after generate: download. No rewrite loop (Rober 7-16). */}
+                <div className="mt-3">
                   <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={() => printHtml(buildCoverHtml({ name, company: job.company, cover }))}>
                     Download letter (PDF)
-                  </Button>
-                  <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={genCover} disabled={busy !== null}>
-                    Rewrite letter
                   </Button>
                 </div>
               </>
@@ -410,25 +515,27 @@ export default function Apply() {
             )}
           </Section>
 
-          {/* 3 — Prefill, never submit: the confirm card. The page's ONE primary
-              action (ink fill) is "Open the application page" — the apply moment. */}
+          {/* 3 — Prefill, never submit: the confirm card. Just the three essentials
+              (Rober 7-16) — no generated-content recap; the posting opens from the
+              header title, and the tracked state lives in the header too. */}
           <Section eyebrow="Step 3" title="Submit it yourself">
             <dl className="mt-4 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-4 rounded-[10px] border border-border bg-secondary p-4">
               {name && <CopyRow label="Full name" value={name} />}
               {user?.email && <CopyRow label="Email" value={user.email} />}
-              {summary && <CopyRow label="Summary" value={summary} />}
               <CopyRow label="Role link" value={job.url} />
             </dl>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Button asChild>
-                <a href={job.url} target="_blank" rel="noopener noreferrer">
-                  Open the application page
-                </a>
-              </Button>
+            <div className="mt-4">
               {hasApplied ? (
-                <span className="inline-flex items-center gap-1.5 text-control text-muted-foreground">
+                <span className="inline-flex items-center gap-2 text-control text-muted-foreground">
                   <CheckIcon />
                   Marked as applied
+                  <button
+                    type="button"
+                    onClick={unmarkApplied}
+                    className="font-medium underline underline-offset-2 transition-colors hover:text-foreground"
+                  >
+                    Undo
+                  </button>
                 </span>
               ) : (
                 <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={markApplied}>
@@ -436,19 +543,57 @@ export default function Apply() {
                 </Button>
               )}
             </div>
-            {hasApplied && (
-              <p className="mt-3 text-body text-muted-foreground">
-                Tracked on your{" "}
-                <button className="text-foreground underline underline-offset-2" onClick={() => navigate("/tracker")}>
-                  applications board
-                </button>
-                .
-              </p>
-            )}
             {errStep === "apply" && (
               <p className="mt-3 text-caption text-destructive" role="status">
                 {error}
               </p>
+            )}
+          </Section>
+
+          {/* 4 — Application-form questions (Rober 7-16): paste ONE question from the
+              real form, get an answer grounded in the CV + JD. One at a time keeps the
+              UI clean and each call cheap; MAX_ANSWERS bounds the sponsored spend. */}
+          <Section eyebrow="Step 4" title="Answer the form's questions">
+            <Textarea
+              className="mt-4 min-h-20 rounded-[10px] font-sans text-body"
+              placeholder={`Paste one question from the application form, e.g. "Why do you want to work at ${job.company}?"`}
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              disabled={qas.length >= MAX_ANSWERS}
+            />
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className={SECONDARY_CTA}
+                onClick={genAnswer}
+                disabled={busy !== null || !question.trim() || qas.length >= MAX_ANSWERS}
+              >
+                {busy === "answer" ? "Drafting your answer…" : "Draft answer"}
+              </Button>
+              {qas.length >= MAX_ANSWERS && (
+                <span className="text-caption text-muted-foreground">
+                  That's the limit for this role ({MAX_ANSWERS} answers).
+                </span>
+              )}
+            </div>
+            {errStep === "answer" && (
+              <p className="mt-3 text-caption text-destructive" role="status">
+                {error}
+              </p>
+            )}
+            {qas.length > 0 && (
+              <ul className="mt-4 flex flex-col gap-3">
+                {qas.map((qa, i) => (
+                  <li key={i} className="rounded-[10px] border border-border bg-secondary p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-micro uppercase text-muted-foreground">{qa.q}</p>
+                      <AnswerCopy text={qa.a} />
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-body text-foreground">{qa.a}</p>
+                  </li>
+                ))}
+              </ul>
             )}
           </Section>
         </div>

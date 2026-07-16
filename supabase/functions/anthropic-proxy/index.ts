@@ -12,7 +12,7 @@ const corsHeaders = {
 // pre-ship: don't limit until launch; capping gets redesigned then — planning spec
 // 2026-07-10-server-side-scoring-backlog-design.md). Metering below stays: usage_events is
 // the observability surface a future cap will read.
-const ALLOWED_KINDS = ['score', 'audit', 'cv', 'letter'];
+const ALLOWED_KINDS = ['score', 'audit', 'cv', 'letter', 'answer'];
 const MAX_TOKENS_CEILING = 8192;    // hard ceiling: a caller can't request a huge, costly generation
 // priceUsd only knows haiku vs sonnet rates, so an unlisted (e.g. pricier) model would be
 // under-metered and could outrun the caps — accept only the two the product actually uses.
