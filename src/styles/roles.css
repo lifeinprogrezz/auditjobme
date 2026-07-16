@@ -400,7 +400,7 @@
 .roles-theme .selclear { border: none; background: none; color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 6px; border-radius: 7px; }
 .roles-theme .selclear:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .roles-theme.light .selchip { background: rgba(255, 255, 255, 0.6); }
-.roles-theme .cards { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; padding: 4px 8px 4px 0; }
+.roles-theme .cards { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; overflow-x: hidden; padding: 4px 8px 4px 0; }
 .roles-theme .cards::-webkit-scrollbar { width: 6px; }
 .roles-theme .cards::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
 
@@ -450,7 +450,7 @@
 .roles-theme:not(.scored) .card .fitchip { display: none; }
 
 /* DETAIL VIEW */
-.roles-theme .detail { display: none; flex: 1; min-height: 0; overflow-y: auto; flex-direction: column; gap: 14px; padding-right: 8px; }
+.roles-theme .detail { display: none; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; flex-direction: column; gap: 14px; padding-right: 8px; }
 .roles-theme.detail-open .cards, .roles-theme.detail-open .phead { display: none; }
 .roles-theme.detail-open .detail { display: flex; }
 .roles-theme .dback { align-self: flex-start; background: none; border: 0; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 2px 0; display: flex; align-items: center; gap: 5px; transition: color 0.2s; }
