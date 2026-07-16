@@ -149,8 +149,8 @@ export default function Tracker() {
 
   if (loading) {
     return (
-      <AppShell title="Applications">
-        <p className="mt-6 text-body text-muted-foreground">Loading your board…</p>
+      <AppShell>
+        <p className="text-body text-muted-foreground">Loading your board…</p>
       </AppShell>
     );
   }
@@ -158,8 +158,8 @@ export default function Tracker() {
   if (apps.length === 0) {
     // First-class empty state (§6.2): a designed paper card, not raw text.
     return (
-      <AppShell title="Applications">
-        <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-page">
+      <AppShell>
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-page">
           <p className="text-body text-muted-foreground text-pretty">
             No applications yet. Open a role from Today, prepare it, then mark it applied and it shows up on this board.
           </p>
@@ -169,9 +169,12 @@ export default function Tracker() {
   }
 
   return (
-    <AppShell title="Applications">
-      <p className="mt-1 text-body text-muted-foreground">
-        Every application in one place, so you always know where you stand. Move a card as things progress.
+    <AppShell>
+      {/* Same opening idiom as Today (Rober 7-16): no h1 + tagline — one
+          outcome-first line, then the board. */}
+      <p className="text-body text-muted-foreground">
+        <span className="font-semibold text-foreground">Everything you've applied to</span>, in one place. Move a
+        card as things progress.
       </p>
       {/* The board breaks OUT of the prose reading column (§6.2 / jj rule 7): a
           full-bleed scroll region so all five stage columns get real width instead
@@ -205,28 +208,15 @@ export default function Tracker() {
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-caption font-medium text-muted-foreground">{a.company}</div>
                           {/* The role name stays INSIDE the product — it opens the prep
-                              page (Rober 7-16); the external posting is the ↗ beside it. */}
-                          <div className="mt-0.5 flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/apply?job=${encodeURIComponent(a.url)}`)}
-                              className="min-w-0 truncate text-left text-control font-semibold text-foreground underline-offset-2 hover:underline"
-                            >
-                              {a.title}
-                            </button>
-                            <a
-                              href={a.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label="Open the job posting"
-                              title="Open the job posting"
-                              className="inline-flex shrink-0 items-center text-muted-foreground transition-colors hover:text-foreground"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                <path d="M7 17 17 7M9 7h8v8" />
-                              </svg>
-                            </a>
-                          </div>
+                              page (Rober 7-16); the posting is reachable from the prep
+                              header title. No ↗ clutter on the card. */}
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/apply?job=${encodeURIComponent(a.url)}`)}
+                            className="mt-0.5 block w-full min-w-0 truncate text-left text-control font-semibold text-foreground underline-offset-2 hover:underline"
+                          >
+                            {a.title}
+                          </button>
                         </div>
                       </div>
                       <div className="mt-2.5 flex items-center justify-between">

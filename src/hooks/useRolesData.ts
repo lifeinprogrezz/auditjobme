@@ -558,6 +558,17 @@ export function useRolesData() {
         return next;
       });
       toast.error("Couldn't mark as applied. Please try again.");
+      return;
+    }
+    // Applied ⇒ leaves Saved (Rober 7-16): the role lives on the applications board
+    // now; keeping the bookmark too is clutter. Best-effort — never blocks the apply.
+    if (saved.has(job.id)) {
+      setSaved((prev) => {
+        const next = new Set(prev);
+        next.delete(job.id);
+        return next;
+      });
+      await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", job.id);
     }
   };
 

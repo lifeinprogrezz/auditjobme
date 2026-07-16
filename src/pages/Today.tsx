@@ -82,14 +82,10 @@ export default function Today() {
   return (
     <AppShell>
       {/* No h1, no tagline (Rober 7-16, direction 1): the nav already says where you
-          are. The page opens with a LIVE status line — data that changes every day,
-          never boilerplate — then goes straight into the sections. */}
+          are. One outcome-first opening line — no stats parade — then straight into
+          the sections. */}
       <p className="text-body text-muted-foreground">
-        <span className="font-semibold text-foreground">
-          {queue.length === 0 ? "No new matches" : `${queue.length} ${queue.length === 1 ? "match" : "matches"}`}
-        </span>{" "}
-        for you today · from {coverage.roles.toLocaleString()} live openings across{" "}
-        {coverage.companies.toLocaleString()} companies, refreshed this morning.
+        <span className="font-semibold text-foreground">Your matches for today</span>, refreshed every morning.
       </p>
       {scoring && (
         <p className="mt-3 font-mono text-caption text-muted-foreground" role="status" aria-live="polite">
@@ -99,12 +95,26 @@ export default function Today() {
 
       {savedJobs.length > 0 && (
         <section className="mt-8">
-          <h2 className="font-display text-micro uppercase text-muted-foreground">Saved ({savedJobs.length})</h2>
+          {/* Section headings carry the page's wayfinding — full display size in ink,
+              not micro-caps whispers (Rober 7-16: they were too hard to find). */}
+          <h2 className="font-display text-section text-foreground">Saved</h2>
           <ul className="mt-3 flex flex-col gap-3">
+            {/* The CARD opens the prep page (Rober 7-16); only the role title itself
+                links out to the posting. The inner link/button opt out via closest(). */}
             {savedJobs.map((job) => (
               <li
                 key={job.id}
-                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-page"
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("a,button")) return;
+                  navigate(`/apply?job=${encodeURIComponent(job.url)}`);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" || (e.target as HTMLElement).closest("a,button")) return;
+                  navigate(`/apply?job=${encodeURIComponent(job.url)}`);
+                }}
+                className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-page transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-px hover:border-foreground/20 hover:shadow-page-lift"
               >
                 <PaperLogo domain={job.domain} company={job.company} size={40} />
                 <div className="min-w-0 flex-1">
@@ -121,14 +131,6 @@ export default function Today() {
                     {job.city ?? job.location ?? (job.remote ? "Remote" : "Location unknown")}
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={SECONDARY_CTA}
-                  onClick={() => navigate(`/apply?job=${encodeURIComponent(job.url)}`)}
-                >
-                  Prepare
-                </Button>
                 <button
                   type="button"
                   onClick={() => toggleSaved(job)}
@@ -154,10 +156,11 @@ export default function Today() {
         <>
           {[
             { heading: `Top ${Math.min(10, queue.length)} to apply today`, items: top, ranked: true },
-            ...(more.length > 0 ? [{ heading: `More matches (${more.length})`, items: more, ranked: false }] : []),
+            // No count on the tail (Rober 7-16) — just scroll to the end.
+            ...(more.length > 0 ? [{ heading: "More matches", items: more, ranked: false }] : []),
           ].map((sec) => (
             <section key={sec.heading} className="mt-8">
-              <h2 className="font-display text-micro uppercase text-muted-foreground">{sec.heading}</h2>
+              <h2 className="font-display text-section text-foreground">{sec.heading}</h2>
               <ol className="mt-3 flex flex-col gap-4">
                 {sec.items.map((job, i) => {
             const rank = sec.ranked ? i + 1 : null;

@@ -21,7 +21,7 @@ import FitChip from "@/components/roles/FitChip";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { tailorSummary, tailorCover, answerQuestion, HAIKU, MAX_ANSWERS, type CoverJson } from "@/lib/tailor";
-import { buildCvHtml, buildCoverHtml } from "@/lib/cvHtml";
+import { downloadCvPdf, downloadCoverPdf } from "@/lib/pdf";
 import { domainFor } from "@/lib/logodev";
 import { cityOf } from "@/lib/geo";
 import type { Json } from "@/integrations/supabase/types";
@@ -33,19 +33,6 @@ import type { Json } from "@/integrations/supabase/types";
 // role-title link in the header, which opens the real posting.
 const SECONDARY_CTA =
   "rounded-[10px] border border-foreground/20 bg-transparent text-control font-semibold text-foreground hover:border-foreground/30 hover:bg-transparent hover:text-foreground";
-
-/** Open the generated HTML in a new window and trigger the browser's print-to-PDF. */
-function printHtml(html: string) {
-  const w = window.open("", "_blank");
-  if (!w) {
-    toast.error("Please allow popups to download the PDF.");
-    return;
-  }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-  w.onload = () => setTimeout(() => w.print(), 500);
-}
 
 type Job = {
   id: string;
@@ -243,14 +230,26 @@ export default function Apply() {
     return !error;
   }
 
-  async function genSummary() {
+  /** ONE click (Rober 7-16): tailor the summary, build the text-based PDF, and
+   *  download it straight to disk. No edit box, no print dialog. A re-click
+   *  re-downloads the already-generated version without a second LLM call. */
+  async function generateAndDownloadCv() {
     if (!job || !cvText) return;
+    if (summary != null) {
+      await downloadCvPdf({ name, summary, cvText, company: job.company });
+      return;
+    }
     setBusy("cv");
     setError("");
     setErrStep(null);
     try {
       const s = await tailorSummary({ role: job.title, company: job.company, jdText: job.jd_text, cvText });
       setSummary(s);
+      await downloadCvPdf({ name, summary: s, cvText, company: job.company });
+      const saved = await saveArtifact("cv", { summary: s });
+      if (!saved) {
+        toast.error("Your CV downloaded, but we couldn't save a copy to your bundle.");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "CV generation failed");
       setErrStep("cv");
@@ -259,29 +258,23 @@ export default function Apply() {
     }
   }
 
-  async function downloadCv() {
-    if (!job || !cvText || summary == null) return;
-    printHtml(buildCvHtml({ name, summary, cvText }));
-    // Persist the reviewed summary (the version the user actually downloaded). If the
-    // write fails, say so — the PDF is fine, but it won't show up in the saved bundle
-    // (issue #54: don't lose the ledger row silently).
-    const saved = await saveArtifact("cv", { summary });
-    if (!saved) {
-      toast.error("Your CV is downloading, but we couldn't save a copy to your bundle. Try again to keep it on file.");
-    }
-  }
-
-  async function genCover() {
+  /** Same one-click contract for the cover letter. */
+  async function generateAndDownloadCover() {
     if (!job || !cvText) return;
+    if (cover != null) {
+      await downloadCoverPdf({ name, company: job.company, cover });
+      return;
+    }
     setBusy("cover");
     setError("");
     setErrStep(null);
     try {
       const c = await tailorCover({ role: job.title, company: job.company, jdText: job.jd_text, cvText }, name);
       setCover(c);
+      await downloadCoverPdf({ name, company: job.company, cover: c });
       const saved = await saveArtifact("letter", { cover: c as unknown as Json });
       if (!saved) {
-        toast.error("We drafted your letter, but couldn't save a copy to your bundle. Try again to keep it on file.");
+        toast.error("Your letter downloaded, but we couldn't save a copy to your bundle.");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Cover letter generation failed");
@@ -329,6 +322,13 @@ export default function Apply() {
       setHasApplied(false);
       setError("Couldn't mark as applied. Please try again.");
       setErrStep("apply");
+      return;
+    }
+    // Applied ⇒ leaves Saved (Rober 7-16): it lives on the applications board now,
+    // keeping it bookmarked too is clutter. Best-effort — never blocks the apply.
+    if (isSaved) {
+      setIsSaved(false);
+      await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", job.id);
     }
   }
 
@@ -393,20 +393,6 @@ export default function Apply() {
               className="underline-offset-4 hover:underline"
             >
               {job.title}
-              <svg
-                className="mb-1 ml-2 inline-block text-muted-foreground"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M7 17 17 7M9 7h8v8" />
-              </svg>
             </a>
           </h1>
           {city && <p className="text-caption text-muted-foreground">{city}</p>}
@@ -452,32 +438,19 @@ export default function Apply() {
         </div>
       ) : (
         <div className="mt-8 flex flex-col gap-6">
-          {/* 1 — Tailored CV: generate → EDIT → download */}
+          {/* 1 — Tailored CV: ONE click, PDF straight to disk (Rober 7-16). */}
           <Section eyebrow="Step 1" title="Tailored CV">
-            {summary == null ? (
-              <Button variant="outline" size="sm" className={`mt-4 ${SECONDARY_CTA}`} onClick={genSummary} disabled={busy !== null}>
-                {busy === "cv" ? "Tailoring your summary…" : "Generate tailored summary"}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={generateAndDownloadCv} disabled={busy !== null}>
+                {busy === "cv" ? "Tailoring your CV…" : summary != null ? "Download again" : "Download tailored CV (PDF)"}
               </Button>
-            ) : (
-              <>
-                <label className="mt-4 block text-micro uppercase text-muted-foreground">
-                  Professional summary (edit before you download)
-                </label>
-                <Textarea
-                  className="mt-2 min-h-32 rounded-[10px] font-sans text-body"
-                  value={summary}
-                  onChange={(e) => setSummary(e.target.value)}
-                />
-                {/* One action after generate: download (which also saves the reviewed
-                    summary to the bundle). No rewrite loop — edit the text directly
-                    (Rober 7-16). */}
-                <div className="mt-3">
-                  <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={downloadCv} disabled={busy !== null || !summary.trim()}>
-                    Download CV (PDF)
-                  </Button>
-                </div>
-              </>
-            )}
+              {summary != null && (
+                <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
+                  <CheckIcon />
+                  Downloaded
+                </span>
+              )}
+            </div>
             {errStep === "cv" && (
               <p className="mt-3 text-caption text-destructive" role="status">
                 {error}
@@ -485,29 +458,19 @@ export default function Apply() {
             )}
           </Section>
 
-          {/* 2 — Cover letter (optional) */}
+          {/* 2 — Cover letter (optional): same one-click contract. */}
           <Section eyebrow="Step 2" title="Cover letter">
-            {cover == null ? (
-              <Button variant="outline" size="sm" className={`mt-4 ${SECONDARY_CTA}`} onClick={genCover} disabled={busy !== null}>
-                {busy === "cover" ? "Writing your cover letter…" : "Generate cover letter"}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={generateAndDownloadCover} disabled={busy !== null}>
+                {busy === "cover" ? "Writing your letter…" : cover != null ? "Download again" : "Download cover letter (PDF)"}
               </Button>
-            ) : (
-              <>
-                <div className="mt-4 space-y-3 rounded-[10px] border border-border bg-secondary p-4 text-body text-foreground">
-                  <p>{cover.greeting}</p>
-                  <p>{cover.p1}</p>
-                  <p>{cover.p2}</p>
-                  <p>{cover.p3}</p>
-                  <p>{cover.sign}</p>
-                </div>
-                {/* One action after generate: download. No rewrite loop (Rober 7-16). */}
-                <div className="mt-3">
-                  <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={() => printHtml(buildCoverHtml({ name, company: job.company, cover }))}>
-                    Download letter (PDF)
-                  </Button>
-                </div>
-              </>
-            )}
+              {cover != null && (
+                <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
+                  <CheckIcon />
+                  Downloaded
+                </span>
+              )}
+            </div>
             {errStep === "cover" && (
               <p className="mt-3 text-caption text-destructive" role="status">
                 {error}
