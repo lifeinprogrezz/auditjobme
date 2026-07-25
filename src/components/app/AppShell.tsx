@@ -46,8 +46,19 @@ export default function AppShell({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Warm the map's lazy chunks while the user reads this page (Rober 7-25
+  // "smoother map↔list"): clicking Map then costs zero "Loading…" flash — the
+  // route swap resolves from the module cache. Idle-delayed so it never
+  // competes with this page's own paint; Vite dedupes repeat imports.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      import("@/pages/RolesMap").catch(() => {});
+    }, 700);
+    return () => window.clearTimeout(t);
+  }, []);
+
   return (
-    <div className="page-grain min-h-screen overflow-x-clip bg-background text-foreground">
+    <div className="page-fade page-grain min-h-screen overflow-x-clip bg-background text-foreground">
       <header
         className={cn(
           "sticky top-0 z-20 border-b border-border bg-background transition-shadow duration-200",

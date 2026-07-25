@@ -197,3 +197,15 @@
     background: color-mix(in srgb, hsl(var(--foreground)) 32%, transparent);
   }
 }
+
+/* Route-swap softener (Rober 7-25 "smoother map↔list"): each surface fades in
+   over 180ms instead of hard-cutting. Applied to BOTH page roots (AppShell +
+   .roles-theme) so the toggle feels like one continuous product. */
+@keyframes page-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.page-fade { animation: page-fade 0.18s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .page-fade { animation: none; }
+}

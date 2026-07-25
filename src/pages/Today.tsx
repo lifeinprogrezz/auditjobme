@@ -4,7 +4,8 @@
 // FitChip instead of any bare score numeral, theme-matched logos, and secondary row
 // CTAs (one-primary law). Consumes the SHARED useRolesData path (server-written
 // scores, full signals) — no client-side scoring loop. Honest copy kept verbatim.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
+import { useRevealOnScroll } from "@/hooks/useRevealOnScroll";
 import { useNavigate } from "react-router-dom";
 import AppShell from "@/components/app/AppShell";
 import PaperLogo from "@/components/app/PaperLogo";
@@ -47,24 +48,10 @@ export default function Today() {
 
   // Infinite reveal (Rober 7-25): the queue is uncapped now, so "More matches"
   // must scroll as deep as the scored pool goes — but 800+ cards mounted at once
-  // is a DOM bomb, so reveal in slices of 30 as the sentinel nears the viewport.
-  const REVEAL_STEP = 30;
-  const [moreShown, setMoreShown] = useState(REVEAL_STEP);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) setMoreShown((n) => n + REVEAL_STEP);
-      },
-      // Start loading well before the user reaches the end — the reveal should
-      // feel endless, never like pagination.
-      { rootMargin: "600px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [more.length, moreShown]);
+  // is a DOM bomb, so reveal in slices as the list end nears the viewport.
+  // Scroll-math implementation, NOT IntersectionObserver — the IO version
+  // didn't fire in Rober's live session; see useRevealOnScroll.
+  const { shown: moreShown, hasMore, sentinelRef } = useRevealOnScroll(more.length);
 
   const coverageLine = (
     <p className="text-body text-muted-foreground text-pretty">
@@ -287,7 +274,7 @@ export default function Today() {
           ))}
           {/* Reveal sentinel: while un-revealed tail remains, this quiet marker
               near the list end triggers the next slice. */}
-          {more.length > moreShown && (
+          {hasMore && (
             <div ref={sentinelRef} className="py-6 text-center font-mono text-caption text-muted-foreground" aria-hidden="true">
               …
             </div>

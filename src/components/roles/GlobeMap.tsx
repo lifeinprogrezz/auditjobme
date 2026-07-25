@@ -867,15 +867,29 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
         } catch {
           /* flat fallback is acceptable */
         }
+        // The world→Europe landing flight is a FIRST-visit flourish only (Rober
+        // 7-25 "smoother map↔list"): on every later mount in the session — e.g.
+        // toggling back from Today — it read as lag, not intent, so repeat
+        // mounts frame Europe instantly with no 450ms hold.
+        let seenIntro = false;
+        try {
+          seenIntro = sessionStorage.getItem("aj-globe-intro") === "1";
+          sessionStorage.setItem("aj-globe-intro", "1");
+        } catch {
+          /* private mode: every mount gets the flourish, nothing breaks */
+        }
         const fitEurope = () => {
           if (mapRef.current !== map || focusRef.current) return;
           try {
-            map.fitBounds(EUROPE_BOUNDS, { padding: fitPad(map, EUROPE_PADDING), duration: dur(CONTINENT_MS) });
+            map.fitBounds(EUROPE_BOUNDS, {
+              padding: fitPad(map, EUROPE_PADDING),
+              duration: seenIntro ? 0 : dur(CONTINENT_MS),
+            });
           } catch {
             /* ignore */
           }
         };
-        fitTimerRef.current = window.setTimeout(fitEurope, 450);
+        fitTimerRef.current = window.setTimeout(fitEurope, seenIntro ? 0 : 450);
         // Prod cold-loads sometimes fire the 450ms fit before the container is laid
         // out, so it no-ops and the map is stranded at the world init zoom. Frame
         // Europe once the map is first idle (tiles loaded + container sized) if it's

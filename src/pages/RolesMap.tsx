@@ -45,6 +45,16 @@ export default function RolesMap() {
   // CV-unlock modal (Phase A front door). Opened from the "Add your CV" affordances,
   // and from the Settings page's Replace-CV deep link (?cv=1) — one shared instance.
   const [cvModalOpen, setCvModalOpen] = useState(false);
+  // Warm the paper surfaces' lazy chunks while the user browses the map (Rober
+  // 7-25 "smoother map↔list") — the List toggle / avatar-menu jumps then swap
+  // with no "Loading…" flash. Idle-delayed past the map's own heavy startup.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      import("./Today").catch(() => {});
+      import("./Tracker").catch(() => {});
+    }, 1500);
+    return () => window.clearTimeout(t);
+  }, []);
   // /?cv=1 → open the CV-unlock flow and strip the param (Rober 7-25: the /settings
   // PAGE replaced the profile modal, so Replace-CV deep-links back to the map's
   // one parsed-upload flow instead of rebuilding it on paper).
@@ -349,6 +359,7 @@ export default function RolesMap() {
 
   const rootClass = [
     "roles-theme",
+    "page-fade",
     light && "light",
     scored && "scored",
     detailLive && "detail-open",
