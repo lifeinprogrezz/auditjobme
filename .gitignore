@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Local environment. The build-time VITE_ values live in the Vercel project env;
+# .env is local-only so a real secret dropped in here can never reach this PUBLIC
+# repo. Copy .env.example to .env for local development.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
