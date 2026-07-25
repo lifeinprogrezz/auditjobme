@@ -6,9 +6,15 @@ for the job-row schema, [`scoring-benchmarks.md`](./scoring-benchmarks.md) for s
 
 ## What the product does
 
-It finds European product roles, scores each one against *your* CV with a language model,
-and prepares the application. The user-facing shape is a globe: roles clustered by city,
-ranked by fit once a CV is on file.
+It finds European tech roles, scores each one against *your* CV with a language model, and
+prepares the application. The user-facing shape is a globe: roles clustered by city, ranked
+by fit once a CV is on file.
+
+**Product roles are the opening wedge, not the scope.** The ingestion and scoring path is
+still product-only today — `scorePrompt.ts` hard-wires the discipline and `job-filters.mjs`
+gates the pool — but the database and the interface are already vertical-agnostic:
+`jobs.role_family` exists, and the headbar Role facet renders whatever families the rows
+carry. Widening the engine is issue #34; nothing above it needs reshaping.
 
 Three surfaces, all behind sign-in except the map:
 

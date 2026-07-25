@@ -1,11 +1,15 @@
 # auditjob.me
 
-A live map of European product roles, scored against your CV.
+A live map of European tech roles, scored against your CV.
 
 Roles are collected daily from applicant tracking systems, venture portfolio boards, and
 startup directories, then ranked by how well each one fits the CV you upload. Once a role
 looks worth it, the app prepares the application: a tailored CV that keeps your own words,
 a cover letter, and answers to the form's questions.
+
+The catalog opens with product roles — a wedge, not a ceiling. The schema and filtering
+already carry a `role_family` dimension so further disciplines slot in without reshaping
+the engine.
 
 Live at **[auditjob.me](https://auditjob.me)**.
 
