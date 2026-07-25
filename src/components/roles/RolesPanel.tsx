@@ -399,11 +399,18 @@ export default function RolesPanel({
     if (job.remote) roleFacts.push(["Remote", "Yes"]);
     if (ago) roleFacts.push(["Posted", ago]);
     if (comp) roleFacts.push(["Comp", comp]);
-    // Work-eligibility cell (issue #42): ALWAYS shown, including the honest "Not
-    // stated" state, so an ambiguous / login-walled JD never silently omits it and
-    // never shows a wrong verdict (geoVerdict's safety property).
+    // Work-eligibility cell (issue #42): ALWAYS shown, so an ambiguous /
+    // login-walled JD never silently omits it and never shows a wrong verdict
+    // (geoVerdict's safety property). When the verdict is unverified but the JD
+    // DID state something (e.g. "Canada only" — real, just not classifiable),
+    // show the raw statement rather than a false "Not stated" (#54 honesty fix);
+    // "Not stated" is reserved for a genuinely silent JD.
     const geo = geoVerdict(job);
-    roleFacts.push(["Work eligibility", geo.kind === "unverified" ? "Not stated" : geo.label]);
+    const geoRaw = job.extraction?.geo_eligibility?.trim();
+    roleFacts.push([
+      "Work eligibility",
+      geo.kind === "unverified" ? (geoRaw ? `"${geoRaw.length > 70 ? `${geoRaw.slice(0, 67)}…` : geoRaw}"` : "Not stated") : geo.label,
+    ]);
     const others = allJobs.filter((j) => j.company === job.company && j.url !== job.url);
     // Hero: a CV holder sees their fit (or a pending state); everyone else sees the
     // unlock prompt — the pre-CV conversion moment (absorbs issue #18).

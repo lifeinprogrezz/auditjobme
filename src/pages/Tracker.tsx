@@ -201,7 +201,7 @@ export default function Tracker() {
                   byColumn[col.value].map((a) => (
                     <article
                       key={a.id}
-                      className="rounded-[10px] bg-card p-3 shadow-page transition-shadow duration-150 hover:shadow-page-lift"
+                      className="rounded-[10px] border border-border bg-card p-3 transition-shadow duration-150 hover:shadow-page-lift"
                     >
                       <div className="flex items-start gap-2.5">
                         <PaperLogo domain={a.logo_domain ?? domainFor(a.company, a.source)} company={a.company} size={24} />

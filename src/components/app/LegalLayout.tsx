@@ -27,7 +27,8 @@ export default function LegalLayout({
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-10 sm:px-6">
-        <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+        {/* §2.1 scale: the shared `page` token, not an off-scale sm:text-3xl (#63). */}
+        <h1 className="text-balance font-display text-page">{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">Last updated: {updated}</p>
         <div className="mt-8 flex flex-col gap-8 leading-relaxed">{children}</div>
       </main>
