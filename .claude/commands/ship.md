@@ -2,7 +2,7 @@
 description: Deploy auditjob.me to Vercel production, confirm the deploy is healthy, and report
 allowed-tools: Bash
 ---
-Ship the current state of the auditjob.me web app to Vercel production. Run from the repo root (`/home/roberto05/Documentos/Coding/auditjobme`); stop and report at the first hard failure. This is the deploy half of the deploy→check→iterate loop (`/verify` is the local half).
+Ship the current state of the auditjob.me web app to Vercel production. Run from the repo root; stop and report at the first hard failure. This is the deploy half of the deploy→check→iterate loop (`/verify` is the local half).
 
 1. **Gate on a local verify first** — `npm run build && npm test`, then smoke-walk a local preview: `npm run preview -- --port 8080 &`, wait ~3s for it to bind, `node scripts/verify-smoke.mjs http://localhost:8080`, then kill the server (`fuser -k 8080/tcp`). Do NOT deploy if any hard check fails — quote the exact failure and stop.
 2. **Deploy to production** — `vercel deploy --prod --yes` (the repo is linked to the `auditjobme` Vercel project; the auth'd CLI handles the rest). Capture the deployment URL it prints.

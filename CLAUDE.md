@@ -13,8 +13,8 @@ context via GitHub Issues.
   (schema changes ALWAYS go through migrations + human review — never the dashboard).
 - `src/pages/` routes · `src/components/` · `src/integrations/supabase/` (regenerate
   `types.ts` after any schema change — it's generated, never hand-edit).
-- Hosted on **Vercel** (preview per PR, production on main). Lovable is disconnected —
-  ignore `.lovable/`.
+- Hosted on **Vercel**: `main` deploys to production (auditjob.me). Branch preview
+  deployments are disabled in `vercel.json` — review on `localhost:8080`, not a preview URL.
 
 ## Economics — sponsored compute (v1)
 Free-cohort AI calls run server-side via the `anthropic-proxy` edge function on OUR
