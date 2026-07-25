@@ -81,7 +81,7 @@ A Node command-line system, file-based, single-user today. What it does:
 
 ### The shell — auditjob.me (the product)
 A Vite + React single-page app (TypeScript), styled with Tailwind + shadcn/ui,
-built in Lovable, backed by Supabase (Postgres + Google sign-in). What's already
+backed by Supabase (Postgres + Google sign-in). What's already
 built and working:
 - Landing page, brand/color system (sage `#8a9a8a` on dark charcoal), **Google
   sign-in**, public audit display at `/a/:username/:slug`, legal pages.
