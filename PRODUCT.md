@@ -325,6 +325,29 @@ digestion, Luma events, ESADE second-degree connections, Grok sentiment, and the
 rest), now reframed for a multi-user product instead of one user. This document
 **cross-links** `ROADMAP.md`; it does not duplicate or replace it.
 
+### North star — the self-learning loop (final form, 2026-07-25)
+
+The product's end state is an agent that **learns from each user's own outcomes**
+— applications, rejections, interviews, dismissals — and adjusts what it shows
+them, the way a person recalibrates their search after every rejection cycle.
+Five stages, strictly in order, each valuable alone:
+
+1. **Capture outcomes** — tracker statuses + transitions (status_events),
+   save/dismiss signals. *Pure data; ships as normal features.*
+2. **Inbox → tracker auto-advance** — the funnel updates itself from ATS emails,
+   making the outcome record complete and honest.
+3. **Nudges** — with real data: "companies like X respond to you; here are 3
+   similar" (a digest line or Today section, no chat surface).
+4. **Outcome-weighted targeting** — scoring/slicing personalizes from the user's
+   own funnel.
+5. **A conversational agent** over all of it — only meaningful once 1–4 exist.
+
+Deliberately NOT tracked as an open issue (it has nothing to ship by itself —
+stages become issues one at a time when their prerequisites have data). A chat
+container without the learning loop was considered and rejected. **Guardrail for
+every feature in the meantime: never design a surface that discards outcome
+data** — signals lost today are unrecoverable training data.
+
 ---
 
 *Foundation written 2026-05-31. Living document — update as parts land.*
