@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSummaryPrompt, buildCoverPrompt, noEmDash } from "./tailor";
+import { buildSummaryPrompt, buildCoverPrompt, buildAnswerPrompt, noEmDash, MAX_ANSWERS } from "./tailor";
 import { stripLeadingSummary, buildCvHtml, buildCoverHtml, esc } from "./cvHtml";
 
 const CV = `John Doe
@@ -30,6 +30,25 @@ describe("tailor prompts", () => {
     expect(p).toContain("greeting, p1, p2, p3, sign");
     expect(p).toContain("NO em-dashes");
     expect(p).toContain("John Doe");
+  });
+
+  it("answer prompt carries the question, CV facts, and the grounding rules", () => {
+    const p = buildAnswerPrompt(
+      { role: "Senior PM", company: "Acme", jdText: "Own the roadmap", cvText: CV },
+      "Why do you want to work at Acme?",
+    );
+    expect(p).toContain("Why do you want to work at Acme?");
+    expect(p).toContain("Senior PM at Acme");
+    expect(p).toContain("Grew activation 40%");
+    expect(p).toContain("Use ONLY facts");
+    expect(p).toContain("Never fabricate");
+    expect(p).toContain("FIRST PERSON");
+    expect(p.toLowerCase()).toContain("no em-dashes");
+    expect(p).toContain("120-180 words");
+  });
+
+  it("answer cap is bounded", () => {
+    expect(MAX_ANSWERS).toBeLessThanOrEqual(10);
   });
 
   it("noEmDash replaces em-dashes with commas", () => {

@@ -1,7 +1,8 @@
-// Pins ProfileModal (issue #43 surface, hardened in #54): the avatar's real destination
-// for a signed-in user. Three states matter — no CV on file, a CV on file, and the sign-out
-// wiring — because a broken empty/loaded branch or a sign-out that doesn't close the modal
-// is a dead-end the map shell can't recover from.
+// Pins ProfileModal (issue #43 surface, hardened in #54; Settings added Rober 7-15):
+// the avatar's real destination for a signed-in user. States that matter — no CV on
+// file, a CV on file, sign-out wiring, and the Settings sub-view where target roles /
+// industries are now EDITED (they no longer render as read-only chips in the profile
+// view) — because a broken branch here is a dead-end the map shell can't recover from.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -17,6 +18,7 @@ vi.mock("@/components/AuthProvider", () => ({
 function renderModal(props: Partial<React.ComponentProps<typeof ProfileModal>> = {}) {
   const onClose = vi.fn();
   const onReplaceCv = vi.fn();
+  const onSaveTargets = vi.fn(async () => true);
   const utils = render(
     <MemoryRouter>
       <ProfileModal
@@ -27,11 +29,13 @@ function renderModal(props: Partial<React.ComponentProps<typeof ProfileModal>> =
         targetSectors={[]}
         cvUpdatedAt={null}
         onReplaceCv={onReplaceCv}
+        sectorOptions={[]}
+        onSaveTargets={onSaveTargets}
         {...props}
       />
     </MemoryRouter>,
   );
-  return { onClose, onReplaceCv, ...utils };
+  return { onClose, onReplaceCv, onSaveTargets, ...utils };
 }
 
 describe("ProfileModal", () => {
@@ -52,6 +56,8 @@ describe("ProfileModal", () => {
           targetSectors={[]}
           cvUpdatedAt={null}
           onReplaceCv={vi.fn()}
+          sectorOptions={[]}
+          onSaveTargets={vi.fn(async () => true)}
         />
       </MemoryRouter>,
     );
@@ -73,14 +79,10 @@ describe("ProfileModal", () => {
     const { onReplaceCv } = renderModal({
       cvText: "one two three four five",
       cvUpdatedAt: "2026-07-10T09:00:00.000Z",
-      targetRoles: ["Product Manager"],
-      targetSectors: ["Fintech"],
     });
     expect(screen.getByText(/CV on file/i)).toBeInTheDocument();
     expect(screen.getByText(/5 words/i)).toBeInTheDocument();
     expect(screen.getByText(/Uploaded/i)).toHaveTextContent("Jul 2026");
-    expect(screen.getByText("Product Manager")).toBeInTheDocument();
-    expect(screen.getByText("Fintech")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^Replace$/i }));
     expect(onReplaceCv).toHaveBeenCalledTimes(1);
   });
@@ -93,5 +95,25 @@ describe("ProfileModal", () => {
     await Promise.resolve();
     expect(signOut).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("Settings → targets are edited here (not in the profile view); Save persists them", () => {
+    const { onSaveTargets } = renderModal({
+      cvText: "a CV",
+      targetRoles: ["Product"],
+      targetSectors: ["Fintech"],
+    });
+    // Target chips are NOT in the profile view anymore — they moved into Settings.
+    expect(screen.queryByRole("button", { name: "Product" })).not.toBeInTheDocument();
+    // Open Settings → the editable pickers appear with the stored picks pre-selected.
+    fireEvent.click(screen.getByRole("button", { name: /^Settings$/i }));
+    expect(screen.getByText(/Target roles/i)).toBeInTheDocument();
+    expect(screen.getByText(/Target industries/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Product" }).className).toContain("on");
+    expect(screen.getByRole("button", { name: "Fintech" }).className).toContain("on");
+    // Save persists the current selection to the profile.
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/i }));
+    expect(onSaveTargets).toHaveBeenCalledTimes(1);
+    expect(onSaveTargets).toHaveBeenCalledWith(["Product"], ["Fintech"]);
   });
 });

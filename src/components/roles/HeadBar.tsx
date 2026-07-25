@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { type Level, type RolesFilters } from "@/lib/roles";
 import FilterChip, { type FilterOption } from "./FilterChip";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -18,18 +18,21 @@ export type HeadBarProps = {
   languageOptions: FilterOption[];
   /** Reset every filter (and the map pin selection) at once. */
   onClearAll: () => void;
-  view: "map" | "list";
-  onView: (v: "map" | "list") => void;
   /** Opens the CV-unlock modal (Phase A front door). */
   onAddCv: () => void;
   /** Opens the profile view (issue #43) — signed-in avatar's real destination. */
   onProfile: () => void;
+  /** Returning-user sign-in — the logged-out header's secondary action (Google OAuth). */
+  onSignIn: () => void;
+  /** Brand click = home reset: clears selection/filters and re-frames Europe (Rober 7-16). */
+  onBrand: () => void;
 };
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, view, onView, onAddCv, onProfile }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, onAddCv, onProfile, onSignIn, onBrand }: HeadBarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
   const [chipsShown, setChipsShown] = useState(false);
   // Smooth width reveal via grid-template-columns 0fr→1fr (.show); .expanded (after
   // the 550ms slide) frees the inner overflow so dropdowns can escape.
@@ -189,7 +192,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
 
   return (
     <header className="nav glass liquid">
-      <Link className="brand" to="/">auditjob.me</Link>
+      <Link className="brand" to="/" onClick={onBrand}>auditjob.me</Link>
       <span className="sep" />
 
       <div className="cmd">
@@ -349,48 +352,58 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
 
       <span className="spacer" />
 
-      {/* CSS hides the seg pre-scored (.roles-theme:not(.scored) .seg) — always rendered. */}
-      <div className={`seg${view === "list" ? " list" : ""}`}>
+      {/* CSS hides the seg pre-scored (.roles-theme:not(.scored) .seg). Map is the
+          in-place view; "List" now navigates to the /today list page (Rober 7-15)
+          rather than resizing the right panel in place. */}
+      <div className="seg">
         <span className="ind" />
-        <button type="button" className={view === "map" ? "on" : ""} aria-pressed={view === "map"} onClick={() => onView("map")}>
+        <button type="button" className="on" aria-pressed>
           Map
         </button>
-        <button type="button" className={view === "list" ? "on" : ""} aria-pressed={view === "list"} onClick={() => onView("list")}>
+        <button type="button" onClick={() => navigate("/today")}>
           List
         </button>
       </div>
 
-      {/* The CV is the unlock and the differentiator — anon gets the same jade door
-          (the modal routes through sign-in); CSS hides it once the root carries .scored. */}
-      <button
-        type="button"
-        className="navcv"
-        onClick={onAddCv}
-      >
-        <span className="sp">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </span>
-        Add your CV
-      </button>
+      {/* Logged-out header (Rober 7-15): "Add your CV" stays the primary jade action,
+          with a real "Sign in" beside it — so a returning-but-unrecognized user signs
+          back in instead of re-uploading a CV (which would re-score the whole catalog).
+          Once signed in, the header carries the avatar only. */}
+      {!signedIn && (
+        <>
+          <button type="button" className="navcv" onClick={onAddCv}>
+            <span className="sp">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </span>
+            Add your CV
+          </button>
+          <button type="button" className="signin" onClick={onSignIn}>
+            Sign in
+          </button>
+        </>
+      )}
 
       {/* Day/night toggle (design direction §9.1): one control in the chrome, the
           same component the pages' AppShell renders — clicking flips the whole app
           via the single root theme class. */}
       <ThemeToggle />
 
-      {/* CV-on-file state (issue #43): a subtle dot badge, same act-strong token as
-          the rest of the identity chrome — score colors (jade/amber/coral) stay
-          reserved for the map, so this reads as "identity established", not a rank. */}
-      <div
-        className={`av${scored ? " has-cv" : ""}`}
-        role="button"
-        tabIndex={0}
-        aria-label="Profile"
-        onClick={onProfile}
-        onKeyDown={keyActivate(onProfile)}
-      />
+      {/* Signed-in identity (issue #43): the avatar is the profile door and the only
+          right-side control once signed in. The has-cv dot uses the act-strong token —
+          score colors (jade/amber/coral) stay reserved for the map, so this reads as
+          "identity established", not a rank. */}
+      {signedIn && (
+        <div
+          className={`av${scored ? " has-cv" : ""}`}
+          role="button"
+          tabIndex={0}
+          aria-label="Profile"
+          onClick={onProfile}
+          onKeyDown={keyActivate(onProfile)}
+        />
+      )}
     </header>
   );
 }

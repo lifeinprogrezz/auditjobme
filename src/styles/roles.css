@@ -381,8 +381,12 @@
 .roles-theme .panel-toggle svg { transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1); }
 .roles-theme.panel-hidden .panel-toggle { right: 14px; }
 .roles-theme.panel-hidden .panel-toggle svg { transform: rotate(180deg); }
-.roles-theme .ptitle { display: none; font-family: var(--font-d); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.035em; color: #fff; margin-bottom: 14px; }
-.roles-theme.scored .ptitle { display: block; }
+/* One header row: title left + the quiet scoring progress right (Rober 7-16). The
+   scored gate moved from .ptitle to the row. */
+.roles-theme .phead { display: none; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.roles-theme.scored .phead { display: flex; }
+.roles-theme .ptitle { font-family: var(--font-d); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.035em; color: #fff; margin: 0; }
+.roles-theme .pprog { font-family: var(--font-m); font-size: 11px; color: var(--muted); white-space: nowrap; }
 /* Map-selection chips (company + city, each independently removable). */
 .roles-theme .selhdr { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 11px; }
 .roles-theme .selchips { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -396,14 +400,11 @@
 .roles-theme .selclear { border: none; background: none; color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 6px; border-radius: 7px; }
 .roles-theme .selclear:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .roles-theme.light .selchip { background: rgba(255, 255, 255, 0.6); }
-.roles-theme .cards { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; padding: 4px 8px 4px 0; }
+.roles-theme .cards { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; overflow-x: hidden; padding: 4px 8px 4px 0; }
 .roles-theme .cards::-webkit-scrollbar { width: 6px; }
 .roles-theme .cards::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
 
 /* list view (post-CV toggle): panel widens into a full list column */
-.roles-theme.view-list .panel { width: min(560px, calc(100% - 36px)); }
-.roles-theme.view-list .panel-toggle { right: calc(min(560px, calc(100% - 36px)) + 24px); }
-.roles-theme.view-list.panel-hidden .panel-toggle { right: 14px; }
 
 /* CARDS */
 .roles-theme .card { position: relative; border-radius: 16px; padding: 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px 13px; align-items: center; background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02)); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 3px 14px -8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 10px 20px -16px rgba(170, 225, 240, 0.16), inset 0 -8px 16px -14px rgba(0, 0, 0, 0.3); transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; cursor: pointer; }
@@ -449,8 +450,8 @@
 .roles-theme:not(.scored) .card .fitchip { display: none; }
 
 /* DETAIL VIEW */
-.roles-theme .detail { display: none; flex: 1; min-height: 0; overflow-y: auto; flex-direction: column; gap: 14px; padding-right: 8px; }
-.roles-theme.detail-open .cards, .roles-theme.detail-open .ptitle { display: none; }
+.roles-theme .detail { display: none; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; flex-direction: column; gap: 14px; padding-right: 8px; }
+.roles-theme.detail-open .cards, .roles-theme.detail-open .phead { display: none; }
 .roles-theme.detail-open .detail { display: flex; }
 .roles-theme .dback { align-self: flex-start; background: none; border: 0; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 2px 0; display: flex; align-items: center; gap: 5px; transition: color 0.2s; }
 .roles-theme .dback:hover { color: #fff; }
@@ -516,6 +517,10 @@
 .roles-theme .dhl { min-width: 0; }
 .roles-theme .dhl .hlt { font-family: var(--font-d); font-size: 16px; font-weight: 600; color: #fff; letter-spacing: -0.01em; }
 .roles-theme .dhl .hls { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.roles-theme .dsum { font-size: 13px; line-height: 1.55; color: var(--subtle); margin: 0; }
+.roles-theme .dsave { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 40px; margin-top: 8px; border-radius: 10px; border: 1px solid var(--hair); background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: color 0.2s, border-color 0.2s; }
+.roles-theme .dsave:hover { color: var(--text); border-color: color-mix(in srgb, var(--text) 22%, transparent); }
+.roles-theme .dsave[aria-pressed="true"] { color: var(--text); border-color: color-mix(in srgb, var(--text) 22%, transparent); }
 .roles-theme .dfit { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 /* Fit bullets: verb-led claims, clamped to 2 lines (render-side belt for the
  * prompt's 12-word cap, design direction §5.2). Muted ink, no jade. */
@@ -556,7 +561,9 @@
 /* The breakdown + evidence list is CARDED under one "What drove it" eyebrow
  * (design direction §3.6 / §5.3): radius 16, hairline, calm ink-tint surface. */
 .roles-theme .dbreak { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); background: color-mix(in srgb, var(--text) 3%, transparent); }
-.roles-theme .dbreak-h { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.roles-theme .dbreak-h { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0; margin: 0; background: none; border: 0; text-align: left; cursor: pointer; font-family: inherit; font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.roles-theme .dbreak-chev { flex-shrink: 0; color: var(--muted); transition: transform 0.18s ease; }
+.roles-theme .dbreak-h[aria-expanded="true"] .dbreak-chev { transform: rotate(90deg); }
 /* ONE grid for all rows (design direction §5.3 acceptance-gap fix): a SHARED
  * max-content label column so every bar origin aligns; the bar owns the 1fr
  * middle, value is 32px. `.dbar-row` collapses to `display: contents` so its
@@ -585,7 +592,9 @@
 .roles-theme .dev-cites { display: flex; flex-direction: column; gap: 3px; }
 /* Definition-list grid: max-content key (nowrap, no fixed 46px wrap → ledger #3) +
  * the quote governor (clamp-2 + overflow-wrap:anywhere + min-width:0). */
-.roles-theme .dev-cite { display: grid; grid-template-columns: max-content 1fr; gap: 8px; align-items: baseline; line-height: 1.5; }
+/* Label stacked ABOVE the quote so a wrapped quote's every line starts at the same
+   left edge (Rober 7-16: the old side-by-side grid slid continuation lines right). */
+.roles-theme .dev-cite { display: flex; flex-direction: column; gap: 1px; line-height: 1.5; }
 .roles-theme .dev-cite-k { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--subtle); white-space: nowrap; }
 .roles-theme .dev-cite-q { min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; color: var(--muted); }
 .roles-theme .dev-empty { font-size: 12px; color: var(--subtle); }
@@ -601,7 +610,6 @@
 .roles-theme .panel-note .btn { display: block; margin: 14px auto 0; }
 /* Status = whisper (design direction §3.4): an inline system line, mono muted
  * caption — NOT a jade banner. The pending FitChips carry the progress shimmer. */
-.roles-theme .scorebar { font-family: var(--font-m); font-size: 11px; color: var(--muted); padding: 6px 2px 10px; margin-bottom: 4px; }
 .roles-theme .morebtn { margin-top: 10px; width: calc(100% - 8px); }
 
 /* ============================================================================
@@ -955,3 +963,4 @@
 .roles-theme .pf-nav { display: flex; gap: 8px; }
 .roles-theme .pf-navlink { flex: 1; text-align: center; padding: 10px 12px; border-radius: 11px; border: 1px solid var(--rim); background: var(--act-tint); color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
 .roles-theme .pf-navlink:hover { border-color: var(--act-border); background: var(--act-strong); color: var(--act-strong-ink); }
+.roles-theme button.pf-navlink { font-family: inherit; cursor: pointer; }

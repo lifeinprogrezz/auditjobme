@@ -15,7 +15,6 @@ import {
   geoVerdict,
   hueFor,
   postedAgo,
-  scoreBucket,
   websiteUrl,
   type RoleJob,
   type RolesFilters,
@@ -24,14 +23,6 @@ import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { useTheme } from "@/lib/theme";
 import ScoreBreakdown from "./ScoreBreakdown";
 import FitChip from "./FitChip";
-
-/** Fit-dependent bullets header (design direction §3.5), driven by the bucket in
- *  code so a "Weak fit" hero never sits above "Why you fit". */
-const BULLETS_HEADER: Record<string, string> = {
-  great: "Why you fit",
-  mid: "Where you stand",
-  low: "Where it breaks down",
-};
 
 // The pool is unbounded (1000+ live rows); each card mounts a Logo.dev <img>,
 // so cap the DOM and point the user at search/filters for the tail.
@@ -49,9 +40,12 @@ export type RolesPanelProps = {
   remaining: number;
   detailJob: RoleJob | null;
   applied: Set<string>;
+  saved: Set<string>;
   onOpenDetail: (j: RoleJob) => void;
   onCloseDetail: () => void;
   onScoreMore: () => void;
+  /** Save / unsave the role for later (Rober 7-15). */
+  onToggleSaved: (job: RoleJob) => void;
   onToggleHidden: () => void;
   /** Opens the CV-unlock modal (Phase A front door). */
   onAddCv: () => void;
@@ -112,9 +106,11 @@ export default function RolesPanel({
   remaining,
   detailJob,
   applied,
+  saved,
   onOpenDetail,
   onCloseDetail,
   onScoreMore,
+  onToggleSaved,
   onToggleHidden,
   onAddCv,
   filters,
@@ -191,7 +187,16 @@ export default function RolesPanel({
 
   const renderCards = () => (
     <>
-      <h1 className="ptitle">{defaultView ? "Hot right now" : "Your matches"}</h1>
+      {/* One compact header row: title left, the scoring progress as a quiet mono
+          whisper right — no separate banner bar (Rober 7-16). */}
+      <div className="phead">
+        <h1 className="ptitle">{defaultView ? (scored ? "Best fit" : "Hot right now") : "Your matches"}</h1>
+        {scoring && (
+          <span className="pprog num" role="status" aria-live="polite">
+            {remaining} to go
+          </span>
+        )}
+      </div>
       {activeChips.length > 0 && (
         <div className="selhdr">
           <div className="selchips">
@@ -248,9 +253,6 @@ export default function RolesPanel({
           )}
         </div>
       )}
-      {scoring && (
-        <div className="scorebar">Scoring roles against your profile… {remaining} to go</div>
-      )}
       {loading ? (
         <div className="panel-note">Loading roles…</div>
       ) : jobs.length === 0 ? (
@@ -267,7 +269,6 @@ export default function RolesPanel({
             </div>
           )}
           {shown.slice(0, CARD_CAP).map((job, i) => {
-            const ago = postedAgo(job.posted_at);
             // Geo / work-auth badge (issue #42): only a high-confidence, actionable
             // verdict shows on the card; an unstated JD renders nothing (never a guess).
             const geo = geoVerdict(job);
@@ -293,14 +294,10 @@ export default function RolesPanel({
                 <div className="cbody">
                   <div className="co">{job.company}</div>
                   <div className="role">{job.title}</div>
+                  {/* Card meta = location (+ geo badge) only; posted-age lives in the
+                      detail facts, the card was carrying too much (Rober 7-16). */}
                   <div className="meta">
                     <b>{job.city ?? job.location ?? (job.remote ? "Remote" : "Location unknown")}</b>
-                    {ago && (
-                      <>
-                        <span className="d" />
-                        {ago}
-                      </>
-                    )}
                     {geo.onCard && <span className={`geo-badge geo-${geo.kind}`}>{geo.label}</span>}
                   </div>
                 </div>
@@ -383,7 +380,12 @@ export default function RolesPanel({
     // Hero: a CV holder sees their fit (or a pending state); everyone else sees the
     // unlock prompt — the pre-CV conversion moment (absorbs issue #18).
     const hasCv = scored;
-    const bullets = job.fitBullets?.length ? job.fitBullets : job.reason ? [job.reason] : [];
+    // The detail leads with the honest one-line summary (job.reason), not the
+    // positive-only fit_bullets — a Weak-fit label must never sit above "why you fit"
+    // points (Rober 7-15). The signed evidence in ScoreBreakdown carries the specifics.
+    // Fall back to the first fit bullet only when the model left reason empty, so a
+    // scored role never renders with no fit text at all.
+    const summary = job.reason?.trim() || job.fitBullets?.[0]?.trim() || null;
 
     return (
       <div className="detail" ref={detailRef}>
@@ -488,9 +490,6 @@ export default function RolesPanel({
                 <FitChip score={job.score} size="lg" />
                 <div className="dhl">
                   <div className="hlt">{fitLabel(job.score)}</div>
-                  {bullets.length > 0 && (
-                    <div className="hls">{BULLETS_HEADER[scoreBucket(job.score)]}</div>
-                  )}
                 </div>
               </>
             ) : (
@@ -504,15 +503,11 @@ export default function RolesPanel({
             )}
           </div>
         )}
-        {hasCv && bullets.length > 0 && (
-          <ul className="dfit">
-            {bullets.map((b, i) => (
-              <li key={i}>{b}</li>
-            ))}
-          </ul>
-        )}
+        {hasCv && summary && <p className="dsum">{summary}</p>}
         {hasCv && job.score != null && (
-          <ScoreBreakdown subscores={job.subscores} evidence={job.evidence} />
+          // key on the job id so switching roles remounts it collapsed (the toggle
+          // state must not carry over from the previous role — Rober 7-15 review).
+          <ScoreBreakdown key={job.id} subscores={job.subscores} evidence={job.evidence} />
         )}
         {!hasCv && (
           <div className="dfit-teaser">
@@ -535,6 +530,19 @@ export default function RolesPanel({
         ) : (
           <button className="btn dcta" onClick={onAddCv}>
             Add your CV to see your fit
+          </button>
+        )}
+        {signedIn && (
+          <button
+            type="button"
+            className="dsave"
+            aria-pressed={saved.has(job.id)}
+            onClick={() => onToggleSaved(job)}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill={saved.has(job.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+              <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
+            </svg>
+            {saved.has(job.id) ? "Saved for later" : "Save for later"}
           </button>
         )}
         {others.length > 0 && (

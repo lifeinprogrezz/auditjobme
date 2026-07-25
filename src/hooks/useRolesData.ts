@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
@@ -206,6 +206,10 @@ export function useRolesData() {
   // flashing the CV modal at a user whose CV is still in flight.
   const [profileChecked, setProfileChecked] = useState(false);
   const [applied, setApplied] = useState<Set<string>>(new Set());
+  const [saved, setSaved] = useState<Set<string>>(new Set());
+  // Saved roles fetched WITHOUT the is_live filter, so an expired-but-saved role still
+  // has display data for the Today Saved section (Rober 7-15 review).
+  const [savedJobsRaw, setSavedJobsRaw] = useState<RoleJob[]>([]);
   // Per-run cancellation: each effect run gets its own id; async loops compare
   // against the current id (a shared boolean would be re-armed by the next run,
   // resurrecting a cancelled loop and leaking user A's scores into user B's view).
@@ -413,6 +417,8 @@ export function useRolesData() {
         setProfile(null);
         setProfileMeta(null);
         setApplied(new Set());
+        setSaved(new Set());
+        setSavedJobsRaw([]);
         setLoading(false);
         return;
       }
@@ -457,6 +463,24 @@ export function useRolesData() {
       const { data: appsData } = await supabase.from("applications").select("job_id").eq("user_id", user.id);
       if (runRef.current !== runId) return;
       setApplied(new Set((appsData ?? []).map((a) => a.job_id)));
+
+      const { data: savedData } = await supabase.from("saved_jobs").select("job_id").eq("user_id", user.id);
+      if (runRef.current !== runId) return;
+      const savedIds = (savedData ?? []).map((s) => s.job_id);
+      setSaved(new Set(savedIds));
+      // Fetch the saved roles' rows WITHOUT the is_live filter so a role saved for
+      // later still shows in the Saved section once the posting expires (the whole
+      // point of "save for later"). Same company enrichment; scores aren't needed here.
+      if (savedIds.length > 0) {
+        const { data: savedRows } = await supabase
+          .from("jobs")
+          .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id, extraction, role_family, workplace")
+          .in("id", savedIds);
+        if (runRef.current !== runId) return;
+        setSavedJobsRaw(enrichAll((savedRows ?? []) as JobsRow[], dims, officesBySlug));
+      } else {
+        setSavedJobsRaw([]);
+      }
 
       const { data: prof } = await supabase
         .from("profiles")
@@ -534,7 +558,61 @@ export function useRolesData() {
         return next;
       });
       toast.error("Couldn't mark as applied. Please try again.");
+      return;
     }
+    // Applied ⇒ leaves Saved (Rober 7-16): the role lives on the applications board
+    // now; keeping the bookmark too is clutter. Best-effort — never blocks the apply.
+    if (saved.has(job.id)) {
+      setSaved((prev) => {
+        const next = new Set(prev);
+        next.delete(job.id);
+        return next;
+      });
+      await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", job.id);
+    }
+  };
+
+  // Save / unsave a role for later (Rober 7-15). Optimistic toggle against the
+  // saved_jobs table; rolls back + toasts on failure, same idiom as markApplied.
+  const toggleSaved = async (job: RoleJob) => {
+    if (!user) return;
+    const wasSaved = saved.has(job.id);
+    setSaved((prev) => {
+      const next = new Set(prev);
+      if (wasSaved) next.delete(job.id);
+      else next.add(job.id);
+      return next;
+    });
+    const { error } = wasSaved
+      ? await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", job.id)
+      : await supabase.from("saved_jobs").upsert({ user_id: user.id, job_id: job.id }, { onConflict: "user_id,job_id" });
+    if (error) {
+      setSaved((prev) => {
+        const next = new Set(prev);
+        if (wasSaved) next.add(job.id);
+        else next.delete(job.id);
+        return next;
+      });
+      toast.error(wasSaved ? "Couldn't remove from saved. Please try again." : "Couldn't save. Please try again.");
+    }
+  };
+
+  // Persist edited target labels to the profile (Settings, Rober 7-15). Roles/sectors
+  // don't feed the 5 score subscores, so no re-score is needed — just update the row
+  // + local profile/meta so the profile view reflects the change immediately.
+  const saveTargets = async (roles: string[], sectors: string[]): Promise<boolean> => {
+    if (!user) return false;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ target_roles: roles, target_sectors: sectors })
+      .eq("id", user.id);
+    if (error) {
+      toast.error("Couldn't save your settings. Please try again.");
+      return false;
+    }
+    setProfile((p) => (p ? { ...p, target_roles: roles, target_sectors: sectors } : p));
+    setProfileMeta((m) => (m ? { ...m, targetRoles: roles, targetSectors: sectors } : m));
+    return true;
   };
 
   /** Manual "check now" — an immediate scores pull, ahead of the next poll tick.
@@ -568,6 +646,16 @@ export function useRolesData() {
     );
   };
 
+  // Saved roles for the Today section: live saved roles (enriched, score-carrying) plus
+  // any saved role that has since expired out of the live pool (from savedJobsRaw),
+  // filtered by the current saved set so unsaving drops them immediately (Rober 7-15).
+  const savedJobs = useMemo(() => {
+    const byId = new Map<string, RoleJob>();
+    for (const j of savedJobsRaw) if (saved.has(j.id)) byId.set(j.id, j);
+    for (const j of jobs) if (saved.has(j.id)) byId.set(j.id, j);
+    return [...byId.values()];
+  }, [jobs, saved, savedJobsRaw]);
+
   return {
     jobs,
     loading,
@@ -577,6 +665,10 @@ export function useRolesData() {
     remaining: jobs.filter((j) => j.score == null).length,
     applied,
     markApplied,
+    saved,
+    savedJobs,
+    toggleSaved,
+    saveTargets,
     scoreMore,
     submitCv,
     /** Post-CV state: the score reveal keys on a CV being present. */

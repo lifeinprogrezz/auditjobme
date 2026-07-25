@@ -5,7 +5,7 @@ import RolesPanel from "@/components/roles/RolesPanel";
 import HeadBar from "@/components/roles/HeadBar";
 import CvUnlockModal from "@/components/roles/CvUnlockModal";
 import ProfileModal from "@/components/roles/ProfileModal";
-import { AUTH_BYPASSED } from "@/components/AuthProvider";
+import { AUTH_BYPASSED, useAuth } from "@/components/AuthProvider";
 import {
   EMPTY_FILTERS,
   LEVELS,
@@ -39,8 +39,9 @@ const HOT_COUNT = 7;
 const FRESH_MS = 21 * 24 * 60 * 60 * 1000;
 
 export default function RolesMap() {
-  const { jobs, loading, scoring, remaining, applied, scoreMore, submitCv, scored, signedIn, cvText, profileMeta, needsCv } =
+  const { jobs, loading, scoring, remaining, applied, saved, toggleSaved, saveTargets, scoreMore, submitCv, scored, signedIn, cvText, profileMeta, needsCv } =
     useRolesData();
+  const { signInWithGoogle } = useAuth();
   // CV-unlock modal (Phase A front door). Opened from the "Add your CV" affordances,
   // and from the profile modal's Replace CV action (issue #43) — one shared instance.
   const [cvModalOpen, setCvModalOpen] = useState(false);
@@ -53,7 +54,6 @@ export default function RolesMap() {
     if (needsCv && !AUTH_BYPASSED) setCvModalOpen(true);
   }, [needsCv]);
   const [filters, setFilters] = useState<RolesFilters>(EMPTY_FILTERS);
-  const [view, setView] = useState<"map" | "list">("map");
   const [detailJob, setDetailJob] = useState<RoleJob | null>(null);
   // A panel-card click flies the map to the role's city (see openDetail); the
   // nonce forces a re-fly even when the same city is reopened.
@@ -216,7 +216,11 @@ export default function RolesMap() {
       setEuropeFrame((n) => n + 1);
     }
   }, [isDefaultView, hasExplored, scored]);
-  const showShowcase = isDefaultView && (!scored || !hasExplored);
+  // Scored users (signed in + CV on file) get their genuinely fit-ranked list as the
+  // DEFAULT rail ("Best fit"), not the curated showcase — the showcase is the
+  // anon/no-CV landing only (Rober 7-15). For anon, !scored is always true so this is
+  // unchanged; only scored users skip straight to the byScore ranking below.
+  const showShowcase = isDefaultView && !scored;
 
   const hotJobs = useMemo(() => {
     // Each showcase card must be a FRESH (<=21d) real PM role: skip legal/EA/intern/
@@ -339,7 +343,6 @@ export default function RolesMap() {
     scored && "scored",
     detailLive && "detail-open",
     panelHidden && "panel-hidden",
-    view === "list" && "view-list",
   ]
     .filter(Boolean)
     .join(" ");
@@ -402,19 +405,27 @@ export default function RolesMap() {
             setFilters(EMPTY_FILTERS);
             setSel({ co: null, city: null });
           }}
-          view={view}
-          onView={setView}
           onAddCv={() => setCvModalOpen(true)}
           // Signed-in avatar opens the profile view; anon avatar goes through the
           // same sign-in front door as "Add your CV" (Rober 7-12: no dead-end for
           // either state, and no second sign-in entry point to maintain).
           onProfile={() => (signedIn ? setProfileModalOpen(true) : setCvModalOpen(true))}
+          onSignIn={signInWithGoogle}
+          // Brand = home: same state reset as the map's reset control, plus a camera
+          // re-frame to the Europe landing (europeFrame bump eases the globe back).
+          onBrand={() => {
+            setSel({ co: null, city: null });
+            setDetailJob(null);
+            setFilters(EMPTY_FILTERS);
+            setHasExplored(false);
+            setEuropeFrame((n) => n + 1);
+          }}
         />
         <RolesPanel
           jobs={panelJobs}
           onAddCv={() => setCvModalOpen(true)}
           allJobs={jobs}
-          defaultView={showShowcase}
+          defaultView={isDefaultView}
           filters={filters}
           onFilters={setFilters}
           selCo={sel.co}
@@ -428,9 +439,11 @@ export default function RolesMap() {
           remaining={remaining}
           detailJob={detailLive}
           applied={applied}
+          saved={saved}
           onOpenDetail={openDetail}
           onCloseDetail={() => setDetailJob(null)}
           onScoreMore={scoreMore}
+          onToggleSaved={toggleSaved}
           onToggleHidden={() => setPanelHidden((v) => !v)}
         />
         <div className="scope" aria-label="Catalog scope">
@@ -498,6 +511,8 @@ export default function RolesMap() {
           setProfileModalOpen(false);
           setCvModalOpen(true);
         }}
+        sectorOptions={sectorOptions}
+        onSaveTargets={saveTargets}
       />
     </div>
   );

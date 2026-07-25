@@ -22,7 +22,7 @@ export type CoverJson = { greeting: string; p1: string; p2: string; p3: string; 
 
 type ProxyMessage = { role: "user" | "assistant"; content: string };
 
-async function callProxy(messages: ProxyMessage[], maxTokens: number, kind: "cv" | "letter"): Promise<string> {
+async function callProxy(messages: ProxyMessage[], maxTokens: number, kind: "cv" | "letter" | "answer"): Promise<string> {
   const url = import.meta.env.VITE_SUPABASE_URL as string;
   const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
   const { data: sessionData } = await supabase.auth.getSession();
@@ -108,10 +108,47 @@ ${cvText.slice(0, 4500)}
 Return JSON now:`;
 }
 
+/** Application-form question cap per role — bounds the sponsored-compute surface. */
+export const MAX_ANSWERS = 8;
+
+export function buildAnswerPrompt({ role, company, jdText, cvText }: TailorInput, question: string): string {
+  const jd = (jdText || "").slice(0, 2000);
+  return `You are answering ONE question from a job-application form, in the candidate's own voice.
+
+QUESTION FROM THE FORM:
+${question.slice(0, 500)}
+
+HARD RULES — do not break (this protects the candidate's credibility):
+- Use ONLY facts, responsibilities, and numbers that literally appear in the CV below. Do NOT invent projects, duties, tools, or numbers the CV does not state.
+- If the CV genuinely has no material for the question, say so honestly in one short line and pivot to the closest real experience. Never fabricate an example.
+- Be honest about any gap vs what the question implies (1 sentence max).
+- Write in the FIRST PERSON. Warm, direct, like the candidate talking. Use contractions.
+- NO em-dashes at all (use commas or short sentences). Write in English.
+- 120-180 words maximum. If the question clearly asks for something very short (a yes/no, a number, a link), answer in 1-2 sentences instead.
+- No buzzwords, no boilerplate that could describe any candidate.
+
+OUTPUT: the answer ONLY. No preamble, no analysis, no heading. Just the answer text, ready to paste into the form.
+
+ROLE: ${role} at ${company}
+
+JOB DESCRIPTION (context for what they care about):
+${jd || "(No JD text — answer from the role title and company plus the CV.)"}
+
+CANDIDATE CV (canonical facts; the only permitted source of claims):
+${cvText.slice(0, 6000)}
+
+Answer:`;
+}
+
 // ── LLM calls ─────────────────────────────────────────────────────────────────
 
 export async function tailorSummary(input: TailorInput): Promise<string> {
   const text = await callProxy([{ role: "user", content: buildSummaryPrompt(input) }], 500, "cv");
+  return noEmDash(text);
+}
+
+export async function answerQuestion(input: TailorInput, question: string): Promise<string> {
+  const text = await callProxy([{ role: "user", content: buildAnswerPrompt(input, question) }], 400, "answer");
   return noEmDash(text);
 }
 
