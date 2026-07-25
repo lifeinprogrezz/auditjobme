@@ -71,13 +71,17 @@ export function pdfFilename(...parts: (string | null | undefined)[]): string {
   return `${base || "document"}.pdf`;
 }
 
+/** @types/pdfmake declares download(defaultFileName?) only; the runtime also takes a done callback. */
+type DownloadableDoc = { download: (defaultFileName: string, cb: () => void) => void };
+
 async function download(def: DocDef, filename: string): Promise<void> {
   const [{ default: pdfMake }, { default: vfsFonts }] = await Promise.all([
     import("pdfmake/build/pdfmake"),
     import("pdfmake/build/vfs_fonts"),
   ]);
   pdfMake.addVirtualFileSystem(vfsFonts);
-  await new Promise<void>((resolve) => pdfMake.createPdf(def as never).download(filename, () => resolve()));
+  const doc = pdfMake.createPdf(def as never) as unknown as DownloadableDoc;
+  await new Promise<void>((resolve) => doc.download(filename, () => resolve()));
 }
 
 export async function downloadCvPdf(input: { name: string; summary: string; cvText: string; company: string }): Promise<void> {
