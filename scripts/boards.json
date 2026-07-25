@@ -524,6 +524,14 @@
   {
    "company": "Blockbrain",
    "token": "blockbrain"
+  },
+  {
+   "company": "Aircall",
+   "token": "aircallioinc"
+  },
+  {
+   "company": "Resolve to Save Lives",
+   "token": "resolvetosavelives"
   }
  ],
  "lever": [
@@ -830,6 +838,10 @@
   {
    "company": "Quantinuum",
    "token": "quantinuum"
+  },
+  {
+   "company": "ispace",
+   "token": "ispace-inc"
   }
  ],
  "ashby": [
@@ -2276,6 +2288,54 @@
   {
    "company": "Fence",
    "token": "fence technology inc"
+  },
+  {
+   "company": "Ankar",
+   "token": "ankar"
+  },
+  {
+   "company": "Beamery",
+   "token": "beamery"
+  },
+  {
+   "company": "Evervault",
+   "token": "evervault"
+  },
+  {
+   "company": "Grand",
+   "token": "grand"
+  },
+  {
+   "company": "Passionfroot",
+   "token": "passionfroot"
+  },
+  {
+   "company": "Payflip",
+   "token": "payflip"
+  },
+  {
+   "company": "Polar",
+   "token": "polar"
+  },
+  {
+   "company": "Primer",
+   "token": "primer"
+  },
+  {
+   "company": "Riplo",
+   "token": "riplo"
+  },
+  {
+   "company": "Searchable",
+   "token": "searchable"
+  },
+  {
+   "company": "Street Group",
+   "token": "streetgroup"
+  },
+  {
+   "company": "Warren",
+   "token": "warren"
   }
  ],
  "workable": [
