@@ -7,13 +7,15 @@
 // pill. Ink-glass token layer only.
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "@/components/AuthProvider";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
+import AccountMenu from "@/components/app/AccountMenu";
 
 const NAV = [
   { to: "/today", label: "Today" },
   { to: "/tracker", label: "Applications" },
+  // Settings is a first-class surface, not a map popup (Rober 7-25).
+  { to: "/settings", label: "Settings" },
 ];
 
 // The two nav voices (§4.3/§6.0): active = the surface-glass thumb with an ink
@@ -32,7 +34,6 @@ export default function AppShell({
   title?: string;
   children: ReactNode;
 }) {
-  const { signOut } = useAuth();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
 
@@ -44,11 +45,6 @@ export default function AppShell({
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
-  };
 
   return (
     <div className="page-grain min-h-screen overflow-x-clip bg-background text-foreground">
@@ -75,15 +71,27 @@ export default function AppShell({
             ))}
           </nav>
           <div className="flex-1" />
-          <NavLink to="/" className={NAV_INACTIVE}>
-            Map
-          </NavLink>
+          {/* The map's Map|List segmented toggle, universalized (Rober 7-25): the
+              same two-state control on every surface — here List is the active
+              face and Map flies you back to the globe. */}
+          <div
+            className="flex items-center gap-0.5 rounded-[12px] border border-border p-0.5"
+            role="group"
+            aria-label="Map or list view"
+          >
+            <button type="button" onClick={() => navigate("/")} className={NAV_INACTIVE}>
+              Map
+            </button>
+            <span className={NAV_ACTIVE} aria-current="true">
+              List
+            </span>
+          </div>
           {/* Day/night toggle (design direction §9.1): the SAME component the map
               HeadBar renders, so the one control reaches every surface. */}
           <ThemeToggle className="inline-grid h-8 w-8 place-items-center rounded-[10px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" />
-          <button type="button" onClick={handleSignOut} className={NAV_INACTIVE}>
-            Sign out
-          </button>
+          {/* The unified account door (Rober 7-25): the same avatar circle + popover
+              the map headbar shows — the bare "Sign out" text button is gone. */}
+          <AccountMenu variant="paper" />
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-8 sm:px-6">

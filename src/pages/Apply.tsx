@@ -67,39 +67,13 @@ function CheckIcon() {
   );
 }
 
-// Prefill row (§6.1): a definition-list pair on the shared `max-content 1fr` grid
-// — micro caps key, mono value, secondary copy button. Copied state is the
-// affordance removed (a muted check), not a re-tinted button (§3.3).
-function CopyRow({ label, value }: { label: string; value: string }) {
-  const [copied, setCopied] = useState(false);
-  const onCopy = async () => {
-    if (await copy(value)) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-  return (
-    <>
-      <dt className="self-center text-micro uppercase text-muted-foreground">{label}</dt>
-      <dd className="flex min-w-0 items-center justify-between gap-3">
-        <span className="min-w-0 break-words font-mono text-dense text-foreground">{value}</span>
-        {copied ? (
-          <span className="inline-flex shrink-0 items-center gap-1.5 text-caption text-muted-foreground">
-            <CheckIcon />
-            Copied
-          </span>
-        ) : (
-          <Button variant="outline" size="sm" className={`shrink-0 ${SECONDARY_CTA}`} onClick={onCopy}>
-            Copy
-          </Button>
-        )}
-      </dd>
-    </>
-  );
-}
+// The old Step-3 "Submit it yourself" prefill card (CopyRow: name/email/link copy
+// rows) was REMOVED (Rober 7-25): the posting opens from the header title, and
+// copying your own name added a step without saving one. Applying now lives in
+// the header — bookmark + "I've applied" side by side.
 
-/** Copy affordance for a drafted answer (Step 4) — same copied-state idiom as
- *  CopyRow: the button swaps to a muted check, never a re-tinted button (§3.3). */
+/** Copy affordance for a drafted answer (Step 3) — copied state swaps the button
+ *  for a muted check, never a re-tinted button (§3.3). */
 function AnswerCopy({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const onCopy = async () => {
@@ -383,8 +357,10 @@ export default function Apply() {
         <PaperLogo domain={domain} company={job.company} size={40} />
         <div className="min-w-0 flex-1">
           <div className="font-display text-micro uppercase text-muted-foreground">{job.company}</div>
-          {/* The title IS the link to the real posting (Rober 7-16) — the apply
-              moment lives here, not in a step-3 button. */}
+          {/* The title IS the link to the real posting (Rober 7-16), with an explicit
+              ↗ glyph (Rober 7-25 — a DELIBERATE exception to the no-arrows call:
+              with the step-3 link row gone, the title is the ONLY door to the
+              posting, so it earns the affordance). */}
           <h1 className="text-balance font-display text-page text-foreground">
             <a
               href={job.url}
@@ -393,11 +369,24 @@ export default function Apply() {
               className="underline-offset-4 hover:underline"
             >
               {job.title}
+              <svg
+                className="ml-1.5 inline-block align-baseline text-muted-foreground"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                aria-hidden="true"
+              >
+                <path d="M7 17 17 7M9 7h8v8" />
+              </svg>
             </a>
           </h1>
           {city && <p className="text-caption text-muted-foreground">{city}</p>}
-          {/* Post-applied state surfaces in the HEADER, only once you've applied
-              (Rober 7-16): the tracked confirmation + the board link. */}
+          {/* Post-applied state surfaces in the HEADER (Rober 7-16): the tracked
+              confirmation + board link + the reversible Undo (Rober 7-25 — the
+              apply action moved fully into the header, so its undo lives here too). */}
           {hasApplied && (
             <p className="mt-1.5 inline-flex items-center gap-1.5 text-caption font-medium text-muted-foreground">
               <CheckIcon />
@@ -409,10 +398,24 @@ export default function Apply() {
               >
                 applications board
               </button>
+              <button
+                type="button"
+                onClick={unmarkApplied}
+                className="font-medium underline underline-offset-2 transition-colors hover:text-foreground"
+              >
+                Undo
+              </button>
+            </p>
+          )}
+          {errStep === "apply" && (
+            <p className="mt-1.5 text-caption text-destructive" role="status">
+              {error}
             </p>
           )}
         </div>
         {score != null && <FitChip score={score} size="sm" />}
+        {/* Save + I've-applied side by side (Rober 7-25): the two role-state actions
+            live together in the header, clean and unmissable. */}
         <button
           type="button"
           onClick={toggleSaved}
@@ -425,6 +428,11 @@ export default function Apply() {
             <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
           </svg>
         </button>
+        {!hasApplied && (
+          <Button variant="outline" size="sm" className={`shrink-0 ${SECONDARY_CTA}`} onClick={markApplied}>
+            I've applied
+          </Button>
+        )}
       </header>
 
       {!cvText ? (
@@ -478,45 +486,11 @@ export default function Apply() {
             )}
           </Section>
 
-          {/* 3 — Prefill, never submit: the confirm card. Just the three essentials
-              (Rober 7-16) — no generated-content recap; the posting opens from the
-              header title, and the tracked state lives in the header too. */}
-          <Section eyebrow="Step 3" title="Submit it yourself">
-            <dl className="mt-4 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-4 rounded-[10px] border border-border bg-secondary p-4">
-              {name && <CopyRow label="Full name" value={name} />}
-              {user?.email && <CopyRow label="Email" value={user.email} />}
-              <CopyRow label="Role link" value={job.url} />
-            </dl>
-            <div className="mt-4">
-              {hasApplied ? (
-                <span className="inline-flex items-center gap-2 text-control text-muted-foreground">
-                  <CheckIcon />
-                  Marked as applied
-                  <button
-                    type="button"
-                    onClick={unmarkApplied}
-                    className="font-medium underline underline-offset-2 transition-colors hover:text-foreground"
-                  >
-                    Undo
-                  </button>
-                </span>
-              ) : (
-                <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={markApplied}>
-                  I've applied
-                </Button>
-              )}
-            </div>
-            {errStep === "apply" && (
-              <p className="mt-3 text-caption text-destructive" role="status">
-                {error}
-              </p>
-            )}
-          </Section>
-
-          {/* 4 — Application-form questions (Rober 7-16): paste ONE question from the
-              real form, get an answer grounded in the CV + JD. One at a time keeps the
-              UI clean and each call cheap; MAX_ANSWERS bounds the sponsored spend. */}
-          <Section eyebrow="Step 4" title="Answer the form's questions">
+          {/* 3 — Application-form questions (Rober 7-16; was Step 4 until the prefill
+              card was cut, Rober 7-25): paste ONE question from the real form, get an
+              answer grounded in the CV + JD. One at a time keeps the UI clean and each
+              call cheap; MAX_ANSWERS bounds the sponsored spend. */}
+          <Section eyebrow="Step 3" title="Answer the form's questions">
             <Textarea
               className="mt-4 min-h-20 rounded-[10px] font-sans text-body"
               placeholder={`Paste one question from the application form, e.g. "Why do you want to work at ${job.company}?"`}

@@ -170,9 +170,22 @@ export default function RolesPanel({
   useEffect(() => {
     setPanelQ("");
   }, [selCo, selCity]);
-  const listContext = activeChips.length > 0;
+  // Local-narrow mode only under a STRUCTURAL narrowing (company/city/facet chips).
+  // The query chip alone must NOT flip the mode: in global mode the panel box edits
+  // filters.query itself, and counting it here would remount the binding on the
+  // first keystroke (value snaps from "stri" to ""), killing the search mid-word.
+  const listContext = activeChips.some((c) => c.key !== "q");
+  // Removing the last structural chip mid-narrow must DROP the local query with it
+  // (review 7-25): panelQ only resets on map-selection change, so without this the
+  // box rebinds to filters.query and renders empty while the stale panelQ keeps
+  // filtering invisibly — an empty search box over a mysteriously narrowed list.
+  useEffect(() => {
+    if (!listContext) setPanelQ("");
+  }, [listContext]);
   const shown = (() => {
-    const q = panelQ.trim().toLowerCase();
+    // Belt to the effect's suspenders: the local narrow can never apply outside
+    // local mode, even for the one render before the reset effect runs.
+    const q = listContext ? panelQ.trim().toLowerCase() : "";
     return q ? jobs.filter((j) => `${j.company} ${j.title}`.toLowerCase().includes(q)) : jobs;
   })();
 
@@ -222,7 +235,13 @@ export default function RolesPanel({
           </div>
         </div>
       )}
-      {listContext && jobs.length > 0 && (
+      {/* Two modes, one box. Chip-narrowed list → the LOCAL narrow (unchanged).
+          No chips (incl. the anon showcase) → the box edits the GLOBAL search:
+          the showcase logos prime "type your favourite company" (Rober 7-25), and
+          typing must surface that company's roles, not filter 7 curated cards.
+          The box stays mounted while a global query empties the list, or the
+          second keystroke would have nowhere to land. */}
+      {(listContext ? jobs.length > 0 : true) && (
         <div className="psearch">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <circle cx="11" cy="11" r="7" />
@@ -231,18 +250,27 @@ export default function RolesPanel({
           <input
             ref={panelSearchRef}
             type="text"
-            aria-label="Search this list"
-            placeholder={searchTarget ? `Search in ${searchTarget}` : "Search these roles"}
-            value={panelQ}
-            onChange={(e) => setPanelQ(e.target.value)}
+            aria-label={listContext ? "Search this list" : "Search all roles and companies"}
+            placeholder={
+              listContext
+                ? searchTarget
+                  ? `Search in ${searchTarget}`
+                  : "Search these roles"
+                : "Search any company or role"
+            }
+            value={listContext ? panelQ : filters.query}
+            onChange={(e) =>
+              listContext ? setPanelQ(e.target.value) : onFilters({ ...filters, query: e.target.value })
+            }
           />
-          {panelQ && (
+          {(listContext ? panelQ : filters.query) && (
             <button
               type="button"
               className="psearch-x"
               aria-label="Clear search"
               onClick={() => {
-                setPanelQ("");
+                if (listContext) setPanelQ("");
+                else onFilters({ ...filters, query: "" });
                 panelSearchRef.current?.focus();
               }}
             >

@@ -43,10 +43,10 @@ describe("geoVerdict", () => {
     expect(v.onCard).toBe(true);
   });
 
-  it("reports EU eligibility when the JD states it", () => {
+  it("reports EU eligibility when the JD states it — detail row only, never a card badge (Rober 7-25)", () => {
     const v = geoVerdict(job({ geo_eligibility: "Open to candidates across the EU" }));
     expect(v.kind).toBe("eu-eligible");
-    expect(v.onCard).toBe(true);
+    expect(v.onCard).toBe(false);
   });
 
   it("falls through to 'unverified' when nothing is stated (never a wrong verdict)", () => {

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import "@/styles/roles.css";
 import GlobeMap from "@/components/roles/GlobeMap";
 import RolesPanel from "@/components/roles/RolesPanel";
 import HeadBar from "@/components/roles/HeadBar";
 import CvUnlockModal from "@/components/roles/CvUnlockModal";
-import ProfileModal from "@/components/roles/ProfileModal";
 import { AUTH_BYPASSED, useAuth } from "@/components/AuthProvider";
 import {
   EMPTY_FILTERS,
@@ -39,14 +39,24 @@ const HOT_COUNT = 7;
 const FRESH_MS = 21 * 24 * 60 * 60 * 1000;
 
 export default function RolesMap() {
-  const { jobs, loading, scoring, remaining, applied, saved, toggleSaved, saveTargets, scoreMore, submitCv, scored, signedIn, cvText, profileMeta, needsCv } =
+  const { jobs, loading, scoring, remaining, applied, saved, toggleSaved, scoreMore, submitCv, scored, signedIn, needsCv } =
     useRolesData();
   const { signInWithGoogle } = useAuth();
   // CV-unlock modal (Phase A front door). Opened from the "Add your CV" affordances,
-  // and from the profile modal's Replace CV action (issue #43) — one shared instance.
+  // and from the Settings page's Replace-CV deep link (?cv=1) — one shared instance.
   const [cvModalOpen, setCvModalOpen] = useState(false);
-  // Profile modal (issue #43) — the avatar's real destination for a signed-in user.
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  // /?cv=1 → open the CV-unlock flow and strip the param (Rober 7-25: the /settings
+  // PAGE replaced the profile modal, so Replace-CV deep-links back to the map's
+  // one parsed-upload flow instead of rebuilding it on paper).
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("cv") !== "1") return;
+    setCvModalOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("cv");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   // Post-sign-in CV gate (Rober 7-13): a session with no CV on the profile gets
   // the CV modal opened in front of it — fires once per false→true transition,
   // so closing it doesn't trap the user in a reopen loop.
@@ -406,10 +416,6 @@ export default function RolesMap() {
             setSel({ co: null, city: null });
           }}
           onAddCv={() => setCvModalOpen(true)}
-          // Signed-in avatar opens the profile view; anon avatar goes through the
-          // same sign-in front door as "Add your CV" (Rober 7-12: no dead-end for
-          // either state, and no second sign-in entry point to maintain).
-          onProfile={() => (signedIn ? setProfileModalOpen(true) : setCvModalOpen(true))}
           onSignIn={signInWithGoogle}
           // Brand = home: same state reset as the map's reset control, plus a camera
           // re-frame to the Europe landing (europeFrame bump eases the globe back).
@@ -507,20 +513,9 @@ export default function RolesMap() {
         sectorOptions={sectorOptions}
         onSubmit={submitCv}
       />
-      <ProfileModal
-        open={profileModalOpen}
-        onClose={() => setProfileModalOpen(false)}
-        cvText={cvText}
-        targetRoles={profileMeta?.targetRoles ?? []}
-        targetSectors={profileMeta?.targetSectors ?? []}
-        cvUpdatedAt={profileMeta?.cvUpdatedAt ?? null}
-        onReplaceCv={() => {
-          setProfileModalOpen(false);
-          setCvModalOpen(true);
-        }}
-        sectorOptions={sectorOptions}
-        onSaveTargets={saveTargets}
-      />
+      {/* ProfileModal is GONE (Rober 7-25): its settings body lives on the routed
+          /settings page, and the avatar opens the unified AccountMenu popover
+          (rendered inside HeadBar) on every surface. */}
     </div>
   );
 }

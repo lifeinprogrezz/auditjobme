@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { type Level, type RolesFilters } from "@/lib/roles";
 import FilterChip, { type FilterOption } from "./FilterChip";
 import ThemeToggle from "@/components/ThemeToggle";
+import AccountMenu from "@/components/app/AccountMenu";
 
 export type HeadBarProps = {
   scored: boolean;
@@ -20,8 +21,6 @@ export type HeadBarProps = {
   onClearAll: () => void;
   /** Opens the CV-unlock modal (Phase A front door). */
   onAddCv: () => void;
-  /** Opens the profile view (issue #43) — signed-in avatar's real destination. */
-  onProfile: () => void;
   /** Returning-user sign-in — the logged-out header's secondary action (Google OAuth). */
   onSignIn: () => void;
   /** Brand click = home reset: clears selection/filters and re-frames Europe (Rober 7-16). */
@@ -30,7 +29,7 @@ export type HeadBarProps = {
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, onAddCv, onProfile, onSignIn, onBrand }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, onAddCv, onSignIn, onBrand }: HeadBarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [chipsShown, setChipsShown] = useState(false);
@@ -181,14 +180,6 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
     (filters.languages?.length ?? 0) > 0 ||
     (filters.workplaces?.length ?? 0) > 0 ||
     filters.query.trim() !== "";
-
-  // div[role=button] chips don't fire click on Enter/Space — wire it explicitly.
-  const keyActivate = (fn: () => void) => (e: React.KeyboardEvent) => {
-    if (e.key !== "Enter" && e.key !== " ") return;
-    if ((e.target as Element).closest(".fdrop")) return; // let checkboxes handle their own keys
-    e.preventDefault();
-    fn();
-  };
 
   return (
     <header className="nav glass liquid">
@@ -390,20 +381,12 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
           via the single root theme class. */}
       <ThemeToggle />
 
-      {/* Signed-in identity (issue #43): the avatar is the profile door and the only
-          right-side control once signed in. The has-cv dot uses the act-strong token —
-          score colors (jade/amber/coral) stay reserved for the map, so this reads as
-          "identity established", not a rank. */}
-      {signedIn && (
-        <div
-          className={`av${scored ? " has-cv" : ""}`}
-          role="button"
-          tabIndex={0}
-          aria-label="Profile"
-          onClick={onProfile}
-          onKeyDown={keyActivate(onProfile)}
-        />
-      )}
+      {/* Signed-in identity (issue #43): the avatar is the account door and the only
+          right-side control once signed in. No corner dot — the old has-cv dot read
+          as an "online" status light (Rober 7-25); CV state lives in Settings now.
+          The SAME AccountMenu popover renders on every surface (map + paper pages)
+          — the ProfileModal it replaced graduated to the /settings page. */}
+      {signedIn && <AccountMenu variant="glass" />}
     </header>
   );
 }

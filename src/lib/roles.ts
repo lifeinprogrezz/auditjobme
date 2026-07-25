@@ -121,8 +121,11 @@ export function geoVerdict(job: RoleJob): GeoVerdict {
   const geo = (ex?.geo_eligibility ?? "").trim();
   // 2. Stated US-only barrier — never soften a barrier the JD spells out.
   if (geo && GEO_US_ONLY_RE.test(geo)) return { kind: "barrier", label: "US work authorization", onCard: true };
-  // 3. Stated EU / EEA / Europe eligibility.
-  if (geo && GEO_EU_RE.test(geo)) return { kind: "eu-eligible", label: "EU eligible", onCard: true };
+  // 3. Stated EU / EEA / Europe eligibility. NOT a card badge (Rober 7-25: the
+  // "EU eligible" bubble read as noise on an EU-focused catalog — every role is
+  // implicitly Europe-relevant here). Still surfaced in the detail pane's
+  // Work-eligibility row, where the stated-vs-not distinction earns its place.
+  if (geo && GEO_EU_RE.test(geo)) return { kind: "eu-eligible", label: "EU eligible", onCard: false };
   // 4. Nothing trustworthy in the JD → the honest "not stated" state (never a guess).
   return { kind: "unverified", label: "Work eligibility not stated", onCard: false };
 }

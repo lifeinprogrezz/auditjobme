@@ -678,6 +678,11 @@ export function useRolesData() {
     cvText: profile?.cv_text ?? null,
     /** Picked labels + last-write date (profile view, issue #43). */
     profileMeta,
+    /** True once the signed-in profile row has actually been fetched. The routed
+     *  /settings page MUST gate on this (review 7-25): rendering the panel off
+     *  the pre-fetch defaults shows "No CV on file" to users who have one, and a
+     *  chip edit seeded from the empty defaults can SAVE over stored targets. */
+    profileChecked,
     /** Signed in with a settled profile but NO CV (Rober 7-13): whichever door
      *  they entered through, the map shell opens the CV modal — CV mandatory as
      *  an invariant, not a door policy. */

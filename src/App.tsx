@@ -15,6 +15,7 @@ const UnderConstruction = lazy(() => import("./pages/UnderConstruction.tsx"));
 const Today = lazy(() => import("./pages/Today.tsx"));
 const Tracker = lazy(() => import("./pages/Tracker.tsx"));
 const Apply = lazy(() => import("./pages/Apply.tsx"));
+const Settings = lazy(() => import("./pages/Settings.tsx"));
 const Privacy = lazy(() => import("./pages/Privacy.tsx"));
 const Terms = lazy(() => import("./pages/Terms.tsx"));
 
@@ -58,6 +59,8 @@ const App = () => (
               <Route path="/digest" element={<Navigate to="/today" replace />} />
               <Route path="/tracker" element={gated(<Tracker />)} />
               <Route path="/apply" element={gated(<Apply />)} />
+              {/* Settings as a routed surface (Rober 7-25) — was the map ProfileModal. */}
+              <Route path="/settings" element={gated(<Settings />)} />
               {/* Public legal pages (the noscript footer links these). */}
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />

@@ -58,9 +58,14 @@ describe("buildActionQueue", () => {
     expect(q.queue.map((j) => j.id)).toEqual(["great2", "mid"]);
   });
 
-  it("caps the queue length", () => {
+  it("caps the queue length only when a finite cap is passed", () => {
     const many = Array.from({ length: 60 }, (_, i) => job(`j${i}`, { score: 4 }));
     expect(buildActionQueue(many, new Set(), 40).queue).toHaveLength(40);
+  });
+
+  it("is UNCAPPED by default — More matches scrolls the whole scored pool (Rober 7-25)", () => {
+    const many = Array.from({ length: 60 }, (_, i) => job(`j${i}`, { score: 4 }));
+    expect(buildActionQueue(many, new Set()).queue).toHaveLength(60);
   });
 
   it("uses the shared great-fit threshold", () => {

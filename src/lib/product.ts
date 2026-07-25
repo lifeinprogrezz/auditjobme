@@ -40,12 +40,16 @@ export interface ActionQueue {
 export function buildActionQueue(
   jobs: RoleJob[],
   appliedIds: ReadonlySet<string>,
-  cap = 40,
+  // UNCAPPED by default (Rober 7-25): "More matches" must scroll as deep as the
+  // scored pool goes — the old cap=40 silently ended the list at 30 tail rows.
+  // DOM cost is the renderer's problem (Today reveals incrementally), not the
+  // data layer's. Callers can still pass a finite cap.
+  cap = Infinity,
 ): ActionQueue {
   const actionable = jobs
     .filter((j) => j.score != null && !appliedIds.has(j.id))
     .sort(byScore);
   const scored = jobs.filter((j) => j.score != null).length;
   const worthApplying = actionable.filter((j) => (j.score as number) >= WORTH_APPLYING_MIN).length;
-  return { total: jobs.length, scored, worthApplying, queue: actionable.slice(0, cap) };
+  return { total: jobs.length, scored, worthApplying, queue: Number.isFinite(cap) ? actionable.slice(0, cap) : actionable };
 }

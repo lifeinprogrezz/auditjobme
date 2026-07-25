@@ -11,6 +11,14 @@
     "api/nightly.ts": { "maxDuration": 60 },
     "api/score-backlog.ts": { "maxDuration": 60 }
   },
+  "redirects": [
+    {
+      "source": "/((?!api/).*)",
+      "has": [{ "type": "host", "value": "(?<sub>.+)\\.vercel\\.app" }],
+      "destination": "https://auditjob.me/$1",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]

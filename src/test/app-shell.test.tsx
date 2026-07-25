@@ -52,11 +52,13 @@ describe("AppShell — D-class page chrome (§6.0)", () => {
     expect(inactive.className).not.toContain("nav-thumb");
   });
 
-  it("the back-to-map link is a nav item (muted), not a button/pill", () => {
+  it("Map|List segmented toggle (Rober 7-25): Map is a muted button back to the globe, List is the active thumb", () => {
     renderShell("/today");
-    const map = screen.getByRole("link", { name: "Map" });
+    const map = screen.getByRole("button", { name: "Map" });
     expect(map.className).toContain("text-muted-foreground");
-    expect(map.className).not.toContain("nav-thumb");
+    expect(map.classList.contains("nav-thumb")).toBe(false);
+    const list = screen.getByText("List");
+    expect(list.classList.contains("nav-thumb")).toBe(true);
   });
 
   it("the page h1 uses the on-scale `page` token, not sm:text-3xl", () => {
