@@ -28,8 +28,15 @@ describe("formatStage", () => {
 describe("formatHeadcount", () => {
   it("renders a bucket with an en dash", () => {
     expect(formatHeadcount("51-200")).toBe("51–200");
-    expect(formatHeadcount("100-500")).toBe("100–500");
     expect(formatHeadcount("11-50")).toBe("11–50");
+    expect(formatHeadcount("501-2000")).toBe("500–2k");
+  });
+  it("names a legacy bucket the same size the Size filter does (issue #68 item 6)", () => {
+    // Pre-migration rows used a second, overlapping scheme. The badge used to
+    // echo the raw token while the filter banded it elsewhere, so one company
+    // could read as two sizes on the same screen.
+    expect(formatHeadcount("100-500")).toBe("201–500");
+    expect(formatHeadcount("30-100")).toBe("51–200");
   });
   it("tolerates spacing", () => {
     expect(formatHeadcount(" 30 - 100 ")).toBe("30–100");

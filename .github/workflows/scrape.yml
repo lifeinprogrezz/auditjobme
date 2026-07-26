@@ -62,6 +62,17 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # Optional: enables the Haiku JD-grounded pass. Unset = free og:description + Wikidata only.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Company size carries ~95% of the deterministic ranker's power (issue #68
+      # item 6), so filling it is economics work, not cosmetics. startupmap.one's
+      # company directory is the one source we already hold that states a size.
+      - name: Backfill missing company size buckets from startupmap.one
+        continue-on-error: true # additive; a third-party hiccup must never fail the scrape
+        run: node scripts/backfill-headcount.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # startupmap 403s datacenter IPs; same proxy the scrape step uses.
+          SCRAPE_PROXY_URL: ${{ secrets.SCRAPE_PROXY_URL }}
       - name: Match companies to the UK Skilled-Worker sponsor register (companies.uk_sponsor_status)
         continue-on-error: true # additive; a gov.uk hiccup must never fail the core scrape
         run: node scripts/enrich-uk-sponsors.mjs

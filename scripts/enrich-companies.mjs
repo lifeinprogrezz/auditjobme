@@ -27,6 +27,7 @@ import {
   parseWikidataTime,
   linkedinFromHtml,
 } from "./enrich-lib.mjs";
+import { normalizeHeadcountBucket } from "./headcount-lib.mjs";
 
 const arg = (name, def) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -50,7 +51,7 @@ async function haikuExtract(company, jd) {
 {"description": "<one plain sentence on what the company does, <=200 chars, or null>",
  "sector": "<short industry label e.g. Fintech, or null>",
  "stage": "<funding stage if stated: seed|series_a|series_b|series_c|series_d|public, else null>",
- "team_size": "<headcount range if stated e.g. 51-200, else null>",
+ "team_size": "<WHOLE-COMPANY headcount if stated, e.g. 51-200 or 340; NOT the size of the hiring team or squad; else null>",
  "founded_year": <integer year if stated, else null>}
 
 ---
@@ -144,7 +145,13 @@ async function enrichOne(co) {
   }
   if (co.sector == null && ai.sector) update.sector = ai.sector;
   if (co.stage == null && ai.stage) update.stage = ai.stage;
-  if (co.headcount_bucket == null && ai.team_size) update.headcount_bucket = ai.team_size;
+  if (co.headcount_bucket == null && ai.team_size) {
+    // The ONE way into headcount_bucket (issue #68 item 6): a free-text model
+    // answer becomes a canonical rung or nothing. Writing it raw is how the
+    // column ended up carrying two overlapping vocabularies at once.
+    const bucket = normalizeHeadcountBucket(ai.team_size);
+    if (bucket) update.headcount_bucket = bucket;
+  }
   if (Object.keys(update).length === 0) return { slug: co.slug, wrote: null };
   if (!DRY && db) await db.from("companies").update(update).eq("slug", co.slug);
   return { slug: co.slug, wrote: update };

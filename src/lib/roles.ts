@@ -412,24 +412,33 @@ export function formatStage(stage: string | null | undefined): string | null {
   return STAGE_LABELS[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** Headcount bucket for display: "51-200" → "51–200" (en dash, "people" implied). null passes through. */
+/** Headcount for display: the canonical band label ("51–200", "people" implied).
+ *  Falls back to an en-dashed copy of anything unmapped. null passes through.
+ *  Routed through sizeBand so the company badge and the Size filter can never
+ *  name the same company two different sizes (issue #68 item 6). */
 export function formatHeadcount(bucket: string | null | undefined): string | null {
   if (!bucket) return null;
+  const band = sizeBand(bucket);
+  if (band) return band;
   const b = bucket.trim();
   return b ? b.replace(/\s*-\s*/g, "–") : null;
 }
 
-// Raw headcount buckets arrive in two inconsistent source schemes (LinkedIn-style
-// 1-10/11-50/51-200/201-500/500-2k/2k+ AND a scraped <10/10-30/30-100/100-500/500+).
-// Normalize both into ONE canonical, non-overlapping size ladder (mapped by midpoint)
-// so the Size filter offers clean, distinct options instead of overlapping buckets.
-// Rober 7-06; pinned by size-band.test.ts.
+// The database now carries ONE vocabulary — 1-10 / 11-50 / 51-200 / 201-500 /
+// 501-2000 / 2001+ (scripts/headcount-lib.mjs, migration
+// 20260726101000_headcount_vocabulary.sql). The legacy tokens below are the two
+// overlapping schemes that column used to hold; they stay mapped so a dataplane
+// artifact built before the migration still renders a size instead of dropping
+// out of the Size filter. Rober 7-06, one vocabulary 7-26; pinned by filters.test.ts.
 const SIZE_BANDS = ["1–10", "11–50", "51–200", "201–500", "500–2k", "2k+"] as const;
 const RAW_TO_BAND: Record<string, number> = {
-  "<10": 0, "1-10": 0,
-  "10-30": 1, "11-50": 1,
-  "30-100": 2, "51-200": 2,
-  "100-500": 3, "201-500": 3,
+  // canonical
+  "1-10": 0, "11-50": 1, "51-200": 2, "201-500": 3, "501-2000": 4, "2001+": 5,
+  // legacy, by the same midpoint collapse the migration applied
+  "<10": 0,
+  "10-30": 1,
+  "30-100": 2,
+  "100-500": 3,
   "500+": 4, "500-2k": 4,
   "2k+": 5,
 };

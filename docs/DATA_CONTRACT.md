@@ -26,9 +26,17 @@
 **companies** — the tracked-company pool.
 - `id` (pk) · `name` · `ats_type` (greenhouse | lever | ashby | smartrecruiters |
   workable | workday | factorial | google | meta | amazon | microsoft | apple | shopify |
-  vc_board | startupmap) · `careers_url` · `hq_country` · `headcount_bucket` (nullable —
-  no LinkedIn enrichment in the product; "unknown" is acceptable) · `status`
+  vc_board | startupmap) · `careers_url` · `hq_country` · `headcount_bucket` · `status`
   (active | paused | requested) · timestamps.
+  - `headcount_bucket` is ONE closed vocabulary, contiguous and disjoint:
+    `1-10` · `11-50` · `51-200` · `201-500` · `501-2000` · `2001+`, or null. Writers
+    MUST go through `normalizeHeadcountBucket()` in `scripts/headcount-lib.mjs`; the
+    CHECK constraint `companies_headcount_bucket_vocabulary` is the backstop, and
+    `src/test/headcount-lib.test.ts` fails if the two lists drift. It matters more
+    than the other company columns: size bucket alone recovers about 95% of the
+    deterministic pre-filter's ranking power (2026-07-26 measurement), so a wrong
+    value moves roles for every user. Null is honest and stays allowed — no
+    LinkedIn enrichment, ever.
 
 **jobs** — the shared role pool (PM roles in Europe, the v1 ICP).
 - `id` (pk) · `company_id` (fk) · `title` · `canonical_url` (unique — dedup key after
@@ -95,5 +103,4 @@
 - Whether scoring runs as Supabase edge functions per user or a queued batch worker
   alongside the scraper (v1 design spec Q12: decide when load is real).
 - jd_text retention policy (full text forever vs. hash + window).
-- Headcount: public substitute source vs. permanently "unknown".
 - Exact allowance figure — from the economics pilot, not invented here.
