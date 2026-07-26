@@ -7,7 +7,9 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   EMPTY_FILTERS,
+  FRESHNESS_WINDOWS,
   LEVELS,
+  UK_SPONSOR_STATUSES,
   WORKPLACES,
   fitLabel,
   formatHeadcount,
@@ -41,6 +43,10 @@ export type RolesPanelProps = {
   detailJob: RoleJob | null;
   applied: Set<string>;
   saved: Set<string>;
+  /** Roles the user said no to (issue #73 slice 4) — drives the detail's toggle. */
+  dismissed: Set<string>;
+  /** Dismiss / restore this role. */
+  onToggleDismissed: (job: RoleJob) => void;
   onOpenDetail: (j: RoleJob) => void;
   onCloseDetail: () => void;
   onScoreMore: () => void;
@@ -107,6 +113,8 @@ export default function RolesPanel({
   detailJob,
   applied,
   saved,
+  dismissed,
+  onToggleDismissed,
   onOpenDetail,
   onCloseDetail,
   onScoreMore,
@@ -152,6 +160,16 @@ export default function RolesPanel({
       key: `wp-${v}`,
       label: WORKPLACES.find((w) => w.value === v)?.label ?? v,
       onX: () => onFilters({ ...filters, workplaces: (filters.workplaces ?? []).filter((x) => x !== v) }),
+    })),
+    ...(filters.freshness ?? []).map((v) => ({
+      key: `fr-${v}`,
+      label: FRESHNESS_WINDOWS.find((w) => w.value === v)?.label ?? v,
+      onX: () => onFilters({ ...filters, freshness: (filters.freshness ?? []).filter((x) => x !== v) }),
+    })),
+    ...(filters.sponsors ?? []).map((v) => ({
+      key: `sp-${v}`,
+      label: UK_SPONSOR_STATUSES.find((st) => st.value === v)?.label ?? v,
+      onX: () => onFilters({ ...filters, sponsors: (filters.sponsors ?? []).filter((x) => x !== v) }),
     })),
   ];
   const clearAllFilters = () => {
@@ -568,17 +586,32 @@ export default function RolesPanel({
           </button>
         )}
         {signedIn && (
-          <button
-            type="button"
-            className="dsave"
-            aria-pressed={saved.has(job.id)}
-            onClick={() => onToggleSaved(job)}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill={saved.has(job.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-              <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
-            </svg>
-            {saved.has(job.id) ? "Saved for later" : "Save for later"}
-          </button>
+          // Save and Not-interested share ONE secondary row: the same .dsave token,
+          // side by side, so saying no is as easy as saying maybe (issue #73 slice 4).
+          <div className="dacts">
+            <button
+              type="button"
+              className="dsave"
+              aria-pressed={saved.has(job.id)}
+              onClick={() => onToggleSaved(job)}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill={saved.has(job.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
+              </svg>
+              {saved.has(job.id) ? "Saved for later" : "Save for later"}
+            </button>
+            <button
+              type="button"
+              className="dsave"
+              aria-pressed={dismissed.has(job.id)}
+              onClick={() => onToggleDismissed(job)}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+              {dismissed.has(job.id) ? "Dismissed" : "Not interested"}
+            </button>
+          </div>
         )}
         {others.length > 0 && (
           <div>

@@ -179,6 +179,9 @@ export type ScoredMatch = {
   score: number;
   reason: string;
   fitBullets: string[];
+  /** Where the role is, for the email's company/location line (issue #72 slice 3).
+   *  Optional: an unknown location is simply omitted, never guessed. */
+  location?: string | null;
 };
 
 export type RankedMatch = ScoredMatch & { rank: number };
@@ -194,11 +197,12 @@ export function rankMatches(matches: ScoredMatch[]): RankedMatch[] {
 
 /** Notification subject — transactional/notification tone (biases Gmail's Updates
  *  tab; a marketing-style "matched to you today" reads as Promotions). `dateLabel`
- *  e.g. "Jul 7". Spec §7 — a hook, not a digest. */
+ *  e.g. "Jul 7". Spec §7 — a hook, not a digest. No em-dash: BRAND.md's copy rule
+ *  covers email, and the subject line is the most-read copy we ship. */
 export function buildEmailSubject(count: number, dateLabel?: string): string {
   const noun = count === 1 ? "match" : "matches";
   const suffix = dateLabel ? ` (${dateLabel})` : "";
-  return `Your job ${noun} — ${count} new${suffix}`;
+  return `Your job ${noun}, ${count} new${suffix}`;
 }
 
 /** Escape the chars that matter inside an HTML text node / href attr. */
@@ -210,10 +214,41 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/** Deep link to ONE role's apply page (issue #72 slice 3). The email used to carry a
+ *  single "See them all" link, so every role cost a hunt through the app; each row
+ *  now lands on its own /apply page. Mirrors the in-app route exactly:
+ *  /apply?job=<encoded posting url>. */
+export function applyUrl(appUrl: string, jobUrl: string): string {
+  return `${appUrl.replace(/\/$/, "")}/apply?job=${encodeURIComponent(jobUrl)}`;
+}
+
+/** Score as the email shows it: one decimal out of five, never a raw float. */
+function scoreLabel(score: number): string {
+  return `${score.toFixed(1)} out of 5`;
+}
+
+/** "Barcelona" / "Remote" style suffix for the meta line; empty when unknown. */
+function metaLine(m: RankedMatch): string {
+  const loc = m.location?.trim();
+  return loc ? `${scoreLabel(m.score)} · ${loc}` : scoreLabel(m.score);
+}
+
+// Brand ink + muted, straight from BRAND.md's light palette. Inlined because email
+// clients drop <style> blocks; a system font stack because they drop webfonts too.
+const INK = "#0b1f26";
+const MUTED = "#3f5a63";
+const HAIR = "rgba(11,31,38,0.12)";
+const FONT =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
 /**
- * The notification email body (spec §1/§7): a LIGHTWEIGHT hook, not a content
- * digest — the top few company/role names + a deep link back into the app. Files
- * never ride the email. Returns text + html. Pure.
+ * The notification email body (spec §1/§7, upgraded in issue #72 slice 3). Still a
+ * NOTIFICATION, not a marketing digest: a plain brand wordmark, one line of context,
+ * then the top few roles, each carrying its score, a one-line reason, its company and
+ * location, and a deep link to ITS OWN /apply page. The transactional tone is load
+ * bearing (with the List-Unsubscribe header in api/nightly.ts it is what keeps this
+ * out of Promotions), so no images, no buttons, no campaign voice. Files never ride
+ * the email. Returns text + html. Pure.
  */
 export function buildEmailBody(
   matches: RankedMatch[],
@@ -225,19 +260,47 @@ export function buildEmailBody(
   const plural = matches.length === 1 ? "" : "s";
 
   const text = [
+    `auditjob.me`,
+    "",
     `You have ${matches.length} new role${plural} matched to you today.`,
     "",
-    ...top.map((m) => `- ${m.company} — ${m.title}`),
-    ...(more > 0 ? [`...and ${more} more.`] : []),
-    "",
+    ...top.flatMap((m) => [
+      `${m.company}`,
+      `${m.title}`,
+      metaLine(m),
+      ...(m.reason?.trim() ? [m.reason.trim()] : []),
+      `Prepare your application: ${applyUrl(appUrl, m.url)}`,
+      "",
+    ]),
+    ...(more > 0 ? [`...and ${more} more.`, ""] : []),
     `See them all: ${appUrl}`,
   ].join("\n");
 
+  const rows = top
+    .map((m) =>
+      [
+        `<div style="padding:14px 0;border-top:1px solid ${HAIR}">`,
+        `<div style="font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:${MUTED}">${esc(m.company)}</div>`,
+        `<div style="margin-top:2px"><a href="${esc(applyUrl(appUrl, m.url))}" style="font-size:16px;font-weight:600;color:${INK};text-decoration:none">${esc(m.title)}</a></div>`,
+        `<div style="margin-top:3px;font-size:13px;color:${MUTED}">${esc(metaLine(m))}</div>`,
+        ...(m.reason?.trim()
+          ? [`<p style="margin:6px 0 0;font-size:14px;line-height:1.45;color:${INK}">${esc(m.reason.trim())}</p>`]
+          : []),
+        `</div>`,
+      ].join(""),
+    )
+    .join("");
+
   const html = [
-    `<p>You have <strong>${matches.length}</strong> new role${plural} matched to you today.</p>`,
-    `<ul>${top.map((m) => `<li>${esc(m.company)} — ${esc(m.title)}</li>`).join("")}</ul>`,
-    ...(more > 0 ? [`<p>...and ${more} more.</p>`] : []),
-    `<p><a href="${esc(appUrl)}">See them all</a></p>`,
+    `<div style="font-family:${FONT};max-width:560px;color:${INK}">`,
+    `<div style="font-size:14px;font-weight:700;letter-spacing:.01em;color:${INK}">auditjob.me</div>`,
+    `<p style="margin:14px 0 4px;font-size:15px">You have <strong>${matches.length}</strong> new role${plural} matched to you today.</p>`,
+    rows,
+    ...(more > 0
+      ? [`<p style="margin:14px 0 0;font-size:14px;color:${MUTED}">...and ${more} more.</p>`]
+      : []),
+    `<p style="margin:18px 0 0;font-size:14px"><a href="${esc(appUrl)}" style="color:${INK}">See them all</a></p>`,
+    `</div>`,
   ].join("");
 
   return { text, html };

@@ -11,6 +11,7 @@ import {
   rankMatches,
   buildEmailSubject,
   buildEmailBody,
+  applyUrl,
   NIGHTLY_FALLBACK_WINDOW_MS,
   NIGHTLY_RUN_BUDGET_MS,
   type ScoredMatch,
@@ -190,31 +191,73 @@ describe("rankMatches", () => {
 
 describe("buildEmailSubject", () => {
   it("uses a transactional subject with count + optional date", () => {
-    expect(buildEmailSubject(1)).toBe("Your job match — 1 new");
-    expect(buildEmailSubject(7)).toBe("Your job matches — 7 new");
-    expect(buildEmailSubject(7, "Jul 7")).toBe("Your job matches — 7 new (Jul 7)");
+    expect(buildEmailSubject(1)).toBe("Your job match, 1 new");
+    expect(buildEmailSubject(7)).toBe("Your job matches, 7 new");
+    expect(buildEmailSubject(7, "Jul 7")).toBe("Your job matches, 7 new (Jul 7)");
+  });
+
+  it("carries no em-dash — BRAND.md's copy rule covers email too", () => {
+    expect(buildEmailSubject(7, "Jul 7")).not.toContain("\u2014");
   });
 });
 
-describe("buildEmailBody", () => {
+describe("applyUrl (issue #72 slice 3)", () => {
+  it("deep-links a role to its OWN /apply page, url-encoded", () => {
+    expect(applyUrl("https://auditjob.me/", "https://boards.co/j?id=1&x=2")).toBe(
+      "https://auditjob.me/apply?job=https%3A%2F%2Fboards.co%2Fj%3Fid%3D1%26x%3D2",
+    );
+  });
+
+  it("tolerates an app url with or without a trailing slash", () => {
+    expect(applyUrl("https://auditjob.me", "https://x/1")).toBe(applyUrl("https://auditjob.me/", "https://x/1"));
+  });
+});
+
+describe("buildEmailBody (issue #72 slice 3)", () => {
   const ranked = (n: number) =>
     Array.from({ length: n }, (_, i) => ({
       url: `https://x/${i}`,
       company: `Co${i}`,
       title: `Role${i}`,
+      location: i === 0 ? "Barcelona" : null,
       score: 5 - i,
-      reason: "",
+      reason: `Reason${i}`,
       fitBullets: [],
       rank: i + 1,
     }));
 
-  it("lists up to `preview` roles and a deep link, no files", () => {
+  it("gives every role its OWN /apply deep link, plus score, reason, company, location", () => {
     const { text, html } = buildEmailBody(ranked(3), "https://auditjob.me/");
     expect(text).toContain("You have 3 new roles matched to you today.");
-    expect(text).toContain("- Co0 — Role0");
+    expect(text).toContain("Co0");
+    expect(text).toContain("Role0");
+    expect(text).toContain("5.0 out of 5 · Barcelona");
+    expect(text).toContain("Reason0");
+    for (let i = 0; i < 3; i++) expect(text).toContain(applyUrl("https://auditjob.me/", `https://x/${i}`));
+    expect(html).toContain(`href="${applyUrl("https://auditjob.me/", "https://x/0")}"`);
+    expect(html).toContain("5.0 out of 5 · Barcelona");
+    expect(html).toContain("Reason0");
+  });
+
+  it("keeps the brand header and the see-them-all link", () => {
+    const { text, html } = buildEmailBody(ranked(2), "https://auditjob.me/");
+    expect(text.startsWith("auditjob.me")).toBe(true);
+    expect(html).toContain("auditjob.me</div>");
     expect(text).toContain("See them all: https://auditjob.me/");
-    expect(text).not.toContain("...and"); // 3 <= preview(5)
-    expect(html).toContain('<a href="https://auditjob.me/">See them all</a>');
+    expect(html).toContain('href="https://auditjob.me/"');
+  });
+
+  it("omits the location silently when we don't hold one (never guesses)", () => {
+    const { text } = buildEmailBody(ranked(2), "https://auditjob.me/");
+    expect(text).toContain("4.0 out of 5\n"); // Co1 has no location: score line only
+  });
+
+  it("stays a NOTIFICATION: no images, no campaign chrome, no em-dashes", () => {
+    const { text, html } = buildEmailBody(ranked(3), "https://auditjob.me/");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("unsubscribe");
+    expect(text).not.toContain("\u2014");
+    expect(html).not.toContain("\u2014");
   });
 
   it("summarizes the overflow beyond the preview count", () => {
@@ -222,17 +265,28 @@ describe("buildEmailBody", () => {
     expect(text).toContain("...and 3 more.");
     expect(html).toContain("...and 3 more.");
     // only the first 5 are itemized
-    expect(text).toContain("- Co4 — Role4");
-    expect(text).not.toContain("- Co5 — Role5");
+    expect(text).toContain("Role4");
+    expect(text).not.toContain("Role5");
   });
 
-  it("escapes HTML-special characters in company/role names", () => {
+  it("escapes HTML-special characters in company/role/reason", () => {
     const rows = [
-      { url: "u", company: "A & B <Inc>", title: 'PM "lead"', score: 5, reason: "", fitBullets: [], rank: 1 },
+      {
+        url: "https://x/1?a=1&b=2",
+        company: "A & B <Inc>",
+        title: 'PM "lead"',
+        location: null,
+        score: 5,
+        reason: "5 > 4 & rising",
+        fitBullets: [],
+        rank: 1,
+      },
     ];
     const { html } = buildEmailBody(rows, "https://auditjob.me/");
     expect(html).toContain("A &amp; B &lt;Inc&gt;");
     expect(html).toContain("PM &quot;lead&quot;");
+    expect(html).toContain("5 &gt; 4 &amp; rising");
+    expect(html).not.toContain("<Inc>");
   });
 });
 

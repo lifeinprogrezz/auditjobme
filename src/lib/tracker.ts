@@ -22,3 +22,24 @@ export const STATUS_ORDER: Status[] = TRACKER_COLUMNS.map((c) => c.value);
 export function normStatus(s: string): Status | null {
   return (STATUS_ORDER as readonly string[]).includes(s) ? (s as Status) : null;
 }
+
+/**
+ * Statuses where an application is still LIVE at that company (issue #73 slice 2 —
+ * the career-ops in-flight semantics, ported exactly). While one of these is open,
+ * that company's OTHER roles collapse out of the action queue: a second application
+ * splits the recruiter's attention and reads as scattershot.
+ *
+ * "rejected" is deliberately NOT here. A closed conversation frees the company to
+ * resurface on a genuinely NEW role — this is cap-1, not deprioritization. The
+ * exact role you applied to never returns either way (that's the role-level
+ * `applied` set, which already worked).
+ */
+export const INFLIGHT_STATUSES: Status[] = ["applied", "responded", "interview", "offer"];
+
+/** True when this raw DB status means an application is still in flight. An
+ *  unrecognised status is NOT in flight (normStatus's no-coercion rule): we never
+ *  hide a company's roles on a status we can't identify. */
+export function isInFlightStatus(status: string | null | undefined): boolean {
+  const s = status == null ? null : normStatus(status);
+  return s != null && INFLIGHT_STATUSES.includes(s);
+}

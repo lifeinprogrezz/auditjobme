@@ -297,6 +297,7 @@ export type Database = {
           notified_at: string | null
           rank: number | null
           reason: string | null
+          rubric_version: string | null
           score: number | null
           seen_at: string | null
           user_id: string
@@ -310,6 +311,7 @@ export type Database = {
           notified_at?: string | null
           rank?: number | null
           reason?: string | null
+          rubric_version?: string | null
           score?: number | null
           seen_at?: string | null
           user_id: string
@@ -323,6 +325,7 @@ export type Database = {
           notified_at?: string | null
           rank?: number | null
           reason?: string | null
+          rubric_version?: string | null
           score?: number | null
           seen_at?: string | null
           user_id?: string
@@ -357,6 +360,35 @@ export type Database = {
             columns: ["audit_id"]
             isOneToOne: false
             referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dismissed_jobs: {
+        Row: {
+          dismissed_at: string
+          id: string
+          job_id: string
+          user_id: string
+        }
+        Insert: {
+          dismissed_at?: string
+          id?: string
+          job_id: string
+          user_id: string
+        }
+        Update: {
+          dismissed_at?: string
+          id?: string
+          job_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dismissed_jobs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]

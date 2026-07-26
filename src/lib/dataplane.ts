@@ -16,6 +16,9 @@ export interface DataplaneJob {
   source: string | null;
   seniority: string | null;
   posted_at: string | null;
+  /** Optional: an artifact built before issue #73 predates the column, and the
+   *  freshness facet falls back to posted_at rather than breaking (roleSeenMs). */
+  first_seen_at?: string | null;
   company_id: string | null;
   extraction: Record<string, unknown> | null;
   role_family: string | null;

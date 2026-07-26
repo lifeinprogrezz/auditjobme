@@ -17,6 +17,10 @@ export type HeadBarProps = {
   sectorOptions: FilterOption[];
   sizeOptions: FilterOption[];
   languageOptions: FilterOption[];
+  /** Age windows (7 / 14 / 28 days) — issue #73 slice 3. */
+  freshnessOptions: FilterOption[];
+  /** UK Skilled-Worker sponsor-licence status — issue #73 slice 5. */
+  sponsorOptions: FilterOption[];
   /** Reset every filter (and the map pin selection) at once. */
   onClearAll: () => void;
   /** Opens the CV-unlock modal (Phase A front door). */
@@ -29,14 +33,16 @@ export type HeadBarProps = {
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, onAddCv, onSignIn, onBrand }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, freshnessOptions, sponsorOptions, onClearAll, onAddCv, onSignIn, onBrand }: HeadBarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [chipsShown, setChipsShown] = useState(false);
   // Smooth width reveal via grid-template-columns 0fr→1fr (.show); .expanded (after
   // the 550ms slide) frees the inner overflow so dropdowns can escape.
   const [chipsExpanded, setChipsExpanded] = useState(false);
-  const [openChip, setOpenChip] = useState<"role" | "level" | "city" | "workplace" | "sector" | "size" | "language" | null>(null);
+  const [openChip, setOpenChip] = useState<
+    "role" | "level" | "city" | "workplace" | "sector" | "size" | "language" | "freshness" | "sponsor" | null
+  >(null);
   const expandTimer = useRef<number | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   // The chip row hides its scrollbar, so give mouse users two ways to move it:
@@ -162,13 +168,17 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
   };
 
   // City / Sector / Size are string multi-selects — one generic toggler.
-  const toggleIn = (key: "cities" | "sectors" | "sizes" | "languages" | "roles" | "workplaces", v: string) => {
+  const toggleIn = (
+    key: "cities" | "sectors" | "sizes" | "languages" | "roles" | "workplaces" | "freshness" | "sponsors",
+    v: string,
+  ) => {
     const cur = filters[key] ?? [];
     const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
     onFilters({ ...filters, [key]: next });
   };
-  const chipOpen = (key: "role" | "level" | "city" | "workplace" | "sector" | "size" | "language") => () =>
-    setOpenChip(openChip === key ? null : key);
+  const chipOpen =
+    (key: "role" | "level" | "city" | "workplace" | "sector" | "size" | "language" | "freshness" | "sponsor") => () =>
+      setOpenChip(openChip === key ? null : key);
 
   // Any filter active → show the headbar-wide Clear all (Rober 7-09).
   const anyActive =
@@ -179,6 +189,8 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
     filters.sizes.length > 0 ||
     (filters.languages?.length ?? 0) > 0 ||
     (filters.workplaces?.length ?? 0) > 0 ||
+    (filters.freshness?.length ?? 0) > 0 ||
+    (filters.sponsors?.length ?? 0) > 0 ||
     filters.query.trim() !== "";
 
   return (
@@ -265,6 +277,18 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
           onClearAll={() => onFilters({ ...filters, levels: [] })}
           disabled={levelOptions.every((o) => o.count === 0) && filters.levels.length === 0}
         />
+        {/* Freshness = a filter, never a ranking input (issue #73 slice 3): age does
+            not predict match quality, so tilting the rank on it would rank on noise. */}
+        <FilterChip
+          label="Freshness"
+          options={freshnessOptions}
+          selected={filters.freshness ?? []}
+          onToggle={(v) => toggleIn("freshness", v)}
+          open={openChip === "freshness"}
+          onOpenToggle={chipOpen("freshness")}
+          onClearAll={() => onFilters({ ...filters, freshness: [] })}
+          disabled={freshnessOptions.every((o) => o.count === 0) && !(filters.freshness?.length ?? 0)}
+        />
         <FilterChip
           label="City"
           searchable
@@ -317,6 +341,18 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
           onOpenToggle={chipOpen("language")}
           onClearAll={() => onFilters({ ...filters, languages: [] })}
           disabled={languageOptions.length === 0 && !(filters.languages?.length ?? 0)}
+        />
+        {/* UK sponsor licence (issue #73 slice 5) — a company attribute from the Home
+            Office register, already shown as a badge, now filterable. */}
+        <FilterChip
+          label="UK sponsor"
+          options={sponsorOptions.filter((o) => o.count > 0)}
+          selected={filters.sponsors ?? []}
+          onToggle={(v) => toggleIn("sponsors", v)}
+          open={openChip === "sponsor"}
+          onOpenToggle={chipOpen("sponsor")}
+          onClearAll={() => onFilters({ ...filters, sponsors: [] })}
+          disabled={sponsorOptions.every((o) => o.count === 0) && !(filters.sponsors?.length ?? 0)}
         />
 
         </div>
