@@ -10,11 +10,18 @@ title = "auditjobme gitleaks config"
 useDefault = true
 
 [allowlist]
-description = "Public-by-design Supabase anon keys (RLS-gated): our own in .env, plus one third-party board's key inlined in the scraper."
+description = "Public-by-design values: Supabase anon keys (RLS-gated) in .env and in the scraper, plus Teamtailor's auto-suffixed public career-site subdomains."
 paths = [
   '''^\.env$''',
 ]
 regexes = [
+  # Teamtailor gives a career site whose preferred name is taken a subdomain with
+  # a creation-timestamp suffix (evrocab-1692891239 -> the public feed at
+  # https://evrocab-1692891239.teamtailor.com/jobs.json). Sitting next to a
+  # "token" key in scripts/boards.json, that reads as high entropy to the generic
+  # rule. It is a hostname anyone can fetch, not a credential. Deliberately narrow:
+  # only the "-1XXXXXXXXX" epoch shape, so a real key next to "token" still fails CI.
+  '''^[a-z0-9][a-z0-9-]*-1[0-9]{9}$''',
   # Scaling Europe (scalingeurope.co.uk) job-board's Supabase publishable/anon
   # key — project yaionvwehtkrqgtjzdqn, role=anon, exp 2036. Public by design
   # (shipped in that site's own browser bundle), used read-only to call their

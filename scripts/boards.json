@@ -1,5 +1,5 @@
 {
- "_comment": "Greenhouse/Lever/Ashby/Workable/SmartRecruiters public-API boards, generated from career-ops portals.yml + startupmap_discovered.yml by app-seed-export.mjs. Dead boards fail non-fatally in scrape.mjs.",
+ "_comment": "Greenhouse/Lever/Ashby/Workable/SmartRecruiters/Teamtailor public-API boards, seeded from career-ops portals.yml + startupmap_discovered.yml by app-seed-export.mjs and kept in sync by `node scripts/sync-boards.mjs --engine=<career-ops> --write` (monthly; verifies liveness, idempotent). Teamtailor entries carry `token` for a *.teamtailor.com subdomain or `host` for a custom career domain. Dead boards fail non-fatally in scrape.mjs.",
  "greenhouse": [
   {
    "company": "Vercel",
@@ -532,6 +532,14 @@
   {
    "company": "Resolve to Save Lives",
    "token": "resolvetosavelives"
+  },
+  {
+   "company": "Dwelly",
+   "token": "dwelly"
+  },
+  {
+   "company": "Freenow by Lyft",
+   "token": "freenow"
   }
  ],
  "lever": [
@@ -842,6 +850,10 @@
   {
    "company": "ispace",
    "token": "ispace-inc"
+  },
+  {
+   "company": "Swave Photonics",
+   "token": "swave"
   }
  ],
  "ashby": [
@@ -2336,6 +2348,18 @@
   {
    "company": "Warren",
    "token": "warren"
+  },
+  {
+   "company": "callosum",
+   "token": "callosum"
+  },
+  {
+   "company": "Mistral.ai",
+   "token": "mistral.ai"
+  },
+  {
+   "company": "Tem",
+   "token": "tem"
   }
  ],
  "workable": [
@@ -2694,6 +2718,14 @@
   {
    "company": "Prem AI",
    "token": "premai"
+  },
+  {
+   "company": "HAYA Therapeutics",
+   "token": "haya-therapeutics"
+  },
+  {
+   "company": "Bud",
+   "token": "thisisbud1"
   }
  ],
  "smartrecruiters": [
@@ -2732,6 +2764,1044 @@
   {
    "company": "Le Collectionist",
    "token": "LeCollectionist"
+  },
+  {
+   "company": "akirolabs",
+   "token": "Akirolabs"
+  },
+  {
+   "company": "Omio",
+   "token": "omio"
+  },
+  {
+   "company": "oneclick-ui",
+   "token": "oneclick-ui"
+  },
+  {
+   "company": "Shippeo",
+   "token": "Shippeo"
+  },
+  {
+   "company": "VanOnGo",
+   "token": "VanOnGo"
+  }
+ ],
+ "teamtailor": [
+  {
+   "company": "73 Strings",
+   "token": "73strings"
+  },
+  {
+   "company": "Auk",
+   "token": "auk-amby"
+  },
+  {
+   "company": "bespoke pixel s",
+   "token": "bespokepixel"
+  },
+  {
+   "company": "Boksi",
+   "token": "boksi"
+  },
+  {
+   "company": "Breathe Battery Technologies",
+   "token": "breathebatterytechnologies"
+  },
+  {
+   "company": "Aira",
+   "host": "career.airahome.com"
+  },
+  {
+   "company": "Altris",
+   "host": "career.altris.se"
+  },
+  {
+   "company": "Anyfin",
+   "host": "career.anyfin.com"
+  },
+  {
+   "company": "Bannerflow",
+   "host": "career.bannerflow.com"
+  },
+  {
+   "company": "Billogram",
+   "host": "career.billogram.com"
+  },
+  {
+   "company": "Cellcolabs",
+   "host": "career.cellcolabs.com"
+  },
+  {
+   "company": "Formalize",
+   "host": "career.formalize.com"
+  },
+  {
+   "company": "Grale",
+   "host": "career.grale.com"
+  },
+  {
+   "company": "Instabox",
+   "host": "career.instabee.com"
+  },
+  {
+   "company": "JENTIS",
+   "host": "career.jentis.com"
+  },
+  {
+   "company": "Lesslie",
+   "host": "career.lesslie.se"
+  },
+  {
+   "company": "Magma Math",
+   "host": "career.magma.se"
+  },
+  {
+   "company": "Modular Finance",
+   "host": "career.modularfinance.com"
+  },
+  {
+   "company": "Mynt",
+   "host": "career.mynt.com"
+  },
+  {
+   "company": "NA-KD",
+   "host": "career.na-kd.com"
+  },
+  {
+   "company": "Natural Cycles",
+   "host": "career.naturalcycles.com"
+  },
+  {
+   "company": "Novatron Fusion Group",
+   "host": "career.novatronfusion.com"
+  },
+  {
+   "company": "Oneflow",
+   "host": "career.oneflow.com"
+  },
+  {
+   "company": "Plaace",
+   "host": "career.plaace.co"
+  },
+  {
+   "company": "Stegra",
+   "host": "career.stegra.com"
+  },
+  {
+   "company": "Teamtailor",
+   "token": "career"
+  },
+  {
+   "company": "Treyd",
+   "host": "career.treyd.io"
+  },
+  {
+   "company": "Univrses",
+   "host": "career.univrses.com"
+  },
+  {
+   "company": "Wehype",
+   "host": "career.wehype.com"
+  },
+  {
+   "company": "Winningtemp",
+   "host": "career.winningtemp.se"
+  },
+  {
+   "company": "Acast",
+   "host": "careers.acast.com"
+  },
+  {
+   "company": "Aiforia Technologies",
+   "host": "careers.aiforia.com"
+  },
+  {
+   "company": "Akamas",
+   "host": "careers.akamas.io"
+  },
+  {
+   "company": "Akeneo",
+   "host": "careers.akeneo.com"
+  },
+  {
+   "company": "Alight",
+   "host": "careers.alight-energy.com"
+  },
+  {
+   "company": "Atlar",
+   "host": "careers.atlar.com"
+  },
+  {
+   "company": "Attensi",
+   "host": "careers.attensi.com"
+  },
+  {
+   "company": "Automata",
+   "host": "careers.automata.tech"
+  },
+  {
+   "company": "Bits Technology",
+   "host": "careers.bits.bi"
+  },
+  {
+   "company": "Blackwall",
+   "host": "careers.blackwall.com"
+  },
+  {
+   "company": "Blykalla",
+   "host": "careers.blykalla.com"
+  },
+  {
+   "company": "Bob W",
+   "host": "careers.bobw.co"
+  },
+  {
+   "company": "Brite Payments",
+   "host": "careers.britepayments.com"
+  },
+  {
+   "company": "bsport",
+   "host": "careers.bsport.io"
+  },
+  {
+   "company": "Bumper",
+   "host": "careers.bumper.co"
+  },
+  {
+   "company": "Candela",
+   "host": "careers.candela.com"
+  },
+  {
+   "company": "Carbonfact",
+   "host": "careers.carbonfact.com"
+  },
+  {
+   "company": "Carla",
+   "host": "careers.carla.se"
+  },
+  {
+   "company": "ChapsVision",
+   "host": "careers.chapsvision.com"
+  },
+  {
+   "company": "Cler",
+   "host": "careers.clerglobal.com"
+  },
+  {
+   "company": "Cloudsmith",
+   "host": "careers.cloudsmith.com"
+  },
+  {
+   "company": "Collective Minds",
+   "host": "careers.cmrad.com"
+  },
+  {
+   "company": "CO2 AI",
+   "host": "careers.co2ai.com"
+  },
+  {
+   "company": "Nevercode",
+   "host": "careers.codemagic.io"
+  },
+  {
+   "company": "Corintis",
+   "host": "careers.corintis.com"
+  },
+  {
+   "company": "Coverflex",
+   "host": "careers.coverflex.com"
+  },
+  {
+   "company": "Cozero",
+   "host": "careers.cozero.io"
+  },
+  {
+   "company": "Crowdcube",
+   "host": "careers.crowdcube.com"
+  },
+  {
+   "company": "CyberVadis",
+   "host": "careers.cybervadis.com"
+  },
+  {
+   "company": "DeepIP",
+   "host": "careers.deepip.ai"
+  },
+  {
+   "company": "Depict",
+   "host": "careers.depict.ai"
+  },
+  {
+   "company": "Descartes Underwriting",
+   "host": "careers.descartesunderwriting.com"
+  },
+  {
+   "company": "Detectify",
+   "host": "careers.detectify.com"
+  },
+  {
+   "company": "Dispelix",
+   "host": "careers.dispelix.com"
+  },
+  {
+   "company": "Doccla",
+   "host": "careers.doccla.com"
+  },
+  {
+   "company": "Done",
+   "host": "careers.doneservices.se"
+  },
+  {
+   "company": "Eletive",
+   "host": "careers.eletive.com"
+  },
+  {
+   "company": "Emfas",
+   "host": "careers.emfas.ai"
+  },
+  {
+   "company": "Fairlo",
+   "host": "careers.fairlo.se"
+  },
+  {
+   "company": "Filed",
+   "host": "careers.filed.com"
+  },
+  {
+   "company": "Findable",
+   "host": "careers.findable.ai"
+  },
+  {
+   "company": "Fishbrain",
+   "host": "careers.fishbrain.com"
+  },
+  {
+   "company": "Flash Pack",
+   "host": "careers.flashpack.com"
+  },
+  {
+   "company": "Fracttal",
+   "host": "careers.fracttal.com"
+  },
+  {
+   "company": "Genie AI",
+   "host": "careers.genieai.co"
+  },
+  {
+   "company": "Murphy AI",
+   "host": "careers.getmurphy.ai"
+  },
+  {
+   "company": "WorkFlex",
+   "host": "careers.getworkflex.com"
+  },
+  {
+   "company": "GitGuardian",
+   "host": "careers.gitguardian.com"
+  },
+  {
+   "company": "Glint Solar",
+   "host": "careers.glintsolar.com"
+  },
+  {
+   "company": "GoodNews",
+   "host": "careers.goodnewsco.es"
+  },
+  {
+   "company": "Grasp",
+   "host": "careers.grasp-ai.com"
+  },
+  {
+   "company": "Greenely",
+   "host": "careers.greenely.se"
+  },
+  {
+   "company": "Greenly",
+   "host": "careers.greenly.earth"
+  },
+  {
+   "company": "HiJiffy",
+   "host": "careers.hijiffy.com"
+  },
+  {
+   "company": "Hublo",
+   "host": "careers.hublo.com"
+  },
+  {
+   "company": "Hypertype",
+   "host": "careers.hypertype.ai"
+  },
+  {
+   "company": "Improvin'",
+   "host": "careers.improvin.com"
+  },
+  {
+   "company": "Infraspeak",
+   "host": "careers.infraspeak.com"
+  },
+  {
+   "company": "Innovamat",
+   "host": "careers.innovamat.com"
+  },
+  {
+   "company": "Innovorder",
+   "host": "careers.innovorder.com"
+  },
+  {
+   "company": "Insurely",
+   "host": "careers.insurely.com"
+  },
+  {
+   "company": "Intric",
+   "host": "careers.intric.ai"
+  },
+  {
+   "company": "Inven",
+   "host": "careers.inven.ai"
+  },
+  {
+   "company": "InvestSuite",
+   "host": "careers.investsuite.com"
+  },
+  {
+   "company": "IXI",
+   "host": "careers.ixieyewear.com"
+  },
+  {
+   "company": "Juni",
+   "host": "careers.juni.co"
+  },
+  {
+   "company": "Kili Technology",
+   "host": "careers.kili-technology.com"
+  },
+  {
+   "company": "Kognic",
+   "host": "careers.kognic.com"
+  },
+  {
+   "company": "Kreditz",
+   "host": "careers.kreditz.com"
+  },
+  {
+   "company": "Kuva Space",
+   "host": "careers.kuvaspace.com"
+  },
+  {
+   "company": "Lightium",
+   "host": "careers.lightium.com"
+  },
+  {
+   "company": "Macadam",
+   "host": "careers.macadam.app"
+  },
+  {
+   "company": "Maurten",
+   "host": "careers.maurten.com"
+  },
+  {
+   "company": "Metricool",
+   "host": "careers.metricool.com"
+  },
+  {
+   "company": "Milkywire",
+   "host": "careers.milkywire.com"
+  },
+  {
+   "company": "Monese",
+   "host": "careers.monese.com"
+  },
+  {
+   "company": "Monta",
+   "host": "careers.monta.com"
+  },
+  {
+   "company": "Montonio",
+   "host": "careers.montonio.com"
+  },
+  {
+   "company": "Mooncard",
+   "host": "careers.mooncard.co"
+  },
+  {
+   "company": "myenergi",
+   "host": "careers.myenergi.com"
+  },
+  {
+   "company": "Neat",
+   "host": "careers.neat.no"
+  },
+  {
+   "company": "Neural DSP",
+   "host": "careers.neuraldsp.com"
+  },
+  {
+   "company": "Nomono",
+   "host": "careers.nomono.co"
+  },
+  {
+   "company": "NORNORM",
+   "host": "careers.nornorm.com"
+  },
+  {
+   "company": "ODILO",
+   "host": "careers.odilo.us"
+  },
+  {
+   "company": "Oivi",
+   "host": "careers.oivi.co"
+  },
+  {
+   "company": "ONEiO",
+   "host": "careers.oneio.cloud"
+  },
+  {
+   "company": "Open Cosmos",
+   "host": "careers.open-cosmos.com"
+  },
+  {
+   "company": "Ornikar",
+   "host": "careers.ornikar.com"
+  },
+  {
+   "company": "Paack",
+   "host": "careers.paack.co"
+  },
+  {
+   "company": "Paligo",
+   "host": "careers.paligo.net"
+  },
+  {
+   "company": "Papernest",
+   "host": "careers.papernest.com"
+  },
+  {
+   "company": "Pasqal",
+   "host": "careers.pasqal.com"
+  },
+  {
+   "company": "PayFit",
+   "host": "careers.payfit.com"
+  },
+  {
+   "company": "Pelico",
+   "host": "careers.pelico.io"
+  },
+  {
+   "company": "Performativ",
+   "host": "careers.performativ.com"
+  },
+  {
+   "company": "Phyron",
+   "host": "careers.phyron.com"
+  },
+  {
+   "company": "Pit",
+   "host": "careers.pit.com"
+  },
+  {
+   "company": "Podimo",
+   "host": "careers.podimo.com"
+  },
+  {
+   "company": "Priceagent",
+   "host": "careers.priceagent.com"
+  },
+  {
+   "company": "Pulsetto",
+   "host": "careers.pulsetto.tech"
+  },
+  {
+   "company": "Qargo TMS",
+   "host": "careers.qargo.com"
+  },
+  {
+   "company": "Qobra",
+   "host": "careers.qobra.co"
+  },
+  {
+   "company": "Quartr",
+   "host": "careers.quartr.com"
+  },
+  {
+   "company": "Quatt",
+   "host": "careers.quatt.io"
+  },
+  {
+   "company": "Reel",
+   "host": "careers.reel.energy"
+  },
+  {
+   "company": "ReOrbit",
+   "host": "careers.reorbit.space"
+  },
+  {
+   "company": "Safello",
+   "host": "careers.safello.com"
+  },
+  {
+   "company": "Sateliot",
+   "host": "careers.sateliot.com"
+  },
+  {
+   "company": "SCRL",
+   "host": "careers.scrl.com"
+  },
+  {
+   "company": "Sendify",
+   "host": "careers.sendify.se"
+  },
+  {
+   "company": "Shakers",
+   "host": "careers.shakersworks.com"
+  },
+  {
+   "company": "smol",
+   "host": "careers.smolproducts.com"
+  },
+  {
+   "company": "Spore.Bio",
+   "host": "careers.spore.bio"
+  },
+  {
+   "company": "stark future",
+   "host": "careers.starkfuture.com"
+  },
+  {
+   "company": "Stoïk",
+   "host": "careers.stoik.io"
+  },
+  {
+   "company": "Stravito",
+   "host": "careers.stravito.com"
+  },
+  {
+   "company": "Summize",
+   "host": "careers.summize.com"
+  },
+  {
+   "company": "Sumsub",
+   "host": "careers.sumsub.com"
+  },
+  {
+   "company": "Swappie",
+   "host": "careers.swappie.com"
+  },
+  {
+   "company": "Swiipr",
+   "host": "careers.swiipr.com"
+  },
+  {
+   "company": "Switchee",
+   "host": "careers.switchee.com"
+  },
+  {
+   "company": "Syre",
+   "host": "careers.syre.com"
+  },
+  {
+   "company": "Tendium",
+   "host": "careers.tendium.ai"
+  },
+  {
+   "company": "Tendium",
+   "host": "careers.tendium.com"
+  },
+  {
+   "company": "TransferRoom",
+   "host": "careers.transferroom.com"
+  },
+  {
+   "company": "Tropicfeel",
+   "host": "careers.tropicfeel.com"
+  },
+  {
+   "company": "TrusTrace",
+   "host": "careers.trustrace.com"
+  },
+  {
+   "company": "Velory",
+   "host": "careers.velory.com"
+  },
+  {
+   "company": "Vivino",
+   "host": "careers.vivino.com"
+  },
+  {
+   "company": "Voi Technology",
+   "host": "careers.voi.com"
+  },
+  {
+   "company": "Wikifarmer",
+   "host": "careers.wikifarmer.com"
+  },
+  {
+   "company": "WorkFlex",
+   "host": "careers.workflex.com"
+  },
+  {
+   "company": "Xelix",
+   "host": "careers.xelix.com"
+  },
+  {
+   "company": "Yoto",
+   "host": "careers.yotoplay.com"
+  },
+  {
+   "company": "Younium",
+   "host": "careers.younium.com"
+  },
+  {
+   "company": "YuLife",
+   "host": "careers.yulife.engineering"
+  },
+  {
+   "company": "ZeroNorth",
+   "host": "careers.zeronorth.com"
+  },
+  {
+   "company": "Chip",
+   "token": "chip"
+  },
+  {
+   "company": "Colossyan",
+   "token": "colossyan"
+  },
+  {
+   "company": "Compri",
+   "token": "compriai"
+  },
+  {
+   "company": "Creditspring",
+   "token": "creditspring"
+  },
+  {
+   "company": "CurifyLabs",
+   "token": "curifylabs"
+  },
+  {
+   "company": "Dema.ai",
+   "token": "dema"
+  },
+  {
+   "company": "Unknown",
+   "token": "elsa"
+  },
+  {
+   "company": "Epiminds",
+   "token": "epimindsab"
+  },
+  {
+   "company": "Epsor",
+   "token": "epsor"
+  },
+  {
+   "company": "Evroc",
+   "token": "evrocab-1692891239"
+  },
+  {
+   "company": "Expliseat",
+   "token": "expliseat"
+  },
+  {
+   "company": "Flower",
+   "token": "flower"
+  },
+  {
+   "company": "Coding Giants",
+   "token": "gigancicodinggiants-1732891096"
+  },
+  {
+   "company": "GoDutch",
+   "token": "godutch"
+  },
+  {
+   "company": "Hadean",
+   "token": "hadean"
+  },
+  {
+   "company": "HIVED",
+   "token": "hivedhq"
+  },
+  {
+   "company": "Hometree",
+   "token": "hometree-1690194722"
+  },
+  {
+   "company": "Implicity",
+   "token": "implicity"
+  },
+  {
+   "company": "IPRally",
+   "token": "iprally"
+  },
+  {
+   "company": "IQM Quantum Computers",
+   "token": "iqm"
+  },
+  {
+   "company": "Bokio",
+   "host": "jobs.bokio.se"
+  },
+  {
+   "company": "Buddywise",
+   "host": "jobs.buddywise.co"
+  },
+  {
+   "company": "Candis",
+   "host": "jobs.candis.io"
+  },
+  {
+   "company": "Funnel",
+   "host": "jobs.funnel.io"
+  },
+  {
+   "company": "Superscript",
+   "host": "jobs.gosuperscript.com"
+  },
+  {
+   "company": "haddock",
+   "host": "jobs.haddock.app"
+  },
+  {
+   "company": "Kaiko",
+   "host": "jobs.kaiko.ai"
+  },
+  {
+   "company": "Landfolk",
+   "host": "jobs.landfolk.com"
+  },
+  {
+   "company": "Lifesum",
+   "host": "jobs.lifesum.com"
+  },
+  {
+   "company": "Lingokids",
+   "host": "jobs.lingokids.com"
+  },
+  {
+   "company": "LIZY",
+   "host": "jobs.lizy.be"
+  },
+  {
+   "company": "Loyal Guru",
+   "host": "jobs.loyal.guru"
+  },
+  {
+   "company": "Lunar",
+   "host": "jobs.lunar.app"
+  },
+  {
+   "company": "ML6",
+   "host": "jobs.ml6.eu"
+  },
+  {
+   "company": "Open Payments",
+   "host": "jobs.openpayments.io"
+  },
+  {
+   "company": "Padoa",
+   "host": "jobs.padoa.fr"
+  },
+  {
+   "company": "Palats",
+   "host": "jobs.palats.io"
+  },
+  {
+   "company": "Pexapark",
+   "host": "jobs.pexapark.com"
+  },
+  {
+   "company": "Qovery",
+   "host": "jobs.qovery.com"
+  },
+  {
+   "company": "Qred",
+   "host": "jobs.qred.com"
+  },
+  {
+   "company": "QuoIntelligence",
+   "host": "jobs.quointelligence.eu"
+  },
+  {
+   "company": "Resolution Games",
+   "host": "jobs.resolutiongames.com"
+  },
+  {
+   "company": "Seedtag",
+   "host": "jobs.seedtag.com"
+  },
+  {
+   "company": "Tibber",
+   "host": "jobs.tibber.com"
+  },
+  {
+   "company": "Timefold",
+   "host": "jobs.timefold.ai"
+  },
+  {
+   "company": "Validio",
+   "host": "jobs.validio.io"
+  },
+  {
+   "company": "DataCrunch.io",
+   "host": "jobs.verda.com"
+  },
+  {
+   "company": "Woffu",
+   "host": "jobs.woffu.com"
+  },
+  {
+   "company": "Yazen",
+   "host": "jobs.yazen.com"
+  },
+  {
+   "company": "Estrid",
+   "host": "join.estrid.com"
+  },
+  {
+   "company": "Froda",
+   "host": "join.froda.se"
+  },
+  {
+   "company": "Kings League",
+   "token": "kosmos"
+  },
+  {
+   "company": "Kustom",
+   "token": "kustom"
+  },
+  {
+   "company": "Leaf Space",
+   "token": "leafspace"
+  },
+  {
+   "company": "LIGENTEC",
+   "token": "ligentec"
+  },
+  {
+   "company": "Luzia",
+   "token": "luzia"
+  },
+  {
+   "company": "Motorica",
+   "token": "motorica"
+  },
+  {
+   "company": "Multiverse Computing",
+   "token": "multiversecomputing"
+  },
+  {
+   "company": "Nofence",
+   "token": "nofence"
+  },
+  {
+   "company": "Nordic Air Defence",
+   "token": "nordicairdefence"
+  },
+  {
+   "company": "nPlan",
+   "token": "nplan"
+  },
+  {
+   "company": "ONNA Farming",
+   "token": "onnagreens"
+  },
+  {
+   "company": "Plummy Games",
+   "token": "plummygames"
+  },
+  {
+   "company": "Rarity Bioscience",
+   "token": "raritybioscience"
+  },
+  {
+   "company": "HEXANA",
+   "host": "recrutement.hexana.fr"
+  },
+  {
+   "company": "La Solive",
+   "host": "rejoindre.la-solive.com"
+  },
+  {
+   "company": "Resights",
+   "token": "resightsaps"
+  },
+  {
+   "company": "Resourcify",
+   "token": "resourcify"
+  },
+  {
+   "company": "SaltX Technology",
+   "token": "saltx"
+  },
+  {
+   "company": "Sessions",
+   "token": "sessions"
+  },
+  {
+   "company": "Shalion",
+   "token": "shalion"
+  },
+  {
+   "company": "Shotgun",
+   "token": "shotgun"
+  },
+  {
+   "company": "Swan",
+   "token": "swanio"
+  },
+  {
+   "company": "Sweatcoin",
+   "token": "sweatcoin"
+  },
+  {
+   "company": "Synthesized",
+   "token": "synthesized"
+  },
+  {
+   "company": "Talentware",
+   "token": "talentwaresrl"
+  },
+  {
+   "company": "Amphora Logistics",
+   "host": "team.amphoralogistics.com"
+  },
+  {
+   "company": "Tembi",
+   "token": "tembi"
+  },
+  {
+   "company": "Templafy",
+   "token": "templafy"
+  },
+  {
+   "company": "Ucademy",
+   "token": "ucademy"
+  },
+  {
+   "company": "Unobravo",
+   "token": "unobravo"
+  },
+  {
+   "company": "Veesion",
+   "token": "veesionvf"
+  },
+  {
+   "company": "7Analytics",
+   "token": "volveamby-amby"
+  },
+  {
+   "company": "Waterdrop",
+   "token": "waterdrop-1732181682"
+  },
+  {
+   "company": "Rise Up",
+   "host": "www.careers.riseup.ai"
+  },
+  {
+   "company": "YEGO",
+   "token": "yego"
   }
  ]
 }

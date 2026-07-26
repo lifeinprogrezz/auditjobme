@@ -1,0 +1,191 @@
+{
+ "version": "https://jsonfeed.org/version/1.1",
+ "title": "Macadam",
+ "home_page_url": "https://careers.macadam.app/jobs",
+ "feed_url": "https://careers.macadam.app/jobs.json",
+ "items": [
+  {
+   "id": "891a7c37-93e1-405c-bafd-5fe7fec4e970",
+   "title": "SENIOR PRODUCT MANAGER",
+   "url": "https://careers.macadam.app/jobs/8096943-senior-product-manager",
+   "date_published": "2026-07-20T15:51:28+02:00",
+   "content_html": "<h5><strong>WHO WE ARE</strong></h5><p>At <strong>Macadam</strong>, we've built an app that rewards people for walking. With over <strong>15 million users worldwide</strong>, we help individuals turn daily steps into positive habits that improve both health and wellbeing.</p><p>Our product sits at the intersection of <strong>gamification, lifestyle, and wellbeing</strong>, and our distinctive visu",
+   "_jobposting": {
+    "@context": "http://schema.org/",
+    "@type": "JobPosting",
+    "title": "SENIOR PRODUCT MANAGER",
+    "description": "<h5><strong>WHO WE ARE</strong></h5><p>At <strong>Macadam</strong>, we've built an app that rewards people for walking. With over <strong>15 million users worldwide</strong>, we help individuals turn ",
+    "identifier": {
+     "@type": "PropertyValue",
+     "name": "Macadam",
+     "value": 8096943
+    },
+    "datePosted": "2026-07-20T15:51:28+02:00",
+    "hiringOrganization": {
+     "@type": "Organization",
+     "name": "Macadam",
+     "sameAs": "https://careers.macadam.app"
+    },
+    "jobLocation": [
+     {
+      "@type": "Place",
+      "address": {
+       "@type": "PostalAddress",
+       "streetAddress": null,
+       "addressLocality": "Barcelona",
+       "postalCode": null,
+       "addressCountry": "ES",
+       "addressRegion": null
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "ad7e7b3f-e7a0-4ce5-8e5b-6a5b370d1b0e",
+   "title": "Senior Technical Product Manager",
+   "url": "https://iqm.teamtailor.com/jobs/7931336-senior-technical-product-manager",
+   "date_published": "2026-06-17T15:47:11+03:00",
+   "content_html": "<p><span>At IQM, we build world-leading quantum computers for the well-being of humankind. We design systems to tackle computational challenges beyond the practical limits of classical machines. Our work sits at the edge of science and engineering. It's complex, demanding, and deeply collaborative. We turn deep research into reliable, full-stack systems that drive discoveries in fields like medici",
+   "_jobposting": {
+    "@context": "http://schema.org/",
+    "@type": "JobPosting",
+    "title": "Senior Technical Product Manager",
+    "description": "<p><span>At IQM, we build world-leading quantum computers for the well-being of humankind. We design systems to tackle computational challenges beyond the practical limits of classical machines. Our w",
+    "identifier": {
+     "@type": "PropertyValue",
+     "name": "IQM Quantum Computers",
+     "value": 7931336
+    },
+    "datePosted": "2026-06-17T15:47:11+03:00",
+    "hiringOrganization": {
+     "@type": "Organization",
+     "name": "IQM Quantum Computers",
+     "sameAs": "https://iqm.teamtailor.com"
+    },
+    "jobLocation": [
+     {
+      "@type": "Place",
+      "address": {
+       "@type": "PostalAddress",
+       "streetAddress": "Keilaranta 19",
+       "addressLocality": "Espoo",
+       "postalCode": "02150",
+       "addressCountry": "FI",
+       "addressRegion": null
+      }
+     },
+     {
+      "@type": "Place",
+      "address": {
+       "@type": "PostalAddress",
+       "streetAddress": "IQM Germany GmbH",
+       "addressLocality": "München",
+       "postalCode": "80992",
+       "addressCountry": "DE",
+       "addressRegion": null
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "bee6da01-04ab-4543-8333-dd0b2907391c",
+   "title": "Senior Data Product Manager",
+   "url": "https://73strings.teamtailor.com/jobs/8041722-senior-data-product-manager",
+   "date_published": "2026-07-08T21:20:21+05:30",
+   "content_html": "<p><strong>OVERVIEW OF 73 STRINGS:</strong></p><p>73 Strings is an innovative platform providing comprehensive data extraction, monitoring, and valuation solutions for the private capital industry. The company's AI-powered platform streamlines middle-office processes for alternative investments, enabling seamless data structuring and standardization, monitoring, and fair value estimation at the cl",
+   "_jobposting": {
+    "@context": "http://schema.org/",
+    "@type": "JobPosting",
+    "title": "Senior Data Product Manager",
+    "description": "<p><strong>OVERVIEW OF 73 STRINGS:</strong></p><p>73 Strings is an innovative platform providing comprehensive data extraction, monitoring, and valuation solutions for the private capital industry. Th",
+    "identifier": {
+     "@type": "PropertyValue",
+     "name": "73 Strings",
+     "value": 8041722
+    },
+    "datePosted": "2026-07-08T21:20:21+05:30",
+    "hiringOrganization": {
+     "@type": "Organization",
+     "name": "73 Strings",
+     "sameAs": "https://73strings.teamtailor.com"
+    },
+    "jobLocation": [
+     {
+      "@type": "Place",
+      "address": {
+       "@type": "PostalAddress",
+       "streetAddress": "575 Lexington Ave",
+       "addressLocality": "New York",
+       "postalCode": "10022",
+       "addressCountry": "US",
+       "addressRegion": "North America"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "7f5da3d5-28db-4570-b3c4-b6e96c3a3be9",
+   "title": "Endpoint Support Engineer",
+   "url": "https://73strings.teamtailor.com/jobs/8057731-endpoint-support-engineer",
+   "date_published": "2026-07-13T14:12:48+05:30",
+   "content_html": "<p><strong>OVERVIEW OF 73 STRINGS:</strong></p><p>73 Strings is an innovative platform providing comprehensive data extraction, monitoring, and valuation solutions for the private capital industry. The company's AI-powered platform streamlines middle-office processes for alternative investments, enabling seamless data structuring and standardization, monitoring, and fair value estimation at the cl",
+   "_jobposting": {
+    "@context": "http://schema.org/",
+    "@type": "JobPosting",
+    "title": "Endpoint Support Engineer",
+    "description": "<p><strong>OVERVIEW OF 73 STRINGS:</strong></p><p>73 Strings is an innovative platform providing comprehensive data extraction, monitoring, and valuation solutions for the private capital industry. Th",
+    "identifier": {
+     "@type": "PropertyValue",
+     "name": "73 Strings",
+     "value": 8057731
+    },
+    "datePosted": "2026-07-13T14:12:48+05:30",
+    "hiringOrganization": {
+     "@type": "Organization",
+     "name": "73 Strings",
+     "sameAs": "https://73strings.teamtailor.com"
+    },
+    "jobLocation": [
+     {
+      "@type": "Place",
+      "address": {
+       "@type": "PostalAddress",
+       "streetAddress": "17, 18th Cross Rd",
+       "addressLocality": "Bengaluru",
+       "postalCode": "560102",
+       "addressCountry": "IN",
+       "addressRegion": "India"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "4f586f50-455b-4dbc-9bc7-7de8d440b9cf",
+   "title": "Responsable de Administración Académica Intern",
+   "url": "https://ucademy.teamtailor.com/jobs/7042633-responsable-de-administracion-academica-intern",
+   "date_published": "2026-01-13T12:04:25+01:00",
+   "content_html": "<p><span><strong>HOLA CRACK!! 👋🏼</strong></span></p><p><span>Estamos buscando al futuro <strong>Responsable de Administración Académica Intern </strong>que quiera unirse a un equipo que sueña con cambiar la manera en la que las personas aprendemos.</span></p><p><span>¡2026 llega a Ucademy con muchos retos y queremos que nos ayudes a superarlos!</span></p><p><span>El sector educativo no evolucion",
+   "_jobposting": {
+    "@context": "http://schema.org/",
+    "@type": "JobPosting",
+    "title": "Responsable de Administración Académica Intern",
+    "description": "<p><span><strong>HOLA CRACK!! 👋🏼</strong></span></p><p><span>Estamos buscando al futuro <strong>Responsable de Administración Académica Intern </strong>que quiera unirse a un equipo que sueña con ca",
+    "identifier": {
+     "@type": "PropertyValue",
+     "name": "Ucademy ",
+     "value": 7042633
+    },
+    "datePosted": "2026-01-13T12:04:25+01:00",
+    "hiringOrganization": {
+     "@type": "Organization",
+     "name": "Ucademy ",
+     "sameAs": "https://ucademy.teamtailor.com"
+    }
+   }
+  }
+ ]
+}
