@@ -11,6 +11,7 @@
 // cv_text (the trust rule, in cvHtml.ts). (2) PREFILL-NEVER-SUBMIT confirm card —
 // we hand you the fields to paste and open the real posting; we never submit.
 import { useEffect, useState } from "react";
+import { usePostHog } from "@posthog/react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -109,6 +110,7 @@ function Section({ eyebrow, title, children }: { eyebrow: string; title: string;
 export default function Apply() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const posthog = usePostHog();
   const [params] = useSearchParams();
   const jobUrl = params.get("job") || "";
 
@@ -233,6 +235,7 @@ export default function Apply() {
       });
       setSummary(s);
       await downloadCvPdf({ name, summary: s, cvText, company: job.company });
+      posthog?.capture("cv_tailored");
       const saved = await saveArtifact("cv", { summary: s });
       if (!saved) {
         toast.error("Your CV downloaded, but we couldn't save a copy to your bundle.");
@@ -262,6 +265,7 @@ export default function Apply() {
       );
       setCover(c);
       await downloadCoverPdf({ name, company: job.company, cover: c });
+      posthog?.capture("cover_letter_downloaded");
       const saved = await saveArtifact("letter", { cover: c as unknown as Json });
       if (!saved) {
         toast.error("Your letter downloaded, but we couldn't save a copy to your bundle.");
@@ -291,6 +295,7 @@ export default function Apply() {
       const next = [...qas, { q, a }];
       setQas(next);
       setQuestion("");
+      posthog?.capture("answer_drafted", { answer_count: next.length });
       const saved = await saveArtifact("answers", { qa: next as unknown as Json });
       if (!saved) {
         toast.error("Answer drafted, but we couldn't save a copy to your bundle.");
@@ -317,6 +322,7 @@ export default function Apply() {
       setErrStep("apply");
       return;
     }
+    posthog?.capture("application_marked_applied", { from: "apply" });
     // Applied ⇒ leaves Saved (Rober 7-16): it lives on the applications board now,
     // keeping it bookmarked too is clutter. Best-effort — never blocks the apply.
     if (isSaved) {

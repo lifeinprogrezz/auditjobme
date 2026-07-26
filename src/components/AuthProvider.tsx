@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
+import posthog from "posthog-js";
 import { supabase } from "@/integrations/supabase/client";
 import { markSessionSeen } from "@/lib/deviceSession";
 
@@ -57,14 +58,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        if (session) markSessionSeen();
+        if (session) {
+          markSessionSeen();
+          posthog.identify(session.user.id, {
+            email: session.user.email,
+            name: session.user.user_metadata?.display_name ?? session.user.user_metadata?.full_name,
+          });
+        } else {
+          posthog.reset();
+        }
         setSession(session);
         setLoading(false);
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) markSessionSeen();
+      if (session) {
+        markSessionSeen();
+        posthog.identify(session.user.id, {
+          email: session.user.email,
+          name: session.user.user_metadata?.display_name ?? session.user.user_metadata?.full_name,
+        });
+      }
       setSession(session);
       setLoading(false);
     });

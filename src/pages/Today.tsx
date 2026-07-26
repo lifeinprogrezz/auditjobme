@@ -5,6 +5,7 @@
 // CTAs (one-primary law). Consumes the SHARED useRolesData path (server-written
 // scores, full signals) — no client-side scoring loop. Honest copy kept verbatim.
 import { useMemo } from "react";
+import { usePostHog } from "@posthog/react";
 import { useRevealOnScroll } from "@/hooks/useRevealOnScroll";
 import { useNavigate } from "react-router-dom";
 import AppShell from "@/components/app/AppShell";
@@ -34,8 +35,14 @@ function GeoBadge({ job }: { job: RoleJob }) {
 
 export default function Today() {
   const navigate = useNavigate();
+  const posthog = usePostHog();
   const { jobs, loading, scored, scoring, remaining, applied, markApplied, saved, savedJobs, toggleSaved, scoreMore } =
     useRolesData();
+
+  const handleMarkApplied = (job: (typeof jobs)[number]) => {
+    posthog?.capture("application_marked_applied", { from: "today" });
+    markApplied(job);
+  };
 
   const coverage = useMemo(() => coverageSummary(jobs), [jobs]);
   const aq = useMemo(() => buildActionQueue(jobs, applied), [jobs, applied]);
@@ -255,7 +262,7 @@ export default function Today() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => markApplied(job)}
+                        onClick={() => handleMarkApplied(job)}
                         className="inline-flex items-center gap-1.5 text-caption font-medium text-muted-foreground transition-colors hover:text-foreground"
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">

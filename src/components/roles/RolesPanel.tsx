@@ -5,6 +5,7 @@
 // renders panel content and never touches body/root classes.
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePostHog } from "@posthog/react";
 import {
   EMPTY_FILTERS,
   LEVELS,
@@ -122,6 +123,7 @@ export default function RolesPanel({
 }: RolesPanelProps) {
   const navigate = useNavigate();
   const detailRef = useRef<HTMLDivElement>(null);
+  const posthog = usePostHog();
 
   useEffect(() => {
     if (detailJob) detailRef.current?.scrollTo(0, 0);
@@ -302,6 +304,7 @@ export default function RolesPanel({
             const geo = geoVerdict(job);
             const open = (e: React.SyntheticEvent) => {
               if ((e.target as HTMLElement).closest(".acts")) return;
+              posthog?.capture("role_detail_opened", { scored, score: job.score ?? null });
               onOpenDetail(job);
             };
             return (
@@ -572,7 +575,10 @@ export default function RolesPanel({
             type="button"
             className="dsave"
             aria-pressed={saved.has(job.id)}
-            onClick={() => onToggleSaved(job)}
+            onClick={() => {
+              if (!saved.has(job.id)) posthog?.capture("role_saved");
+              onToggleSaved(job);
+            }}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill={saved.has(job.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
               <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />

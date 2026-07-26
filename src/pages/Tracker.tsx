@@ -9,6 +9,7 @@
 // "move updates exactly one row's position" acceptance, and keep the board
 // keyboard-accessible). Keeps the existing Supabase write-back.
 import { useEffect, useMemo, useState } from "react";
+import { usePostHog } from "@posthog/react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
@@ -51,6 +52,7 @@ function Chevron({ dir }: { dir: -1 | 1 }) {
 export default function Tracker() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const posthog = usePostHog();
   const [apps, setApps] = useState<AppRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -144,6 +146,8 @@ export default function Tracker() {
     if (error) {
       setApps((cur) => cur.map((a) => (a.id === id ? { ...a, status: prev } : a)));
       toast.error("Couldn't move that application. Please try again.");
+    } else {
+      posthog?.capture("application_stage_updated", { from_stage: prev, to_stage: next });
     }
   };
 

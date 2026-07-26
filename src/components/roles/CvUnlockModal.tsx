@@ -5,6 +5,7 @@
 // dark Onboarding palette. Scoring stays auth-gated: anon users only get the
 // client-side parse + a localStorage stash handed off to the profile at sign-in.
 import { useEffect, useRef, useState } from "react";
+import { usePostHog } from "@posthog/react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ROLE_ARCHETYPES,
@@ -53,6 +54,7 @@ export default function CvUnlockModal({
   const [sectorQuery, setSectorQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const posthog = usePostHog();
 
   // Reset to a clean idle state whenever the modal is (re)opened.
   useEffect(() => {
@@ -98,6 +100,7 @@ export default function CvUnlockModal({
       const text = await extractPdfText(file);
       setCvText(text);
       setStage("parsed");
+      posthog?.capture("cv_uploaded", { word_count: cvWordCount(text) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not read that PDF.");
       setStage("idle");
@@ -115,6 +118,11 @@ export default function CvUnlockModal({
     setSubmitting(true);
     setError("");
     const labels = { roles, sectors };
+    posthog?.capture("cv_submitted", {
+      roles_selected: roles.length,
+      sectors_selected: sectors.length,
+      signed_in: signedIn,
+    });
     if (signedIn) {
       // Already signed in — write straight to the profile and reveal in-session.
       const ok = await onSubmit(cvText, labels);
