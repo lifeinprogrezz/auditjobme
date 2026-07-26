@@ -24,6 +24,7 @@ import { tailorSummary, tailorCover, answerQuestion, HAIKU, MAX_ANSWERS, type Co
 import { downloadCvPdf, downloadCoverPdf } from "@/lib/pdf";
 import { domainFor } from "@/lib/logodev";
 import { cityOf } from "@/lib/geo";
+import { auditHref } from "@/lib/auditLink";
 import type { Json } from "@/integrations/supabase/types";
 
 // §3.3 secondary CTA — the ONE idiom for every non-primary action on the page:
@@ -72,7 +73,7 @@ function CheckIcon() {
 // copying your own name added a step without saving one. Applying now lives in
 // the header — bookmark + "I've applied" side by side.
 
-/** Copy affordance for a drafted answer (Step 3) — copied state swaps the button
+/** Copy affordance for a drafted answer (Step 4) — copied state swaps the button
  *  for a muted check, never a re-tinted button (§3.3). */
 function AnswerCopy({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -521,11 +522,37 @@ export default function Apply() {
             )}
           </Section>
 
-          {/* 3 — Application-form questions (Rober 7-16; was Step 4 until the prefill
-              card was cut, Rober 7-25): paste ONE question from the real form, get an
-              answer grounded in the CV + JD. One at a time keeps the UI clean and each
-              call cheap; MAX_ANSWERS bounds the sponsored spend. */}
-          <Section eyebrow="Step 3" title="Answer the form's questions">
+          {/* 3 — Company audit (issue #82): a public page about this company that the
+              user generates and sends themselves, entirely INDEPENDENT of the CV and
+              cover letter above — its link is never wired into any generated text, and
+              generating one never touches what's already downloaded (Rober 7-26,
+              explicitly rejected coupling the two). This is a plain link to the
+              standalone audit tool at /audit, prefilled with this job's posting: no
+              generation call happens here, so opening this page never spends anything.
+              The button is the ONLY way it fires; there is no auto-generation on
+              mount or on this step's own render. */}
+          <Section eyebrow="Step 3" title="Company audit">
+            <p className="mt-2 text-caption text-muted-foreground text-pretty">
+              A public page built for {job.company}: the diagnosis, a few proposals, and why you're the right fit. It
+              doesn't touch your cover letter or your answers below, and it costs nothing until you generate it. Once
+              it's ready you get a link, and it's yours to send wherever you like: a message, an email, the
+              application itself.
+            </p>
+            <div className="mt-4">
+              <Button variant="outline" size="sm" className={SECONDARY_CTA} asChild>
+                <a href={auditHref(job.url)} target="_blank" rel="noopener noreferrer">
+                  Prepare an audit for this company
+                </a>
+              </Button>
+            </div>
+          </Section>
+
+          {/* 4 — Application-form questions (Rober 7-16; was Step 3 until the company
+              audit stepped in ahead of it, Rober 7-26 — issue #82): paste ONE question
+              from the real form, get an answer grounded in the CV + JD. One at a time
+              keeps the UI clean and each call cheap; MAX_ANSWERS bounds the sponsored
+              spend. */}
+          <Section eyebrow="Step 4" title="Answer the form's questions">
             <Textarea
               className="mt-4 min-h-20 rounded-[10px] font-sans text-body"
               placeholder={`Paste one question from the application form, e.g. "Why do you want to work at ${job.company}?"`}
