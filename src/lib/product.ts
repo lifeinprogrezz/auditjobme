@@ -133,7 +133,7 @@ export function buildActionQueue(
  * (a third of the pool is is_live=false at any time) and career-ops' appliedCos does
  * not care; hand this only live rows and a company quietly stops collapsing exactly
  * when the conversation is hottest. useRolesData satisfies this by fetching the
- * applied rows by id, no is_live filter (RLS: 20260726093000).
+ * applied rows by id, no is_live filter (RLS: 20260726094000).
  */
 export function inFlightCompanyKeys(
   jobs: Pick<RoleJob, "id" | "company" | "company_id">[],

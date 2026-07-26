@@ -32,7 +32,7 @@ describe("useRolesData feeds inFlightCompanyKeys a liveness-independent pool", (
       filters.length,
       "exactly one is_live filter belongs in this hook (the paged live-pool fetch). " +
         "The by-id fetches — applied / saved / dismissed — must stay unfiltered so an " +
-        "expired posting still resolves (RLS 20260726093000 grants the read).",
+        "expired posting still resolves (RLS 20260726094000 grants the read).",
     ).toBe(1);
   });
 });
