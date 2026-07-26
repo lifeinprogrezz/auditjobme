@@ -310,10 +310,19 @@ export default function App() {
   const publishAudit = async () => {
     if (!auditId || publishing) return;
     setPublishing(true);
-    const { error } = await supabase.from("audits").update({ is_published: true }).eq("id", auditId);
+    // .select("id") is required here, not decorative: Supabase/PostgREST returns
+    // no error when an UPDATE's RLS policy (or a missing grant) matches zero rows --
+    // it just updates nothing. Without checking the returned row, a frontend that
+    // ever runs ahead of its migration would flip isPublished=true and reveal a
+    // share link while the row stays private server-side.
+    const { data, error } = await supabase.from("audits").update({ is_published: true }).eq("id", auditId).select("id");
     setPublishing(false);
     if (error) {
       console.error("Failed to publish audit:", error);
+      return;
+    }
+    if (!data || data.length === 0) {
+      console.error("Failed to publish audit: update matched no row (policy or grant mismatch)");
       return;
     }
     setIsPublished(true);
