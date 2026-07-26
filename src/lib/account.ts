@@ -28,6 +28,7 @@ export const USER_DATA_TABLES: readonly UserDataTable[] = [
   { table: "applications", column: "user_id", label: "the roles you marked as applied" },
   { table: "status_events", column: "user_id", label: "the status history of every application" },
   { table: "saved_jobs", column: "user_id", label: "the roles you saved" },
+  { table: "dismissed_jobs", column: "user_id", label: "the roles you dismissed" },
   { table: "scores", column: "user_id", label: "your match score for every role" },
   { table: "daily_matches", column: "user_id", label: "your nightly match lists" },
   {
