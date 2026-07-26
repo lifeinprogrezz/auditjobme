@@ -14,6 +14,7 @@ import { domainFor } from "@/lib/logodev";
 import { fetchDataplane, type DataplaneCompany, type DataplaneOffice } from "@/lib/dataplane";
 import { DEV_FIXTURE, DEV_FIXTURE_PROFILE, devFixtureScores } from "@/lib/devFixture";
 import { createScoreBuffer, type ScoreBuffer } from "@/lib/scoreCoalescer";
+import { track } from "@/lib/analytics";
 
 type JobsRow = {
   id: string;
@@ -650,6 +651,9 @@ export function useRolesData() {
       toast.error("Couldn't mark as applied. Please try again.");
       return;
     }
+    // Only call site left using this hook's markApplied is Today (issue #89) —
+    // RolesMap routes "apply" through /apply, which fires its own from:"apply".
+    track("application_marked_applied", { from: "today" });
     // Applied ⇒ leaves Saved (Rober 7-16): the role lives on the applications board
     // now; keeping the bookmark too is clutter. Best-effort — never blocks the apply.
     if (saved.has(job.id)) {

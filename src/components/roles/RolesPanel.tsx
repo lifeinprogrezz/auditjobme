@@ -23,6 +23,7 @@ import {
 } from "@/lib/roles";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { useTheme } from "@/lib/theme";
+import { track } from "@/lib/analytics";
 import ScoreBreakdown from "./ScoreBreakdown";
 import FitChip from "./FitChip";
 
@@ -139,6 +140,15 @@ export default function RolesPanel({
   // /apply handles the signed-out case. "Add your CV" opens the Phase-A CV-unlock
   // modal (onAddCv, from RolesMap).
   const goApply = (j: RoleJob) => navigate(`/apply?job=${encodeURIComponent(j.url)}`);
+
+  // Every "open this role" path in the panel (a card click, Enter on a focused
+  // card, or a "more roles" item) routes through here, so the event fires once
+  // per open regardless of which affordance triggered it (issue #89). `scored`
+  // mirrors `hasCv` below — whether this user's CV has been scored yet.
+  const openDetail = (j: RoleJob) => {
+    track("role_detail_opened", { scored, score: j.score ?? null });
+    onOpenDetail(j);
+  };
 
   // Active-filter chips: map selection (co/city) + every headbar filter, each
   // removable. They read/write the SAME filter state the headbar uses, so the two
@@ -320,7 +330,7 @@ export default function RolesPanel({
             const geo = geoVerdict(job);
             const open = (e: React.SyntheticEvent) => {
               if ((e.target as HTMLElement).closest(".acts")) return;
-              onOpenDetail(job);
+              openDetail(job);
             };
             return (
               <article
@@ -593,7 +603,11 @@ export default function RolesPanel({
               type="button"
               className="dsave"
               aria-pressed={saved.has(job.id)}
-              onClick={() => onToggleSaved(job)}
+              onClick={() => {
+                // Fire only on the save transition, never on unsave (issue #89).
+                if (!saved.has(job.id)) track("role_saved");
+                onToggleSaved(job);
+              }}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill={saved.has(job.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
                 <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
@@ -625,11 +639,11 @@ export default function RolesPanel({
                   className="dmore-item"
                   role="button"
                   tabIndex={0}
-                  onClick={() => onOpenDetail(o)}
+                  onClick={() => openDetail(o)}
                   onKeyDown={(e) => {
                     if (e.key !== "Enter" && e.key !== " ") return;
                     e.preventDefault();
-                    onOpenDetail(o);
+                    openDetail(o);
                   }}
                 >
                   <span className="mi-role">{o.title}</span>

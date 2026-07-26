@@ -17,6 +17,7 @@ import {
   writeCvStash,
 } from "@/lib/labels";
 import { hasSeenSession } from "@/lib/deviceSession";
+import { track } from "@/lib/analytics";
 import type { FilterOption } from "./FilterChip";
 
 type Stage = "idle" | "reading" | "parsed";
@@ -98,6 +99,8 @@ export default function CvUnlockModal({
       const text = await extractPdfText(file);
       setCvText(text);
       setStage("parsed");
+      // Word count only — never the CV text itself (issue #89).
+      track("cv_uploaded", { word_count: cvWordCount(text) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not read that PDF.");
       setStage("idle");
@@ -112,6 +115,7 @@ export default function CvUnlockModal({
 
   const handleSubmit = async () => {
     if (!cvText.trim() || submitting) return;
+    track("cv_submitted");
     setSubmitting(true);
     setError("");
     const labels = { roles, sectors };
