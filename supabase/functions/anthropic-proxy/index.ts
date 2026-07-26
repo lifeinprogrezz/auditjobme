@@ -19,11 +19,21 @@ const MAX_TOKENS_CEILING = 8192;    // hard ceiling: a caller can't request a hu
 const ALLOWED_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-4-6'];
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
-/** USD cost from token counts, by model family. */
-function priceUsd(model: string, inTok: number, outTok: number): number {
+// ── Message Batches (issue #96, lever 2) ─────────────────────────────────────
+// Batch is a flat 50% discount on input AND output. Only the service-role workers
+// (api/nightly.ts, api/score-backlog.ts) may use it — batch has no latency
+// guarantee, so it is never on a user-facing path.
+const BATCH_DISCOUNT = 0.5;         // Anthropic Message Batches: 50% off list price
+const BATCH_MAX_REQUESTS = 250;     // mirrors src/lib/scoreBatch.ts BATCH_MAX_REQUESTS
+const CUSTOM_ID_MAX = 64;           // Anthropic's per-request custom_id ceiling
+const BATCH_ID_RE = /^msgbatch_[A-Za-z0-9_-]{1,128}$/;
+
+/** USD cost from token counts, by model family. `discount` is 1 at list price and
+ *  BATCH_DISCOUNT for work that went through the Message Batches API. */
+function priceUsd(model: string, inTok: number, outTok: number, discount = 1): number {
   const m = (model || '').toLowerCase();
   const [inRate, outRate] = m.includes('haiku') ? [1.0, 5.0] : [3.0, 15.0]; // USD per million tokens
-  return (inTok / 1e6) * inRate + (outTok / 1e6) * outRate;
+  return ((inTok / 1e6) * inRate + (outTok / 1e6) * outRate) * discount;
 }
 
 function json(obj: unknown, status: number) {
@@ -134,6 +144,166 @@ async function runScoring(admin: SupabaseClient, apiKey: string, userId: string,
   return json(data, 200);
 }
 
+// ── Message Batches: submit / poll / retrieve ────────────────────────────────
+// Three thin operations, service-role only. They exist HERE rather than in the
+// Vercel workers for the same reason every other call does: ANTHROPIC_API_KEY
+// lives in this function's env and nowhere else, and usage_events is written
+// server-side where a client can't reach it.
+
+const anthropic = (path: string, apiKey: string, init: RequestInit = {}) =>
+  fetch(`https://api.anthropic.com/v1${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+  });
+
+/**
+ * Validate a batch request array against the SAME guardrails the synchronous path
+ * enforces — model allowlist, max_tokens ceiling, request count. Batch is cheaper
+ * per token, not exempt: without this, a caller could route an unlisted (pricier)
+ * model or an 8k-token generation through the discounted endpoint and be
+ * under-metered exactly as on the sync path. Returns an error string, or null.
+ */
+function validateBatchRequests(requests: unknown): string | null {
+  if (!Array.isArray(requests) || requests.length === 0) return 'requests array is required';
+  if (requests.length > BATCH_MAX_REQUESTS) return `at most ${BATCH_MAX_REQUESTS} requests per batch`;
+  const seen = new Set<string>();
+  for (const r of requests) {
+    const req = r as { custom_id?: unknown; params?: Record<string, unknown> };
+    if (typeof req?.custom_id !== 'string' || !req.custom_id || req.custom_id.length > CUSTOM_ID_MAX) {
+      return `each request needs a custom_id of 1-${CUSTOM_ID_MAX} characters`;
+    }
+    if (seen.has(req.custom_id)) return `duplicate custom_id: ${req.custom_id}`;
+    seen.add(req.custom_id);
+    const p = req.params;
+    if (!p || typeof p !== 'object') return 'each request needs a params object';
+    if (typeof p.model !== 'string' || !ALLOWED_MODELS.includes(p.model)) return 'Unsupported model';
+    if (typeof p.max_tokens !== 'number' || p.max_tokens <= 0 || p.max_tokens > MAX_TOKENS_CEILING) {
+      return `max_tokens must be 1-${MAX_TOKENS_CEILING}`;
+    }
+    if (!Array.isArray(p.messages) || p.messages.length === 0) return 'each request needs a messages array';
+  }
+  return null;
+}
+
+/**
+ * Authoritative metering for a retrieved batch: one usage_events row per SUCCEEDED
+ * result, keyed on the target user, priced at the batch discount and flagged
+ * `batch: true`. Failed/expired results produced no billable tokens and get no row.
+ *
+ * Never throws (a metering failure must not cost the caller the retrieved scores).
+ * Falls back to an insert without the `batch` flag when migration
+ * 20260726103000 has not been applied yet, so cost stays recorded either way —
+ * same degrade pattern as daily_matches.rubric_version in api/nightly.ts.
+ */
+async function meterBatchResults(
+  admin: SupabaseClient,
+  userId: string,
+  kind: string,
+  jsonl: string,
+): Promise<number> {
+  const rows: Record<string, unknown>[] = [];
+  for (const line of jsonl.split('\n')) {
+    const t = line.trim();
+    if (!t) continue;
+    try {
+      const r = JSON.parse(t);
+      if (r?.result?.type !== 'succeeded') continue;
+      const msg = r.result.message ?? {};
+      const inTok = msg.usage?.input_tokens ?? 0;
+      const outTok = msg.usage?.output_tokens ?? 0;
+      const usedModel = String(msg.model ?? DEFAULT_MODEL);
+      rows.push({
+        user_id: userId,
+        kind: ALLOWED_KINDS.includes(kind) ? kind : 'score',
+        model: usedModel,
+        input_tokens: inTok,
+        output_tokens: outTok,
+        cost_usd: priceUsd(usedModel, inTok, outTok, BATCH_DISCOUNT),
+        batch: true,
+      });
+    } catch {
+      // A corrupt result line must not cost the batch its metering — skip it.
+    }
+  }
+  if (rows.length === 0) return 0;
+  try {
+    const { error } = await admin.from('usage_events').insert(rows);
+    if (error) {
+      console.warn('batch metering insert failed, retrying without the batch flag:', error.message);
+      const { error: retryErr } = await admin
+        .from('usage_events')
+        .insert(rows.map(({ batch: _b, ...rest }) => rest));
+      if (retryErr) console.warn('batch metering retry failed:', retryErr.message);
+    }
+  } catch (e) {
+    console.warn('batch metering insert threw:', e);
+  }
+  return rows.length;
+}
+
+/** Service-role batch operations. `op` defaults to 'message' (the synchronous path). */
+async function runBatchOp(
+  admin: SupabaseClient,
+  apiKey: string,
+  op: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  if (op === 'batch_submit') {
+    const invalid = validateBatchRequests(body.requests);
+    if (invalid) return json({ error: invalid }, 400);
+    const res = await anthropic('/messages/batches', apiKey, {
+      method: 'POST',
+      body: JSON.stringify({ requests: body.requests }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('Anthropic batch submit error:', data);
+      return json({ error: data.error?.message || `Anthropic API error [${res.status}]` }, res.status);
+    }
+    return json({ id: data.id, processing_status: data.processing_status }, 200);
+  }
+
+  const batchId = body.batch_id;
+  if (typeof batchId !== 'string' || !BATCH_ID_RE.test(batchId)) {
+    return json({ error: 'A valid batch_id is required' }, 400);
+  }
+
+  if (op === 'batch_poll') {
+    const res = await anthropic(`/messages/batches/${batchId}`, apiKey);
+    const data = await res.json();
+    if (!res.ok) {
+      return json({ error: data.error?.message || `Anthropic API error [${res.status}]` }, res.status);
+    }
+    return json({ processing_status: data.processing_status, request_counts: data.request_counts }, 200);
+  }
+
+  if (op === 'batch_results') {
+    const targetUserId = body.target_user_id;
+    if (typeof targetUserId !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(targetUserId)) {
+      return json({ error: 'A valid target_user_id is required for batch_results' }, 400);
+    }
+    const head = await anthropic(`/messages/batches/${batchId}`, apiKey);
+    const batch = await head.json();
+    if (!head.ok) {
+      return json({ error: batch.error?.message || `Anthropic API error [${head.status}]` }, head.status);
+    }
+    if (batch.processing_status !== 'ended' || !batch.results_url) {
+      return json({ processing_status: batch.processing_status, jsonl: null }, 200);
+    }
+    const res = await anthropic(batch.results_url.replace('https://api.anthropic.com/v1', ''), apiKey);
+    if (!res.ok) {
+      return json({ error: `Anthropic results fetch failed [${res.status}]` }, res.status);
+    }
+    const jsonl = await res.text();
+    // Meter BEFORE returning: the tokens are spent whether or not the worker
+    // manages to persist the scores, so the ledger must record them either way.
+    const metered = await meterBatchResults(admin, targetUserId, String(body.kind ?? 'score'), jsonl);
+    return json({ processing_status: 'ended', jsonl, metered }, 200);
+  }
+
+  return json({ error: `Unsupported op: ${op}` }, 400);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -160,7 +330,12 @@ Deno.serve(async (req) => {
     if (isServiceRole) {
       const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
       if (!apiKey) return json({ error: 'ANTHROPIC_API_KEY is not configured' }, 500);
-      const { messages, model, max_tokens, system, tools, kind, target_user_id } = await req.json();
+      const payload = await req.json();
+      // Batch operations (issue #96) are service-role ONLY — batch has no latency
+      // guarantee, so it must never sit on a user-facing path.
+      const op = typeof payload.op === 'string' ? payload.op : 'message';
+      if (op !== 'message') return await runBatchOp(admin, apiKey, op, payload);
+      const { messages, model, max_tokens, system, tools, kind, target_user_id } = payload;
       if (typeof target_user_id !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(target_user_id)) {
         return json({ error: 'A valid target_user_id is required for service-role calls' }, 400);
       }

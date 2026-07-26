@@ -308,7 +308,8 @@ declare
     'applications.user_id', 'artifacts.user_id', 'audits.user_id',
     'company_requests.user_id', 'daily_matches.user_id', 'device_fingerprints.user_id',
     'dismissed_jobs.user_id', 'feedback.user_id', 'profiles.id', 'purchases.user_id',
-    'saved_jobs.user_id', 'scores.user_id', 'status_events.user_id', 'usage_events.user_id'
+    'saved_jobs.user_id', 'score_batches.user_id', 'scores.user_id', 'status_events.user_id',
+    'usage_events.user_id'
   ];
   discovered text[];
   missing text;
@@ -372,6 +373,11 @@ begin
   insert into public.purchases (user_id, stripe_session_id, credits, product_id)
     values (mine, 'ci-fixture-mine', 1, 'ci'), (theirs, 'ci-fixture-theirs', 1, 'ci');
   insert into public.usage_events (user_id, kind, cost_usd) values (mine, 'score', 0.001), (theirs, 'score', 0.001);
+  -- score_batches carries an in-flight scoring job (issue #96); provider_batch_id is
+  -- unique, so the two fixture rows need distinct ids.
+  insert into public.score_batches (user_id, provider_batch_id, worker, rubric_version)
+    values (mine, 'msgbatch_ci_fixture_mine', 'backlog', 'v6'),
+           (theirs, 'msgbatch_ci_fixture_theirs', 'backlog', 'v6');
 
   -- Everything is really there before the delete, or the assertions below prove nothing.
   foreach pair in array seeded loop

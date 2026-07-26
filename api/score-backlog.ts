@@ -23,6 +23,15 @@ import {
   buildReadySubject,
   buildReadyBody,
 } from "../src/lib/scoreBacklog.js";
+import {
+  SYNC_ONBOARDING_SLICE,
+  buildBatchRequests,
+  chunkForBatch,
+  isMissingBatchTable,
+  isBatchStale,
+  parseBatchResults,
+  partitionOnboarding,
+} from "../src/lib/scoreBatch.js";
 
 type Req = { method?: string; headers: Record<string, string | string[] | undefined> };
 type Res = { status: (code: number) => Res; json: (body: unknown) => void };
@@ -87,6 +96,35 @@ async function scoreViaProxy(
     ? (data.content.find((b) => b?.type === "text") ?? data.content[0])
     : null;
   return parseScoreResponse(textBlock?.text ?? "", sources);
+}
+
+/** Call one of the proxy's service-role batch operations (issue #96, lever 2).
+ *  Never throws — a batch hiccup must not cost the tick its synchronous work. */
+async function proxyBatchOp(
+  proxyUrl: string,
+  serviceKey: string,
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await fetch(proxyUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+        "Content-Type": "application/json",
+        "x-region": "eu-central-1", // residency pin: edge fns run caller-near by default (S1)
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      console.warn(`[score-backlog] proxy ${String(body.op)} non-ok ${res.status}`);
+      return null;
+    }
+    return (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  } catch (e) {
+    console.warn(`[score-backlog] proxy ${String(body.op)} failed:`, e);
+    return null;
+  }
 }
 
 /** Fire one Resend notification. Fail-soft: logs + returns false, never throws. */
@@ -174,10 +212,68 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   const summary = {
     users: active.length,
     scored: 0,
+    batchScored: 0,
+    submitted: 0,
+    inFlight: 0,
     failed: 0,
     emailed: 0,
     completed: 0,
     deadlineHit: false,
+    batchAvailable: true,
+  };
+
+  // Migration 20260726103000 is applied by hand, so this code can run for a few
+  // ticks before score_batches exists. The first missing-table read flips this off
+  // for the whole run and every user falls back to the previous fully-synchronous
+  // path — full price, but never a broken run.
+  let batchAvailable = true;
+
+  /** Upsert one batch's returned scores. Returns the job ids that actually landed —
+   *  a role that failed to parse or upsert is deliberately NOT included, so it stays
+   *  in the backlog and the next tick re-queues it. */
+  const persistBatchResults = async (
+    userId: string,
+    jsonl: string,
+    profile: { cv_text: string | null },
+    jdByJob: Map<string, string | null>,
+  ): Promise<string[]> => {
+    const landed: string[] = [];
+    for (const r of parseBatchResults(jsonl)) {
+      if (r.kind !== "succeeded") {
+        summary.failed++; // no scores row → the next tick re-queues this role
+        continue;
+      }
+      const jdText = jdByJob.get(r.customId) ?? null;
+      // Identical validator + grounding as the synchronous path — a batch result is
+      // the same model output, arriving later.
+      const parsed = parseScoreResponse(r.text, { cvText: profile.cv_text, jdText });
+      if (!parsed) {
+        summary.failed++;
+        continue;
+      }
+      const { error: upErr } = await admin.from("scores").upsert(
+        {
+          user_id: userId,
+          job_id: r.customId,
+          score: parsed.score,
+          rubric_version: RUBRIC_VERSION,
+          signals: {
+            reason: parsed.reason,
+            fit_bullets: parsed.fitBullets,
+            subscores: parsed.subscores,
+            evidence: parsed.evidence,
+          },
+        },
+        { onConflict: "user_id,job_id,rubric_version" },
+      );
+      if (upErr) {
+        console.warn(`[score-backlog] batch upsert failed for ${userId}/${r.customId}:`, upErr.message);
+        summary.failed++;
+        continue;
+      }
+      landed.push(r.customId);
+    }
+    return landed;
   };
 
   for (const p of active) {
@@ -204,24 +300,140 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         if (!data || data.length < PAGE) break;
       }
       const scoreByJob = new Map(scoredRows.map((r) => [r.job_id, r.score]));
-      const backlog = selectBacklog(liveJobs, new Set(scoreByJob.keys()));
+      // A user's FIRST pass is the one somebody is watching. Captured BEFORE this
+      // tick's work lands, so it stays true for the whole tick.
+      const isFirstPass = scoredRows.length === 0;
+
+      const profile = {
+        target_seniority: (p.target_seniority as string | null) ?? null,
+        target_cities: (p.target_cities as string[] | null) ?? null,
+        open_to_remote: (p.open_to_remote as boolean | null) ?? null,
+        citizenship: (p.citizenship as string | null) ?? null,
+        eu_work_authorized: (p.eu_work_authorized as boolean | null) ?? null,
+        languages: (p.languages as string[] | null) ?? null,
+        cv_text: (p.cv_text as string | null) ?? null,
+      };
+
+      // ── Phase 1: retrieve anything this user already has in flight ──────────
+      // Submission and retrieval are DIFFERENT cron ticks: a batch outlives the 60s
+      // invocation that started it. Retrieval runs first so a drained batch frees
+      // its job ids before the backlog for this tick is computed.
+      const inFlightJobIds = new Set<string>();
+      if (batchAvailable) {
+        const { data: openBatches, error: obErr } = await admin
+          .from("score_batches")
+          .select("id, provider_batch_id, job_ids, rubric_version")
+          .eq("user_id", userId)
+          .eq("worker", "backlog")
+          .eq("status", "submitted");
+        if (obErr && isMissingBatchTable(obErr)) {
+          console.warn("[score-backlog] score_batches missing — apply migration 20260726103000. Falling back to synchronous scoring.");
+          batchAvailable = false;
+          summary.batchAvailable = false;
+        } else if (obErr) {
+          throw new Error(`score_batches read failed: ${obErr.message}`);
+        }
+        for (const b of openBatches ?? []) {
+          const jobIds = (b.job_ids as string[] | null) ?? [];
+          // A rubric bump retires the batch: its judgments were produced under a
+          // rubric the product has moved off. Retire the row so the ids are freed
+          // and re-scored under the current rubric.
+          if (isBatchStale(String(b.rubric_version), RUBRIC_VERSION)) {
+            await admin.from("score_batches").update({ status: "failed", retrieved_at: new Date().toISOString() }).eq("id", b.id);
+            continue;
+          }
+          const res = await proxyBatchOp(proxyUrl, serviceKey, {
+            op: "batch_results",
+            batch_id: b.provider_batch_id,
+            target_user_id: userId,
+            kind: "score",
+          });
+          const jsonl = res?.jsonl;
+          if (typeof jsonl !== "string") {
+            // Still processing (or a transient proxy failure) — keep it in flight so
+            // this tick does not re-submit and re-pay for the same roles.
+            jobIds.forEach((id) => inFlightJobIds.add(id));
+            summary.inFlight += jobIds.length;
+            continue;
+          }
+          const { data: jdRows } = await admin.from("jobs").select("id, jd_text").in("id", jobIds);
+          const jdByJob = new Map((jdRows ?? []).map((r) => [r.id as string, r.jd_text as string | null]));
+          const landed = await persistBatchResults(userId, jsonl, profile, jdByJob);
+          summary.batchScored += landed.length;
+          // Feeds both the backlog predicate below and the completion math further
+          // down, so a role scored by this tick's retrieval is not re-queued.
+          landed.forEach((jobId) => scoreByJob.set(jobId, scoreByJob.get(jobId) ?? 0));
+          await admin
+            .from("score_batches")
+            .update({ status: "retrieved", retrieved_at: new Date().toISOString() })
+            .eq("id", b.id);
+        }
+      }
+
+      // ── Phase 2: what is still unscored and not already in flight ───────────
+      const backlog = selectBacklog(liveJobs, new Set(scoreByJob.keys())).filter(
+        (j) => !inFlightJobIds.has(j.id),
+      );
 
       if (backlog.length > 0) {
-        const profile = {
-          target_seniority: (p.target_seniority as string | null) ?? null,
-          target_cities: (p.target_cities as string[] | null) ?? null,
-          open_to_remote: (p.open_to_remote as boolean | null) ?? null,
-          citizenship: (p.citizenship as string | null) ?? null,
-          eu_work_authorized: (p.eu_work_authorized as boolean | null) ?? null,
-          languages: (p.languages as string[] | null) ?? null,
-          cv_text: (p.cv_text as string | null) ?? null,
-        };
+        // The split (issue #96): a brand-new user gets SYNC_ONBOARDING_SLICE roles
+        // at full price so their screen fills immediately; the long tail goes to
+        // batch at half price. Returning users have nobody watching — all batch.
+        const { sync: syncSlice, batched } = batchAvailable
+          ? partitionOnboarding(backlog, isFirstPass, SYNC_ONBOARDING_SLICE)
+          : { sync: backlog, batched: [] };
+
+        // ── Phase 3: submit the tail. One batch per tick keeps the retrieval hop
+        // and the upsert pass bounded; the remainder is picked up next tick. ────
+        if (batched.length > 0) {
+          const { head } = chunkForBatch(batched);
+          const { data: jdRows, error: jdErr } = await admin
+            .from("jobs")
+            .select("id, jd_text")
+            .in("id", head.map((j) => j.id));
+          if (jdErr) throw new Error(`jd_text read failed: ${jdErr.message}`);
+          const jdById = new Map((jdRows ?? []).map((r) => [r.id, r.jd_text as string | null]));
+          const requests = buildBatchRequests(
+            head.map((j) => ({
+              id: j.id,
+              // Byte-identical to the synchronous path's prompt — same rubric, same
+              // shaping, same grounding facts. Only the transport differs.
+              userMessage: buildScoreUserMessage(profile, {
+                id: j.id,
+                company: j.company,
+                title: j.title,
+                location: j.location ?? null,
+                remote: Boolean(j.remote),
+                seniority: j.seniority ?? null,
+                jd_text: jdById.get(j.id) ?? null,
+                yoe_min: j.extraction?.yoe_min ?? null,
+                geo_eligibility: j.extraction?.geo_eligibility ?? null,
+              }),
+            })),
+            { model: HAIKU, maxTokens: SCORE_MAX_TOKENS, system: SYSTEM },
+          );
+          const submitted = await proxyBatchOp(proxyUrl, serviceKey, { op: "batch_submit", requests });
+          const providerBatchId = submitted?.id;
+          if (typeof providerBatchId === "string") {
+            // Record BEFORE anything else can fail: an unrecorded batch is paid-for
+            // work nothing will ever retrieve.
+            const { error: insErr } = await admin.from("score_batches").insert({
+              user_id: userId,
+              provider_batch_id: providerBatchId,
+              worker: "backlog",
+              rubric_version: RUBRIC_VERSION,
+              job_ids: head.map((j) => j.id),
+            });
+            if (insErr) console.warn(`[score-backlog] score_batches insert failed for ${providerBatchId}:`, insErr.message);
+            else summary.submitted += head.length;
+          }
+        }
 
         // Score in jd-batches: fetch jd_text for ≤JD_BATCH rows, pool-score them,
         // upsert as each lands (a crash loses only in-flight calls). Failed calls
         // (parse/network) are NOT upserted, so the next tick retries them naturally.
-        for (let i = 0; i < backlog.length && Date.now() < deadlineMs; i += JD_BATCH) {
-          const batch = backlog.slice(i, i + JD_BATCH);
+        for (let i = 0; i < syncSlice.length && Date.now() < deadlineMs; i += JD_BATCH) {
+          const batch = syncSlice.slice(i, i + JD_BATCH);
           const { data: jdRows, error: jdErr } = await admin
             .from("jobs")
             .select("id, jd_text")
@@ -284,7 +496,9 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // run's landed upserts): a DB count would also include rows for jobs that
       // have since gone dead and could fake a drained backlog. Failed calls
       // above landed no row, so they hold the pass open for the next tick —
-      // never a false "ready" email.
+      // never a false "ready" email. Roles sitting in an OPEN batch are likewise
+      // absent from scoreByJob, so the "your roles are scored" email waits for the
+      // batch tail to drain rather than firing on the synchronous slice alone.
       const remaining = liveJobs.filter((j) => !scoreByJob.has(j.id)).length;
 
       if (

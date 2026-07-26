@@ -19,7 +19,14 @@ context via GitHub Issues.
 ## Economics — sponsored compute (v1)
 Free-cohort AI calls run server-side via the `anthropic-proxy` edge function on OUR
 capped key, **Haiku only** (target state — the legacy AuditGenerator pipeline still
-calls Sonnet; migrate it when the caps land). Enforcement lives in edge functions + DB (per-user $
+calls Sonnet; migrate it when the caps land). **Scoring nobody is waiting on goes
+through the proxy's service-role batch ops (`batch_submit`/`batch_poll`/`batch_results`)
+for a flat 50% discount** — same model, same rubric bytes, same validator, so it is a
+cost change and never a judgment change; in-flight state lives in `score_batches` and
+`usage_events.batch` splits the ledger. Batch has no latency guarantee, so it is never
+on a user-facing path: a new user's first `SYNC_ONBOARDING_SLICE` roles stay synchronous
+(`src/lib/scoreBatch.ts`, pinned by `src/test/score-batch.test.ts`; issue #96).
+Enforcement lives in edge functions + DB (per-user $
 allowance, global monthly kill-switch, device-fingerprint guard) — NEVER in the client
 (this repo is public; client checks are decoration). The PARKED future
 bring-your-own-key tier's `ConnectProvider` prototype was deleted in #57
