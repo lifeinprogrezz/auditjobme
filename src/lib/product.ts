@@ -127,6 +127,13 @@ export function buildActionQueue(
  * slice 2). `applications` carries job_id + status; each resolves to its company
  * through the job pool. A status we don't recognise, or a job_id we can't resolve,
  * contributes nothing — a company's roles are never hidden on a guess.
+ *
+ * CALLER CONTRACT: `jobs` must be LIVENESS-INDEPENDENT — it has to contain the
+ * applications' own job rows, not just the live pool. Postings close mid-interview
+ * (a third of the pool is is_live=false at any time) and career-ops' appliedCos does
+ * not care; hand this only live rows and a company quietly stops collapsing exactly
+ * when the conversation is hottest. useRolesData satisfies this by fetching the
+ * applied rows by id, no is_live filter (RLS: 20260726093000).
  */
 export function inFlightCompanyKeys(
   jobs: Pick<RoleJob, "id" | "company" | "company_id">[],

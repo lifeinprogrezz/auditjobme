@@ -196,10 +196,31 @@ describe("inFlightCompanyKeys (issue #73 slice 2 — career-ops semantics)", () 
     expect(ids(q)).toEqual(["s2"]);
   });
 
-  it("never hides a company on a status it can't identify, or an unresolvable job", () => {
+  it("never hides a company on a status it can't identify, or a job in no pool at all", () => {
     expect(inFlightCompanyKeys(jobs, [{ job_id: "s1", status: "ghosted" }], isInFlightStatus).size).toBe(0);
     expect(inFlightCompanyKeys(jobs, [{ job_id: "s1", status: null }], isInFlightStatus).size).toBe(0);
     expect(inFlightCompanyKeys(jobs, [{ job_id: "nope", status: "applied" }], isInFlightStatus).size).toBe(0);
+  });
+
+  it("collapses on an applied posting that has LEFT the live pool — liveness-independent", () => {
+    // The applied posting closed mid-interview (is_live=false), so it is absent from
+    // the live jobs pool. career-ops' appliedCos doesn't care about liveness and
+    // neither may this: the caller feeds the application's OWN row (fetched by id,
+    // no is_live filter) and the company stays collapsed while the conversation runs.
+    const dead = job("s0", { company: "Stripe", company_id: "stripe" });
+    const apps = [{ job_id: "s0", status: "interview" }];
+    // The live pool alone cannot resolve it — which is exactly why the caller must
+    // not pass only live rows.
+    expect(inFlightCompanyKeys(jobs, apps, isInFlightStatus).size).toBe(0);
+    const keys = inFlightCompanyKeys([dead, ...jobs], apps, isInFlightStatus);
+    expect([...keys]).toEqual(["stripe"]);
+    // ...and Stripe's other LIVE role does NOT resurface in the queue.
+    const q = buildActionQueue(
+      [job("s2", { company: "Stripe", company_id: "stripe", score: 4.6 }), job("w1", { company: "Wise", company_id: "wise", score: 4.2 })],
+      new Set(),
+      { inFlightCompanies: keys },
+    );
+    expect(ids(q)).toEqual(["w1"]);
   });
 });
 

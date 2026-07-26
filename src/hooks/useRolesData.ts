@@ -215,6 +215,15 @@ export function useRolesData() {
   // collapse (issue #73 slice 2) needs the status to tell a live conversation from a
   // closed one — a rejected company must resurface on a new role.
   const [applications, setApplications] = useState<{ job_id: string; status: string | null }[]>([]);
+  // The applied roles' OWN job rows, fetched by id WITHOUT the is_live filter (same
+  // idiom as savedJobsRaw/dismissedJobsRaw). The in-flight company collapse must be
+  // LIVENESS-INDEPENDENT — career-ops' appliedCos is — and postings routinely close
+  // mid-conversation: resolving applications against the live pool alone would let a
+  // company's other roles resurface the moment the applied posting flipped is_live
+  // false. Identity columns only; nothing here is rendered.
+  const [appliedJobsRaw, setAppliedJobsRaw] = useState<
+    { id: string; company: string; company_id: string | null }[]
+  >([]);
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   // Dismissed roles fetched WITHOUT the is_live filter, so the /settings undo list
@@ -431,6 +440,7 @@ export function useRolesData() {
         setProfileMeta(null);
         setApplied(new Set());
         setApplications([]);
+        setAppliedJobsRaw([]);
         setSaved(new Set());
         setSavedJobsRaw([]);
         setDismissed(new Set());
@@ -483,6 +493,21 @@ export function useRolesData() {
       if (runRef.current !== runId) return;
       setApplied(new Set((appsData ?? []).map((a) => a.job_id)));
       setApplications((appsData ?? []).map((a) => ({ job_id: a.job_id, status: a.status ?? null })));
+
+      // Resolve those applications to their companies from their OWN rows, not from
+      // the live pool (see appliedJobsRaw): an application whose posting has since
+      // closed must still collapse its company while the conversation is open.
+      const appliedIds = (appsData ?? []).map((a) => a.job_id);
+      if (appliedIds.length > 0) {
+        const { data: appliedRows } = await supabase
+          .from("jobs")
+          .select("id, company, company_id")
+          .in("id", appliedIds);
+        if (runRef.current !== runId) return;
+        setAppliedJobsRaw((appliedRows ?? []) as { id: string; company: string; company_id: string | null }[]);
+      } else {
+        setAppliedJobsRaw([]);
+      }
 
       // Dismissed roles (issue #73 slice 4) — same own-row table shape as saved_jobs.
       const { data: dismissedData } = await supabase
@@ -590,6 +615,14 @@ export function useRolesData() {
     // Mirror the row into `applications` too (default status 'applied'), so the
     // company's other roles collapse out of the queue in the same tick.
     setApplications((prev) => [...prev.filter((a) => a.job_id !== job.id), { job_id: job.id, status: "applied" }]);
+    // Carry the job's identity alongside, so applying a role that is NOT in the live
+    // pool (an expired role applied from the Saved section) still resolves to its
+    // company for the collapse — the same reason the load path fetches these rows.
+    setAppliedJobsRaw((prev) =>
+      prev.some((j) => j.id === job.id)
+        ? prev
+        : [...prev, { id: job.id, company: job.company, company_id: job.company_id ?? null }],
+    );
     const { error } = await supabase
       .from("applications")
       .upsert({ user_id: user.id, job_id: job.id }, { onConflict: "user_id,job_id" });
@@ -600,6 +633,7 @@ export function useRolesData() {
         return next;
       });
       setApplications((prev) => prev.filter((a) => a.job_id !== job.id));
+      setAppliedJobsRaw((prev) => prev.filter((j) => j.id !== job.id));
       toast.error("Couldn't mark as applied. Please try again.");
       return;
     }
@@ -743,9 +777,14 @@ export function useRolesData() {
   // Companies with a LIVE conversation (issue #73 slice 2): their other roles
   // collapse out of the action queue. Rejected/closed companies are absent here,
   // so they resurface on a new role.
+  // The pool is the live jobs PLUS the applied roles' own rows: a dead applied
+  // posting is absent from `jobs`, and resolving against `jobs` alone would silently
+  // stop collapsing that company mid-conversation. appliedJobsRaw leads so it still
+  // resolves if the live pool is empty; falling back to `jobs` keeps the collapse
+  // working if that fetch ever comes back empty.
   const inFlightCompanies = useMemo(
-    () => inFlightCompanyKeys(jobs, applications, isInFlightStatus),
-    [jobs, applications],
+    () => inFlightCompanyKeys([...appliedJobsRaw, ...jobs], applications, isInFlightStatus),
+    [jobs, appliedJobsRaw, applications],
   );
 
   return {
