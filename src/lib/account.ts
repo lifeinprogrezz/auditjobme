@@ -49,7 +49,12 @@ export const USER_DATA_TABLES: readonly UserDataTable[] = [
 ] as const;
 
 /** Tables whose rows point at a role in the shared catalogue, so the export can carry it. */
-const JOB_REFERENCE_TABLES: readonly UserTableName[] = ["applications", "saved_jobs", "artifacts"];
+const JOB_REFERENCE_TABLES: readonly UserTableName[] = [
+  "applications",
+  "saved_jobs",
+  "dismissed_jobs",
+  "artifacts",
+];
 
 export const ACCOUNT_EXPORT_FORMAT = "auditjob.me account export";
 export const ACCOUNT_EXPORT_VERSION = 1;
@@ -57,8 +62,8 @@ export const ACCOUNT_EXPORT_VERSION = 1;
 export const ACCOUNT_EXPORT_README =
   "Everything auditjob.me holds about your account, straight from the database. " +
   "Each key under `data` is one table, and each row is exactly as we store it. " +
-  "`jobs` carries the roles your applications, saved roles and generated documents " +
-  "point at, so the file reads on its own. Roles you have not acted on come from the " +
+  "`jobs` carries the roles your applications, saved roles, dismissals and generated " +
+  "documents point at, so the file reads on its own. Roles you have not acted on come from the " +
   "public job catalogue, which is the same for everyone and is not personal data.";
 
 export type ExportRow = Record<string, unknown>;

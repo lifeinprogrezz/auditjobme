@@ -127,14 +127,22 @@ describe("buildAccountExport", () => {
     const client = fakeClient({
       applications: [{ id: "a1", job_id: "job-1" }],
       saved_jobs: [{ id: "s1", job_id: "job-1" }],
+      // Dismissing IS acting on a role, so the role it points at has to come along:
+      // "the roles you dismissed" rendered as bare identifiers is complete but
+      // unreadable, which defeats the point of handing someone their data.
+      dismissed_jobs: [{ id: "d1", job_id: "job-3" }],
       artifacts: [{ id: "f1", job_id: "job-2" }, { id: "f2", job_id: null }],
-      jobs: [{ id: "job-1", title: "Product Manager" }, { id: "job-2", title: "Senior Product Manager" }],
+      jobs: [
+        { id: "job-1", title: "Product Manager" },
+        { id: "job-2", title: "Senior Product Manager" },
+        { id: "job-3", title: "Group Product Manager" },
+      ],
     });
     const out = await buildAccountExport(client, { userId: "user-1" });
 
     const jobsRead = client.reads.find((r) => r.table === "jobs");
-    expect(jobsRead?.values).toEqual(["job-1", "job-2"]);
-    expect(out.jobs).toHaveLength(2);
+    expect(jobsRead?.values).toEqual(["job-1", "job-3", "job-2"]);
+    expect(out.jobs).toHaveLength(3);
   });
 
   it("skips the catalogue read entirely when nothing references a role", async () => {
