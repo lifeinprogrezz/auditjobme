@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { clampDropLeft } from "@/lib/facetRow";
 
 export type FilterOption = { value: string; label: string; count: number };
 
@@ -42,7 +43,34 @@ export default function FilterChip({
   // glass .nav's transform + backdrop-filter block the position:fixed escape hatch —
   // so the open dropdown portals onto the .roles-theme page root (keeps the theme's
   // CSS variables + light/dark class) anchored below the chip's viewport rect.
-  const rect = open ? chipRef.current?.getBoundingClientRect() : undefined;
+  //
+  // The anchor is RE-MEASURED on any ancestor scroll (capture phase catches the chip
+  // row itself) and on resize, so the panel travels with its chip. It used to be
+  // measured once at render and the row's onScroll closed every dropdown instead —
+  // which raced the browser's own scroll-into-view: clicking a chip the row was
+  // clipping (always "UK sponsor" at 1920px, intermittently Freshness) focused it,
+  // the browser scrolled it into view a frame later, and the just-opened dropdown
+  // closed itself. The chip looked like a dead button. Verified 2026-07-26.
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    const place = () => {
+      const el = chipRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setPos({ top: r.bottom + 9, left: clampDropLeft(r.left, window.innerWidth) });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open]);
 
   // Chip clicks toggle the dropdown, but clicks INSIDE the dropdown (search box,
   // checkboxes) must not — they manage their own state.
@@ -73,8 +101,8 @@ export default function FilterChip({
       <svg className="caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
         <path d="m6 9 6 6 6-6" />
       </svg>
-      {open && rect && createPortal(
-      <div className="fdrop fdrop-multi fdrop-portal" style={{ top: rect.bottom + 9, left: rect.left }}>
+      {open && pos && createPortal(
+      <div className="fdrop fdrop-multi fdrop-portal" style={{ top: pos.top, left: pos.left }}>
         {searchable && (
           <input
             className="fdrop-search"

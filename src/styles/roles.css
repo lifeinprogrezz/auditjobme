@@ -158,7 +158,7 @@
 /* Smooth auto-width reveal: grid-template-columns 0fr→1fr animates to the chips' EXACT
    natural width (no max-width overshoot / dead-time), so the slide + fade read as one
    motion at any speed. flex:none keeps it from shrinking (the search is the sponge). */
-.roles-theme .fchips { display: grid; flex: 0 1 auto; min-width: 0; grid-template-columns: 0fr; opacity: 0; pointer-events: none; margin-left: 0; transition: grid-template-columns 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.55s cubic-bezier(0.4, 0, 0.2, 1); }
+.roles-theme .fchips { position: relative; display: grid; flex: 0 1 auto; min-width: 0; grid-template-columns: 0fr; opacity: 0; pointer-events: none; margin-left: 0; transition: grid-template-columns 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.55s cubic-bezier(0.4, 0, 0.2, 1); }
 /* ^ flex-shrink 1 (was none): once the search hits its min-width the chip row is the
    next shrink-sponge — it clips + scrolls (.fchips-inner) instead of pushing the
    Add-CV/avatar off the nav. Chips themselves are flex:none so they keep their size
@@ -167,12 +167,22 @@
    (Rober 7-10: "horrendous"); it moves via touchpad horizontal swipe, mouse wheel
    (HeadBar's native wheel listener) and press-drag pan. Scroll-AWARE edge fades:
    HeadBar toggles .fade-l/.fade-r so only the side actually hiding content fades;
-   at either extreme the end chip reads crisp. */
+   at either extreme the end chip reads crisp. The fade runs 32px (was 18px) so the
+   chip travelling under the .fscroll arrow has dissolved by the time it reaches it. */
 .roles-theme .fchips-inner { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .roles-theme .fchips-inner::-webkit-scrollbar { display: none; }
-.roles-theme .fchips-inner.fade-r { -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%); mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%); }
-.roles-theme .fchips-inner.fade-l { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 100%); mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 100%); }
-.roles-theme .fchips-inner.fade-l.fade-r { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); }
+.roles-theme .fchips-inner.fade-r { -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 32px), transparent 100%); mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 32px), transparent 100%); }
+.roles-theme .fchips-inner.fade-l { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 32px, #000 100%); mask-image: linear-gradient(to right, transparent 0, #000 32px, #000 100%); }
+.roles-theme .fchips-inner.fade-l.fade-r { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%); }
+/* The row's VISIBLE scroll cue (2026-07-26 UI verification): a 26px chevron sitting on
+   the fading edge, rendered by HeadBar only on the side actually hiding chips. The mask
+   fade alone was invisible in practice — at 1920px the nine chips need 852px of a 488px
+   row, so four facets (Sector / Size / Language / UK sponsor) were off-row with nothing
+   to say so. Pressing one pans by FACET_SCROLL_STEP; wheel + drag still work. */
+.roles-theme .fscroll { position: absolute; top: 50%; transform: translateY(-50%); z-index: 6; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: 999px; border: 1px solid var(--rim); background: var(--glass-2); box-shadow: var(--sh); color: var(--text); cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+.roles-theme .fscroll:hover { border-color: var(--act-border); color: var(--text); }
+.roles-theme .fscroll.l { left: -3px; }
+.roles-theme .fscroll.r { right: -3px; }
 /* Press-drag pan (HeadBar pointer handlers) — while panning, kill chip hover cues. */
 .roles-theme .fchips-inner.panning { cursor: grabbing; }
 .roles-theme .fchips-inner.panning .fchip { pointer-events: none; }
@@ -694,6 +704,9 @@
 .roles-theme.light .filterbtn:hover { background: rgba(11, 31, 38, 0.08); }
 .roles-theme.light .fchip { border-color: var(--hair); background: rgba(11, 31, 38, 0.045); color: var(--muted); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 -1px 0 rgba(11, 31, 38, 0.06); }
 .roles-theme.light .fchip:hover { background: rgba(11, 31, 38, 0.08); color: var(--text); }
+/* Same voice as .light .fclear — the dark-theme glass reads as a smudge on paper. */
+.roles-theme.light .fscroll { border-color: var(--hair); background: #ffffff; color: var(--text); box-shadow: 0 2px 10px -4px rgba(11, 31, 38, 0.35); }
+.roles-theme.light .fscroll:hover { background: rgba(11, 31, 38, 0.05); border-color: var(--text); }
 .roles-theme.light .fdrop { background: rgba(255, 255, 255, 0.74); border-color: rgba(11, 31, 38, 0.12); box-shadow: 0 18px 50px -16px rgba(20, 60, 70, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.95); }
 .roles-theme.light .fdrop::before { background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), transparent 46%); mix-blend-mode: normal; }
 .roles-theme.light .fdrop label { color: var(--text); }

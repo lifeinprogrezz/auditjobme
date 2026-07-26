@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { type Level, type RolesFilters } from "@/lib/roles";
 import FilterChip, { type FilterOption } from "./FilterChip";
+import { FACET_SCROLL_STEP, overflowSides } from "@/lib/facetRow";
 import ThemeToggle from "@/components/ThemeToggle";
 import AccountMenu from "@/components/app/AccountMenu";
 
@@ -51,16 +52,23 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
   // preventDefault. Drag suppresses the trailing click (capture phase) past 5px
   // so panning never toggles a chip.
   const drag = useRef<{ startX: number; startLeft: number; moved: boolean } | null>(null);
-  // Scroll-aware edge fades: only the side actually hiding content gets the mask
-  // (.fade-l / .fade-r), so Role reads crisp at the start and Language at the end.
-  // Re-checked after every render (chip widths change with counts) + on resize.
+  // Which side is hiding chips. Drives the edge-fade masks (.fade-l / .fade-r) AND
+  // the arrow buttons — the mask alone was not a scroll cue anyone saw: at 1920px
+  // the header is 1220px wide and the nine chips need 852px of a 488px row, so
+  // Sector / Size / Language / UK sponsor sat off-row with an 18px gradient as
+  // their only hint. Re-checked after every render (chip widths change with counts),
+  // on resize, and on scroll.
+  const [over, setOver] = useState({ l: false, r: false });
   const updateFades = () => {
     const el = rowRef.current;
     if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    el.classList.toggle("fade-l", el.scrollLeft > 2);
-    el.classList.toggle("fade-r", max - el.scrollLeft > 2);
+    const { l, r } = overflowSides(el);
+    el.classList.toggle("fade-l", l);
+    el.classList.toggle("fade-r", r);
+    setOver((prev) => (prev.l === l && prev.r === r ? prev : { l, r }));
   };
+  const nudge = (dir: 1 | -1) =>
+    rowRef.current?.scrollBy({ left: dir * FACET_SCROLL_STEP, behavior: "smooth" });
   useEffect(updateFades);
   useEffect(() => {
     const el = rowRef.current;
@@ -129,7 +137,16 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
     const onDocClick = (e: MouseEvent) => {
       const t = e.target as Element | null;
       // .fdrop is portaled out of the chip (scrollable row) — treat it as inside.
-      if (t && !t.closest(".fchip") && !t.closest(".filterbtn") && !t.closest(".fdrop")) setOpenChip(null);
+      // .fscroll (the row's arrow buttons) too: panning the row now MOVES an open
+      // dropdown with its chip, so pressing an arrow must not close it.
+      if (
+        t &&
+        !t.closest(".fchip") &&
+        !t.closest(".filterbtn") &&
+        !t.closest(".fdrop") &&
+        !t.closest(".fscroll")
+      )
+        setOpenChip(null);
     };
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
@@ -241,14 +258,14 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
       </button>
 
       <div className={`fchips${chipsShown ? " show" : ""}${chipsExpanded ? " expanded" : ""}`}>
-        {/* Fixed-position portaled dropdowns would detach on scroll — close them. */}
+        {/* Scrolling no longer closes the open dropdown — FilterChip re-anchors its
+            portaled panel to the chip on every ancestor scroll, so the panel pans
+            with the row. Closing here used to race the browser's scroll-into-view
+            on a clipped chip and made "UK sponsor" look like a dead button. */}
         <div
           className="fchips-inner"
           ref={rowRef}
-          onScroll={() => {
-            setOpenChip(null);
-            updateFades();
-          }}
+          onScroll={updateFades}
           onPointerDown={onRowPointerDown}
           onPointerMove={onRowPointerMove}
           onPointerUp={onRowPointerUp}
@@ -356,6 +373,22 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
         />
 
         </div>
+        {/* The scroll cue. Rendered only once the row has finished opening and only
+            on the side actually hiding chips, so a row that fits shows nothing. */}
+        {chipsExpanded && over.l && (
+          <button type="button" className="fscroll l" aria-label="Scroll filters left" onClick={() => nudge(-1)}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+        )}
+        {chipsExpanded && over.r && (
+          <button type="button" className="fscroll r" aria-label="Scroll filters right" onClick={() => nudge(1)}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Clear-all lives OUTSIDE the scrollable row — pinned right of the chips so it
