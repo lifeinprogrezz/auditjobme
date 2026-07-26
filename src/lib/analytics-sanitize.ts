@@ -114,7 +114,14 @@ export function sanitizeUrl(value: string): string {
   return kept.length ? `${base}?${kept.join("&")}` : base;
 }
 
-function sanitizeString(key: string, value: string): string {
+/**
+ * Scrub one string that MIGHT be a URL. Left byte-identical unless its key looks
+ * URL-shaped, its value looks URL-shaped, or it carries a credential parameter —
+ * so passing ordinary text through this costs nothing. Exported because the Sentry
+ * hooks in ./sentry-sanitize need the same rule for single strings (an event's
+ * `transaction`, `message` and exception values); one implementation, two vendors.
+ */
+export function sanitizeString(key: string, value: string): string {
   const carriesCredentials = CREDENTIAL_MARKER_RE.test(value);
   if (!carriesCredentials && !isUrlKey(key) && !LOOKS_LIKE_URL_RE.test(value)) return value;
 
