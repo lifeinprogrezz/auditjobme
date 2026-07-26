@@ -692,8 +692,48 @@ export type Database = {
           },
         ]
       }
+      score_batches: {
+        Row: {
+          batch_date: string | null
+          id: string
+          job_ids: string[]
+          provider_batch_id: string
+          retrieved_at: string | null
+          rubric_version: string
+          status: string
+          submitted_at: string
+          user_id: string
+          worker: string
+        }
+        Insert: {
+          batch_date?: string | null
+          id?: string
+          job_ids?: string[]
+          provider_batch_id: string
+          retrieved_at?: string | null
+          rubric_version: string
+          status?: string
+          submitted_at?: string
+          user_id: string
+          worker: string
+        }
+        Update: {
+          batch_date?: string | null
+          id?: string
+          job_ids?: string[]
+          provider_batch_id?: string
+          retrieved_at?: string | null
+          rubric_version?: string
+          status?: string
+          submitted_at?: string
+          user_id?: string
+          worker?: string
+        }
+        Relationships: []
+      }
       usage_events: {
         Row: {
+          batch: boolean
           cost_usd: number | null
           created_at: string
           id: string
@@ -705,6 +745,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          batch?: boolean
           cost_usd?: number | null
           created_at?: string
           id?: string
@@ -716,6 +757,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          batch?: boolean
           cost_usd?: number | null
           created_at?: string
           id?: string

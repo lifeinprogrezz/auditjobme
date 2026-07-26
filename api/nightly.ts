@@ -39,6 +39,12 @@ import {
   type ScoredMatch,
   type RankedMatch,
 } from "../src/lib/nightly.js";
+import {
+  buildBatchRequests,
+  isBatchStale,
+  isMissingBatchTable,
+  parseBatchResults,
+} from "../src/lib/scoreBatch.js";
 
 // Minimal Vercel Node handler types (avoids a @vercel/node dependency).
 type Req = { method?: string; headers: Record<string, string | string[] | undefined> };
@@ -120,6 +126,35 @@ async function scoreViaProxy(
   // Observability: a 200 that doesn't parse is a SILENT zero-match otherwise.
   if (!parsed) console.warn("[nightly] unparseable score response — skipping job");
   return parsed ? { kind: "ok", ...parsed } : { kind: "skip" };
+}
+
+/** Call one of the proxy's service-role batch operations (issue #96, lever 2).
+ *  Never throws — a batch hiccup must not halt the nightly drain. */
+async function proxyBatchOp(
+  proxyUrl: string,
+  serviceKey: string,
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await fetch(proxyUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+        "Content-Type": "application/json",
+        "x-region": "eu-central-1", // residency pin: edge fns run caller-near by default (S1)
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      console.warn(`[nightly] proxy ${String(body.op)} non-ok ${res.status}`);
+      return null;
+    }
+    return (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  } catch (e) {
+    console.warn(`[nightly] proxy ${String(body.op)} failed:`, e);
+    return null;
+  }
 }
 
 /** Fire one Resend notification. Fail-soft: logs + returns false, never throws. */
@@ -270,7 +305,26 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     jobs.map((j) => [j.url, { company: j.company, title: j.title, location: j.location ?? null }]),
   );
 
-  const summary = { users: active.length, processed: 0, skipped: 0, emailed: 0, capped: 0, matches: 0, deadlineHit: false };
+  const summary = {
+    users: active.length,
+    processed: 0,
+    skipped: 0,
+    emailed: 0,
+    capped: 0,
+    matches: 0,
+    submitted: 0,
+    inFlight: 0,
+    deadlineHit: false,
+    batchAvailable: true,
+  };
+
+  // Issue #96 lever 2: the nightly slice is scored through the Message Batches API
+  // (a flat 50% discount) because nobody is waiting on it — the deliverable is one
+  // email, not a live screen. Submission and retrieval land on DIFFERENT ticks of
+  // the 06:00–09:50 UTC drain window; migration 20260726103000 holds the in-flight
+  // state between them. Until that migration is applied, this flips off and every
+  // user falls back to the previous synchronous pass.
+  let batchAvailable = true;
 
   // F6 durable execution: budget the user loop. When time runs out we exit cleanly
   // (in-flight user already finished — the check is between users) and the next
@@ -318,6 +372,116 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         continue;
       }
       const rowsForUser = sel.data ?? [];
+
+      // ── Batch phase 1: retrieve anything already in flight for this user ────
+      // Runs BEFORE the action decision because a retrieval writes today's rows,
+      // which is exactly what decideNightlyAction reads. Either outcome ends this
+      // user's tick: retrieved (batch persisted + emailed) or still processing.
+      if (batchAvailable) {
+        const { data: openBatches, error: obErr } = await admin
+          .from("score_batches")
+          .select("id, provider_batch_id, job_ids, rubric_version, batch_date")
+          .eq("user_id", userId)
+          .eq("worker", "nightly")
+          .eq("status", "submitted");
+        if (obErr && isMissingBatchTable(obErr)) {
+          console.warn("[nightly] score_batches missing — apply migration 20260726103000. Falling back to synchronous scoring.");
+          batchAvailable = false;
+          summary.batchAvailable = false;
+        } else if (obErr) {
+          console.warn(`[nightly] score_batches read failed for ${userId}: ${obErr.message} — skipping to protect exactly-once notifications`);
+          summary.skipped++;
+          continue;
+        }
+        const open = (openBatches ?? [])[0];
+        if (open) {
+          if (isBatchStale(String(open.rubric_version), RUBRIC_VERSION)) {
+            // Rubric moved on: the judgments about to come back are no longer the
+            // product's. Retire the row; the flow below re-submits under the new one.
+            await admin
+              .from("score_batches")
+              .update({ status: "failed", retrieved_at: new Date().toISOString() })
+              .eq("id", open.id);
+          } else {
+            const res = await proxyBatchOp(proxyUrl, serviceKey, {
+              op: "batch_results",
+              batch_id: open.provider_batch_id,
+              target_user_id: userId,
+              kind: "score",
+            });
+            const jsonl = res?.jsonl;
+            if (typeof jsonl !== "string") {
+              summary.inFlight++; // still processing — a later tick picks it up
+              continue;
+            }
+            const jobById = new Map(jobs.map((j) => [j.id, j]));
+            const batchDate = (open.batch_date as string | null) ?? today;
+            const scored: ScoredMatch[] = [];
+            for (const r of parseBatchResults(jsonl)) {
+              if (r.kind !== "succeeded") continue;
+              const j = jobById.get(r.customId);
+              if (!j) continue; // role went dead between submit and retrieve
+              // Same validator as the synchronous path, sources omitted exactly as
+              // scoreViaProxy omits them — a batch result is the same model output.
+              const parsed = parseScoreResponse(r.text);
+              if (!parsed) {
+                console.warn("[nightly] unparseable batch score — skipping job");
+                continue;
+              }
+              scored.push({
+                url: j.url,
+                company: j.company,
+                title: j.title,
+                location: j.location ?? null,
+                score: parsed.score,
+                reason: parsed.reason,
+                fitBullets: parsed.fitBullets,
+              });
+            }
+            await admin
+              .from("score_batches")
+              .update({ status: "retrieved", retrieved_at: new Date().toISOString() })
+              .eq("id", open.id);
+            summary.processed++;
+            if (scored.length === 0) continue;
+
+            // An F7 rescore of an already-notified day keeps its ONE email: the
+            // upsert preserves notified_at, so re-check before sending.
+            const priorToday = rowsForUser.filter((r) => r.batch_date === batchDate);
+            const alreadyNotified = priorToday.some((r) => r.notified_at != null);
+            const ranked = rankMatches(scored);
+            const rows: MatchRow[] = ranked.map((m) => ({
+              user_id: userId,
+              job_url: m.url,
+              rank: m.rank,
+              score: m.score,
+              reason: m.reason,
+              fit_bullets: m.fitBullets,
+              batch_date: batchDate,
+              rubric_version: RUBRIC_VERSION,
+            }));
+            let { error: upErr } = await admin
+              .from("daily_matches")
+              .upsert(rows, { onConflict: "user_id,job_url,batch_date" });
+            if (upErr && isMissingRubricColumn(upErr)) {
+              console.warn("[nightly] daily_matches.rubric_version missing — retrying batch upsert without the rubric stamp.");
+              ({ error: upErr } = await admin
+                .from("daily_matches")
+                .upsert(rows.map(({ rubric_version: _rv, ...rest }) => rest), { onConflict: "user_id,job_url,batch_date" }));
+            }
+            if (upErr) {
+              console.warn(`[nightly] batch upsert failed for ${userId}:`, upErr.message);
+              continue;
+            }
+            summary.matches += rows.length;
+            if (resendKey && !alreadyNotified && (await sendBatchEmail(resendKey, userId, batchDate, ranked))) {
+              summary.emailed++;
+            }
+            continue;
+          }
+        }
+      }
+
       const todaysRows = rowsForUser.filter((r) => r.batch_date === today);
       const action = decideNightlyAction(todaysRows, RUBRIC_VERSION);
 
@@ -395,6 +559,48 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         languages: (p.languages as string[] | null) ?? null,
         cv_text: (p.cv_text as string | null) ?? null,
       };
+
+      // ── Batch phase 2: submit, don't score. Nobody is waiting on the nightly
+      // slice — the deliverable is one email — so it goes to the discounted batch
+      // path and a later tick in the drain window retrieves, ranks, and sends. ──
+      if (batchAvailable) {
+        const requests = buildBatchRequests(
+          candidates.map((j) => ({
+            id: j.id,
+            // Byte-identical to the synchronous prompt below: same rubric, same
+            // shaping, same grounding facts. Only the transport differs.
+            userMessage: buildScoreUserMessage(profile, {
+              id: j.id,
+              company: j.company,
+              title: j.title,
+              location: j.location ?? null,
+              remote: Boolean(j.remote),
+              seniority: j.seniority ?? null,
+              jd_text: j.jd_text ?? null,
+              yoe_min: j.yoe_min ?? null,
+              geo_eligibility: j.geo_eligibility ?? null,
+            }),
+          })),
+          { model: HAIKU, maxTokens: SCORE_MAX_TOKENS, system: SYSTEM },
+        );
+        const submitted = await proxyBatchOp(proxyUrl, serviceKey, { op: "batch_submit", requests });
+        const providerBatchId = submitted?.id;
+        if (typeof providerBatchId === "string") {
+          // Record BEFORE anything else can fail: an unrecorded batch is paid-for
+          // work that nothing will ever retrieve.
+          const { error: insErr } = await admin.from("score_batches").insert({
+            user_id: userId,
+            provider_batch_id: providerBatchId,
+            worker: "nightly",
+            rubric_version: RUBRIC_VERSION,
+            job_ids: candidates.map((j) => j.id),
+            batch_date: today,
+          });
+          if (insErr) console.warn(`[nightly] score_batches insert failed for ${providerBatchId}:`, insErr.message);
+          else summary.submitted += candidates.length;
+        }
+        continue;
+      }
 
       // Score the (≤ NIGHTLY_TOP_N) candidates CONCURRENTLY. Sequential scoring of a
       // full slice against a real multi-KB CV exceeds Vercel's 60s function cap, and

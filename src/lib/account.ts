@@ -41,6 +41,11 @@ export const USER_DATA_TABLES: readonly UserDataTable[] = [
   { table: "feedback", column: "user_id", label: "the feedback you sent us" },
   { table: "usage_events", column: "user_id", label: "your AI usage records" },
   {
+    table: "score_batches",
+    column: "user_id",
+    label: "the scoring jobs we queued for you in the background",
+  },
+  {
     table: "device_fingerprints",
     column: "user_id",
     label: "the device signal we use to keep free usage fair",
