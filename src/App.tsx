@@ -18,6 +18,14 @@ const Apply = lazy(() => import("./pages/Apply.tsx"));
 const Settings = lazy(() => import("./pages/Settings.tsx"));
 const Privacy = lazy(() => import("./pages/Privacy.tsx"));
 const Terms = lazy(() => import("./pages/Terms.tsx"));
+// The standalone company-audit generator (issue #82) — Apply Step 3 links here
+// with ?job=<url> prefilled; nothing on this route runs until its own explicit
+// "Generate" button is pressed. Gated like the rest of the product surfaces
+// since it reads the signed-in user's audit history.
+const Audit = lazy(() => import("@/components/AuditGenerator.jsx"));
+// The public, shareable audit page (issue #82) — anyone with the link, signed
+// in or not, so this route stays ungated.
+const PublicAudit = lazy(() => import("./pages/PublicAudit.tsx"));
 
 const gated = (node: ReactNode) => <RequireAuth>{node}</RequireAuth>;
 
@@ -59,6 +67,11 @@ const App = () => (
               <Route path="/digest" element={<Navigate to="/today" replace />} />
               <Route path="/tracker" element={gated(<Tracker />)} />
               <Route path="/apply" element={gated(<Apply />)} />
+              {/* Company audit (issue #82): the generator itself is gated (it's tied to
+                  the signed-in user's CV + audit history); the page it produces is a
+                  public share link, so /a/:username/:slug stays open to anyone. */}
+              <Route path="/audit" element={gated(<Audit />)} />
+              <Route path="/a/:username/:slug" element={<PublicAudit />} />
               {/* Settings as a routed surface (Rober 7-25) — was the map ProfileModal. */}
               <Route path="/settings" element={gated(<Settings />)} />
               {/* Public legal pages (the noscript footer links these). */}
