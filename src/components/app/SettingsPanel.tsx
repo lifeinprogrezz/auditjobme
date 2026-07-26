@@ -14,6 +14,7 @@ import {
   visibleSectorChips,
   filterSectorSearch,
 } from "@/lib/labels";
+import { USER_DATA_TABLES } from "@/lib/account";
 import type { FilterOption } from "@/components/roles/FilterChip";
 
 export type SettingsPanelProps = {
@@ -31,7 +32,14 @@ export type SettingsPanelProps = {
   onSaveTargets: (roles: string[], sectors: string[]) => Promise<boolean>;
   /** Signed-in identity caption (e.g. the account email). */
   email?: string | null;
+  /** Build and download the account export. Resolves false on failure (issue #84). */
+  onExportData: () => Promise<boolean>;
+  /** Delete the account for real. Resolves false on failure; on success the app signs out. */
+  onDeleteAccount: () => Promise<boolean>;
 };
+
+/** The word someone has to type before the delete button does anything. */
+export const DELETE_CONFIRM_WORD = "delete";
 
 /** Toggle a value in/out of a capped list — ignores extra picks past the cap. */
 function toggleCapped(list: string[], value: string, cap: number): string[] {
@@ -55,6 +63,8 @@ export default function SettingsPanel({
   sectorOptions,
   onSaveTargets,
   email,
+  onExportData,
+  onDeleteAccount,
 }: SettingsPanelProps) {
   // Edits stay null until the first touch, then own the render — no effect-seeding
   // race against the async profile load (the ProfileModal open-seeding lesson,
@@ -64,6 +74,13 @@ export default function SettingsPanel({
   const [sectorQuery, setSectorQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  // Account section (issue #84): export state, and a two-step delete.
+  const [exporting, setExporting] = useState(false);
+  const [exportFailed, setExportFailed] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmWord, setConfirmWord] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteFailed, setDeleteFailed] = useState(false);
 
   const roles = editRoles ?? targetRoles;
   const sectors = editSectors ?? targetSectors;
@@ -86,6 +103,30 @@ export default function SettingsPanel({
       setEditRoles(null);
       setEditSectors(null);
       setSavedFlash(true);
+    }
+  };
+
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    setExportFailed(false);
+    const ok = await onExportData();
+    setExporting(false);
+    if (!ok) setExportFailed(true);
+  };
+
+  const confirmed = confirmWord.trim().toLowerCase() === DELETE_CONFIRM_WORD;
+
+  const handleDelete = async () => {
+    if (deleting || !confirmed) return;
+    setDeleting(true);
+    setDeleteFailed(false);
+    const ok = await onDeleteAccount();
+    // On success the app signs out and leaves this page, so only the failure path
+    // needs to put the button back.
+    if (!ok) {
+      setDeleting(false);
+      setDeleteFailed(true);
     }
   };
 
@@ -202,6 +243,84 @@ export default function SettingsPanel({
           </span>
         )}
       </div>
+
+      {/* Account (issue #84). Both surfaces are obligations, not extras: the product
+          launches to European residents, who can ask for their data and ask us to
+          delete it. The list of what goes comes from USER_DATA_TABLES, the same list
+          the export reads, so the promise on screen and the code cannot drift. */}
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
+        <h2 className="font-display text-section text-foreground">Your data</h2>
+        <p className="mt-3 text-body text-muted-foreground text-pretty">
+          Download everything we hold about you in one file. It's plain text in JSON format, so you can open it in
+          any editor or load it into something else. The file is put together in your browser, from your own rows.
+        </p>
+        <Button variant="outline" className="mt-4" onClick={handleExport} disabled={exporting}>
+          {exporting ? "Preparing your file…" : "Download my data"}
+        </Button>
+        {exportFailed && (
+          <p className="mt-3 text-caption text-muted-foreground" role="alert">
+            We couldn't put your file together just now. Give it another try in a moment.
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
+        <h2 className="font-display text-section text-foreground">Delete your account</h2>
+        <p className="mt-3 text-body text-muted-foreground text-pretty">
+          This deletes your account and everything stored with it:
+        </p>
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-body text-muted-foreground">
+          {USER_DATA_TABLES.map((t) => (
+            <li key={t.table}>{t.label}</li>
+          ))}
+        </ul>
+        <p className="mt-3 text-body text-muted-foreground text-pretty">
+          It happens straight away, it covers every one of those, and there's no undo. If you want to keep a copy,
+          download your data first. You'll be signed out as soon as it's done.
+        </p>
+
+        {!confirmingDelete ? (
+          <Button variant="destructive" className="mt-4" onClick={() => setConfirmingDelete(true)}>
+            Delete my account
+          </Button>
+        ) : (
+          <div className="mt-4 flex flex-col gap-3">
+            <label htmlFor="delete-confirm" className="text-body text-foreground">
+              Type <b>{DELETE_CONFIRM_WORD}</b> to confirm.
+            </label>
+            <input
+              id="delete-confirm"
+              type="text"
+              autoComplete="off"
+              value={confirmWord}
+              onChange={(e) => setConfirmWord(e.target.value)}
+              className="w-full max-w-xs rounded-[10px] border border-border bg-background px-3 py-2 text-body text-foreground outline-none placeholder:text-muted-foreground focus:border-foreground/30"
+            />
+            <div className="flex items-center gap-3">
+              <Button variant="destructive" onClick={handleDelete} disabled={!confirmed || deleting}>
+                {deleting ? "Deleting…" : "Delete everything"}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  setConfirmWord("");
+                  setDeleteFailed(false);
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+        {deleteFailed && (
+          <p className="mt-3 text-caption text-muted-foreground" role="alert">
+            We couldn't finish deleting your account just now, so it's still here. Try again, or email
+            hello@lifeinprogrezz.com and we'll do it by hand.
+          </p>
+        )}
+      </section>
 
       {email && <p className="text-caption text-muted-foreground">Signed in as {email}</p>}
     </div>

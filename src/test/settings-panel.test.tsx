@@ -3,13 +3,20 @@
 // states migrated from profile-modal.test.tsx). States that matter: no CV on
 // file vs CV on file, Replace wiring, and the editable target roles / industries
 // with Save persistence — a broken branch here strands preference editing.
+//
+// The account section (issue #84) is pinned here too, because it is a launch gate:
+// the download has to be reachable, and the delete has to say what it destroys and
+// refuse to fire on a stray click.
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import SettingsPanel from "@/components/app/SettingsPanel";
+import { USER_DATA_TABLES } from "@/lib/account";
 
 function renderPanel(props: Partial<React.ComponentProps<typeof SettingsPanel>> = {}) {
   const onReplaceCv = vi.fn();
   const onSaveTargets = vi.fn(async () => true);
+  const onExportData = vi.fn(async () => true);
+  const onDeleteAccount = vi.fn(async () => true);
   const utils = render(
     <SettingsPanel
       cvText={null}
@@ -20,10 +27,12 @@ function renderPanel(props: Partial<React.ComponentProps<typeof SettingsPanel>> 
       sectorOptions={[]}
       onSaveTargets={onSaveTargets}
       email="rober@example.com"
+      onExportData={onExportData}
+      onDeleteAccount={onDeleteAccount}
       {...props}
     />,
   );
-  return { onReplaceCv, onSaveTargets, ...utils };
+  return { onReplaceCv, onSaveTargets, onExportData, onDeleteAccount, ...utils };
 }
 
 describe("SettingsPanel", () => {
@@ -87,5 +96,61 @@ describe("SettingsPanel", () => {
   it("shows the signed-in identity caption", () => {
     renderPanel({ cvText: "a CV" });
     expect(screen.getByText(/Signed in as rober@example.com/i)).toBeInTheDocument();
+  });
+});
+
+describe("SettingsPanel — account section (issue #84)", () => {
+  beforeEach(() => cleanup());
+
+  it("offers the download, and says so when it couldn't be built", async () => {
+    const onExportData = vi.fn(async () => false);
+    renderPanel({ onExportData });
+    fireEvent.click(screen.getByRole("button", { name: /Download my data/i }));
+    expect(onExportData).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/couldn't put your file together/i));
+  });
+
+  it("names every kind of data the delete destroys", () => {
+    renderPanel();
+    for (const spec of USER_DATA_TABLES) {
+      expect(screen.getByText(spec.label)).toBeInTheDocument();
+    }
+  });
+
+  it("a single click never deletes: confirmation is typed, and the wrong word stays disabled", () => {
+    const { onDeleteAccount } = renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /Delete my account/i }));
+    expect(onDeleteAccount).not.toHaveBeenCalled();
+
+    const confirmButton = screen.getByRole("button", { name: /Delete everything/i });
+    expect(confirmButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/Type delete to confirm/i), { target: { value: "yes" } });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.click(confirmButton);
+    expect(onDeleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("the typed word (any case) unlocks the delete, and Cancel backs out clean", () => {
+    const { onDeleteAccount } = renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /Delete my account/i }));
+    fireEvent.change(screen.getByLabelText(/Type delete to confirm/i), { target: { value: " DELETE " } });
+    fireEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+
+    // Backing out returns the section to its resting state, with the word cleared.
+    expect(screen.queryByRole("button", { name: /Delete everything/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Delete my account/i }));
+    expect(screen.getByRole("button", { name: /Delete everything/i })).toBeDisabled();
+    expect(onDeleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("confirmed delete fires once, and a failure says the account is still there", async () => {
+    const onDeleteAccount = vi.fn(async () => false);
+    renderPanel({ onDeleteAccount });
+    fireEvent.click(screen.getByRole("button", { name: /Delete my account/i }));
+    fireEvent.change(screen.getByLabelText(/Type delete to confirm/i), { target: { value: "delete" } });
+    fireEvent.click(screen.getByRole("button", { name: /Delete everything/i }));
+    expect(onDeleteAccount).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/still here/i));
   });
 });
