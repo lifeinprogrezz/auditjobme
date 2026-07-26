@@ -193,17 +193,20 @@ export default function App() {
   };
 
 
-  const loadAudit = async (auditId) => {
+  const loadAudit = async (id) => {
     const { data } = await supabase
       .from("audits")
-      .select("audit_data, slug")
-      .eq("id", auditId)
+      .select("audit_data, slug, is_published")
+      .eq("id", id)
       .single();
 
     if (data?.audit_data) {
       setData(data.audit_data);
       setStage("hub");
       setShowHistory(false);
+      setAuditId(id);
+      setAuditSlug(data.slug || null);
+      setIsPublished(!!data.is_published);
 
       if (data.slug && user) {
         const { data: profile } = await supabase
@@ -212,13 +215,22 @@ export default function App() {
           .eq("id", user.id)
           .maybeSingle();
 
-        const ownerSlug = getPublicAuditOwner(user, profile);
-        setShareUrl(ownerSlug ? `https://auditjob.me/a/${ownerSlug}/${data.slug}` : null);
+        const resolvedOwnerSlug = getPublicAuditOwner(user, profile);
+        setOwnerSlug(resolvedOwnerSlug);
+        setShareUrl(data.is_published && resolvedOwnerSlug ? `https://auditjob.me/a/${resolvedOwnerSlug}/${data.slug}` : null);
+      } else {
+        setShareUrl(null);
       }
     }
   };
 
-  // Save audit to DB + upload PDF
+  // Save audit to DB + upload PDF. Audits start PRIVATE (#90) -- is_published
+  // stays false until the owner presses the explicit share control below.
+  const [auditId, setAuditId] = useState(null);
+  const [auditSlug, setAuditSlug] = useState(null);
+  const [ownerSlug, setOwnerSlug] = useState(null);
+  const [isPublished, setIsPublished] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [shareUrl, setShareUrl] = useState(null);
   const [copied, setCopied] = useState(false);
 
@@ -238,7 +250,7 @@ export default function App() {
         .select("username, display_name")
         .eq("id", user.id)
         .maybeSingle();
-      const ownerSlug = getPublicAuditOwner(user, profile);
+      const resolvedOwnerSlug = getPublicAuditOwner(user, profile);
 
       // Generate PDF HTML blob
       const pdfHtml = generatePDFHTML(auditData);
@@ -252,7 +264,9 @@ export default function App() {
 
       const pdfPath = uploadError ? null : fileName;
 
-      // Save to audits table
+      // Save to audits table. Starts PRIVATE (#90): is_published is false until
+      // the owner explicitly publishes it below. No one, not even someone who
+      // guesses the link, can read this audit before that.
       const { data: auditRow } = await supabase.from("audits").insert({
         user_id: user.id,
         company_name: auditData.company?.company || "Unknown",
@@ -263,7 +277,7 @@ export default function App() {
         audit_data: auditData,
         pdf_path: pdfPath,
         slug,
-        is_published: true,
+        is_published: false,
         duration_seconds: durationSecs || null,
       }).select("id").single();
 
@@ -277,13 +291,42 @@ export default function App() {
         setDeviceAuditCount(prev => prev + 1);
       }
 
-      // Set shareable URL
-      setShareUrl(ownerSlug ? `https://auditjob.me/a/${ownerSlug}/${slug}` : null);
+      // Private until the owner presses "Publish" below -- no share link yet.
+      setAuditId(auditRow?.id || null);
+      setAuditSlug(slug);
+      setOwnerSlug(resolvedOwnerSlug);
+      setIsPublished(false);
+      setShareUrl(null);
 
       loadHistory();
     } catch (err) {
       console.error("Failed to save audit:", err);
     }
+  };
+
+  // Explicit share action (#90): the ONLY thing that makes an audit readable
+  // by anyone besides its owner. Flips is_published server-side (RLS scoped to
+  // the owning row) and only then reveals the link.
+  const publishAudit = async () => {
+    if (!auditId || publishing) return;
+    setPublishing(true);
+    // .select("id") is required here, not decorative: Supabase/PostgREST returns
+    // no error when an UPDATE's RLS policy (or a missing grant) matches zero rows --
+    // it just updates nothing. Without checking the returned row, a frontend that
+    // ever runs ahead of its migration would flip isPublished=true and reveal a
+    // share link while the row stays private server-side.
+    const { data, error } = await supabase.from("audits").update({ is_published: true }).eq("id", auditId).select("id");
+    setPublishing(false);
+    if (error) {
+      console.error("Failed to publish audit:", error);
+      return;
+    }
+    if (!data || data.length === 0) {
+      console.error("Failed to publish audit: update matched no row (policy or grant mismatch)");
+      return;
+    }
+    setIsPublished(true);
+    setShareUrl(ownerSlug && auditSlug ? `https://auditjob.me/a/${ownerSlug}/${auditSlug}` : null);
   };
 
   // Timer for processing stage
@@ -609,6 +652,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
   const reset = () => {
     setStage("input"); setData({ cv:null,company:null,pains:null,diagnosis:null,proposals:null,prototypes:null,about:null,contacts:null,accent:"#8a9a8a",roleCtx:null,showProtos:false });
     setCvFile(null); setCvBase64(null); setJobLink(""); setPersonal(""); setShowAdv(false); setShareUrl(null); setCopied(false);
+    setAuditId(null); setAuditSlug(null); setOwnerSlug(null); setIsPublished(false); setPublishing(false);
   };
 
   const accent = safeAccent(data.accent) || "#8a9a8a";
@@ -915,15 +959,26 @@ ROLE: ${company.role || roleCtx.role_type || ""}
                 <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)", width: "100%" }} onClick={() => downloadPDF(data)}>
                   Download PDF
                 </button>
-                <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)", width: "100%" }} onClick={() => { if (shareUrl) { window.open(shareUrl, "_blank"); } else { setStage("results"); } }}>
+                <button className="hub-btn" style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)", width: "100%" }} onClick={() => { if (isPublished && shareUrl) { window.open(shareUrl, "_blank"); } else { setStage("results"); } }}>
                   View Interactive Audit
                 </button>
-                {shareUrl && (
+                {isPublished && shareUrl ? (
                   <button className="hub-btn" style={{ background: accent, color: textOn(accent), width: "100%" }} onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
                     {copied ? "Link Copied" : "Share Audit Link"}
                   </button>
+                ) : (
+                  <button className="hub-btn" style={{ background: accent, color: textOn(accent), width: "100%" }} onClick={publishAudit} disabled={publishing || !auditId}>
+                    {publishing ? "Publishing..." : "Publish & Get Link"}
+                  </button>
                 )}
               </div>
+              <p className="gen-hint">
+                <span style={{ color: "var(--muted)" }}>
+                  {isPublished
+                    ? "This link is public now. Anyone who has it can read the audit."
+                    : "This audit is private. Only you can see it until you publish. Once you publish, anyone with the link can read it."}
+                </span>
+              </p>
             </Anim>
             {data.contacts?.length > 0 && (
               <Anim delay={0.3}>

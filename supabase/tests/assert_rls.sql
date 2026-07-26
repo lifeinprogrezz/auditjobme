@@ -420,3 +420,82 @@ begin
   raise notice 'account-deletion behaviour check passed: delete_own_account() removed every row keyed to the caller across % tables, left the other account and the shared catalogue untouched.', array_length(seeded, 1);
 end $$;
 rollback;
+
+-- ---------------------------------------------------------------------------
+-- Audits start private (auditjobme#90). AuditGenerator used to hard-code
+-- is_published: true on every insert, so every audit -- naming a real company,
+-- carrying the author's public display name -- was readable by anyone holding
+-- the link the moment it was generated, with no action from the user. The
+-- fix: the column default (false, since 20260613120000_private_by_default.sql)
+-- now actually holds, and publishing is a separate, owner-only action.
+begin;
+do $$
+declare
+  owner_id uuid := gen_random_uuid();
+  other_id uuid := gen_random_uuid();
+  aid uuid;
+  n int;
+begin
+  insert into auth.users (id, email) values
+    (owner_id, 'audit-owner-90-ci@example.invalid'),
+    (other_id, 'audit-other-90-ci@example.invalid');
+
+  -- The owner creates an audit exactly as AuditGenerator now does: no
+  -- is_published given, so it must land on the column default.
+  perform set_config('request.jwt.claims', json_build_object('sub', owner_id::text)::text, true);
+  perform set_config('role', 'authenticated', true);
+  insert into public.audits (user_id, company_name, audit_data, slug)
+    values (owner_id, 'CI Fixture Co', '{}'::jsonb, 'ci-fixture-audit-90')
+    returning id into aid;
+
+  select count(*) into n from public.audits where id = aid and is_published = false;
+  if n <> 1 then
+    raise exception 'a newly inserted audit with no explicit is_published must default to private (false)';
+  end if;
+
+  -- The owner must still be able to read their own unpublished audit.
+  select count(*) into n from public.audits where id = aid;
+  if n <> 1 then
+    raise exception 'the owner must be able to read their own unpublished audit';
+  end if;
+
+  -- As anon, the unpublished audit is invisible -- the exact link-exposure bug
+  -- this issue closes.
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', '', true);
+  select count(*) into n from public.audits where id = aid;
+  if n <> 0 then
+    raise exception 'an unpublished audit must not be readable by anon -- found % row(s)', n;
+  end if;
+
+  -- A different signed-in user must not be able to publish somebody else's audit.
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims', json_build_object('sub', other_id::text)::text, true);
+  update public.audits set is_published = true where id = aid;
+  select count(*) into n from public.audits where id = aid and is_published = true;
+  if n <> 0 then
+    raise exception 'a different user must not be able to publish somebody else''s audit';
+  end if;
+
+  -- The owner publishes it -- the explicit share action (AuditGenerator's
+  -- "Publish & Get Link" control), which depends on the owner-scoped UPDATE
+  -- policy added alongside this fix.
+  perform set_config('request.jwt.claims', json_build_object('sub', owner_id::text)::text, true);
+  update public.audits set is_published = true where id = aid;
+  select count(*) into n from public.audits where id = aid and is_published = true;
+  if n <> 1 then
+    raise exception 'the owner must be able to publish (UPDATE is_published) their own audit';
+  end if;
+
+  -- Now, and only now, anon can read it.
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', '', true);
+  select count(*) into n from public.audits where id = aid and is_published = true;
+  if n <> 1 then
+    raise exception 'a published audit must be readable by anon -- the whole point of the share link';
+  end if;
+
+  perform set_config('role', 'none', true);
+  raise notice 'audit privacy check passed: private by default, invisible to anon until published, only the owner can publish, published audits are readable by anon.';
+end $$;
+rollback;
