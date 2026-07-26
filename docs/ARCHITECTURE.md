@@ -52,10 +52,14 @@ changing either — the split is deliberate, not accidental.
 
 ### Ingestion — `scripts/scrape.mjs`
 
-Runs daily at 05:00 UTC. Reads `scripts/boards.json` (verified Greenhouse / Lever / Ashby
-tokens) and the modules in `scripts/sources/`:
+Runs daily at 05:00 UTC. Reads `scripts/boards.json` (verified Greenhouse / Lever / Ashby /
+Workable / SmartRecruiters / Teamtailor tokens) and the modules in `scripts/sources/`:
 
 - `ats-extra.mjs` — SmartRecruiters, Workable, Workday, Factorial
+- `teamtailor.mjs` — Teamtailor's official `{site}/jobs.json` syndication feed. One request
+  per company, full description inline, no auth. Boards come in two flavours: `token` for a
+  `*.teamtailor.com` subdomain, `host` for a custom career domain (`careers.macadam.app`),
+  which is how most of the European tenants publish
 - `bigtech.mjs` — Google, Amazon, Microsoft, Apple (Meta is a documented known gap: its
   endpoint rejects datacenter and budget-residential IPs; only a premium proxy pool would
   change that, so the scraper skips it gracefully)
@@ -63,6 +67,16 @@ tokens) and the modules in `scripts/sources/`:
 - `_proxy.mjs` — routes *only* the sources that need a residential exit through
   `SCRAPE_PROXY_URL`; everything else goes direct, keeping proxy bandwidth to a few hundred
   kilobytes a day
+
+### Keeping the board list current — `scripts/sync-boards.mjs`
+
+The personal career-ops engine resolves postings back to their applicant-tracking system
+every night, so it learns about new company boards before the product does. This script
+reads that engine's files (read only), pulls out every board token it has ever seen, drops
+what `boards.json` already knows, verifies each remaining board against its public endpoint,
+and with `--write` adds the live ones. It is idempotent, so a monthly
+`node scripts/sync-boards.mjs --engine=<career-ops-dir> --write` is safe. Without it the
+board list quietly falls behind and the diff gets done by hand again.
 
 Rows are filtered by `job-filters.mjs`, enriched (`enrich-companies.mjs`,
 `enrich-uk-sponsors.mjs`, `extract-jd.mjs`, `workplace-lib.mjs`) and upserted. **Rows missing

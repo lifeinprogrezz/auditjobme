@@ -17,6 +17,7 @@ import { resolveWorkplace } from "./workplace-lib.mjs";
 import { sources as atsExtraSources } from "./sources/ats-extra.mjs";
 import { sources as bigtechSources } from "./sources/bigtech.mjs";
 import { sources as vcSources } from "./sources/vc-startupmap.mjs";
+import { fetchTeamtailor } from "./sources/teamtailor.mjs";
 
 // Board tokens live in boards.json (verified Greenhouse/Lever/Ashby public APIs, sourced from the
 // career-ops portals.yml). Dead boards fail non-fatally below; add/curate tokens there, not here.
@@ -161,7 +162,7 @@ async function fetchSmartRecruiters(b) {
 
 // Board classes eligible for the vanished-role retirement diff below. Only rows
 // whose board was scanned SUCCESSFULLY this run may be retired.
-const BOARD_KINDS = ["greenhouse", "lever", "ashby", "workable", "smartrecruiters"];
+const BOARD_KINDS = ["greenhouse", "lever", "ashby", "workable", "smartrecruiters", "teamtailor"];
 
 async function main() {
   const url = process.env.SUPABASE_URL;
@@ -175,6 +176,10 @@ async function main() {
     ...ASHBY_BOARDS.map((b) => ({ company: b.company, kind: "ashby", run: () => fetchAshby(b) })),
     ...(BOARDS.workable || []).map((b) => ({ company: b.company, kind: "workable", run: () => fetchWorkable(b) })),
     ...(BOARDS.smartrecruiters || []).map((b) => ({ company: b.company, kind: "smartrecruiters", run: () => fetchSmartRecruiters(b) })),
+    // Teamtailor's official jobs.json syndication feed — one request per company,
+    // full description inline. Entries carry `token` (a *.teamtailor.com subdomain)
+    // or `host` (a custom career domain). See sources/teamtailor.mjs.
+    ...(BOARDS.teamtailor || []).map((b) => ({ company: b.company, kind: "teamtailor", run: () => fetchTeamtailor(b) })),
     ...atsExtraSources,
     ...bigtechSources,
     ...vcSources,
