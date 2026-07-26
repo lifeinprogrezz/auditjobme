@@ -307,8 +307,8 @@ declare
   seeded text[] := array[
     'applications.user_id', 'artifacts.user_id', 'audits.user_id',
     'company_requests.user_id', 'daily_matches.user_id', 'device_fingerprints.user_id',
-    'feedback.user_id', 'profiles.id', 'purchases.user_id', 'saved_jobs.user_id',
-    'scores.user_id', 'status_events.user_id', 'usage_events.user_id'
+    'dismissed_jobs.user_id', 'feedback.user_id', 'profiles.id', 'purchases.user_id',
+    'saved_jobs.user_id', 'scores.user_id', 'status_events.user_id', 'usage_events.user_id'
   ];
   discovered text[];
   missing text;
@@ -356,6 +356,7 @@ begin
   insert into public.applications (user_id, job_id, status) values (mine, jid, 'applied');
   insert into public.applications (user_id, job_id, status) values (theirs, jid, 'applied');
   insert into public.saved_jobs (user_id, job_id) values (mine, jid), (theirs, jid);
+  insert into public.dismissed_jobs (user_id, job_id) values (mine, jid), (theirs, jid);
   insert into public.scores (user_id, job_id, score) values (mine, jid, 4.2), (theirs, jid, 4.2);
   insert into public.artifacts (user_id, job_id, kind) values (mine, jid, 'cv'), (theirs, jid, 'cv');
   insert into public.audits (user_id, company_name, audit_data)

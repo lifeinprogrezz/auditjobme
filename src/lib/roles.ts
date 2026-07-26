@@ -2,6 +2,10 @@
 // Design authority: .claude/skills/glass-design/SKILL.md + the v43 mockup.
 
 import type { ScoreSubscore, ScoreEvidence } from "@/lib/scorePrompt";
+// ONE source for "when did this role appear" (first_seen_at → posted_at → unknown).
+// nightly.ts is dependency-free, so the browser bundle and the Node nightly worker
+// share the exact same fallback instead of drifting apart. Issue #73 slice 3.
+import { jobSeenMs } from "@/lib/nightly";
 
 /** Role-level structured facts extracted from the JD (jobs.extraction JSONB,
  *  written by scripts/extract-jd.mjs). Every field nullable; null = unknown →
@@ -41,6 +45,10 @@ export type RoleJob = {
    *  the remote flag. Drives the headbar Workplace facet. */
   workplace?: string | null;
   posted_at: string | null;
+  /** When the scrape first saw this role (jobs.first_seen_at, NOT NULL in the DB).
+   *  Optional here only because a pre-#73 dataplane artifact predates the column;
+   *  roleSeenMs falls back to posted_at, so freshness degrades instead of breaking. */
+  first_seen_at?: string | null;
   /** Per-user fit score 0–5 (score.ts rubric), null = not scored yet. */
   score: number | null;
   /** One-sentence "why it fits" from scores.signals.reason. */
@@ -191,6 +199,14 @@ export type RolesFilters = {
   // (~60% of the catalog is honestly unlabeled — "unknown matches everything" would
   // fill a Hybrid view with unlabeled roles). Optional so fixtures typecheck.
   workplaces?: string[];
+  // Age windows in days as strings ("7" | "14" | "28"), keyed on roleSeenMs. A
+  // multi-select reads as a UNION, so picking 7 and 28 means "within 28 days" —
+  // the widest selected window wins (freshnessCutoffMs). Issue #73 slice 3.
+  freshness?: string[];
+  // companies.uk_sponsor_status values ("licensed" | "unmatched"). DISCOVERY facet:
+  // a company we never checked (null) hides while a selection is active, because a
+  // silent register match is not evidence of a licence. Issue #73 slice 5.
+  sponsors?: string[];
 };
 
 export const EMPTY_FILTERS: RolesFilters = {
@@ -202,7 +218,48 @@ export const EMPTY_FILTERS: RolesFilters = {
   languages: [],
   roles: [],
   workplaces: [],
+  freshness: [],
+  sponsors: [],
 };
+
+/** Fixed option order + display labels for the Freshness facet (issue #73 slice 3).
+ *  Deliberately a FILTER only: we measured freshness against 10,921 rows of the
+ *  personal engine's scoring data on 2026-07-26 and it does NOT predict match
+ *  quality (the learned weights are non-monotonic), so an age tilt in the queue
+ *  ranking would rank on noise. Filtering by recency is a user preference; ranking
+ *  by it would be a fabricated signal. */
+export const FRESHNESS_WINDOWS: { value: string; label: string; days: number }[] = [
+  { value: "7", label: "7 days", days: 7 },
+  { value: "14", label: "14 days", days: 14 },
+  { value: "28", label: "28 days", days: 28 },
+];
+
+/** Fixed option order + expanded labels for the UK sponsor-licence facet. The status
+ *  is a COMPANY attribute from the Home Office register (already rendered as a badge
+ *  in the detail panel); this makes it filterable for UK-target users. */
+export const UK_SPONSOR_STATUSES: { value: string; label: string }[] = [
+  { value: "licensed", label: "Licensed UK sponsor" },
+  { value: "unmatched", label: "Not on the UK register" },
+];
+
+/** When this role appeared, in epoch ms: first_seen_at → posted_at → 0 (unknown).
+ *  Shared with the nightly worker's selection so the app and the email agree on
+ *  what "new" means. */
+export function roleSeenMs(job: Pick<RoleJob, "first_seen_at" | "posted_at">): number {
+  return jobSeenMs(job);
+}
+
+/** Oldest seen-time that still passes the selected freshness windows, or null when
+ *  nothing is selected (no age filter). The WIDEST selected window wins — a
+ *  multi-select is a union, so 7 + 28 means "within 28 days". */
+export function freshnessCutoffMs(selected: string[] | undefined, nowMs: number): number | null {
+  if (!selected || selected.length === 0) return null;
+  const days = selected
+    .map((v) => FRESHNESS_WINDOWS.find((w) => w.value === v)?.days)
+    .filter((d): d is number => d != null);
+  if (days.length === 0) return null;
+  return nowMs - Math.max(...days) * 86_400_000;
+}
 
 /** Client-side filter, honest to the data. Free-text query matches company + title
  *  ONLY (geography is the City filter's job now — the headbar no longer claims to
@@ -243,9 +300,19 @@ export function workplaceOf(job: RoleJob): string | null {
   return job.workplace ?? job.extraction?.remote_policy ?? (job.remote ? "remote" : null);
 }
 
-export function filterJobs(jobs: RoleJob[], f: RolesFilters): RoleJob[] {
+export function filterJobs(jobs: RoleJob[], f: RolesFilters, nowMs: number = Date.now()): RoleJob[] {
   const q = f.query.trim().toLowerCase();
+  const freshCutoff = freshnessCutoffMs(f.freshness, nowMs);
   return jobs.filter((j) => {
+    // Freshness = a DISCOVERY filter: a role whose seen-time we don't hold (both
+    // first_seen_at and posted_at missing) can't be proven fresh, so it hides while
+    // a window is selected rather than being fabricated into it.
+    if (freshCutoff != null && roleSeenMs(j) < freshCutoff) return false;
+    // UK sponsor licence — same discovery semantics: an unchecked company (null) is
+    // not evidence of a licence, so it hides while a status is selected.
+    if (f.sponsors && f.sponsors.length) {
+      if (!j.ukSponsorStatus || !f.sponsors.includes(j.ukSponsorStatus)) return false;
+    }
     // Workplace = a DISCOVERY filter (like languages): only roles KNOWN to match a
     // selected mode pass; unknown-mode rows hide while a selection is active.
     if (f.workplaces && f.workplaces.length) {

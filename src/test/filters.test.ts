@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sizeBand, sizeBandOrder, filterJobs, requiredLanguages, roleFamily, workplaceOf, EMPTY_FILTERS, type RoleJob } from "@/lib/roles";
+import { sizeBand, sizeBandOrder, filterJobs, freshnessCutoffMs, requiredLanguages, roleFamily, roleSeenMs, workplaceOf, EMPTY_FILTERS, FRESHNESS_WINDOWS, type RoleJob } from "@/lib/roles";
 
 const base: RoleJob = {
   id: "1",
@@ -167,5 +167,89 @@ describe("filterJobs — Language discovery facet", () => {
   it("multi-select is a union (German OR French)", () => {
     const got = filterJobs(jobs, { ...EMPTY_FILTERS, languages: ["German", "French"] }).map((j) => j.id);
     expect(got).toEqual(["de", "deen", "denl", "fr"]); // any role walling on German or French
+  });
+});
+
+// ── Issue #73 slice 3: the Freshness facet ────────────────────────────────────
+// FILTER ONLY. We measured age against 10,921 rows of the personal engine's golden
+// scoring data on 2026-07-26: freshness does NOT predict match quality (the learned
+// weights are non-monotonic), so it must never tilt the ranking — only the view.
+const DAY = 86_400_000;
+const NOW = Date.parse("2026-07-26T12:00:00Z");
+const daysAgo = (n: number) => new Date(NOW - n * DAY).toISOString();
+
+describe("roleSeenMs", () => {
+  it("prefers first_seen_at, falls back to posted_at, then unknown", () => {
+    expect(roleSeenMs({ first_seen_at: daysAgo(2), posted_at: daysAgo(90) })).toBe(Date.parse(daysAgo(2)));
+    expect(roleSeenMs({ first_seen_at: null, posted_at: daysAgo(5) })).toBe(Date.parse(daysAgo(5)));
+    expect(roleSeenMs({ first_seen_at: null, posted_at: null })).toBe(0);
+  });
+});
+
+describe("freshnessCutoffMs", () => {
+  it("returns null when nothing is selected (no age filter at all)", () => {
+    expect(freshnessCutoffMs([], NOW)).toBeNull();
+    expect(freshnessCutoffMs(undefined, NOW)).toBeNull();
+    expect(freshnessCutoffMs(["nonsense"], NOW)).toBeNull();
+  });
+  it("a multi-select is a UNION — the widest selected window wins", () => {
+    expect(freshnessCutoffMs(["7"], NOW)).toBe(NOW - 7 * DAY);
+    expect(freshnessCutoffMs(["7", "28"], NOW)).toBe(NOW - 28 * DAY);
+  });
+  it("offers exactly the 7 / 14 / 28-day ladder", () => {
+    expect(FRESHNESS_WINDOWS.map((w) => w.days)).toEqual([7, 14, 28]);
+  });
+});
+
+describe("filterJobs — Freshness discovery facet", () => {
+  const jobs = [
+    mk({ id: "fresh", first_seen_at: daysAgo(2), posted_at: null }),
+    mk({ id: "mid", first_seen_at: daysAgo(10), posted_at: null }),
+    mk({ id: "old", first_seen_at: daysAgo(40), posted_at: null }),
+    // posted_at is nullable and first_seen_at is on every real row; this is the
+    // pre-#73 dataplane-artifact shape, where the fallback carries the date.
+    mk({ id: "fallback", first_seen_at: null, posted_at: daysAgo(3) }),
+    mk({ id: "undated", first_seen_at: null, posted_at: null }),
+  ];
+
+  it("no window selected → everything shows, undated rows included", () => {
+    expect(filterJobs(jobs, EMPTY_FILTERS, NOW)).toHaveLength(5);
+  });
+  it("7 days keeps only roles seen inside the window", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, freshness: ["7"] }, NOW).map((j) => j.id)).toEqual([
+      "fresh",
+      "fallback",
+    ]);
+  });
+  it("28 days widens it; a 40-day-old role still fails", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, freshness: ["28"] }, NOW).map((j) => j.id)).toEqual([
+      "fresh",
+      "mid",
+      "fallback",
+    ]);
+  });
+  it("an UNDATED role hides while a window is active — we never fabricate it as fresh", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, freshness: ["28"] }, NOW).map((j) => j.id)).not.toContain("undated");
+  });
+});
+
+// ── Issue #73 slice 5: the UK sponsor-licence facet ───────────────────────────
+describe("filterJobs — UK sponsor discovery facet", () => {
+  const jobs = [
+    mk({ id: "lic", ukSponsorStatus: "licensed" }),
+    mk({ id: "un", ukSponsorStatus: "unmatched" }),
+    mk({ id: "unchecked", ukSponsorStatus: null }),
+  ];
+
+  it("no status selected → everything shows (fail-open)", () => {
+    expect(filterJobs(jobs, EMPTY_FILTERS, NOW)).toHaveLength(3);
+  });
+  it("selecting 'licensed' keeps only companies on the Home Office register", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, sponsors: ["licensed"] }, NOW).map((j) => j.id)).toEqual(["lic"]);
+  });
+  it("an UNCHECKED company hides while a status is active — silence is not evidence", () => {
+    const got = filterJobs(jobs, { ...EMPTY_FILTERS, sponsors: ["licensed", "unmatched"] }, NOW).map((j) => j.id);
+    expect(got).toEqual(["lic", "un"]);
+    expect(got).not.toContain("unchecked");
   });
 });

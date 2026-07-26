@@ -41,3 +41,11 @@ resurrect it into v1.
 
 ## Commands
 `npm run dev` (port 8080) · `npm run build` · `npm test` (vitest) · `npm run lint`
+
+**Verifying an authed surface** (/today, /tracker, /apply) without credentials:
+`VITE_E2E_BYPASS_AUTH=1 npm run dev`. Dev-only and double-gated on `import.meta.env.DEV`,
+so a production build folds it out. It hands RequireAuth a mock user AND (via
+`src/lib/devFixture.ts`) synthetic scores + a synthetic nightly batch over the real
+public pool, so the queue, the New section, dismiss and "+N more from {company}" all
+render. The mock carries no JWT: every row is labelled a fixture, nothing persists,
+and RLS stays the only enforcement. Never verify a data-persistence claim through it.

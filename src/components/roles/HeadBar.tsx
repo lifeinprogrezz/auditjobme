@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { type Level, type RolesFilters } from "@/lib/roles";
 import FilterChip, { type FilterOption } from "./FilterChip";
+import { FACET_SCROLL_STEP, overflowSides } from "@/lib/facetRow";
 import ThemeToggle from "@/components/ThemeToggle";
 import AccountMenu from "@/components/app/AccountMenu";
 
@@ -17,6 +18,10 @@ export type HeadBarProps = {
   sectorOptions: FilterOption[];
   sizeOptions: FilterOption[];
   languageOptions: FilterOption[];
+  /** Age windows (7 / 14 / 28 days) — issue #73 slice 3. */
+  freshnessOptions: FilterOption[];
+  /** UK Skilled-Worker sponsor-licence status — issue #73 slice 5. */
+  sponsorOptions: FilterOption[];
   /** Reset every filter (and the map pin selection) at once. */
   onClearAll: () => void;
   /** Opens the CV-unlock modal (Phase A front door). */
@@ -29,14 +34,16 @@ export type HeadBarProps = {
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, onClearAll, onAddCv, onSignIn, onBrand }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, freshnessOptions, sponsorOptions, onClearAll, onAddCv, onSignIn, onBrand }: HeadBarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [chipsShown, setChipsShown] = useState(false);
   // Smooth width reveal via grid-template-columns 0fr→1fr (.show); .expanded (after
   // the 550ms slide) frees the inner overflow so dropdowns can escape.
   const [chipsExpanded, setChipsExpanded] = useState(false);
-  const [openChip, setOpenChip] = useState<"role" | "level" | "city" | "workplace" | "sector" | "size" | "language" | null>(null);
+  const [openChip, setOpenChip] = useState<
+    "role" | "level" | "city" | "workplace" | "sector" | "size" | "language" | "freshness" | "sponsor" | null
+  >(null);
   const expandTimer = useRef<number | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   // The chip row hides its scrollbar, so give mouse users two ways to move it:
@@ -45,16 +52,23 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
   // preventDefault. Drag suppresses the trailing click (capture phase) past 5px
   // so panning never toggles a chip.
   const drag = useRef<{ startX: number; startLeft: number; moved: boolean } | null>(null);
-  // Scroll-aware edge fades: only the side actually hiding content gets the mask
-  // (.fade-l / .fade-r), so Role reads crisp at the start and Language at the end.
-  // Re-checked after every render (chip widths change with counts) + on resize.
+  // Which side is hiding chips. Drives the edge-fade masks (.fade-l / .fade-r) AND
+  // the arrow buttons — the mask alone was not a scroll cue anyone saw: at 1920px
+  // the header is 1220px wide and the nine chips need 852px of a 488px row, so
+  // Sector / Size / Language / UK sponsor sat off-row with an 18px gradient as
+  // their only hint. Re-checked after every render (chip widths change with counts),
+  // on resize, and on scroll.
+  const [over, setOver] = useState({ l: false, r: false });
   const updateFades = () => {
     const el = rowRef.current;
     if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    el.classList.toggle("fade-l", el.scrollLeft > 2);
-    el.classList.toggle("fade-r", max - el.scrollLeft > 2);
+    const { l, r } = overflowSides(el);
+    el.classList.toggle("fade-l", l);
+    el.classList.toggle("fade-r", r);
+    setOver((prev) => (prev.l === l && prev.r === r ? prev : { l, r }));
   };
+  const nudge = (dir: 1 | -1) =>
+    rowRef.current?.scrollBy({ left: dir * FACET_SCROLL_STEP, behavior: "smooth" });
   useEffect(updateFades);
   useEffect(() => {
     const el = rowRef.current;
@@ -123,7 +137,16 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
     const onDocClick = (e: MouseEvent) => {
       const t = e.target as Element | null;
       // .fdrop is portaled out of the chip (scrollable row) — treat it as inside.
-      if (t && !t.closest(".fchip") && !t.closest(".filterbtn") && !t.closest(".fdrop")) setOpenChip(null);
+      // .fscroll (the row's arrow buttons) too: panning the row now MOVES an open
+      // dropdown with its chip, so pressing an arrow must not close it.
+      if (
+        t &&
+        !t.closest(".fchip") &&
+        !t.closest(".filterbtn") &&
+        !t.closest(".fdrop") &&
+        !t.closest(".fscroll")
+      )
+        setOpenChip(null);
     };
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
@@ -162,13 +185,17 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
   };
 
   // City / Sector / Size are string multi-selects — one generic toggler.
-  const toggleIn = (key: "cities" | "sectors" | "sizes" | "languages" | "roles" | "workplaces", v: string) => {
+  const toggleIn = (
+    key: "cities" | "sectors" | "sizes" | "languages" | "roles" | "workplaces" | "freshness" | "sponsors",
+    v: string,
+  ) => {
     const cur = filters[key] ?? [];
     const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
     onFilters({ ...filters, [key]: next });
   };
-  const chipOpen = (key: "role" | "level" | "city" | "workplace" | "sector" | "size" | "language") => () =>
-    setOpenChip(openChip === key ? null : key);
+  const chipOpen =
+    (key: "role" | "level" | "city" | "workplace" | "sector" | "size" | "language" | "freshness" | "sponsor") => () =>
+      setOpenChip(openChip === key ? null : key);
 
   // Any filter active → show the headbar-wide Clear all (Rober 7-09).
   const anyActive =
@@ -179,6 +206,8 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
     filters.sizes.length > 0 ||
     (filters.languages?.length ?? 0) > 0 ||
     (filters.workplaces?.length ?? 0) > 0 ||
+    (filters.freshness?.length ?? 0) > 0 ||
+    (filters.sponsors?.length ?? 0) > 0 ||
     filters.query.trim() !== "";
 
   return (
@@ -229,14 +258,14 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
       </button>
 
       <div className={`fchips${chipsShown ? " show" : ""}${chipsExpanded ? " expanded" : ""}`}>
-        {/* Fixed-position portaled dropdowns would detach on scroll — close them. */}
+        {/* Scrolling no longer closes the open dropdown — FilterChip re-anchors its
+            portaled panel to the chip on every ancestor scroll, so the panel pans
+            with the row. Closing here used to race the browser's scroll-into-view
+            on a clipped chip and made "UK sponsor" look like a dead button. */}
         <div
           className="fchips-inner"
           ref={rowRef}
-          onScroll={() => {
-            setOpenChip(null);
-            updateFades();
-          }}
+          onScroll={updateFades}
           onPointerDown={onRowPointerDown}
           onPointerMove={onRowPointerMove}
           onPointerUp={onRowPointerUp}
@@ -264,6 +293,18 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
           onOpenToggle={chipOpen("level")}
           onClearAll={() => onFilters({ ...filters, levels: [] })}
           disabled={levelOptions.every((o) => o.count === 0) && filters.levels.length === 0}
+        />
+        {/* Freshness = a filter, never a ranking input (issue #73 slice 3): age does
+            not predict match quality, so tilting the rank on it would rank on noise. */}
+        <FilterChip
+          label="Freshness"
+          options={freshnessOptions}
+          selected={filters.freshness ?? []}
+          onToggle={(v) => toggleIn("freshness", v)}
+          open={openChip === "freshness"}
+          onOpenToggle={chipOpen("freshness")}
+          onClearAll={() => onFilters({ ...filters, freshness: [] })}
+          disabled={freshnessOptions.every((o) => o.count === 0) && !(filters.freshness?.length ?? 0)}
         />
         <FilterChip
           label="City"
@@ -318,8 +359,36 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
           onClearAll={() => onFilters({ ...filters, languages: [] })}
           disabled={languageOptions.length === 0 && !(filters.languages?.length ?? 0)}
         />
+        {/* UK sponsor licence (issue #73 slice 5) — a company attribute from the Home
+            Office register, already shown as a badge, now filterable. */}
+        <FilterChip
+          label="UK sponsor"
+          options={sponsorOptions.filter((o) => o.count > 0)}
+          selected={filters.sponsors ?? []}
+          onToggle={(v) => toggleIn("sponsors", v)}
+          open={openChip === "sponsor"}
+          onOpenToggle={chipOpen("sponsor")}
+          onClearAll={() => onFilters({ ...filters, sponsors: [] })}
+          disabled={sponsorOptions.every((o) => o.count === 0) && !(filters.sponsors?.length ?? 0)}
+        />
 
         </div>
+        {/* The scroll cue. Rendered only once the row has finished opening and only
+            on the side actually hiding chips, so a row that fits shows nothing. */}
+        {chipsExpanded && over.l && (
+          <button type="button" className="fscroll l" aria-label="Scroll filters left" onClick={() => nudge(-1)}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+        )}
+        {chipsExpanded && over.r && (
+          <button type="button" className="fscroll r" aria-label="Scroll filters right" onClick={() => nudge(1)}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Clear-all lives OUTSIDE the scrollable row — pinned right of the chips so it

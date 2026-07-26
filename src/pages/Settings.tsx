@@ -37,7 +37,7 @@ function downloadJson(filename: string, text: string) {
 export default function Settings() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { jobs, cvText, profileMeta, profileChecked, saveTargets } = useRolesData();
+  const { jobs, cvText, profileMeta, profileChecked, saveTargets, dismissedJobs, toggleDismissed } = useRolesData();
 
   // Issue #84 — data export. Every row we hold for this account, read own-row through
   // RLS, assembled in the browser. A failed read throws rather than hand over a
@@ -126,6 +126,8 @@ export default function Settings() {
         sectorOptions={sectorOptions}
         onSaveTargets={saveTargets}
         email={user?.email ?? null}
+        dismissedJobs={dismissedJobs}
+        onRestoreDismissed={toggleDismissed}
         onExportData={handleExportData}
         onDeleteAccount={handleDeleteAccount}
       />

@@ -5,11 +5,14 @@ import { toast } from "@/components/ui/sonner";
 import { RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
 import type { ScoreSubscore, ScoreEvidence } from "@/lib/scorePrompt";
 import { applyLandedScores, byScore, type RoleJob, type RoleExtraction } from "@/lib/roles";
+import { inFlightCompanyKeys } from "@/lib/product";
+import { isInFlightStatus } from "@/lib/tracker";
 import { hashCv, readCvStash, clearCvStash } from "@/lib/labels";
 import { shouldPromptCv } from "@/lib/deviceSession";
 import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
 import { fetchDataplane, type DataplaneCompany, type DataplaneOffice } from "@/lib/dataplane";
+import { DEV_FIXTURE, DEV_FIXTURE_PROFILE, devFixtureScores } from "@/lib/devFixture";
 import { createScoreBuffer, type ScoreBuffer } from "@/lib/scoreCoalescer";
 
 type JobsRow = {
@@ -22,6 +25,9 @@ type JobsRow = {
   source: string | null;
   seniority: string | null;
   posted_at: string | null;
+  /** jobs.first_seen_at — the Freshness facet's primary key (issue #73 slice 3);
+   *  NOT NULL in the DB, optional here only for a pre-#73 dataplane artifact. */
+  first_seen_at?: string | null;
   company_id: string | null;
   extraction: RoleExtraction | null;
   role_family: string | null;
@@ -206,7 +212,24 @@ export function useRolesData() {
   // flashing the CV modal at a user whose CV is still in flight.
   const [profileChecked, setProfileChecked] = useState(false);
   const [applied, setApplied] = useState<Set<string>>(new Set());
+  // The application ROWS (job_id + status), not just the ids: the in-flight company
+  // collapse (issue #73 slice 2) needs the status to tell a live conversation from a
+  // closed one — a rejected company must resurface on a new role.
+  const [applications, setApplications] = useState<{ job_id: string; status: string | null }[]>([]);
+  // The applied roles' OWN job rows, fetched by id WITHOUT the is_live filter (same
+  // idiom as savedJobsRaw/dismissedJobsRaw). The in-flight company collapse must be
+  // LIVENESS-INDEPENDENT — career-ops' appliedCos is — and postings routinely close
+  // mid-conversation: resolving applications against the live pool alone would let a
+  // company's other roles resurface the moment the applied posting flipped is_live
+  // false. Identity columns only; nothing here is rendered.
+  const [appliedJobsRaw, setAppliedJobsRaw] = useState<
+    { id: string; company: string; company_id: string | null }[]
+  >([]);
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  // Dismissed roles fetched WITHOUT the is_live filter, so the /settings undo list
+  // still has display data once a posting expires (same reason as savedJobsRaw).
+  const [dismissedJobsRaw, setDismissedJobsRaw] = useState<RoleJob[]>([]);
   // Saved roles fetched WITHOUT the is_live filter, so an expired-but-saved role still
   // has display data for the Today Saved section (Rober 7-15 review).
   const [savedJobsRaw, setSavedJobsRaw] = useState<RoleJob[]>([]);
@@ -372,7 +395,7 @@ export function useRolesData() {
         for (let from = 0; ; from += PAGE) {
           const { data, error } = await supabase
             .from("jobs")
-            .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id, extraction, role_family, workplace")
+            .select("id, company, title, url, location, remote, source, seniority, posted_at, first_seen_at, company_id, extraction, role_family, workplace")
             .eq("is_live", true)
             .range(from, from + PAGE - 1);
           if (error || !data) break;
@@ -417,8 +440,12 @@ export function useRolesData() {
         setProfile(null);
         setProfileMeta(null);
         setApplied(new Set());
+        setApplications([]);
+        setAppliedJobsRaw([]);
         setSaved(new Set());
         setSavedJobsRaw([]);
+        setDismissed(new Set());
+        setDismissedJobsRaw([]);
         setLoading(false);
         return;
       }
@@ -447,7 +474,7 @@ export function useRolesData() {
           evidence: sig?.evidence ?? null,
         };
       });
-      const merged = enrichAll(rows, dims, officesBySlug).map((j) => ({
+      const scoredRows = enrichAll(rows, dims, officesBySlug).map((j) => ({
         ...j,
         score: scoreByJob[j.id]?.score ?? null,
         reason: scoreByJob[j.id]?.reason ?? null,
@@ -455,14 +482,58 @@ export function useRolesData() {
         subscores: scoreByJob[j.id]?.subscores ?? null,
         evidence: scoreByJob[j.id]?.evidence ?? null,
       }));
+      // Dev-only (VITE_E2E_BYPASS_AUTH under vite dev): the mock user has no JWT, so
+      // the query above returns nothing and every authed surface renders empty. Fill
+      // the gaps with obviously-labelled synthetic scores so an automated walk can
+      // reach the queue, the dismiss control and the "+N more" affordance. Folded out
+      // of production builds — see lib/devFixture.ts.
+      const merged = DEV_FIXTURE ? devFixtureScores(scoredRows) : scoredRows;
       merged.sort(byScore);
       if (runRef.current !== runId) return;
       setJobs(merged);
       setLoading(false);
 
-      const { data: appsData } = await supabase.from("applications").select("job_id").eq("user_id", user.id);
+      const { data: appsData } = await supabase
+        .from("applications")
+        .select("job_id, status")
+        .eq("user_id", user.id);
       if (runRef.current !== runId) return;
       setApplied(new Set((appsData ?? []).map((a) => a.job_id)));
+      setApplications((appsData ?? []).map((a) => ({ job_id: a.job_id, status: a.status ?? null })));
+
+      // Resolve those applications to their companies from their OWN rows, not from
+      // the live pool (see appliedJobsRaw): an application whose posting has since
+      // closed must still collapse its company while the conversation is open.
+      const appliedIds = (appsData ?? []).map((a) => a.job_id);
+      if (appliedIds.length > 0) {
+        const { data: appliedRows } = await supabase
+          .from("jobs")
+          .select("id, company, company_id")
+          .in("id", appliedIds);
+        if (runRef.current !== runId) return;
+        setAppliedJobsRaw((appliedRows ?? []) as { id: string; company: string; company_id: string | null }[]);
+      } else {
+        setAppliedJobsRaw([]);
+      }
+
+      // Dismissed roles (issue #73 slice 4) — same own-row table shape as saved_jobs.
+      const { data: dismissedData } = await supabase
+        .from("dismissed_jobs")
+        .select("job_id")
+        .eq("user_id", user.id);
+      if (runRef.current !== runId) return;
+      const dismissedIds = (dismissedData ?? []).map((d) => d.job_id);
+      setDismissed(new Set(dismissedIds));
+      if (dismissedIds.length > 0) {
+        const { data: dismissedRows } = await supabase
+          .from("jobs")
+          .select("id, company, title, url, location, remote, source, seniority, posted_at, first_seen_at, company_id, extraction, role_family, workplace")
+          .in("id", dismissedIds);
+        if (runRef.current !== runId) return;
+        setDismissedJobsRaw(enrichAll((dismissedRows ?? []) as JobsRow[], dims, officesBySlug));
+      } else {
+        setDismissedJobsRaw([]);
+      }
 
       const { data: savedData } = await supabase.from("saved_jobs").select("job_id").eq("user_id", user.id);
       if (runRef.current !== runId) return;
@@ -474,7 +545,7 @@ export function useRolesData() {
       if (savedIds.length > 0) {
         const { data: savedRows } = await supabase
           .from("jobs")
-          .select("id, company, title, url, location, remote, source, seniority, posted_at, company_id, extraction, role_family, workplace")
+          .select("id, company, title, url, location, remote, source, seniority, posted_at, first_seen_at, company_id, extraction, role_family, workplace")
           .in("id", savedIds);
         if (runRef.current !== runId) return;
         setSavedJobsRaw(enrichAll((savedRows ?? []) as JobsRow[], dims, officesBySlug));
@@ -497,8 +568,14 @@ export function useRolesData() {
           targetSectors: prof.target_sectors ?? [],
           cvUpdatedAt: prof.updated_at ?? null,
         });
+      } else if (DEV_FIXTURE) {
+        // Same dev-only gate: `scored` is Boolean(profile.cv_text), and the mock
+        // user has no profile row, so without this /today never leaves its
+        // "add your CV" empty state and the walk sees nothing.
+        setProfile(DEV_FIXTURE_PROFILE);
+        setProfileMeta({ targetRoles: ["Product Manager"], targetSectors: [], cvUpdatedAt: null });
       }
-      if (!prof?.cv_text?.trim()) {
+      if (!DEV_FIXTURE && !prof?.cv_text?.trim()) {
         // Post-OAuth handoff (Phase A): a CV stashed before the sign-in redirect
         // is written to the profile now, then revealed. Only when the profile
         // has no CV yet (never clobber an existing one). Scoring itself is the
@@ -548,6 +625,17 @@ export function useRolesData() {
   const markApplied = async (job: RoleJob) => {
     if (!user) return;
     setApplied((prev) => new Set(prev).add(job.id));
+    // Mirror the row into `applications` too (default status 'applied'), so the
+    // company's other roles collapse out of the queue in the same tick.
+    setApplications((prev) => [...prev.filter((a) => a.job_id !== job.id), { job_id: job.id, status: "applied" }]);
+    // Carry the job's identity alongside, so applying a role that is NOT in the live
+    // pool (an expired role applied from the Saved section) still resolves to its
+    // company for the collapse — the same reason the load path fetches these rows.
+    setAppliedJobsRaw((prev) =>
+      prev.some((j) => j.id === job.id)
+        ? prev
+        : [...prev, { id: job.id, company: job.company, company_id: job.company_id ?? null }],
+    );
     const { error } = await supabase
       .from("applications")
       .upsert({ user_id: user.id, job_id: job.id }, { onConflict: "user_id,job_id" });
@@ -557,6 +645,8 @@ export function useRolesData() {
         next.delete(job.id);
         return next;
       });
+      setApplications((prev) => prev.filter((a) => a.job_id !== job.id));
+      setAppliedJobsRaw((prev) => prev.filter((j) => j.id !== job.id));
       toast.error("Couldn't mark as applied. Please try again.");
       return;
     }
@@ -594,6 +684,42 @@ export function useRolesData() {
         return next;
       });
       toast.error(wasSaved ? "Couldn't remove from saved. Please try again." : "Couldn't save. Please try again.");
+    }
+  };
+
+  // Dismiss / restore a role (issue #73 slice 4). "Not interested" is the missing
+  // half of the queue: without it the same rejected match keeps nagging from the top
+  // forever. Optimistic toggle against dismissed_jobs, same idiom as toggleSaved.
+  const toggleDismissed = async (job: RoleJob) => {
+    if (!user) return;
+    const wasDismissed = dismissed.has(job.id);
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      if (wasDismissed) next.delete(job.id);
+      else next.add(job.id);
+      return next;
+    });
+    // Keep the undo list populated for a role dismissed straight from the queue.
+    if (!wasDismissed) setDismissedJobsRaw((prev) => (prev.some((j) => j.id === job.id) ? prev : [...prev, job]));
+    // Dev-only walk (VITE_E2E_BYPASS_AUTH): the mock user's insert is refused by RLS,
+    // which would roll the row straight back and make the control look broken. Keep
+    // the state local instead — nothing is persisted, exactly as the gate intends.
+    if (DEV_FIXTURE) return;
+    const { error } = wasDismissed
+      ? await supabase.from("dismissed_jobs").delete().eq("user_id", user.id).eq("job_id", job.id)
+      : await supabase
+          .from("dismissed_jobs")
+          .upsert({ user_id: user.id, job_id: job.id }, { onConflict: "user_id,job_id" });
+    if (error) {
+      setDismissed((prev) => {
+        const next = new Set(prev);
+        if (wasDismissed) next.add(job.id);
+        else next.delete(job.id);
+        return next;
+      });
+      toast.error(
+        wasDismissed ? "Couldn't restore this role. Please try again." : "Couldn't hide this role. Please try again.",
+      );
     }
   };
 
@@ -656,6 +782,28 @@ export function useRolesData() {
     return [...byId.values()];
   }, [jobs, saved, savedJobsRaw]);
 
+  // Dismissed roles for the /settings undo list — same live-row-wins merge as
+  // savedJobs, filtered by the current set so restoring drops them immediately.
+  const dismissedJobs = useMemo(() => {
+    const byId = new Map<string, RoleJob>();
+    for (const j of dismissedJobsRaw) if (dismissed.has(j.id)) byId.set(j.id, j);
+    for (const j of jobs) if (dismissed.has(j.id)) byId.set(j.id, j);
+    return [...byId.values()];
+  }, [jobs, dismissed, dismissedJobsRaw]);
+
+  // Companies with a LIVE conversation (issue #73 slice 2): their other roles
+  // collapse out of the action queue. Rejected/closed companies are absent here,
+  // so they resurface on a new role.
+  // The pool is the live jobs PLUS the applied roles' own rows: a dead applied
+  // posting is absent from `jobs`, and resolving against `jobs` alone would silently
+  // stop collapsing that company mid-conversation. appliedJobsRaw leads so it still
+  // resolves if the live pool is empty; falling back to `jobs` keeps the collapse
+  // working if that fetch ever comes back empty.
+  const inFlightCompanies = useMemo(
+    () => inFlightCompanyKeys([...appliedJobsRaw, ...jobs], applications, isInFlightStatus),
+    [jobs, appliedJobsRaw, applications],
+  );
+
   return {
     jobs,
     loading,
@@ -668,6 +816,12 @@ export function useRolesData() {
     saved,
     savedJobs,
     toggleSaved,
+    /** Roles the user said no to (issue #73 slice 4) — excluded from the queue + rail. */
+    dismissed,
+    dismissedJobs,
+    toggleDismissed,
+    /** companyKey() set of companies with an in-flight application (issue #73 slice 2). */
+    inFlightCompanies,
     saveTargets,
     scoreMore,
     submitCv,

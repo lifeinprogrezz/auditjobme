@@ -263,9 +263,12 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     first_seen_at: r.first_seen_at,
     posted_at: r.posted_at,
   }));
-  // url → {company,title} for rebuilding the email preview on the retry-email path
-  // (daily_matches stores only job_url, not the display fields).
-  const jobByUrl = new Map(jobs.map((j) => [j.url, { company: j.company, title: j.title }]));
+  // url → {company,title,location} for rebuilding the email preview on the
+  // retry-email path (daily_matches stores only job_url, not the display fields).
+  // Location joined the set with the per-role email rows (issue #72 slice 3).
+  const jobByUrl = new Map(
+    jobs.map((j) => [j.url, { company: j.company, title: j.title, location: j.location ?? null }]),
+  );
 
   const summary = { users: active.length, processed: 0, skipped: 0, emailed: 0, capped: 0, matches: 0, deadlineHit: false };
 
@@ -340,6 +343,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
                 url,
                 company: meta?.company ?? url,
                 title: meta?.title ?? "New role",
+                location: meta?.location ?? null,
                 score: Number(r.score) || 0,
                 reason: (r.reason as string | null) ?? "",
                 fitBullets: Array.isArray(r.fit_bullets) ? (r.fit_bullets as string[]) : [],
@@ -429,6 +433,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
           url: j.url,
           company: j.company,
           title: j.title,
+          location: j.location ?? null,
           score: r.score,
           reason: r.reason,
           fitBullets: r.fitBullets,

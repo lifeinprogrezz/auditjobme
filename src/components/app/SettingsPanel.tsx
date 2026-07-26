@@ -16,6 +16,7 @@ import {
 } from "@/lib/labels";
 import { USER_DATA_TABLES } from "@/lib/account";
 import type { FilterOption } from "@/components/roles/FilterChip";
+import type { RoleJob } from "@/lib/roles";
 
 export type SettingsPanelProps = {
   /** Stored CV text (null/empty when the user hasn't dropped one yet). */
@@ -32,6 +33,11 @@ export type SettingsPanelProps = {
   onSaveTargets: (roles: string[], sectors: string[]) => Promise<boolean>;
   /** Signed-in identity caption (e.g. the account email). */
   email?: string | null;
+  /** Roles the user said "not interested" to (issue #73 slice 4). Optional: the
+   *  section is simply absent when there are none. */
+  dismissedJobs?: RoleJob[];
+  /** Put one back in the queue. */
+  onRestoreDismissed?: (job: RoleJob) => void;
   /** Build and download the account export. Resolves false on failure (issue #84). */
   onExportData: () => Promise<boolean>;
   /** Delete the account for real. Resolves false on failure; on success the app signs out. */
@@ -63,6 +69,8 @@ export default function SettingsPanel({
   sectorOptions,
   onSaveTargets,
   email,
+  dismissedJobs = [],
+  onRestoreDismissed,
   onExportData,
   onDeleteAccount,
 }: SettingsPanelProps) {
@@ -229,6 +237,41 @@ export default function SettingsPanel({
           </div>
         )}
       </section>
+
+      {/* Dismissed roles (issue #73 slice 4): saying no has to be undoable, or nobody
+          uses it. Same section idiom as the pickers above; absent when empty. */}
+      {dismissedJobs.length > 0 && (
+        <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
+          <h2 className="font-display text-section text-foreground">Not interested</h2>
+          <p className="mt-1 text-caption text-muted-foreground">
+            These roles stay out of your queue and off the map. Put one back any time.
+          </p>
+          <ul className="mt-4 flex flex-col gap-3">
+            {dismissedJobs.map((job) => (
+              <li key={job.id} className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="font-display text-micro uppercase text-muted-foreground">{job.company}</div>
+                  <a
+                    href={job.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block truncate font-display text-body text-foreground underline-offset-2 hover:underline"
+                  >
+                    {job.title}
+                  </a>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onRestoreDismissed?.(job)}
+                  className="shrink-0 text-control font-medium text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
+                >
+                  Undo
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="flex items-center gap-4">
         <Button onClick={handleSave} disabled={saving}>
