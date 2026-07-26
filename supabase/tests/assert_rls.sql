@@ -440,6 +440,7 @@ declare
   owner_id uuid := gen_random_uuid();
   other_id uuid := gen_random_uuid();
   aid uuid;
+  aid2 uuid;
   n int;
 begin
   insert into auth.users (id, email) values
@@ -501,7 +502,35 @@ begin
     raise exception 'a published audit must be readable by anon -- the whole point of the share link';
   end if;
 
+  -- A different SIGNED-IN user must also be able to read the published audit --
+  -- the acceptance-panel fix (2026-07-26). Before it, "Anyone can view
+  -- published audits" was TO anon only, so a signed-in visitor following the
+  -- exact same /a/:username/:slug share link (issue #82) got zero rows while
+  -- an anonymous visitor did not -- the asymmetry that let this ship unnoticed.
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims', json_build_object('sub', other_id::text)::text, true);
+  select count(*) into n from public.audits where id = aid and is_published = true;
+  if n <> 1 then
+    raise exception 'a published audit must be readable by a DIFFERENT signed-in user, not just anon';
+  end if;
+
+  -- Regression guard: the fix must not become "every audit is visible to
+  -- everyone". A second, still-private audit from the SAME owner must stay
+  -- invisible to that other signed-in user -- only is_published = true opens
+  -- the door, and #90's private-by-default guarantee must survive this change.
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims', json_build_object('sub', owner_id::text)::text, true);
+  insert into public.audits (user_id, company_name, audit_data, slug)
+    values (owner_id, 'CI Fixture Co', '{}'::jsonb, 'ci-fixture-audit-90-unpub')
+    returning id into aid2;
+
+  perform set_config('request.jwt.claims', json_build_object('sub', other_id::text)::text, true);
+  select count(*) into n from public.audits where id = aid2;
+  if n <> 0 then
+    raise exception 'an unpublished audit must still be invisible to a different signed-in user -- found % row(s)', n;
+  end if;
+
   perform set_config('role', 'none', true);
-  raise notice 'audit privacy check passed: private by default, invisible to anon until published, only the owner can publish, published audits are readable by anon.';
+  raise notice 'audit privacy check passed: private by default, invisible to anon until published, only the owner can publish, published audits are readable by anon AND by a different signed-in user, unpublished audits stay invisible to both.';
 end $$;
 rollback;
