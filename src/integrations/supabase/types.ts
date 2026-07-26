@@ -52,6 +52,7 @@ export type Database = {
       artifacts: {
         Row: {
           content: Json
+          context: string | null
           created_at: string
           id: string
           job_id: string | null
@@ -64,6 +65,7 @@ export type Database = {
         }
         Insert: {
           content?: Json
+          context?: string | null
           created_at?: string
           id?: string
           job_id?: string | null
@@ -76,6 +78,7 @@ export type Database = {
         }
         Update: {
           content?: Json
+          context?: string | null
           created_at?: string
           id?: string
           job_id?: string | null
