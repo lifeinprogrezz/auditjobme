@@ -25,6 +25,7 @@ import { downloadCvPdf, downloadCoverPdf } from "@/lib/pdf";
 import { domainFor } from "@/lib/logodev";
 import { cityOf } from "@/lib/geo";
 import { auditHref } from "@/lib/auditLink";
+import { track } from "@/lib/analytics";
 import type { Json } from "@/integrations/supabase/types";
 
 // §3.3 secondary CTA — the ONE idiom for every non-primary action on the page:
@@ -233,6 +234,7 @@ export default function Apply() {
         context: roleContext.trim() || undefined,
       });
       setSummary(s);
+      track("cv_tailored");
       await downloadCvPdf({ name, summary: s, cvText, company: job.company });
       const saved = await saveArtifact("cv", { summary: s });
       if (!saved) {
@@ -251,6 +253,7 @@ export default function Apply() {
     if (!job || !cvText) return;
     if (cover != null) {
       await downloadCoverPdf({ name, company: job.company, cover });
+      track("cover_letter_downloaded");
       return;
     }
     setBusy("cover");
@@ -263,6 +266,7 @@ export default function Apply() {
       );
       setCover(c);
       await downloadCoverPdf({ name, company: job.company, cover: c });
+      track("cover_letter_downloaded");
       const saved = await saveArtifact("letter", { cover: c as unknown as Json });
       if (!saved) {
         toast.error("Your letter downloaded, but we couldn't save a copy to your bundle.");
@@ -292,6 +296,7 @@ export default function Apply() {
       const next = [...qas, { q, a }];
       setQas(next);
       setQuestion("");
+      track("answer_drafted", { answer_count: next.length });
       const saved = await saveArtifact("answers", { qa: next as unknown as Json });
       if (!saved) {
         toast.error("Answer drafted, but we couldn't save a copy to your bundle.");
@@ -318,6 +323,7 @@ export default function Apply() {
       setErrStep("apply");
       return;
     }
+    track("application_marked_applied", { from: "apply" });
     // Applied ⇒ leaves Saved (Rober 7-16): it lives on the applications board now,
     // keeping it bookmarked too is clutter. Best-effort — never blocks the apply.
     if (isSaved) {
