@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import App from "./App.tsx";
 import ErrorFallback from "./components/ErrorFallback.tsx";
+import { sanitizeAnalyticsProperties } from "./lib/analytics-sanitize";
 // Brand fonts load globally (token layer: tailwind font-display/sans/mono +
 // roles.css --font-d/s/m) so toasts, dialogs, and standalone pages never fall
 // back to the browser default — previously only the /roles chunk imported them.
@@ -46,6 +47,12 @@ if (posthogKey) {
       capture_pageview: "history_change",
       autocapture: false,
       disable_session_recording: true,
+      // Nothing credential-bearing may leave the browser. Supabase's implicit OAuth
+      // flow returns the session in the URL fragment, and `capture_pageview` records
+      // the full URL — so unsanitized, every sign-in shipped the user's access token,
+      // Google provider token and refresh token to PostHog. Sanitized before send,
+      // in code, rather than filtered on the vendor side. See lib/analytics-sanitize.
+      sanitize_properties: sanitizeAnalyticsProperties,
     });
   });
 }
