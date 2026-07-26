@@ -133,7 +133,25 @@ begin
     raise exception 'applications_log_status_update needs its IS DISTINCT FROM guard so a no-op update writes no event; got: %', tdef;
   end if;
 
-  raise notice 'status_events shape check passed: own-row SELECT only, no client writes, definer-rights trigger on insert + real status moves.';
+  -- Un-applying must DETACH the history, never erase it (issue #77 follow-up, Rober
+  -- 2026-07-26): application_id is nullable with ON DELETE SET NULL. Outcome data is
+  -- never discarded, so a mis-click un-apply cannot take the ledger with it.
+  if exists (
+    select 1 from pg_attribute
+    where attrelid = 'public.status_events'::regclass
+      and attname = 'application_id' and attnotnull
+  ) then
+    raise exception 'status_events.application_id must be nullable so events survive un-applying';
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.status_events'::regclass and contype = 'f'
+      and conname = 'status_events_application_id_fkey' and confdeltype = 'n'
+  ) then
+    raise exception 'status_events.application_id foreign key must be ON DELETE SET NULL, never CASCADE';
+  end if;
+
+  raise notice 'status_events shape check passed: own-row SELECT only, no client writes, definer-rights trigger on insert + real status moves, history survives un-apply.';
 end $$;
 
 -- Behavioural pin for the same trigger: shape alone does not prove it records
@@ -180,6 +198,19 @@ begin
     raise exception 'a no-op status write or an unrelated column edit forged an event; expected 2, got %', n;
   end if;
 
-  raise notice 'status_events behaviour check passed: initial applied event + one real move recorded, no-op writes ignored.';
+  -- Un-applying the role (the mis-click correction in Apply.tsx deletes the application)
+  -- must keep both events and simply detach them. The lookup moves to user_id, because
+  -- application_id is exactly what gets nulled.
+  delete from public.applications where id = aid;
+  select count(*) into n from public.status_events where user_id = uid;
+  if n <> 2 then
+    raise exception 'deleting an application must PRESERVE its status events; expected 2, got %', n;
+  end if;
+  select count(*) into n from public.status_events where user_id = uid and application_id is not null;
+  if n <> 0 then
+    raise exception 'events of a deleted application must be detached (application_id null); % still attached', n;
+  end if;
+
+  raise notice 'status_events behaviour check passed: initial applied event + one real move recorded, no-op writes ignored, history survives un-apply.';
 end $$;
 rollback;
