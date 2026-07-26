@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/react";
 import App from "./App.tsx";
 import ErrorFallback from "./components/ErrorFallback.tsx";
 import { sanitizeAnalyticsProperties } from "./lib/analytics-sanitize";
+import { sanitizeSentryBreadcrumb, sanitizeSentryEvent } from "./lib/sentry-sanitize";
 // Brand fonts load globally (token layer: tailwind font-display/sans/mono +
 // roles.css --font-d/s/m) so toasts, dialogs, and standalone pages never fall
 // back to the browser default — previously only the /roles chunk imported them.
@@ -30,6 +31,15 @@ if (sentryDsn) {
     dsn: sentryDsn,
     tracesSampleRate: 0,
     environment: import.meta.env.MODE,
+    // Same leak as the PostHog hook below, second vendor. Supabase's implicit OAuth
+    // flow leaves the session in the URL fragment, and two default Sentry
+    // integrations record that URL: HttpContext writes it to event.request.url, and
+    // Breadcrumbs stores navigation from/to as path + query + FRAGMENT. So any error
+    // captured around sign-in shipped the access token, Google provider token and
+    // refresh token. Scrubbed before send, sharing one sanitizer with analytics.
+    // See lib/sentry-sanitize.
+    beforeSend: sanitizeSentryEvent,
+    beforeBreadcrumb: sanitizeSentryBreadcrumb,
   });
 }
 
