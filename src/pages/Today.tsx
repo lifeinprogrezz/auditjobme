@@ -25,6 +25,7 @@ import {
 } from "@/lib/product";
 import { geoVerdict, postedAgo, type RoleJob } from "@/lib/roles";
 import { RUBRIC_VERSION } from "@/lib/score";
+import { DEV_FIXTURE, devFixtureBatch } from "@/lib/devFixture";
 import FitChip from "@/components/roles/FitChip";
 
 // §3.3 secondary CTA — the ONE idiom for every list-row action on this page (there is
@@ -73,6 +74,15 @@ export default function Today() {
     scoreMore,
   } = useRolesData();
   const daily = useDailyMatches();
+  // Dev-only (VITE_E2E_BYPASS_AUTH under vite dev): daily_matches is an own-row read
+  // the mock user can't make, so the New section never rendered and had no live
+  // verification coverage. Synthesize tonight's batch over the real pool instead.
+  // Folded out of production builds — see lib/devFixture.ts.
+  const batch = useMemo(() => {
+    if (!DEV_FIXTURE || daily.loading || daily.rows.length > 0) return daily;
+    const batchDate = new Date().toISOString().slice(0, 10);
+    return { batchDate, rows: devFixtureBatch(jobs, batchDate, RUBRIC_VERSION), loading: false };
+  }, [daily, jobs]);
   // Which "+N more from {company}" lists are open, keyed by the row's job id.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleExpanded = (id: string) =>
@@ -89,14 +99,14 @@ export default function Today() {
   // and dismissed roles drop out — this is a to-do list, not an archive.
   const newJobs = useMemo(
     () =>
-      resolveBatchJobs(daily.rows, jobs, {
+      resolveBatchJobs(batch.rows, jobs, {
         appliedIds: applied,
         dismissedIds: dismissed,
         rubricVersion: RUBRIC_VERSION,
       }),
-    [daily.rows, jobs, applied, dismissed],
+    [batch.rows, jobs, applied, dismissed],
   );
-  const newHeading = useMemo(() => newSectionHeading(daily.batchDate), [daily.batchDate]);
+  const newHeading = useMemo(() => newSectionHeading(batch.batchDate), [batch.batchDate]);
   const aq = useMemo(
     () => buildActionQueue(jobs, applied, { dismissedIds: dismissed, inFlightCompanies }),
     [jobs, applied, dismissed, inFlightCompanies],

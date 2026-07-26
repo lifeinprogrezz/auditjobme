@@ -12,6 +12,7 @@ import { shouldPromptCv } from "@/lib/deviceSession";
 import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
 import { fetchDataplane, type DataplaneCompany, type DataplaneOffice } from "@/lib/dataplane";
+import { DEV_FIXTURE, DEV_FIXTURE_PROFILE, devFixtureScores } from "@/lib/devFixture";
 import { createScoreBuffer, type ScoreBuffer } from "@/lib/scoreCoalescer";
 
 type JobsRow = {
@@ -473,7 +474,7 @@ export function useRolesData() {
           evidence: sig?.evidence ?? null,
         };
       });
-      const merged = enrichAll(rows, dims, officesBySlug).map((j) => ({
+      const scoredRows = enrichAll(rows, dims, officesBySlug).map((j) => ({
         ...j,
         score: scoreByJob[j.id]?.score ?? null,
         reason: scoreByJob[j.id]?.reason ?? null,
@@ -481,6 +482,12 @@ export function useRolesData() {
         subscores: scoreByJob[j.id]?.subscores ?? null,
         evidence: scoreByJob[j.id]?.evidence ?? null,
       }));
+      // Dev-only (VITE_E2E_BYPASS_AUTH under vite dev): the mock user has no JWT, so
+      // the query above returns nothing and every authed surface renders empty. Fill
+      // the gaps with obviously-labelled synthetic scores so an automated walk can
+      // reach the queue, the dismiss control and the "+N more" affordance. Folded out
+      // of production builds — see lib/devFixture.ts.
+      const merged = DEV_FIXTURE ? devFixtureScores(scoredRows) : scoredRows;
       merged.sort(byScore);
       if (runRef.current !== runId) return;
       setJobs(merged);
@@ -561,8 +568,14 @@ export function useRolesData() {
           targetSectors: prof.target_sectors ?? [],
           cvUpdatedAt: prof.updated_at ?? null,
         });
+      } else if (DEV_FIXTURE) {
+        // Same dev-only gate: `scored` is Boolean(profile.cv_text), and the mock
+        // user has no profile row, so without this /today never leaves its
+        // "add your CV" empty state and the walk sees nothing.
+        setProfile(DEV_FIXTURE_PROFILE);
+        setProfileMeta({ targetRoles: ["Product Manager"], targetSectors: [], cvUpdatedAt: null });
       }
-      if (!prof?.cv_text?.trim()) {
+      if (!DEV_FIXTURE && !prof?.cv_text?.trim()) {
         // Post-OAuth handoff (Phase A): a CV stashed before the sign-in redirect
         // is written to the profile now, then revealed. Only when the profile
         // has no CV yet (never clobber an existing one). Scoring itself is the
@@ -688,6 +701,10 @@ export function useRolesData() {
     });
     // Keep the undo list populated for a role dismissed straight from the queue.
     if (!wasDismissed) setDismissedJobsRaw((prev) => (prev.some((j) => j.id === job.id) ? prev : [...prev, job]));
+    // Dev-only walk (VITE_E2E_BYPASS_AUTH): the mock user's insert is refused by RLS,
+    // which would roll the row straight back and make the control look broken. Keep
+    // the state local instead — nothing is persisted, exactly as the gate intends.
+    if (DEV_FIXTURE) return;
     const { error } = wasDismissed
       ? await supabase.from("dismissed_jobs").delete().eq("user_id", user.id).eq("job_id", job.id)
       : await supabase
