@@ -20,7 +20,15 @@ const base: RoleJob = {
 const mk = (o: Partial<RoleJob>): RoleJob => ({ ...base, ...o });
 
 describe("sizeBand", () => {
-  it("maps both inconsistent source schemes into one canonical ladder", () => {
+  it("bands every canonical bucket the database can now hold (issue #68 item 6)", () => {
+    expect(sizeBand("1-10")).toBe("1–10");
+    expect(sizeBand("11-50")).toBe("11–50");
+    expect(sizeBand("51-200")).toBe("51–200");
+    expect(sizeBand("201-500")).toBe("201–500");
+    expect(sizeBand("501-2000")).toBe("500–2k");
+    expect(sizeBand("2001+")).toBe("2k+");
+  });
+  it("still maps the legacy schemes, for artifacts built before the migration", () => {
     expect(sizeBand("1-10")).toBe("1–10");
     expect(sizeBand("<10")).toBe("1–10");
     expect(sizeBand("10-30")).toBe("11–50");
