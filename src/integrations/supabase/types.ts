@@ -622,6 +622,41 @@ export type Database = {
           },
         ]
       }
+      status_events: {
+        Row: {
+          application_id: string
+          changed_at: string
+          from_status: string | null
+          id: string
+          to_status: string
+          user_id: string
+        }
+        Insert: {
+          application_id: string
+          changed_at?: string
+          from_status?: string | null
+          id?: string
+          to_status: string
+          user_id: string
+        }
+        Update: {
+          application_id?: string
+          changed_at?: string
+          from_status?: string | null
+          id?: string
+          to_status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "status_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usage_events: {
         Row: {
           cost_usd: number | null
