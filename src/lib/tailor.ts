@@ -16,6 +16,10 @@ export type TailorInput = {
   company: string;
   jdText?: string | null;
   cvText: string;
+  /** Optional per-role note from the candidate (why this company, a referral, a
+   *  hook) — issue #76. Feeds the prompt ONLY when non-empty; the model may use
+   *  it, never invent beyond it. Lives on the artifact row, never the profile. */
+  context?: string | null;
 };
 
 export type CoverJson = { greeting: string; p1: string; p2: string; p3: string; sign: string };
@@ -57,8 +61,20 @@ export function noEmDash(s: string): string {
 
 // ── Pure prompt builders (unit-tested) ───────────────────────────────────────
 
-export function buildSummaryPrompt({ role, company, jdText, cvText }: TailorInput): string {
+/** Optional per-role note block (issue #76). Returns "" when there is nothing
+ *  supplied, so every prompt that splices this in stays byte-identical to
+ *  today when the box is empty — the no-context invariant, pinned in
+ *  tailor.test.ts. When present, it explicitly bounds the model to the
+ *  supplied facts (plus the CV) — never inventing beyond either. */
+function buildContextBlock(context?: string | null): string {
+  const c = (context || "").trim();
+  if (!c) return "";
+  return `\nWHAT THE CANDIDATE TOLD US ABOUT THIS APPLICATION (optional, from them directly): ${c}\nYou may use this if relevant. Do NOT invent anything beyond what is stated here or in the CV.\n`;
+}
+
+export function buildSummaryPrompt({ role, company, jdText, cvText, context }: TailorInput): string {
   const jd = (jdText || "").slice(0, 2500);
+  const contextBlock = buildContextBlock(context);
   return `You are writing the Professional Summary for ONE specific job application — the only part of the CV that changes per role. Make it concrete to THIS role; it should be impossible to reuse verbatim for a different job.
 
 Write a summary that:
@@ -80,14 +96,15 @@ ROLE: ${role} at ${company}
 
 JOB DESCRIPTION:
 ${jd || "(No JD text — write from the role title and company plus the CV; stay concrete, avoid filler.)"}
-
+${contextBlock}
 CANDIDATE CV (canonical facts; select the most relevant real proof from anywhere in it):
 ${cvText.slice(0, 6000)}
 
 Professional Summary:`;
 }
 
-export function buildCoverPrompt({ role, company, jdText, cvText }: TailorInput, candidateName: string): string {
+export function buildCoverPrompt({ role, company, jdText, cvText, context }: TailorInput, candidateName: string): string {
+  const contextBlock = buildContextBlock(context);
   return `You are writing a cover letter for a job application. Produce a warm, honest cover letter body.
 
 STRICT RULES:
@@ -101,7 +118,7 @@ STRICT RULES:
 
 ROLE: ${role} at ${company}
 JD EXCERPT: ${(jdText || "").slice(0, 800)}
-
+${contextBlock}
 CV TEXT (key facts):
 ${cvText.slice(0, 4500)}
 
@@ -111,8 +128,9 @@ Return JSON now:`;
 /** Application-form question cap per role — bounds the sponsored-compute surface. */
 export const MAX_ANSWERS = 8;
 
-export function buildAnswerPrompt({ role, company, jdText, cvText }: TailorInput, question: string): string {
+export function buildAnswerPrompt({ role, company, jdText, cvText, context }: TailorInput, question: string): string {
   const jd = (jdText || "").slice(0, 2000);
+  const contextBlock = buildContextBlock(context);
   return `You are answering ONE question from a job-application form, in the candidate's own voice.
 
 QUESTION FROM THE FORM:
@@ -133,7 +151,7 @@ ROLE: ${role} at ${company}
 
 JOB DESCRIPTION (context for what they care about):
 ${jd || "(No JD text — answer from the role title and company plus the CV.)"}
-
+${contextBlock}
 CANDIDATE CV (canonical facts; the only permitted source of claims):
 ${cvText.slice(0, 6000)}
 

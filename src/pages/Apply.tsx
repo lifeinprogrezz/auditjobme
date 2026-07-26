@@ -130,6 +130,10 @@ export default function Apply() {
   const [qas, setQas] = useState<{ q: string; a: string }[]>([]);
   const [hasApplied, setHasApplied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  // Per-role context (issue #76): "anything specific for this one?" — feeds the
+  // three generated surfaces for THIS role only, never the profile. Empty box =
+  // every prompt stays byte-identical to before (pinned in tailor.test.ts).
+  const [roleContext, setRoleContext] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -141,6 +145,7 @@ export default function Apply() {
     setScore(null);
     setQuestion("");
     setQas([]);
+    setRoleContext("");
     async function load() {
       if (!user) {
         setLoading(false);
@@ -194,13 +199,15 @@ export default function Apply() {
   }
 
   /** Persist a generated artifact. Returns whether the write landed so callers can
-   *  surface a failure instead of losing the ledger row silently (issue #54). */
+   *  surface a failure instead of losing the ledger row silently (issue #54).
+   *  Carries the per-role context (issue #76) on the artifact row itself, never
+   *  on the profile — it's a record of what shaped THIS role's generated text. */
   async function saveArtifact(kind: string, content: Json): Promise<boolean> {
     if (!user || !job) return false;
     await supabase.from("artifacts").delete().match({ user_id: user.id, job_id: job.id, kind });
     const { error } = await supabase
       .from("artifacts")
-      .insert({ user_id: user.id, job_id: job.id, kind, content, model: HAIKU });
+      .insert({ user_id: user.id, job_id: job.id, kind, content, model: HAIKU, context: roleContext.trim() || null });
     return !error;
   }
 
@@ -217,7 +224,13 @@ export default function Apply() {
     setError("");
     setErrStep(null);
     try {
-      const s = await tailorSummary({ role: job.title, company: job.company, jdText: job.jd_text, cvText });
+      const s = await tailorSummary({
+        role: job.title,
+        company: job.company,
+        jdText: job.jd_text,
+        cvText,
+        context: roleContext.trim() || undefined,
+      });
       setSummary(s);
       await downloadCvPdf({ name, summary: s, cvText, company: job.company });
       const saved = await saveArtifact("cv", { summary: s });
@@ -243,7 +256,10 @@ export default function Apply() {
     setError("");
     setErrStep(null);
     try {
-      const c = await tailorCover({ role: job.title, company: job.company, jdText: job.jd_text, cvText }, name);
+      const c = await tailorCover(
+        { role: job.title, company: job.company, jdText: job.jd_text, cvText, context: roleContext.trim() || undefined },
+        name,
+      );
       setCover(c);
       await downloadCoverPdf({ name, company: job.company, cover: c });
       const saved = await saveArtifact("letter", { cover: c as unknown as Json });
@@ -268,7 +284,10 @@ export default function Apply() {
     setError("");
     setErrStep(null);
     try {
-      const a = await answerQuestion({ role: job.title, company: job.company, jdText: job.jd_text, cvText }, q);
+      const a = await answerQuestion(
+        { role: job.title, company: job.company, jdText: job.jd_text, cvText, context: roleContext.trim() || undefined },
+        q,
+      );
       const next = [...qas, { q, a }];
       setQas(next);
       setQuestion("");
@@ -446,6 +465,22 @@ export default function Apply() {
         </div>
       ) : (
         <div className="mt-8 flex flex-col gap-6">
+          {/* Per-role context (issue #76), above Step 1: feeds the tailored summary,
+              cover letter, and drafted answers below with a fact the candidate
+              supplies, never invents. Never touches the CV body. */}
+          <Section eyebrow="Optional" title="Anything specific for this one?">
+            <p className="mt-2 text-caption text-muted-foreground text-pretty">
+              Why this company, a referral, a hook, anything that's specific to this application. We'll only use
+              what you write here, never invent beyond it, and it won't touch your CV.
+            </p>
+            <Textarea
+              className="mt-4 min-h-20 rounded-[10px] font-sans text-body"
+              placeholder={`e.g. "A former colleague on the team pointed me here" or "I've been following your product closely and have a specific idea for it."`}
+              value={roleContext}
+              onChange={(e) => setRoleContext(e.target.value)}
+            />
+          </Section>
+
           {/* 1 — Tailored CV: ONE click, PDF straight to disk (Rober 7-16). */}
           <Section eyebrow="Step 1" title="Tailored CV">
             <div className="mt-4 flex flex-wrap items-center gap-3">
