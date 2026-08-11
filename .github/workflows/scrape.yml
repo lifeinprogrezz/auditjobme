@@ -79,6 +79,25 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # Issue #68 items 1+5: the ONLY retirement path for rows from vc:*, startupmap,
+      # workday, factorial, bigtech and seed sources (the board-diff above never
+      # re-scans them). Conservative verdicts: 404/410 + slug-dropping redirects
+      # retire; 403/5xx/timeout are left alone. Oldest-checked-first rotation.
+      - name: Liveness sweep over immortal-class rows (retire dead URLs)
+        continue-on-error: true # hygiene; a hiccup must never fail the core scrape
+        run: node scripts/liveness-sweep.mjs --apply --limit 200
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # Issue #68 item 4: derive companies.logo_domain from the company's own
+      # careers/website URL for null-logo companies with a live role. Hosted-ATS
+      # URLs never produce a domain (a wrong domain renders a wrong logo).
+      - name: Backfill missing company logo domains (careers/website URL derivation)
+        continue-on-error: true # cosmetic; must never fail the core scrape
+        run: node scripts/logo-backfill.mjs --apply
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       # F3 (issue #37): publish the static dataplane LAST, after every write to the
       # pool — the /roles map and the GEO feeds fetch these artifacts instead of
       # querying the DB per visitor. Deliberately NOT continue-on-error: a red run

@@ -4,6 +4,7 @@
 // shared useRolesData path feeding the pure SettingsPanel (pinned by its test).
 import { useNavigate } from "react-router-dom";
 import AppShell from "@/components/app/AppShell";
+import ForwardingSection from "@/components/app/ForwardingSection";
 import SettingsPanel from "@/components/app/SettingsPanel";
 import { useAuth } from "@/components/AuthProvider";
 import { useRolesData } from "@/hooks/useRolesData";
@@ -147,6 +148,10 @@ export default function Settings() {
         onSaveConnections={saveConnections}
         onRemoveConnections={removeConnections}
       />
+      {/* Issue #75 — email auto-tracking (forwarding address). Self-contained
+          section: owns its token read/create, so the pure SettingsPanel and its
+          test stay untouched. */}
+      <ForwardingSection />
     </AppShell>
   );
 }

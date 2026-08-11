@@ -14,6 +14,8 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { isPM, isEU, inferSeniority, stripHtml } from "./job-filters.mjs";
 import { resolveWorkplace } from "./workplace-lib.mjs";
+import { isRecruitmentFirm } from "./recruitment-firms.mjs";
+import { BOARD_KINDS } from "./liveness-lib.mjs";
 import { sources as atsExtraSources } from "./sources/ats-extra.mjs";
 import { sources as bigtechSources } from "./sources/bigtech.mjs";
 import { sources as vcSources } from "./sources/vc-startupmap.mjs";
@@ -160,9 +162,10 @@ async function fetchSmartRecruiters(b) {
   return all.filter((j) => j.url && isPM(j.title) && isEU(j.location));
 }
 
-// Board classes eligible for the vanished-role retirement diff below. Only rows
-// whose board was scanned SUCCESSFULLY this run may be retired.
-const BOARD_KINDS = ["greenhouse", "lever", "ashby", "workable", "smartrecruiters", "teamtailor"];
+// Board classes eligible for the vanished-role retirement diff below (only rows
+// whose board was scanned SUCCESSFULLY this run may be retired) are BOARD_KINDS,
+// imported from liveness-lib.mjs — the nightly liveness sweep (issue #68) covers
+// exactly the complement of that set, so the two must never drift apart.
 
 async function main() {
   const url = process.env.SUPABASE_URL;
@@ -248,6 +251,13 @@ async function main() {
   all = all.filter((j) => j.company && j.title && j.url);
   const dropped = beforeRequired - all.length;
   if (dropped) console.error(`Dropped ${dropped} role(s) missing company/title/url.`);
+  // Recruitment-firm / aggregator gate (issue #68 item 3): agency, staffing and
+  // anonymized-employer postings never enter the pool. Exact normalized-name
+  // match only — see scripts/recruitment-firms.mjs.
+  const beforeFirms = all.length;
+  all = all.filter((j) => !isRecruitmentFirm(j.company));
+  const firmDropped = beforeFirms - all.length;
+  if (firmDropped) console.error(`Dropped ${firmDropped} recruitment-firm/aggregator role(s).`);
   console.error(`Total: ${all.length} EU PM roles.`);
 
   if (process.argv.includes("--sql")) {
