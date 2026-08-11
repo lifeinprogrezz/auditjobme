@@ -9,7 +9,8 @@
   },
   "functions": {
     "api/nightly.ts": { "maxDuration": 60 },
-    "api/score-backlog.ts": { "maxDuration": 60 }
+    "api/score-backlog.ts": { "maxDuration": 60 },
+    "api/inbound-email.ts": { "maxDuration": 30 }
   },
   "redirects": [
     {
