@@ -1,4 +1,11 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.57.2';
+import {
+  capUsdFromEnv,
+  globalCapVerdict,
+  monthStartIso,
+  sumCostUsd,
+  type CapVerdict,
+} from './cap.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,10 +15,14 @@ const corsHeaders = {
 };
 
 // Sponsored-compute guardrails — enforced SERVER-SIDE (the client never enforces). EVERY LLM
-// call in the product routes through this proxy. SPEND CAPS REMOVED 2026-07-10 (Rober's call,
-// pre-ship: don't limit until launch; capping gets redesigned then — planning spec
-// 2026-07-10-server-side-scoring-backlog-design.md). Metering below stays: usage_events is
-// the observability surface a future cap will read.
+// call in the product routes through this proxy. GLOBAL SPEND CAP (issue #35, decided
+// 2026-07-26, wired 2026-08-11): ONE fail-closed monthly cap — $300/month default, override
+// via GLOBAL_MONTHLY_CAP_USD — on ALL spend paths (user-JWT, service-role, batch_submit),
+// read from usage_events month-to-date. It is a runaway-bug/abuse kill-switch, not a business
+// constraint; deterministic surfaces are unaffected when it trips. NO per-user caps at launch
+// (deliberately deferred to the usage reviews — planning spec 2026-07-26-economics-decisions.md,
+// "The global fail-closed cap: $300/month"). Pure verdict logic: ./cap.ts, pinned by
+// src/test/global-cap.test.ts.
 const ALLOWED_KINDS = ['score', 'audit', 'cv', 'letter', 'answer'];
 const MAX_TOKENS_CEILING = 8192;    // hard ceiling: a caller can't request a huge, costly generation
 // priceUsd only knows haiku vs sonnet rates, so an unlisted (e.g. pricier) model would be
@@ -82,6 +93,38 @@ function jwtRoleClaim(jwt: string): string | null {
   }
 }
 
+/**
+ * GLOBAL monthly kill-switch — FAIL-CLOSED. Reads month-to-date spend from
+ * usage_events (same per-call read + reduce as the pre-9b861db cap; row volume is
+ * small at launch scale) and blocks when the cap is reached OR when the read fails
+ * (a DB outage must not uncap us). Gates the synchronous generation tail on BOTH
+ * auth paths and batch_submit; batch_poll/batch_results stay open — those tokens
+ * are already spent, and blocking retrieval would strand paid-for scores unmetered.
+ * Returns the blocking Response, or null to proceed.
+ */
+async function enforceGlobalCap(admin: SupabaseClient): Promise<Response | null> {
+  const capUsd = capUsdFromEnv(Deno.env.get('GLOBAL_MONTHLY_CAP_USD'));
+  let verdict: CapVerdict;
+  try {
+    const { data, error } = await admin
+      .from('usage_events')
+      .select('cost_usd')
+      .gte('created_at', monthStartIso(new Date()));
+    verdict = globalCapVerdict({
+      capUsd,
+      monthTotalUsd: sumCostUsd(data),
+      readError: error ?? undefined,
+    });
+  } catch (e) {
+    verdict = globalCapVerdict({ capUsd, readError: e ?? new Error('cap read threw') });
+  }
+  if (!verdict.allowed) {
+    console.error(`global cap blocked call (${verdict.status}, cap $${capUsd}/month)`);
+    return json({ error: verdict.message }, verdict.status);
+  }
+  return null;
+}
+
 type ScoreParams = {
   messages: unknown;
   model?: string;
@@ -92,13 +135,16 @@ type ScoreParams = {
 };
 
 /**
- * The shared generation tail: Anthropic call → authoritative metering, keyed on
- * `userId`. The user-JWT path passes the session user; the service-role path passes
- * target_user_id. Spend caps removed 2026-07-10 (see header note); the model/kind/
- * max-tokens allowlists below remain identical on both paths.
+ * The shared spend-guarded generation tail: global cap → Anthropic call →
+ * authoritative metering, keyed on `userId`. The user-JWT path passes the session
+ * user; the service-role path passes target_user_id. The global cap (see header
+ * note) and the model/kind/max-tokens allowlists are identical on both paths.
  */
 async function runScoring(admin: SupabaseClient, apiKey: string, userId: string, params: ScoreParams) {
   const { messages, model, max_tokens, system, tools, kind } = params;
+
+  const blocked = await enforceGlobalCap(admin);
+  if (blocked) return blocked;
 
   const body: Record<string, unknown> = {
     model: model || DEFAULT_MODEL,
@@ -251,6 +297,10 @@ async function runBatchOp(
   if (op === 'batch_submit') {
     const invalid = validateBatchRequests(body.requests);
     if (invalid) return json({ error: invalid }, 400);
+    // Batch spends real tokens on submit — the global cap gates it exactly like the
+    // sync path. Poll/results are NOT gated: those tokens are already spent.
+    const blocked = await enforceGlobalCap(admin);
+    if (blocked) return blocked;
     const res = await anthropic('/messages/batches', apiKey, {
       method: 'POST',
       body: JSON.stringify({ requests: body.requests }),
