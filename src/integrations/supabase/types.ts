@@ -429,6 +429,7 @@ export type Database = {
           jd_hash: string | null
           jd_source_detail: string | null
           jd_text: string | null
+          liveness_checked_at: string | null
           location: string | null
           posted_at: string | null
           remote: boolean
@@ -453,6 +454,7 @@ export type Database = {
           jd_hash?: string | null
           jd_source_detail?: string | null
           jd_text?: string | null
+          liveness_checked_at?: string | null
           location?: string | null
           posted_at?: string | null
           remote?: boolean
@@ -477,6 +479,7 @@ export type Database = {
           jd_hash?: string | null
           jd_source_detail?: string | null
           jd_text?: string | null
+          liveness_checked_at?: string | null
           location?: string | null
           posted_at?: string | null
           remote?: boolean

@@ -30,6 +30,7 @@
  * Greenhouse/Lever/Ashby boards. `run()` returns the filtered EU-PM array.
  */
 import { isPM, isEU, inferSeniority, stripHtml } from "../job-filters.mjs";
+import { resolveGetroJobs } from "../getro-lib.mjs";
 import { pfetch } from "./_proxy.mjs";
 
 const TIMEOUT_MS = 20_000;
@@ -233,7 +234,15 @@ async function fetchAllGetro() {
   const seen = new Set();
   for (const board of GETRO_BOARDS) {
     try {
-      const jobs = await fetchGetroBoard(board);
+      const raw = await fetchGetroBoard(board);
+      // Getro boards emit LinkedIn URLs, some with WRONG company attribution
+      // (issue #68 item 2 — the Beekeeper→LumApps / Passfort→Moody's class).
+      // ATS-direct rows pass through; LinkedIn rows are re-attributed to the
+      // company named in the URL slug or dropped. See scripts/getro-lib.mjs.
+      const { jobs, reattributed, dropped } = resolveGetroJobs(raw);
+      if (reattributed || dropped) {
+        console.error(`  ${board.name} (getro): re-attributed ${reattributed}, dropped ${dropped} unresolvable LinkedIn row(s)`);
+      }
       for (const j of jobs) {
         // The three Getro VCs overlap in portfolio; dedup by URL within the board.
         const key = (j.url || "").split("?")[0].split("#")[0].toLowerCase();
