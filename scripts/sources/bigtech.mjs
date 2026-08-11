@@ -167,6 +167,23 @@ async function fetchMeta(company) {
 // GET jobs.apple.com/en-us/search?search=…&sort=relevance&page=N (sort=relevance REQUIRED).
 // Results in `window.__staticRouterHydrationData = JSON.parse("…");` →
 // JSON.parse(JSON.parse(captured)).loaderData.search.searchResults[].
+//
+// The search MUST be location-filtered (issue #71): unfiltered, "product manager"
+// returns ~5,850 relevance-sorted results that are almost entirely US/China, and
+// the MAX_PAGES ceiling (15×20=300 rows) is exhausted before the European slice
+// ever surfaces — which is why this source sat at 0 live rows while working
+// perfectly. `location=` takes +-joined country slugs; the set below was verified
+// live on 2026-08-11 (each slug's results checked against its country — several
+// plausible-looking slugs like denmark-DEN or france-FRA resolve to US SITES, so
+// only country-verified slugs are listed; an invalid slug in the join is ignored
+// server-side, and isEU() downstream still guards every row).
+const APPLE_EU_LOCATIONS = [
+  "united-kingdom-GBR", "germany-DEU", "ireland-IRL", "netherlands-NLD",
+  "austria-AUT", "poland-POL", "spain-ESPC", "france-FRAC", "switzerland-CHEC",
+  "italy-ITAC", "sweden-SWEC", "belgium-BELC", "portugal-PRTC", "hungary-HUNC",
+  "denmark-DNKC", "norway-NORC", "finland-FINC", "czechia-CZEC", "greece-GRCC",
+  "romania-ROUC",
+].join("+");
 async function fetchApple(company) {
   const PAGE_SIZE = 20;
   const rows = [];
@@ -176,7 +193,7 @@ async function fetchApple(company) {
   for (let page = 1; (page - 1) * PAGE_SIZE < total && page <= MAX_PAGES; page++) {
     const url = `https://jobs.apple.com/en-us/search?search=${encodeURIComponent(
       "product manager",
-    )}&sort=relevance&page=${page}`;
+    )}&sort=relevance&location=${APPLE_EU_LOCATIONS}&page=${page}`;
     const res = await fetch(
       url,
       fetchOpts({ headers: { "User-Agent": BROWSER_UA, Accept: "text/html" } }),
@@ -198,8 +215,10 @@ async function fetchApple(company) {
       ...results.map((j) => {
         const slug = j.transformedPostingTitle || "";
         const teamCode = (j.team && j.team.teamCode) || "";
+        // "City, Country" per office: the bare site name alone ("Cork",
+        // "Eldon Square") carries no country and would fail the EU filter.
         const location = (j.locations || [])
-          .map((l) => l.name || l.countryName || "")
+          .map((l) => [l.name, l.countryName].filter(Boolean).join(", "))
           .filter(Boolean)
           .join("; ");
         return {
