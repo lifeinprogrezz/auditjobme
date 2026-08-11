@@ -68,6 +68,24 @@ export const USER_DATA_TABLES: readonly UserDataTable[] = [
     column: "user_id",
     label: "the processing record of each application email you forwarded (never the email itself)",
   },
+  // Issue #78 — referral attribution. Same generated-types note as #75 above.
+  // referrals carries TWO user columns, so it is read once per direction and the
+  // export merges the rows (a row is personal data of both people on it).
+  {
+    table: "referral_tokens" as UserTableName,
+    column: "user_id",
+    label: "your invite link token",
+  },
+  {
+    table: "referrals" as UserTableName,
+    column: "referee_id",
+    label: "who invited you, if you signed up through an invite link",
+  },
+  {
+    table: "referrals" as UserTableName,
+    column: "referrer_id",
+    label: "the sign-ups your invite link brought in",
+  },
 ] as const;
 
 /** Tables whose rows point at a role in the shared catalogue, so the export can carry it. */
@@ -144,7 +162,9 @@ export async function buildAccountExport(
   for (const spec of USER_DATA_TABLES) {
     const { data: rows, error } = await client.from(spec.table).select("*").eq(spec.column, userId);
     if (error) throw new Error(`Could not read ${spec.table}: ${error.message}`);
-    data[spec.table] = rows ?? [];
+    // A table can appear once per user column (referrals: referee_id + referrer_id);
+    // the directions are disjoint rows, merged under the one table key.
+    data[spec.table] = [...(data[spec.table] ?? []), ...(rows ?? [])];
   }
 
   const jobIds = referencedJobIds(data);
