@@ -9,7 +9,8 @@
  *
  * Each `run()` resolves to an array of normalized job objects:
  *   { company, title, url, location, remote, source, posted_at, jd_text, seniority }
- * filtered through the shared job-filters (isPM(title) && isEU(location)).
+ * filtered through the shared job-filters (isInScope(title) && isEU(location))
+ * — the five role_family verticals since #34, not PM-only.
  *
  * API shapes verified against career-ops scan.mjs (the engine these slugs come
  * from). The SmartRecruiters / Workable / Workday LIST endpoints do NOT carry a
@@ -18,7 +19,7 @@
  * SSR: the detail page embeds a schema.org JobPosting with the description, so
  * its PM matches DO get jd_text.
  */
-import { isPM, isEU, inferSeniority, stripHtml } from "../job-filters.mjs";
+import { isInScope, isEU, inferSeniority, stripHtml, FAMILY_SEED_QUERIES } from "../job-filters.mjs";
 
 const fetchOpts = (extra = {}) => ({ signal: AbortSignal.timeout(20000), ...extra }); // fresh signal per call
 const UA =
@@ -122,7 +123,7 @@ async function fetchSmartRecruiters(b) {
     offset += 100;
     page++;
   }
-  return all.filter((j) => isPM(j.title) && isEU(j.location));
+  return all.filter((j) => isInScope(j.title) && isEU(j.location));
 }
 
 async function fetchWorkable(b) {
@@ -163,59 +164,66 @@ async function fetchWorkable(b) {
     page++;
     if (!token) break;
   }
-  return all.filter((j) => j.url && isPM(j.title) && isEU(j.location));
+  return all.filter((j) => j.url && isInScope(j.title) && isEU(j.location));
 }
 
 async function fetchWorkday(b) {
   const sub = b.subdomain || "wd1";
   const url = `https://${b.tenant}.${sub}.myworkdayjobs.com/wday/cxs/${b.tenant}/${b.site}/jobs`;
   const all = [];
-  let offset = 0;
-  let total = Infinity; // pinned to the FIRST page's count; later pages can wrongly report 0
-  let page = 0;
-  while (offset < total && page < MAX_PAGES) {
-    const res = await fetch(
-      url,
-      fetchOpts({
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ appliedFacets: {}, limit: 20, offset, searchText: "product manager" }),
-      })
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (page === 0) total = data.total || 0;
-    const postings = data.jobPostings || [];
-    if (!postings.length) break; // empty page → done (don't trust a flaky total)
-    for (const j of postings) {
-      const location = j.locationsText || (j.locations && j.locations[0]) || null;
-      all.push({
-        company: b.company,
-        title: j.title || "",
-        url: j.externalPath
+  const seenUrls = new Set();
+  // All-vertical (#34): one relevance query per family (MAX_PAGES applies per
+  // query). Workday search is fuzzy, so each seed recalls its family's cluster
+  // and isInScope() does the precision work below.
+  for (const searchText of FAMILY_SEED_QUERIES) {
+    let offset = 0;
+    let total = Infinity; // pinned to the FIRST page's count; later pages can wrongly report 0
+    let page = 0;
+    while (offset < total && page < MAX_PAGES) {
+      const res = await fetch(
+        url,
+        fetchOpts({
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ appliedFacets: {}, limit: 20, offset, searchText }),
+        })
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (page === 0) total = data.total || 0;
+      const postings = data.jobPostings || [];
+      if (!postings.length) break; // empty page → done (don't trust a flaky total)
+      for (const j of postings) {
+        const jobUrl = j.externalPath
           ? `https://${b.tenant}.${sub}.myworkdayjobs.com/${b.site}${j.externalPath}`
-          : "",
-        location,
-        remote: /remote/i.test(location || "") || /remote/i.test(j.title || ""),
-        source: "workday",
-        posted_at: null, // postedOn is relative ("Posted 3 Days Ago"), not a date
-        jd_text: null, // list endpoint carries no description
-        seniority: inferSeniority(j.title),
-      });
+          : "";
+        if (jobUrl && seenUrls.has(jobUrl)) continue; // family queries overlap — dedup per board
+        if (jobUrl) seenUrls.add(jobUrl);
+        const location = j.locationsText || (j.locations && j.locations[0]) || null;
+        all.push({
+          company: b.company,
+          title: j.title || "",
+          url: jobUrl,
+          location,
+          remote: /remote/i.test(location || "") || /remote/i.test(j.title || ""),
+          source: "workday",
+          posted_at: null, // postedOn is relative ("Posted 3 Days Ago"), not a date
+          jd_text: null, // list endpoint carries no description
+          seniority: inferSeniority(j.title),
+        });
+      }
+      offset += 20;
+      page++;
     }
-    offset += 20;
-    page++;
   }
-  return all.filter((j) => j.url && isPM(j.title) && isEU(j.location));
+  return all.filter((j) => j.url && isInScope(j.title) && isEU(j.location));
 }
 
 // Factorial — self-hosted Rails careers (careers.factorialhr.com). SSR homepage
 // lists every opening as /job_posting/{slug}-{id}; the markup has no titles/dates,
-// so de-slug for a cheap PM pre-filter, then GET the detail page (only for PM
-// matches) and grep the schema.org JobPosting fields. All openings on one page —
-// no pagination.
-const PM_GATE =
-  /(product[ -]manager|product[ -]owner|head of product|group product|principal product|product lead|associate product|\bapm\b|growth (manager|lead|product))/i;
+// so de-slug for a cheap in-scope pre-filter (the all-vertical classifier over the
+// de-slugged title, #34), then GET the detail page (only for matches) and grep the
+// schema.org JobPosting fields. All openings on one page — no pagination.
 const deslug = (s) => s.replace(/-\d+$/, "").replace(/-/g, " ");
 const titleCase = (s) => s.replace(/\b\w/g, (c) => c.toUpperCase());
 const grab = (h, re) => {
@@ -231,7 +239,7 @@ async function fetchFactorial(b) {
   const jobs = [];
   for (const slug of slugs) {
     const human = deslug(slug);
-    if (!PM_GATE.test(human)) continue; // cheap pre-filter — skip the detail fetch
+    if (!isInScope(human)) continue; // cheap pre-filter — skip the detail fetch
     const detailUrl = `https://careers.factorialhr.com/job_posting/${slug}`;
     let title = titleCase(human);
     let location = null;
@@ -261,7 +269,7 @@ async function fetchFactorial(b) {
       seniority: inferSeniority(title),
     });
   }
-  return jobs.filter((j) => isPM(j.title) && isEU(j.location));
+  return jobs.filter((j) => isInScope(j.title) && isEU(j.location));
 }
 
 const FACTORIAL = [{ company: "Factorial" }];

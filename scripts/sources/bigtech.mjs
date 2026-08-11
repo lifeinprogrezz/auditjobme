@@ -1,8 +1,10 @@
 /**
  * Big-tech sources for the daily scrape -> shared `jobs` pool.
  *
- * Five proprietary careers APIs, one "product manager" query each:
- *   Google · Meta · Amazon · Microsoft · Apple.
+ * Five proprietary careers APIs — Google · Meta · Amazon · Microsoft · Apple —
+ * each queried once per role family (FAMILY_SEED_QUERIES, #34 all-vertical):
+ * these are fuzzy relevance searches, so one seed term per family recalls the
+ * family's whole cluster and the shared isInScope() gate does the precision.
  * (Shopify is intentionally dropped — its mission-themed careers model has no
  * scrapable list of openings.)
  *
@@ -16,14 +18,14 @@
  * Export: `sources = [{ company, run }]`; run() returns the filtered EU-PM array.
  * The orchestrator (scrape.mjs) spreads these into SOURCES.
  */
-import { isPM, isEU, inferSeniority, stripHtml } from "../job-filters.mjs";
+import { isInScope, isEU, inferSeniority, stripHtml, FAMILY_SEED_QUERIES } from "../job-filters.mjs";
 import { pfetch } from "./_proxy.mjs";
 
 const TIMEOUT_MS = 20000;
 const fetchOpts = (extra = {}) => ({ signal: AbortSignal.timeout(TIMEOUT_MS), ...extra }); // fresh signal per call
 const BROWSER_UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-const MAX_PAGES = 15; // per-source pagination ceiling (bounds cost on big result sets)
+const MAX_PAGES = 15; // per-QUERY pagination ceiling (bounds cost on big result sets)
 
 // Normalize a date-ish value to a YYYY-MM-DD string, or null. posted_at in the
 // jobs contract is a nullable ISO-ish date; big-tech feeds give unix seconds,
@@ -42,11 +44,14 @@ function toPostedAt(value) {
 const isRemote = (location, title) =>
   /remote/i.test(location || "") || /remote/i.test(title || "");
 
-// Shared shaping: filter PM titles, build the contract object, then keep EU only.
+// Shared shaping: drop duplicate URLs (the per-family queries overlap), keep only
+// in-scope titles, build the contract object, then keep EU only.
 // `rows` are pre-normalized {title, url, location, posted, jd} objects.
 function shape(rows, source) {
+  const seen = new Set();
   return rows
-    .filter((r) => isPM(r.title))
+    .filter((r) => (r.url && seen.has(r.url) ? false : (r.url && seen.add(r.url), true)))
+    .filter((r) => isInScope(r.title))
     .map((r) => ({
       company: r.company,
       title: r.title,
@@ -67,11 +72,12 @@ function shape(rows, source) {
 async function fetchAmazon(company) {
   const SIZE = 100;
   const rows = [];
+  for (const query of FAMILY_SEED_QUERIES) {
   let offset = 0;
   let total = Infinity;
   for (let page = 0; offset < total && page < MAX_PAGES; page++) {
     const url =
-      `https://www.amazon.jobs/en/search.json?base_query=${encodeURIComponent("product manager")}` +
+      `https://www.amazon.jobs/en/search.json?base_query=${encodeURIComponent(query)}` +
       `&result_limit=${SIZE}&offset=${offset}&sort=relevant&loc_query=&query_options=&radius=24km`;
     const res = await fetch(url, fetchOpts({ headers: { Accept: "application/json" } }));
     if (!res.ok) throw new Error(`Amazon HTTP ${res.status}`);
@@ -91,6 +97,7 @@ async function fetchAmazon(company) {
     );
     offset += SIZE;
   }
+  }
   return shape(rows, "amazon");
 }
 
@@ -100,12 +107,13 @@ async function fetchAmazon(company) {
 async function fetchMicrosoft(company) {
   const PAGE_SIZE = 10;
   const rows = [];
+  for (const query of FAMILY_SEED_QUERIES) {
   let start = 0;
   let total = Infinity;
   for (let page = 0; start < total && page < MAX_PAGES; page++) {
     const url =
       `https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com` +
-      `&query=${encodeURIComponent("product manager")}&location=&start=${start}&`;
+      `&query=${encodeURIComponent(query)}&location=&start=${start}&`;
     const res = await fetch(url, fetchOpts({ headers: { Accept: "application/json" } }));
     if (!res.ok) throw new Error(`Microsoft HTTP ${res.status}`);
     const json = await res.json();
@@ -124,42 +132,49 @@ async function fetchMicrosoft(company) {
     );
     start += PAGE_SIZE;
   }
+  }
   return shape(rows, "microsoft");
 }
 
 // ── Meta — GraphQL POST, form-encoded, returns all jobs in one shot ──────────
-// POST metacareers.com/graphql with doc_id + variables={search_input:{q:"product manager"}}.
+// POST metacareers.com/graphql with doc_id + variables={search_input:{q:<query>}},
+// one request per family seed query (#34).
 // data.job_search_with_featured_jobs.all_jobs[] = { id, title, locations[] }.
 async function fetchMeta(company) {
-  const body = new URLSearchParams({
-    doc_id: "29615178951461218",
-    fb_api_req_friendly_name: "CareersJobSearchResultsDataQuery",
-    fb_api_caller_class: "RelayModern",
-    variables: JSON.stringify({ search_input: { q: "product manager" } }),
-  });
-  const res = await pfetch(
-    "https://www.metacareers.com/graphql",
-    fetchOpts({
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "Mozilla/5.0",
-        Accept: "application/json",
-      },
-      body: body.toString(),
-    }),
-  );
-  if (!res.ok) throw new Error(`Meta HTTP ${res.status}`);
-  const json = await res.json();
-  const list = json?.data?.job_search_with_featured_jobs?.all_jobs || [];
-  const rows = list.map((j) => ({
-    company,
-    title: j.title || "",
-    url: j.id ? `https://www.metacareers.com/jobs/${j.id}/` : "",
-    location: (j.locations || []).join("; "),
-    posted: "", // Meta list endpoint omits the posted date
-    jd: "",
-  }));
+  const rows = [];
+  for (const query of FAMILY_SEED_QUERIES) {
+    const body = new URLSearchParams({
+      doc_id: "29615178951461218",
+      fb_api_req_friendly_name: "CareersJobSearchResultsDataQuery",
+      fb_api_caller_class: "RelayModern",
+      variables: JSON.stringify({ search_input: { q: query } }),
+    });
+    const res = await pfetch(
+      "https://www.metacareers.com/graphql",
+      fetchOpts({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0",
+          Accept: "application/json",
+        },
+        body: body.toString(),
+      }),
+    );
+    if (!res.ok) throw new Error(`Meta HTTP ${res.status}`);
+    const json = await res.json();
+    const list = json?.data?.job_search_with_featured_jobs?.all_jobs || [];
+    rows.push(
+      ...list.map((j) => ({
+        company,
+        title: j.title || "",
+        url: j.id ? `https://www.metacareers.com/jobs/${j.id}/` : "",
+        location: (j.locations || []).join("; "),
+        posted: "", // Meta list endpoint omits the posted date
+        jd: "",
+      })),
+    );
+  }
   return shape(rows, "meta");
 }
 
@@ -187,12 +202,13 @@ const APPLE_EU_LOCATIONS = [
 async function fetchApple(company) {
   const PAGE_SIZE = 20;
   const rows = [];
-  let total = Infinity;
   const HYDRATION_RE =
     /window\.__staticRouterHydrationData\s*=\s*JSON\.parse\((".*?")\);<\/script>/s;
+  for (const query of FAMILY_SEED_QUERIES) {
+  let total = Infinity;
   for (let page = 1; (page - 1) * PAGE_SIZE < total && page <= MAX_PAGES; page++) {
     const url = `https://jobs.apple.com/en-us/search?search=${encodeURIComponent(
-      "product manager",
+      query,
     )}&sort=relevance&location=${APPLE_EU_LOCATIONS}&page=${page}`;
     const res = await fetch(
       url,
@@ -237,6 +253,7 @@ async function fetchApple(company) {
     );
     if (results.length < PAGE_SIZE) break;
   }
+  }
   return shape(rows, "apple");
 }
 
@@ -253,10 +270,11 @@ async function fetchApple(company) {
 async function fetchGoogle(company) {
   const PAGE_SIZE = 20;
   const rows = [];
+  for (const query of FAMILY_SEED_QUERIES) {
   let total = Infinity;
   for (let page = 1; (page - 1) * PAGE_SIZE < total && page <= MAX_PAGES; page++) {
     const url = `https://www.google.com/about/careers/applications/jobs/results/?q=${encodeURIComponent(
-      "product manager",
+      query,
     )}&page=${page}`;
     const res = await fetch(
       url,
@@ -308,6 +326,7 @@ async function fetchGoogle(company) {
       }),
     );
     if (jobArray.length < PAGE_SIZE) break;
+  }
   }
   return shape(rows, "google");
 }
