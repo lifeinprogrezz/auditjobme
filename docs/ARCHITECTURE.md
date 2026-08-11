@@ -53,13 +53,18 @@ changing either — the split is deliberate, not accidental.
 ### Ingestion — `scripts/scrape.mjs`
 
 Runs daily at 05:00 UTC. Reads `scripts/boards.json` (verified Greenhouse / Lever / Ashby /
-Workable / SmartRecruiters / Teamtailor tokens) and the modules in `scripts/sources/`:
+Workable / SmartRecruiters / Teamtailor / Personio tokens) and the modules in `scripts/sources/`:
 
 - `ats-extra.mjs` — SmartRecruiters, Workable, Workday, Factorial
 - `teamtailor.mjs` — Teamtailor's official `{site}/jobs.json` syndication feed. One request
   per company, full description inline, no auth. Boards come in two flavours: `token` for a
   `*.teamtailor.com` subdomain, `host` for a custom career domain (`careers.macadam.app`),
   which is how most of the European tenants publish
+- `personio.mjs` — Personio's public per-tenant `/xml` feed
+  (`{token}.jobs.personio.de/xml`; the `.com` mirror serves the same document). One request
+  per company, full description inline, no auth. Personio emits bare city names with no
+  country, so the connector translates the European hub cities (native spellings included)
+  into the shared filter's vocabulary
 - `bigtech.mjs` — Google, Amazon, Microsoft, Apple (Meta is a documented known gap: its
   endpoint rejects datacenter and budget-residential IPs; only a premium proxy pool would
   change that, so the scraper skips it gracefully)

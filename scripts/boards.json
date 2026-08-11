@@ -1,5 +1,5 @@
 {
- "_comment": "Greenhouse/Lever/Ashby/Workable/SmartRecruiters/Teamtailor public-API boards, seeded from career-ops portals.yml + startupmap_discovered.yml by app-seed-export.mjs and kept in sync by `node scripts/sync-boards.mjs --engine=<career-ops> --write` (monthly; verifies liveness, idempotent). Teamtailor entries carry `token` for a *.teamtailor.com subdomain or `host` for a custom career domain. Dead boards fail non-fatally in scrape.mjs.",
+ "_comment": "Greenhouse/Lever/Ashby/Workable/SmartRecruiters/Teamtailor/Personio public-API boards, seeded from career-ops portals.yml + startupmap_discovered.yml by app-seed-export.mjs and kept in sync by `node scripts/sync-boards.mjs --engine=<career-ops> --write` (monthly; verifies liveness, idempotent). Teamtailor entries carry `token` for a *.teamtailor.com subdomain or `host` for a custom career domain. Personio entries carry `token` for a *.jobs.personio.de tenant (the .com mirror serves the same feed). Dead boards fail non-fatally in scrape.mjs.",
  "greenhouse": [
   {
    "company": "Vercel",
@@ -3802,6 +3802,692 @@
   {
    "company": "YEGO",
    "token": "yego"
+  }
+ ],
+ "personio": [
+  {
+   "company": "ACCURE Battery Intelligence",
+   "token": "accure"
+  },
+  {
+   "company": "Afilio",
+   "token": "afilio"
+  },
+  {
+   "company": "Again",
+   "token": "again"
+  },
+  {
+   "company": "Aily Labs",
+   "token": "ailylabs"
+  },
+  {
+   "company": "AIRMO",
+   "token": "airmo"
+  },
+  {
+   "company": "alphin",
+   "token": "alphin"
+  },
+  {
+   "company": "anybill",
+   "token": "anybill"
+  },
+  {
+   "company": "Anyline",
+   "token": "anyline-gmbh"
+  },
+  {
+   "company": "Apartool",
+   "token": "apartool"
+  },
+  {
+   "company": "Apheris",
+   "token": "apheris"
+  },
+  {
+   "company": "Ariadne Maps",
+   "token": "ariadne"
+  },
+  {
+   "company": "Banxware",
+   "token": "banxware"
+  },
+  {
+   "company": "Beyond Presence",
+   "token": "beyond-presence-1"
+  },
+  {
+   "company": "Blackwave",
+   "token": "blackwave"
+  },
+  {
+   "company": "Bliq",
+   "token": "bliq"
+  },
+  {
+   "company": "Bounti",
+   "token": "bounti"
+  },
+  {
+   "company": "Bring!",
+   "token": "bring-labs"
+  },
+  {
+   "company": "Building Radar",
+   "token": "building-radar"
+  },
+  {
+   "company": "Bullfinch",
+   "token": "bullfinch"
+  },
+  {
+   "company": "Carbon One (C1 Green Chemicals)",
+   "token": "c1-green-chemicals-ag"
+  },
+  {
+   "company": "Candis",
+   "token": "candis"
+  },
+  {
+   "company": "Cansativa",
+   "token": "cansativa"
+  },
+  {
+   "company": "Caravelo",
+   "token": "caravelo"
+  },
+  {
+   "company": "Cariqa",
+   "token": "cariqa"
+  },
+  {
+   "company": "Cashlink",
+   "token": "cashlink"
+  },
+  {
+   "company": "Circula",
+   "token": "circula"
+  },
+  {
+   "company": "CLARK",
+   "token": "clark"
+  },
+  {
+   "company": "Cloover",
+   "token": "cloover"
+  },
+  {
+   "company": "Cronofy",
+   "token": "cronofy"
+  },
+  {
+   "company": "Curity",
+   "token": "curity"
+  },
+  {
+   "company": "CYCLE",
+   "token": "cycle"
+  },
+  {
+   "company": "cylib",
+   "token": "cylib-gmbh"
+  },
+  {
+   "company": "Cyted Health",
+   "token": "cyted"
+  },
+  {
+   "company": "DeepDrive",
+   "token": "deepdrive-gmbh"
+  },
+  {
+   "company": "Deepset",
+   "token": "deepset"
+  },
+  {
+   "company": "Delfos Energy",
+   "token": "delfos-energy"
+  },
+  {
+   "company": "deltaVision",
+   "token": "deltavision"
+  },
+  {
+   "company": "Demodesk",
+   "token": "demodesk-gmbh"
+  },
+  {
+   "company": "deskbird",
+   "token": "deskbird"
+  },
+  {
+   "company": "doctorly",
+   "token": "doctorly"
+  },
+  {
+   "company": "Dunia Innovations",
+   "token": "dunia"
+  },
+  {
+   "company": "ecoplanet",
+   "token": "ecoplanet-green-operations-gmbh"
+  },
+  {
+   "company": "Edurino",
+   "token": "edurino"
+  },
+  {
+   "company": "EINHUNDERT Energy",
+   "token": "einhundert-energie-gmbh"
+  },
+  {
+   "company": "Engitix",
+   "token": "engitix-limited"
+  },
+  {
+   "company": "ENVIRIA",
+   "token": "enviria"
+  },
+  {
+   "company": "Everphone",
+   "token": "everphone"
+  },
+  {
+   "company": "Fairphone",
+   "token": "fairphone"
+  },
+  {
+   "company": "feld.energy",
+   "token": "feld-energy"
+  },
+  {
+   "company": "Filics",
+   "token": "filics"
+  },
+  {
+   "company": "Finoa",
+   "token": "finoa"
+  },
+  {
+   "company": "FINVIA",
+   "token": "finvia"
+  },
+  {
+   "company": "Flatpay",
+   "token": "flatpay"
+  },
+  {
+   "company": "FlexiDAO",
+   "token": "flexidao"
+  },
+  {
+   "company": "Floy",
+   "token": "floy"
+  },
+  {
+   "company": "Flybotix",
+   "token": "flybotix"
+  },
+  {
+   "company": "foodforecast",
+   "token": "foodforecast"
+  },
+  {
+   "company": "Forefront RF",
+   "token": "forefront-rf"
+  },
+  {
+   "company": "Framer",
+   "token": "framer"
+  },
+  {
+   "company": "Freshflow",
+   "token": "freshflow"
+  },
+  {
+   "company": "Frontnow",
+   "token": "frontnow"
+  },
+  {
+   "company": "Genow",
+   "token": "genow"
+  },
+  {
+   "company": "getquin",
+   "token": "getquin"
+  },
+  {
+   "company": "Graph Therapeutics",
+   "token": "graph-therapeutics"
+  },
+  {
+   "company": "Greenlyte",
+   "token": "greenlyte-carbon-technologies-gmbh"
+  },
+  {
+   "company": "Hades Mining",
+   "token": "hades"
+  },
+  {
+   "company": "Haut.AI",
+   "token": "haut-ai"
+  },
+  {
+   "company": "hellgrün",
+   "token": "hellgruen-energie"
+  },
+  {
+   "company": "Helrom",
+   "token": "helrom-gmbh"
+  },
+  {
+   "company": "Helu.io",
+   "token": "helu"
+  },
+  {
+   "company": "hexafarms",
+   "token": "hexafarms"
+  },
+  {
+   "company": "Holy Technologies",
+   "token": "holy-technologies-gmbh"
+  },
+  {
+   "company": "Holyvolt",
+   "token": "holyvolt"
+  },
+  {
+   "company": "Hypatos",
+   "token": "hypatos-gmbh"
+  },
+  {
+   "company": "Implify",
+   "token": "implify"
+  },
+  {
+   "company": "INBRAIN Neuroelectronics",
+   "token": "inbrain-neuroelectronics"
+  },
+  {
+   "company": "Integral",
+   "token": "integral"
+  },
+  {
+   "company": "Intigriti",
+   "token": "intigriti"
+  },
+  {
+   "company": "NAO",
+   "token": "invest-nao"
+  },
+  {
+   "company": "Invitris",
+   "token": "invitris"
+  },
+  {
+   "company": "JUMiNGO",
+   "token": "jumingo"
+  },
+  {
+   "company": "Kalia Lab",
+   "token": "kalialab"
+  },
+  {
+   "company": "Kertos",
+   "token": "kertos"
+  },
+  {
+   "company": "Kintai",
+   "token": "kintai"
+  },
+  {
+   "company": "kiutra",
+   "token": "kiutra"
+  },
+  {
+   "company": "koppla",
+   "token": "koppla"
+  },
+  {
+   "company": "KoRo",
+   "token": "koro-handels-gmbh"
+  },
+  {
+   "company": "Kraftblock",
+   "token": "kraftblock"
+  },
+  {
+   "company": "Kraftling",
+   "token": "kraftling"
+  },
+  {
+   "company": "LANCH",
+   "token": "lanch"
+  },
+  {
+   "company": "Latana",
+   "token": "latana"
+  },
+  {
+   "company": "Lative",
+   "token": "lative"
+  },
+  {
+   "company": "Lepaya",
+   "token": "lepaya"
+  },
+  {
+   "company": "Lumoview Building Analytics",
+   "token": "lumoview"
+  },
+  {
+   "company": "Machine26",
+   "token": "machine26"
+  },
+  {
+   "company": "Mercanis",
+   "token": "mercanis"
+  },
+  {
+   "company": "METYCLE",
+   "token": "metycle"
+  },
+  {
+   "company": "mogenius",
+   "token": "mogenius"
+  },
+  {
+   "company": "mo:re",
+   "token": "more"
+  },
+  {
+   "company": "NEURA Robotics",
+   "token": "neura-robotics"
+  },
+  {
+   "company": "NomuPay",
+   "token": "nomupay"
+  },
+  {
+   "company": "Novicap",
+   "token": "novicap"
+  },
+  {
+   "company": "Olio",
+   "token": "olio"
+  },
+  {
+   "company": "ONIQ",
+   "token": "oniq"
+  },
+  {
+   "company": "Ore Energy",
+   "token": "ore-energy"
+  },
+  {
+   "company": "Ory",
+   "token": "ory"
+  },
+  {
+   "company": "Pactos",
+   "token": "pactos"
+  },
+  {
+   "company": "ParkBee",
+   "token": "parkbee"
+  },
+  {
+   "company": "Penzilla",
+   "token": "penzilla-gmbh"
+  },
+  {
+   "company": "Perlego",
+   "token": "perlego"
+  },
+  {
+   "company": "Pina Earth",
+   "token": "pina"
+  },
+  {
+   "company": "Planet A Foods",
+   "token": "planetafoods"
+  },
+  {
+   "company": "Planted Green",
+   "token": "planted"
+  },
+  {
+   "company": "Plantura",
+   "token": "plantura"
+  },
+  {
+   "company": "Prewave",
+   "token": "prewave"
+  },
+  {
+   "company": "PROJECT EADEN",
+   "token": "project-eaden"
+  },
+  {
+   "company": "Pruna AI",
+   "token": "pruna-ai"
+  },
+  {
+   "company": "Q.ANT",
+   "token": "q-ant-gmbh"
+  },
+  {
+   "company": "Codacy",
+   "token": "qamine-portugal"
+  },
+  {
+   "company": "QPLIX",
+   "token": "qplix"
+  },
+  {
+   "company": "quantilope",
+   "token": "quantilope-gmbh"
+  },
+  {
+   "company": "QuantumDiamonds",
+   "token": "quantum-diamond"
+  },
+  {
+   "company": "Quibim",
+   "token": "quibim"
+  },
+  {
+   "company": "Quuppa",
+   "token": "quuppa-oy"
+  },
+  {
+   "company": "Rail-Flow",
+   "token": "rail-flow"
+  },
+  {
+   "company": "Rebike",
+   "token": "rebike-mobility"
+  },
+  {
+   "company": "Recyda",
+   "token": "recyda-gmbh"
+  },
+  {
+   "company": "Reflex Aerospace",
+   "token": "reflex-aerospace-gmbh"
+  },
+  {
+   "company": "Regpit",
+   "token": "regpit-gmbh"
+  },
+  {
+   "company": "Relu",
+   "token": "relu"
+  },
+  {
+   "company": "Rencore",
+   "token": "rencore"
+  },
+  {
+   "company": "Revel8",
+   "token": "revel8"
+  },
+  {
+   "company": "Revo Foods",
+   "token": "revo-foods"
+  },
+  {
+   "company": "SAEKI",
+   "token": "saeki"
+  },
+  {
+   "company": "Sales Layer",
+   "token": "saleslayer"
+  },
+  {
+   "company": "Salv",
+   "token": "salv"
+  },
+  {
+   "company": "Sastrify",
+   "token": "sastrify"
+  },
+  {
+   "company": "Schüttflix",
+   "token": "schuettflix"
+  },
+  {
+   "company": "Selma Finance",
+   "token": "selma-finance"
+  },
+  {
+   "company": "Sewts",
+   "token": "sewts"
+  },
+  {
+   "company": "shipzero",
+   "token": "shipzero"
+  },
+  {
+   "company": "Signaloid",
+   "token": "signaloid"
+  },
+  {
+   "company": "signpath",
+   "token": "signpath"
+  },
+  {
+   "company": "Silverflow",
+   "token": "silverflow"
+  },
+  {
+   "company": "simpleclub",
+   "token": "simpleclub"
+  },
+  {
+   "company": "Spotahome",
+   "token": "spotahome"
+  },
+  {
+   "company": "Stark",
+   "token": "stark"
+  },
+  {
+   "company": "Tandem Bank",
+   "token": "tandem"
+  },
+  {
+   "company": "Tanso",
+   "token": "tanso"
+  },
+  {
+   "company": "theion",
+   "token": "theion-gmbh"
+  },
+  {
+   "company": "Thorizon",
+   "token": "thorizon"
+  },
+  {
+   "company": "Timeless Investments",
+   "token": "timeless-investments"
+  },
+  {
+   "company": "Track Titan",
+   "token": "titan-academy"
+  },
+  {
+   "company": "topi",
+   "token": "topi"
+  },
+  {
+   "company": "Tripleye",
+   "token": "tripleye"
+  },
+  {
+   "company": "turbalance",
+   "token": "turbalance"
+  },
+  {
+   "company": "TWAICE",
+   "token": "twaice"
+  },
+  {
+   "company": "Ucaneo",
+   "token": "ucaneo"
+  },
+  {
+   "company": "UniteLabs GmbH",
+   "token": "unitelabs"
+  },
+  {
+   "company": "Upway",
+   "token": "upway"
+  },
+  {
+   "company": "Vamo",
+   "token": "vamo"
+  },
+  {
+   "company": "Vanilla Steel",
+   "token": "vanilla-steel-gmbh"
+  },
+  {
+   "company": "Vapaus",
+   "token": "vapaus"
+  },
+  {
+   "company": "Vendure",
+   "token": "vendure"
+  },
+  {
+   "company": "vestr",
+   "token": "vestr"
+  },
+  {
+   "company": "Vodeno",
+   "token": "vodeno"
+  },
+  {
+   "company": "Voltfang",
+   "token": "voltfang"
+  },
+  {
+   "company": "Vytal",
+   "token": "vytal"
+  },
+  {
+   "company": "WALLROUND",
+   "token": "wallround"
+  },
+  {
+   "company": "WorkerHero",
+   "token": "workerhero"
+  },
+  {
+   "company": "Yaba",
+   "token": "yaba"
   }
  ]
 }

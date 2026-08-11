@@ -39,6 +39,15 @@ describe("detectBoard", () => {
       ats: "teamtailor",
       token: "73strings",
     });
+    expect(detectBoard("https://vytal.jobs.personio.de/job/1795121")).toEqual({
+      ats: "personio",
+      token: "vytal",
+    });
+    // .com and .de serve the identical tenant feed - same token either way.
+    expect(detectBoard("https://accure.jobs.personio.com/job/990518?language=en")).toEqual({
+      ats: "personio",
+      token: "accure",
+    });
   });
 
   it("returns null for a posting that is not on a known board", () => {

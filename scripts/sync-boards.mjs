@@ -41,6 +41,12 @@ import {
   boardKey,
 } from "./board-sync-lib.mjs";
 import { isTeamtailorFeed, teamtailorFeedUrl } from "./sources/teamtailor.mjs";
+import {
+  isPersonioFeed,
+  personioFeedUrl,
+  countPersonioPositions,
+  parsePosition,
+} from "./sources/personio.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BOARDS_PATH = join(__dirname, "boards.json");
@@ -172,6 +178,17 @@ const PROBES = {
     const d = await r.json();
     if (!isTeamtailorFeed(d)) throw new Error("not a Teamtailor jobs.json feed");
     return { jobs: d.items.length, name: String(d.title || "").trim() || null };
+  },
+  async personio(e) {
+    const r = await fetch(personioFeedUrl(e), fetchOpts({ headers: { Accept: "application/xml, text/xml" } }));
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const xml = await r.text();
+    if (!isPersonioFeed(xml)) throw new Error("not a Personio /xml feed");
+    // The feed has no board-level name; the first position's hiring legal
+    // entity (<subcompany>) is the closest thing, and only a nicety.
+    const first = (xml.match(/<position>([\s\S]*?)<\/position>/i) || [])[1];
+    const name = first ? parsePosition(first).subcompany || null : null;
+    return { jobs: countPersonioPositions(xml), name };
   },
 };
 

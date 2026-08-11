@@ -20,6 +20,7 @@ import { sources as atsExtraSources } from "./sources/ats-extra.mjs";
 import { sources as bigtechSources } from "./sources/bigtech.mjs";
 import { sources as vcSources } from "./sources/vc-startupmap.mjs";
 import { fetchTeamtailor } from "./sources/teamtailor.mjs";
+import { fetchPersonio } from "./sources/personio.mjs";
 
 // Board tokens live in boards.json (verified Greenhouse/Lever/Ashby public APIs, sourced from the
 // career-ops portals.yml). Dead boards fail non-fatally below; add/curate tokens there, not here.
@@ -183,6 +184,10 @@ async function main() {
     // full description inline. Entries carry `token` (a *.teamtailor.com subdomain)
     // or `host` (a custom career domain). See sources/teamtailor.mjs.
     ...(BOARDS.teamtailor || []).map((b) => ({ company: b.company, kind: "teamtailor", run: () => fetchTeamtailor(b) })),
+    // Personio's public per-tenant /xml feed — one request per company, full
+    // description inline. Entries carry `token` (a *.jobs.personio.de tenant).
+    // See sources/personio.mjs.
+    ...(BOARDS.personio || []).map((b) => ({ company: b.company, kind: "personio", run: () => fetchPersonio(b) })),
     ...atsExtraSources,
     ...bigtechSources,
     ...vcSources,

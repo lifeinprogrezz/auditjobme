@@ -124,6 +124,6 @@ describe("checkUrl", () => {
 
 describe("BOARD_KINDS", () => {
   it("stays the exact board-diff set — the sweep covers its complement", () => {
-    expect(BOARD_KINDS).toEqual(["greenhouse", "lever", "ashby", "workable", "smartrecruiters", "teamtailor"]);
+    expect(BOARD_KINDS).toEqual(["greenhouse", "lever", "ashby", "workable", "smartrecruiters", "teamtailor", "personio"]);
   });
 });
