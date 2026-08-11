@@ -14,6 +14,7 @@ import { domainFor } from "@/lib/logodev";
 import { fetchDataplane, type DataplaneCompany, type DataplaneOffice } from "@/lib/dataplane";
 import { DEV_FIXTURE, DEV_FIXTURE_PROFILE, devFixtureScores } from "@/lib/devFixture";
 import { createScoreBuffer, type ScoreBuffer } from "@/lib/scoreCoalescer";
+import { buildWarmIndex, type ParsedConnection, type WarmContact } from "@/lib/connections";
 import { track } from "@/lib/analytics";
 
 type JobsRow = {
@@ -234,6 +235,11 @@ export function useRolesData() {
   // Saved roles fetched WITHOUT the is_live filter, so an expired-but-saved role still
   // has display data for the Today Saved section (Rober 7-15 review).
   const [savedJobsRaw, setSavedJobsRaw] = useState<RoleJob[]>([]);
+  // Warm contacts (issue #41): the user's own LinkedIn connections upload, read
+  // whole so the Today cards can mark "You know N people here". Information only —
+  // NEVER fed into scoring (deliberate divergence from the personal engine).
+  const [connections, setConnections] = useState<WarmContact[]>([]);
+  const [connectionsUpdatedAt, setConnectionsUpdatedAt] = useState<string | null>(null);
   // Per-run cancellation: each effect run gets its own id; async loops compare
   // against the current id (a shared boolean would be re-armed by the next run,
   // resurrecting a cancelled loop and leaking user A's scores into user B's view).
@@ -447,6 +453,8 @@ export function useRolesData() {
         setSavedJobsRaw([]);
         setDismissed(new Set());
         setDismissedJobsRaw([]);
+        setConnections([]);
+        setConnectionsUpdatedAt(null);
         setLoading(false);
         return;
       }
@@ -552,6 +560,44 @@ export function useRolesData() {
         setSavedJobsRaw(enrichAll((savedRows ?? []) as JobsRow[], dims, officesBySlug));
       } else {
         setSavedJobsRaw([]);
+      }
+
+      // Warm contacts (issue #41): the user's whole connections upload, paged past
+      // PostgREST's row cap (a LinkedIn export routinely runs to a few thousand
+      // rows). Read defensively — an error (e.g. the migration not applied yet)
+      // just means no markers anywhere, never a crash.
+      {
+        let connRows: {
+          full_name: string;
+          company: string;
+          company_key: string;
+          position: string | null;
+          linkedin_url: string | null;
+          created_at: string;
+        }[] = [];
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await supabase
+            .from("connections")
+            .select("full_name, company, company_key, position, linkedin_url, created_at")
+            .eq("user_id", user.id)
+            .range(from, from + PAGE - 1);
+          if (error || !data) break;
+          connRows = connRows.concat(data);
+          if (data.length < PAGE) break;
+        }
+        if (runRef.current !== runId) return;
+        setConnections(
+          connRows.map((r) => ({
+            fullName: r.full_name,
+            company: r.company,
+            companyKey: r.company_key,
+            position: r.position,
+            linkedinUrl: r.linkedin_url,
+          })),
+        );
+        setConnectionsUpdatedAt(
+          connRows.reduce<string | null>((acc, r) => (acc == null || r.created_at > acc ? r.created_at : acc), null),
+        );
       }
 
       const { data: prof } = await supabase
@@ -745,6 +791,69 @@ export function useRolesData() {
     return true;
   };
 
+  /**
+   * Replace the stored connections upload with a freshly parsed one (issue #41,
+   * from /settings). Replace-not-merge on purpose: the LinkedIn export is a full
+   * snapshot, so the stored set should be exactly the latest file. Chunked
+   * inserts keep each request bounded. Returns true on success; a mid-way
+   * failure surfaces a toast and the user re-uploads (the next upload wipes and
+   * rewrites, so a partial state never survives a retry).
+   */
+  const saveConnections = async (rows: ParsedConnection[]): Promise<boolean> => {
+    if (!user || rows.length === 0) return false;
+    const { error: delErr } = await supabase.from("connections").delete().eq("user_id", user.id);
+    if (delErr) {
+      toast.error("Couldn't save your connections. Please try again.");
+      return false;
+    }
+    const CHUNK = 500;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const { error } = await supabase.from("connections").insert(
+        rows.slice(i, i + CHUNK).map((r) => ({
+          user_id: user.id,
+          full_name: r.fullName,
+          company: r.company,
+          company_key: r.companyKey,
+          position: r.position,
+          linkedin_url: r.linkedinUrl,
+          connected_on: r.connectedOn,
+        })),
+      );
+      if (error) {
+        toast.error("Couldn't save your connections. Please try again.");
+        return false;
+      }
+    }
+    setConnections(
+      rows.map((r) => ({
+        fullName: r.fullName,
+        company: r.company,
+        companyKey: r.companyKey,
+        position: r.position,
+        linkedinUrl: r.linkedinUrl,
+      })),
+    );
+    setConnectionsUpdatedAt(new Date().toISOString());
+    // Counts only — never names, companies or the file itself (issue #89 rule).
+    track("connections_uploaded", { connection_count: rows.length });
+    return true;
+  };
+
+  /** Remove the whole connections upload (issue #41): every row goes, and every
+   *  warm marker disappears with it. */
+  const removeConnections = async (): Promise<boolean> => {
+    if (!user) return false;
+    const { error } = await supabase.from("connections").delete().eq("user_id", user.id);
+    if (error) {
+      toast.error("Couldn't remove your connections. Please try again.");
+      return false;
+    }
+    setConnections([]);
+    setConnectionsUpdatedAt(null);
+    track("connections_removed");
+    return true;
+  };
+
   /** Manual "check now" — an immediate scores pull, ahead of the next poll tick.
    *  Kept for the RolesPanel prop surface; scoring itself is server-side. */
   const scoreMore = () => {
@@ -808,6 +917,11 @@ export function useRolesData() {
     [jobs, appliedJobsRaw, applications],
   );
 
+  // Warm-contact lookup (issue #41): company key → who the user knows there.
+  // Consumed per card row on Today; empty map (no upload) short-circuits every
+  // lookup, so users without an upload pay nothing.
+  const warmIndex = useMemo(() => buildWarmIndex(connections), [connections]);
+
   return {
     jobs,
     loading,
@@ -826,6 +940,13 @@ export function useRolesData() {
     toggleDismissed,
     /** companyKey() set of companies with an in-flight application (issue #73 slice 2). */
     inFlightCompanies,
+    /** Warm contacts (issue #41): lookup for the card marker, count + date for
+     *  /settings, save/remove for the upload flow. Never touches scoring. */
+    warmIndex,
+    connectionsCount: connections.length,
+    connectionsUpdatedAt,
+    saveConnections,
+    removeConnections,
     saveTargets,
     scoreMore,
     submitCv,
