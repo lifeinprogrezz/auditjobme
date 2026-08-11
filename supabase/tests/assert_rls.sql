@@ -307,7 +307,8 @@ declare
   seeded text[] := array[
     'applications.user_id', 'artifacts.user_id', 'audits.user_id',
     'company_requests.user_id', 'daily_matches.user_id', 'device_fingerprints.user_id',
-    'dismissed_jobs.user_id', 'feedback.user_id', 'profiles.id', 'purchases.user_id',
+    'dismissed_jobs.user_id', 'feedback.user_id', 'inbound_emails.user_id',
+    'inbound_tokens.user_id', 'profiles.id', 'purchases.user_id',
     'saved_jobs.user_id', 'score_batches.user_id', 'scores.user_id', 'status_events.user_id',
     'usage_events.user_id'
   ];
@@ -378,6 +379,11 @@ begin
   insert into public.score_batches (user_id, provider_batch_id, worker, rubric_version)
     values (mine, 'msgbatch_ci_fixture_mine', 'backlog', 'v6'),
            (theirs, 'msgbatch_ci_fixture_theirs', 'backlog', 'v6');
+  -- Inbox forwarding (auditjobme#75): the token is unique, so distinct fixtures.
+  insert into public.inbound_tokens (user_id, token)
+    values (mine, 'cifixturetokenmine'), (theirs, 'cifixturetokentheirs');
+  insert into public.inbound_emails (user_id, classification, action)
+    values (mine, 'confirmation', 'confirmed'), (theirs, 'confirmation', 'confirmed');
 
   -- Everything is really there before the delete, or the assertions below prove nothing.
   foreach pair in array seeded loop
