@@ -9,6 +9,7 @@ import {
   nightlyBudgetExhausted,
   cronAuthResult,
   rankMatches,
+  attachWarmCounts,
   buildEmailSubject,
   buildEmailBody,
   applyUrl,
@@ -287,6 +288,71 @@ describe("buildEmailBody (issue #72 slice 3)", () => {
     expect(html).toContain("PM &quot;lead&quot;");
     expect(html).toContain("5 &gt; 4 &amp; rising");
     expect(html).not.toContain("<Inc>");
+  });
+});
+
+// Issue #108 (follow-up to #41 / PR #104): the nightly email carries the same
+// warm-contacts marker as the web cards — same companyKey() normalization on both
+// sides of the match, information only, never a score or rank input.
+describe("attachWarmCounts (issue #108 warm marker)", () => {
+  const match = (company: string, rank: number) => ({
+    url: `https://x/${rank}`,
+    company,
+    title: "PM",
+    location: null,
+    score: 4,
+    reason: "r",
+    fitBullets: [],
+    rank,
+  });
+
+  it("counts stored connection keys per company via the SAME companyKey() the cards use", () => {
+    // Stored keys come from companyKey() at upload time; the job side says
+    // "Spotify Ltd" while the connections said "Spotify AB" — both fold to "spotify".
+    const stored = ["spotify", "spotify", "acme"];
+    const out = attachWarmCounts([match("Spotify Ltd", 1), match("Klarna", 2)], stored);
+    expect(out[0].warmCount).toBe(2);
+    expect(out[1].warmCount).toBeUndefined();
+  });
+
+  it("never changes score or rank — information, not a thumb on the scale", () => {
+    const [m] = attachWarmCounts([match("Acme GmbH", 1)], ["acme"]);
+    expect(m.warmCount).toBe(1);
+    expect(m.score).toBe(4);
+    expect(m.rank).toBe(1);
+  });
+
+  it("no connections uploaded → the input array back, untouched (the no-op path)", () => {
+    const input = [match("Spotify", 1)];
+    const out = attachWarmCounts(input, []);
+    expect(out).toBe(input); // identity, not a copy: zero behavior change
+    expect(out[0].warmCount).toBeUndefined();
+  });
+
+  it("email body renders the marker line in text AND html, plain copy", () => {
+    const withWarm = attachWarmCounts(
+      [match("Spotify", 1), match("Klarna", 2)],
+      ["spotify", "spotify"],
+    );
+    const { text, html } = buildEmailBody(withWarm, "https://auditjob.me/");
+    expect(text).toContain("You know 2 people here");
+    expect(html).toContain("You know 2 people here");
+    // exactly one row carries it
+    expect(text.match(/You know/g)?.length).toBe(1);
+    expect(html.match(/You know/g)?.length).toBe(1);
+  });
+
+  it("email body without warm counts carries no marker (byte-level no-op)", () => {
+    const plain = [match("Spotify", 1)];
+    const { text, html } = buildEmailBody(plain, "https://auditjob.me/");
+    expect(text).not.toContain("You know");
+    expect(html).not.toContain("You know");
+  });
+
+  it("singular copy for one person", () => {
+    const withWarm = attachWarmCounts([match("Acme", 1)], ["acme"]);
+    const { text } = buildEmailBody(withWarm, "https://auditjob.me/");
+    expect(text).toContain("You know 1 person here");
   });
 });
 
