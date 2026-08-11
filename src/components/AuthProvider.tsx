@@ -2,6 +2,21 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { markSessionSeen } from "@/lib/deviceSession";
+import { captureRefToken, claimStoredReferral, type ClaimRpc } from "@/lib/referral";
+
+// Issue #78 (attribution only) — landing on `/?ref={token}` stashes the token in
+// localStorage (Google OAuth redirects back to the bare origin, so the query string
+// alone would not survive sign-up), and once a session exists the stashed token is
+// handed to the server-side claim_referral() RPC exactly once. Both are best-effort
+// and fire-and-forget: RLS + the RPC's own rules are the enforcement, this is just
+// the courier. claim_referral is not in the generated types until the migration is
+// applied and types.ts is regenerated (same note as delete_own_account).
+function claimReferralIfStashed() {
+  const rpc = ((fn: string, args: object) => supabase.rpc(fn as never, args as never)) as unknown as ClaimRpc;
+  void claimStoredReferral(rpc, window.localStorage).catch(() => {
+    /* best-effort — never in the way of sign-in */
+  });
+}
 
 interface AuthContextType {
   session: Session | null;
@@ -55,16 +70,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (BYPASS_AUTH) return;
 
+    // Referral capture must run BEFORE the sign-in it hopes to attribute.
+    try {
+      captureRefToken(window.location.search, window.localStorage);
+    } catch {
+      /* ignore — attribution is best-effort */
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        if (session) markSessionSeen();
+        if (session) {
+          markSessionSeen();
+          claimReferralIfStashed();
+        }
         setSession(session);
         setLoading(false);
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) markSessionSeen();
+      if (session) {
+        markSessionSeen();
+        claimReferralIfStashed();
+      }
       setSession(session);
       setLoading(false);
     });

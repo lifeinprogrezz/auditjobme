@@ -300,6 +300,11 @@ do $$
 declare
   mine uuid := gen_random_uuid();
   theirs uuid := gen_random_uuid();
+  -- Referral fixtures (issue #78): referrals carries TWO user columns, and a row
+  -- linking mine<->theirs would cascade away with mine and falsely fail the
+  -- "other user untouched" half. Two bystander accounts keep the pairs disjoint.
+  bystander_a uuid := gen_random_uuid();
+  bystander_b uuid := gen_random_uuid();
   jid uuid;
   audit_mine uuid;
   audit_theirs uuid;
@@ -309,6 +314,7 @@ declare
     'company_requests.user_id', 'connections.user_id', 'daily_matches.user_id', 'device_fingerprints.user_id',
     'dismissed_jobs.user_id', 'feedback.user_id', 'inbound_emails.user_id',
     'inbound_tokens.user_id', 'profiles.id', 'purchases.user_id',
+    'referral_tokens.user_id', 'referrals.referee_id', 'referrals.referrer_id',
     'saved_jobs.user_id', 'score_batches.user_id', 'scores.user_id', 'status_events.user_id',
     'usage_events.user_id'
   ];
@@ -347,7 +353,9 @@ begin
   -- Seed both users. profiles rows are written by the on_auth_user_created trigger.
   insert into auth.users (id, email) values
     (mine, 'gdpr-delete-mine@example.invalid'),
-    (theirs, 'gdpr-delete-theirs@example.invalid');
+    (theirs, 'gdpr-delete-theirs@example.invalid'),
+    (bystander_a, 'gdpr-delete-bystander-a@example.invalid'),
+    (bystander_b, 'gdpr-delete-bystander-b@example.invalid');
   update public.profiles set cv_text = 'CI fixture CV' where id in (mine, theirs);
 
   insert into public.jobs (company, title, url)
@@ -388,6 +396,15 @@ begin
     values (mine, 'cifixturetokenmine'), (theirs, 'cifixturetokentheirs');
   insert into public.inbound_emails (user_id, classification, action)
     values (mine, 'confirmation', 'confirmed'), (theirs, 'confirmation', 'confirmed');
+  -- Referral attribution (auditjobme#78). Each of mine/theirs appears once as
+  -- referrer and once as referee, always paired with a bystander: deleting mine
+  -- must remove exactly the two rows mine is part of, and leave theirs' two rows
+  -- (which involve no mine) standing.
+  insert into public.referral_tokens (user_id, token)
+    values (mine, 'cifixturereftokmine'), (theirs, 'cifixturereftoktheirs');
+  insert into public.referrals (referrer_id, referee_id)
+    values (mine, bystander_a), (bystander_a, mine),
+           (theirs, bystander_b), (bystander_b, theirs);
 
   -- Everything is really there before the delete, or the assertions below prove nothing.
   foreach pair in array seeded loop
@@ -673,5 +690,189 @@ begin
   end if;
 
   raise notice 'inbox-forwarding behaviour check passed: client cannot stamp confirmed_at, server can, token RPC is idempotent.';
+end $$;
+rollback;
+
+-- ---------------------------------------------------------------------------
+-- Referral attribution (auditjobme#78, attribution half only — the reward half
+-- is blocked on #35). referrals is the fraud surface a future reward pays out
+-- against, so its write path must stay exactly this narrow: zero client write
+-- privilege on both tables, the definer-rights RPCs as the only writers, and the
+-- claim deriving referrer/referee/signed_up_at entirely server-side. Shape first.
+do $$
+declare
+  bad text;
+  n int;
+  secdef boolean;
+  cfg text[];
+  tbl text;
+  role_name text;
+  priv text;
+  fn text;
+begin
+  foreach tbl in array array['referral_tokens', 'referrals'] loop
+    if to_regclass('public.' || tbl) is null then
+      raise exception '% is missing -- referral attribution (auditjobme#78) must exist', tbl;
+    end if;
+
+    select string_agg(policyname || ' (' || cmd || ')', ', ' order by policyname)
+      into bad
+      from pg_policies
+      where schemaname = 'public' and tablename = tbl and cmd <> 'SELECT';
+    if bad is not null then
+      raise exception '% must have SELECT-only policies (server-side RPCs are the only writers); found: %', tbl, bad;
+    end if;
+
+    foreach role_name in array array['authenticated', 'anon'] loop
+      foreach priv in array array['INSERT', 'UPDATE', 'DELETE'] loop
+        if has_table_privilege(role_name::name, 'public.' || tbl, priv) then
+          raise exception 'role % still has % on % -- referral rows must be server-written only', role_name, priv, tbl;
+        end if;
+      end loop;
+    end loop;
+  end loop;
+
+  -- referral_tokens: exactly one own-row SELECT policy.
+  select count(*) into n
+    from pg_policies
+    where schemaname = 'public' and tablename = 'referral_tokens'
+      and cmd = 'SELECT' and qual like '%user_id%' and qual like '%uid%';
+  if n <> 1 then
+    raise exception 'referral_tokens needs exactly one own-row (auth.uid() = user_id) SELECT policy; found %', n;
+  end if;
+
+  -- referrals: exactly one SELECT policy, scoped to BOTH parties of the row.
+  select count(*) into n
+    from pg_policies
+    where schemaname = 'public' and tablename = 'referrals'
+      and cmd = 'SELECT'
+      and qual like '%referrer_id%' and qual like '%referee_id%' and qual like '%uid%';
+  if n <> 1 then
+    raise exception 'referrals needs exactly one party-scoped (auth.uid() = referrer_id OR referee_id) SELECT policy; found %', n;
+  end if;
+
+  -- One referrer per referee, forever: the PRIMARY KEY must be referee_id.
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.referrals'::regclass and contype = 'p'
+      and conkey = (select array_agg(attnum) from pg_attribute
+                    where attrelid = 'public.referrals'::regclass and attname = 'referee_id')
+  ) then
+    raise exception 'referrals must have its PRIMARY KEY on referee_id -- one referrer per referee is the anti-fraud shape';
+  end if;
+
+  -- Self-referral is refused in the schema, not just in the RPC.
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.referrals'::regclass and contype = 'c'
+      and pg_get_constraintdef(oid) ~* 'referrer_id\s*<>\s*referee_id'
+  ) then
+    raise exception 'referrals is missing its CHECK (referrer_id <> referee_id) self-referral guard';
+  end if;
+
+  -- Both RPCs: definer-rights (clients hold no write privilege), pinned
+  -- search_path, callable by authenticated only -- anon can neither mint nor claim.
+  foreach fn in array array['public.get_or_create_referral_token()', 'public.claim_referral(text)'] loop
+    if to_regprocedure(fn) is null then
+      raise exception '% is missing', fn;
+    end if;
+    select p.prosecdef, p.proconfig into secdef, cfg
+      from pg_proc p where p.oid = to_regprocedure(fn)::oid;
+    if not secdef then
+      raise exception '% must be SECURITY DEFINER -- it writes a table the caller cannot', fn;
+    end if;
+    if cfg is null or not exists (select 1 from unnest(cfg) c where c like 'search_path=%') then
+      raise exception '% must pin its search_path (SET search_path = ...)', fn;
+    end if;
+    if has_function_privilege('anon', to_regprocedure(fn)::oid, 'EXECUTE') then
+      raise exception 'anon must not be able to execute %', fn;
+    end if;
+    if not has_function_privilege('authenticated', to_regprocedure(fn)::oid, 'EXECUTE') then
+      raise exception 'authenticated must be able to execute %', fn;
+    end if;
+  end loop;
+
+  raise notice 'referral shape check passed: server-written tables, party-scoped SELECT only, referee_id primary key, self-referral CHECK, definer-rights RPCs for authenticated only.';
+end $$;
+
+-- Behavioural pin: the token RPC mints once; the claim records exactly the caller
+-- with the token's owner as referrer; unknown tokens, self-referrals, second
+-- claims and stale accounts are all refused. All rolled back.
+begin;
+do $$
+declare
+  referrer uuid := gen_random_uuid();
+  referee uuid := gen_random_uuid();
+  latecomer uuid := gen_random_uuid();
+  tok1 text;
+  tok2 text;
+  ok boolean;
+  n int;
+  r record;
+begin
+  -- created_at is seeded explicitly: GoTrue stamps it in production, but a bare
+  -- INSERT here leaves it NULL, and claim_referral fails closed on a NULL
+  -- created_at (an account whose age cannot be proven is never attributed).
+  insert into auth.users (id, email, created_at) values
+    (referrer, 'referral-referrer-ci@example.invalid', now()),
+    (referee, 'referral-referee-ci@example.invalid', now()),
+    -- An account past the sign-up window: created 30 days ago.
+    (latecomer, 'referral-latecomer-ci@example.invalid', now() - interval '30 days');
+
+  -- The referrer mints a token; the RPC is idempotent.
+  perform set_config('request.jwt.claims', json_build_object('sub', referrer::text)::text, true);
+  select public.get_or_create_referral_token() into tok1;
+  select public.get_or_create_referral_token() into tok2;
+  if tok1 is null or length(tok1) < 16 then
+    raise exception 'get_or_create_referral_token() returned a weak or empty token: %', tok1;
+  end if;
+  if tok1 <> tok2 then
+    raise exception 'get_or_create_referral_token() must return the SAME token on every call; got % then %', tok1, tok2;
+  end if;
+
+  -- Self-referral: the referrer claiming their own token is refused.
+  select public.claim_referral(tok1) into ok;
+  if ok then
+    raise exception 'claim_referral() accepted a self-referral';
+  end if;
+
+  -- A fresh referee claims: recorded, with the referrer derived from the token
+  -- and signed_up_at from the account creation, never from the client.
+  perform set_config('request.jwt.claims', json_build_object('sub', referee::text)::text, true);
+  select public.claim_referral('not-a-real-token') into ok;
+  if ok then
+    raise exception 'claim_referral() accepted an unknown token';
+  end if;
+  select public.claim_referral(tok1) into ok;
+  if not ok then
+    raise exception 'claim_referral() refused a valid first claim from a fresh account';
+  end if;
+  select * into r from public.referrals where referee_id = referee;
+  if r is null or r.referrer_id <> referrer or r.signed_up_at is null then
+    raise exception 'the attribution row is wrong: referrer=% signed_up_at=%', r.referrer_id, r.signed_up_at;
+  end if;
+
+  -- Claiming again -- same token or anyone else's -- must change nothing.
+  select public.claim_referral(tok1) into ok;
+  if ok then
+    raise exception 'a second claim by the same referee must be a no-op';
+  end if;
+  select count(*) into n from public.referrals where referee_id = referee;
+  if n <> 1 then
+    raise exception 'the referee must have exactly one attribution row; found %', n;
+  end if;
+
+  -- An established account (past the window) is never rewritten into a referral.
+  perform set_config('request.jwt.claims', json_build_object('sub', latecomer::text)::text, true);
+  select public.claim_referral(tok1) into ok;
+  if ok then
+    raise exception 'claim_referral() attributed an account created outside the sign-up window';
+  end if;
+  select count(*) into n from public.referrals where referee_id = latecomer;
+  if n <> 0 then
+    raise exception 'a stale account acquired an attribution row';
+  end if;
+
+  raise notice 'referral behaviour check passed: idempotent token mint, valid first claim recorded with server-derived fields, unknown token / self-referral / repeat claim / stale account all refused.';
 end $$;
 rollback;

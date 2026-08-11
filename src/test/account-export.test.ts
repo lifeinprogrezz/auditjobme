@@ -115,12 +115,23 @@ describe("buildAccountExport", () => {
     expect(out.exported_at).toBe("2026-07-26T09:30:00.000Z");
 
     for (const spec of USER_DATA_TABLES) {
-      const read = client.reads.find((r) => r.table === spec.table);
-      expect(read, `${spec.table} was never read`).toBeTruthy();
-      expect(read?.column).toBe(spec.column);
+      // referrals appears once per user column (issue #78), so match on both.
+      const read = client.reads.find((r) => r.table === spec.table && r.column === spec.column);
+      expect(read, `${spec.table}.${spec.column} was never read`).toBeTruthy();
       expect(read?.value).toBe("user-1");
       expect(out.data[spec.table]).toEqual([]);
     }
+  });
+
+  it("merges a table read once per user column under one key (referrals, issue #78)", async () => {
+    const client = fakeClient({
+      referrals: [{ referee_id: "user-1", referrer_id: "user-2" }],
+    });
+    const out = await buildAccountExport(client, { userId: "user-1" });
+    // The fake returns the same rows for both directions; what matters is that the
+    // second read APPENDS under the "referrals" key instead of overwriting it.
+    expect(client.reads.filter((r) => r.table === "referrals")).toHaveLength(2);
+    expect(out.data.referrals).toHaveLength(2);
   });
 
   it("carries the roles the user's own rows point at, deduped", async () => {

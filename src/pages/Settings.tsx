@@ -5,6 +5,7 @@
 import { useNavigate } from "react-router-dom";
 import AppShell from "@/components/app/AppShell";
 import ForwardingSection from "@/components/app/ForwardingSection";
+import ReferralSection from "@/components/app/ReferralSection";
 import SettingsPanel from "@/components/app/SettingsPanel";
 import { useAuth } from "@/components/AuthProvider";
 import { useRolesData } from "@/hooks/useRolesData";
@@ -152,6 +153,10 @@ export default function Settings() {
           section: owns its token read/create, so the pure SettingsPanel and its
           test stay untouched. */}
       <ForwardingSection />
+      {/* Issue #78 — referral attribution: the invite link, nothing more (the
+          reward half is blocked on #35). Self-contained like ForwardingSection,
+          so the pure SettingsPanel and its test stay untouched. */}
+      <ReferralSection />
     </AppShell>
   );
 }
