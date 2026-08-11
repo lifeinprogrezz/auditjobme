@@ -33,12 +33,14 @@ import {
   isMissingRubricColumn,
   classifyHistoryRead,
   rankMatches,
+  attachWarmCounts,
   buildEmailSubject,
   buildEmailBody,
   type NightlyJob,
   type ScoredMatch,
   type RankedMatch,
 } from "../src/lib/nightly.js";
+import { companyKey } from "../src/lib/connections.js";
 import {
   buildBatchRequests,
   isBatchStale,
@@ -232,6 +234,28 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   // stamp notified_at so the same-day early-exit (B3) treats the user as done.
   // Shared by the fresh-score path and the email-retry path. Fail-soft → bool.
   // Local closure (not module-level) so it captures `admin`'s inferred client type.
+  // Warm-contacts marker (issue #108, following #41 / PR #104): the user's OWN
+  // connections rows, matched on the SAME companyKey() the Today/digest cards use
+  // (imported, never reimplemented — the two surfaces must never disagree). ONE
+  // cheap query against the (user_id, company_key) index, filtered to the email's
+  // companies; a user who never uploaded a connections export gets an empty result
+  // and a byte-identical email. Fail-soft: a read error drops the marker, never
+  // the email. NO score or rank change — information, not a thumb on the scale.
+  const withWarmCounts = async (userId: string, ranked: RankedMatch[]): Promise<RankedMatch[]> => {
+    const keys = [...new Set(ranked.map((m) => companyKey(m.company)).filter(Boolean))];
+    if (keys.length === 0) return ranked;
+    const { data, error } = await admin
+      .from("connections")
+      .select("company_key")
+      .eq("user_id", userId)
+      .in("company_key", keys);
+    if (error || !data) {
+      if (error) console.warn(`[nightly] connections read failed for ${userId}: ${error.message} — sending without warm markers`);
+      return ranked;
+    }
+    return attachWarmCounts(ranked, data.map((r) => r.company_key as string));
+  };
+
   const sendBatchEmail = async (
     key: string,
     userId: string,
@@ -241,7 +265,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     const { data: authUser } = await admin.auth.admin.getUserById(userId);
     const to = authUser?.user?.email;
     if (!to) return false;
-    const sent = await sendEmail(key, to, buildEmailSubject(ranked.length, dateLabel), buildEmailBody(ranked, APP_URL));
+    const sent = await sendEmail(key, to, buildEmailSubject(ranked.length, dateLabel), buildEmailBody(await withWarmCounts(userId, ranked), APP_URL));
     if (sent) {
       await admin
         .from("daily_matches")

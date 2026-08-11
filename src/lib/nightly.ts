@@ -1,7 +1,9 @@
 // Phase B (overnight-job-hunter, spec 2026-07-07 §7): pure logic for the nightly
 // matches worker (api/nightly.ts). Zero runtime deps → unit-testable AND Node-safe
-// (the Vercel worker imports these directly, no vite/@ alias). Pinned by
+// (the Vercel worker imports these directly, no vite/@ alias; the one local import
+// below is pure too, and carries the .js extension Node ESM requires). Pinned by
 // src/test/nightly.test.ts. Rule + code move together.
+import { companyKey, warmMarkerLabel } from "./connections.js";
 
 /** How many top new matches to score + surface per user per night (spec §5). */
 export const NIGHTLY_TOP_N = 10;
@@ -182,9 +184,39 @@ export type ScoredMatch = {
   /** Where the role is, for the email's company/location line (issue #72 slice 3).
    *  Optional: an unknown location is simply omitted, never guessed. */
   location?: string | null;
+  /** How many of the user's own connections work at this company (issue #108,
+   *  following #41/#104). Information for the email row ONLY — deliberately no
+   *  score or rank input, same rule as the web cards. Absent/0 renders nothing. */
+  warmCount?: number;
 };
 
 export type RankedMatch = ScoredMatch & { rank: number };
+
+/**
+ * Warm-contacts marker for the email rows (issue #108, follow-up to #41 / PR #104).
+ * `connectionKeys` are the STORED company_key values from the user's own
+ * `connections` rows; each match's company is normalized through the SAME
+ * companyKey() the web cards use, so the email and the Today card can never
+ * disagree on who counts as warm. Returns new match objects carrying `warmCount`
+ * where > 0; with no keys (user never uploaded a connections export) it returns
+ * the input array UNCHANGED — the exact no-op the no-connections path needs.
+ * Deliberately never touches score or rank. Pure.
+ */
+export function attachWarmCounts(
+  matches: RankedMatch[],
+  connectionKeys: readonly string[],
+): RankedMatch[] {
+  if (connectionKeys.length === 0) return matches;
+  const counts = new Map<string, number>();
+  for (const k of connectionKeys) {
+    if (!k) continue;
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return matches.map((m) => {
+    const n = counts.get(companyKey(m.company)) ?? 0;
+    return n > 0 ? { ...m, warmCount: n } : m;
+  });
+}
 
 /** Rank scored matches highest-first with a 1-based rank. Stable on ties (keeps
  *  input order). Pure. */
@@ -264,31 +296,41 @@ export function buildEmailBody(
     "",
     `You have ${matches.length} new role${plural} matched to you today.`,
     "",
-    ...top.flatMap((m) => [
-      `${m.company}`,
-      `${m.title}`,
-      metaLine(m),
-      ...(m.reason?.trim() ? [m.reason.trim()] : []),
-      `Prepare your application: ${applyUrl(appUrl, m.url)}`,
-      "",
-    ]),
+    ...top.flatMap((m) => {
+      // Warm marker (issue #108): same copy as the Today card, information only —
+      // the rank and score around it are untouched by it, deliberately.
+      const warm = warmMarkerLabel(m.warmCount ?? 0);
+      return [
+        `${m.company}`,
+        `${m.title}`,
+        metaLine(m),
+        ...(warm ? [warm] : []),
+        ...(m.reason?.trim() ? [m.reason.trim()] : []),
+        `Prepare your application: ${applyUrl(appUrl, m.url)}`,
+        "",
+      ];
+    }),
     ...(more > 0 ? [`...and ${more} more.`, ""] : []),
     `See them all: ${appUrl}`,
   ].join("\n");
 
   const rows = top
-    .map((m) =>
-      [
+    .map((m) => {
+      const warm = warmMarkerLabel(m.warmCount ?? 0);
+      return [
         `<div style="padding:14px 0;border-top:1px solid ${HAIR}">`,
         `<div style="font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:${MUTED}">${esc(m.company)}</div>`,
         `<div style="margin-top:2px"><a href="${esc(applyUrl(appUrl, m.url))}" style="font-size:16px;font-weight:600;color:${INK};text-decoration:none">${esc(m.title)}</a></div>`,
         `<div style="margin-top:3px;font-size:13px;color:${MUTED}">${esc(metaLine(m))}</div>`,
+        ...(warm
+          ? [`<div style="margin-top:3px;font-size:13px;color:${MUTED}">${esc(warm)}</div>`]
+          : []),
         ...(m.reason?.trim()
           ? [`<p style="margin:6px 0 0;font-size:14px;line-height:1.45;color:${INK}">${esc(m.reason.trim())}</p>`]
           : []),
         `</div>`,
-      ].join(""),
-    )
+      ].join("");
+    })
     .join("");
 
   const html = [
