@@ -8,7 +8,7 @@
 // Two decisions worth pinning in prose:
 // - PRIVACY POSTURE: the export is the user's own data about their own network,
 //   handled exactly like the CV — stored server-side in an own-row RLS table
-//   (migration 20260811120000_connections.sql), included in the account export
+//   (migration 20260811220000_connections.sql), included in the account export
 //   and the account delete (USER_DATA_TABLES in src/lib/account.ts). Nothing here
 //   ever contacts anyone, and nothing is shared between users.
 // - NO SCORE CHANGE, deliberately: the personal career-ops engine applies a +0.3
