@@ -639,8 +639,10 @@ begin
   insert into public.applications (user_id, job_id, status)
     values (uid, jid, 'applied') returning id into aid;
 
-  -- Client context: own-row edits go through, but confirmed_at silently stays put.
-  perform set_config('role', 'authenticated', true);
+  -- Client context = a JWT present, so auth.uid() resolves (that is the exact test
+  -- the guard trigger makes). The role stays the harness role on purpose: table
+  -- grants for authenticated aren't what this block pins, and the ephemeral CI DB
+  -- doesn't carry the hosted stack's default-privilege grants on applications.
   perform set_config('request.jwt.claims', json_build_object('sub', uid::text)::text, true);
   update public.applications set confirmed_at = now(), notes = 'client edit' where id = aid;
   select confirmed_at into ts from public.applications where id = aid;
@@ -659,7 +661,6 @@ begin
   end if;
 
   -- Server context (no JWT): the inbound endpoint's write sticks.
-  perform set_config('role', 'none', true);
   perform set_config('request.jwt.claims', '', true);
   update public.applications set confirmed_at = now() where id = aid;
   select confirmed_at into ts from public.applications where id = aid;
