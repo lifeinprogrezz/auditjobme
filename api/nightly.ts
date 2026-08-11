@@ -22,7 +22,7 @@
 //   GitHub Action sends it as `Authorization: Bearer <CRON_SECRET>`).
 import { createClient } from "@supabase/supabase-js";
 import { pickScoringSlice } from "../src/lib/labels.js";
-import { SYSTEM, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION } from "../src/lib/scorePrompt.js";
+import { buildScoreSystem, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION } from "../src/lib/scorePrompt.js";
 import {
   NIGHTLY_TOP_N,
   NIGHTLY_RUN_BUDGET_MS,
@@ -296,7 +296,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   // ── Candidate jobs (newest first) + company→sector for the label slice ────
   const { data: jobRows, error: jErr } = await admin
     .from("jobs")
-    .select("id, company, company_id, title, url, location, remote, seniority, jd_text, extraction, first_seen_at, posted_at")
+    .select("id, company, company_id, title, url, location, remote, seniority, jd_text, extraction, role_family, first_seen_at, posted_at")
     .eq("is_live", true)
     .order("first_seen_at", { ascending: false })
     .limit(JOB_FETCH_LIMIT);
@@ -318,6 +318,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     jd_text: r.jd_text,
     yoe_min: (r.extraction as { yoe_min?: number | null } | null)?.yoe_min ?? null,
     geo_eligibility: (r.extraction as { geo_eligibility?: string | null } | null)?.geo_eligibility ?? null,
+    role_family: r.role_family ?? null,
     sector: r.company_id ? (sectorBySlug.get(r.company_id) ?? null) : null,
     first_seen_at: r.first_seen_at,
     posted_at: r.posted_at,
@@ -591,8 +592,10 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         const requests = buildBatchRequests(
           candidates.map((j) => ({
             id: j.id,
-            // Byte-identical to the synchronous prompt below: same rubric, same
-            // shaping, same grounding facts. Only the transport differs.
+            // Byte-identical to the synchronous prompt below: same rubric (incl.
+            // the row's role-family fit block, #34), same shaping, same grounding
+            // facts. Only the transport differs.
+            system: buildScoreSystem(j.role_family),
             userMessage: buildScoreUserMessage(profile, {
               id: j.id,
               company: j.company,
@@ -605,7 +608,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
               geo_eligibility: j.geo_eligibility ?? null,
             }),
           })),
-          { model: HAIKU, maxTokens: SCORE_MAX_TOKENS, system: SYSTEM },
+          { model: HAIKU, maxTokens: SCORE_MAX_TOKENS, system: buildScoreSystem(null) },
         );
         const submitted = await proxyBatchOp(proxyUrl, serviceKey, { op: "batch_submit", requests });
         const providerBatchId = submitted?.id;
@@ -637,7 +640,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
             proxyUrl,
             serviceKey,
             userId,
-            SYSTEM,
+            buildScoreSystem(j.role_family), // #34: per-row role-family rubric
             buildScoreUserMessage(profile, {
               id: j.id,
               company: j.company,

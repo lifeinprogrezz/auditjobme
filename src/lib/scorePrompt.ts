@@ -28,6 +28,9 @@ export interface ScoreableJob {
    *  line is simply omitted from the prompt. */
   yoe_min?: number | null;
   geo_eligibility?: string | null;
+  /** jobs.role_family (#34 all-vertical). Selects the per-family fit block in
+   *  buildScoreSystem(); null/absent = pre-all-vertical row → product. */
+  role_family?: string | null;
 }
 
 // v2 (2026-07-06): added fit_bullets — 3-5 grounded "why you fit" points for the
@@ -44,7 +47,17 @@ export interface ScoreableJob {
 // "3 to 4 bullets, each at most 12 words" (mirrors the evidence-quote cap in the
 // same prompt) — so the /roles detail one-liners stay scannable; the bump re-scores
 // cached rows lazily so the capped bullets propagate on next load.
-export const RUBRIC_VERSION = "v6";
+// v7 (2026-08-11, #34 all-vertical): the system prompt is parametrized by the
+// row's role_family — a shared core (seniority/geo/work-auth/language/background,
+// unchanged) + a per-family fit block (buildScoreSystem below). Product rows'
+// prompt bytes changed too (they gain the product fit block), so the bump
+// re-scores cached rows lazily on the usual paths. NOTE (decided 2026-07-26,
+// vertical-set spec Decision 1): scored rows should eventually record core_v +
+// family_v SEPARATELY so a one-family fit-block bump re-scores only that family;
+// today every family launches at f1 under this one composite version, so the
+// split key (schema + read-path change) lands with the first independent
+// family bump, not here.
+export const RUBRIC_VERSION = "v7";
 
 /** The five rubric dimensions, in weighing order — subscores cover exactly these. */
 export const SUBSCORE_KEYS = ["seniority", "geography", "work_auth", "language", "background"] as const;
@@ -99,7 +112,68 @@ export interface ScoreEvidence {
  *  fit the old 500; a truncated response parses to null and the paid-for score is lost. */
 export const SCORE_MAX_TOKENS = 1000;
 
-export const SYSTEM = `You score how strong a match a Product Manager role is for a specific job-seeker, on a 0 to 5 scale (one decimal). 5 means an excellent fit they should prioritize; 0 means a poor fit or one they realistically can't get. Weigh, in roughly this order: seniority match (their target level vs the role's), geography and accessibility (is it in a target city, or remote if they're open to remote), work authorization (their citizenship and EU authorization vs where the role is), language fit, and how well their CV and background match the role. Return ONLY a JSON object, no other text: {"score": <number 0-5>, "reason": "<one short plain-spoken sentence, no jargon, no em-dashes>", "fit_bullets": ["<3 to 4 short second-person bullets, each at most 12 words, naming a SPECIFIC overlap between THIS person's CV/background and THIS role (e.g. 'Your marketplace growth work maps to their two-sided model'). Ground every bullet in their actual CV and the role; never generic filler; no jargon, no em-dashes. If their CV is weak for this role, say so honestly in fewer bullets.>"], "subscores": [{"key": "seniority", "score": <0-5>}, {"key": "geography", "score": <0-5>}, {"key": "work_auth", "score": <0-5>}, {"key": "language", "score": <0-5>}, {"key": "background", "score": <0-5>}], "evidence": [<3 to 6 objects, each {"label": "<2-4 word factor name>", "cv_line": "<quote copied word-for-word from their CV, at most 12 words, or an empty string if nothing in the CV supports this factor>", "jd_phrase": "<quote copied word-for-word from the role description, at most 12 words, or an empty string>", "contribution": <-1 to 1, negative when this factor pulled the score DOWN>}. Cover the strongest pushes in BOTH directions. Quotes must be exact substrings of the CV or the description; never invent or paraphrase a quote, use an empty string instead.>]}.`;
+// ── All-vertical rubric (#34): shared core + per-family fit block ────────────
+// Architecture decided 2026-07-26 (planning repo, vertical-set spec Decision 1):
+// the core judges every function the same way (seniority, geography, work
+// authorization, language, background weight order); the fit block says what
+// "background match" MEANS for that function. Rejected alternative: one rubric
+// with the family passed as context — a bump aimed at one family would re-judge
+// every other family's rows.
+
+/** The five jobs.role_family values the engine ships (issue #34). */
+export type RoleFamily = "product" | "engineering" | "sales" | "marketing" | "operations";
+
+/** Human label per family, used in the scoring prompt ("a Product Manager
+ *  role", "an Engineering role"). */
+export const ROLE_FAMILY_LABELS: Record<RoleFamily, string> = {
+  product: "Product Manager",
+  engineering: "Engineering",
+  sales: "Sales",
+  marketing: "Marketing",
+  operations: "Operations",
+};
+
+/** Normalize a jobs.role_family value: null/absent/unknown → "product" (every
+ *  pre-all-vertical row was ingested under the PM-only gate). */
+export function normalizeRoleFamily(family?: string | null): RoleFamily {
+  return family && family in ROLE_FAMILY_LABELS ? (family as RoleFamily) : "product";
+}
+
+/** Per-family fit blocks — what a strong CV↔role background match means for
+ *  this function. Each is versioned f1 (2026-08-11); when one bumps
+ *  independently, the core_v/family_v split key lands with it (see the
+ *  RUBRIC_VERSION note above). */
+export const FAMILY_FIT_BLOCKS: Record<RoleFamily, string> = {
+  product:
+    "For this Product Manager role, background fit means: evidence of owning a product or feature end to end (discovery, shipping, iteration), measurable outcomes they moved, domain overlap with this company's space, and fluency working with engineers and data.",
+  engineering:
+    "For this Engineering role, background fit means: overlap between the technologies and systems in their CV and this role's stack, evidence of building and shipping production software, scope match (individual contributor versus lead or manager), and domain familiarity. Data, machine learning and analytics engineering count as engineering backgrounds.",
+  sales:
+    "For this Sales role, background fit means: match on sales motion and segment (self-serve, mid-market, enterprise), quota-carrying or pipeline-building evidence with numbers, familiarity with this industry and its buyers, and language or territory fit for the market the role covers.",
+  marketing:
+    "For this Marketing role, background fit means: overlap on channel and discipline (growth, performance, content, brand, product marketing), campaigns or funnels they owned with measurable results, analytics and tooling fluency, and familiarity with this audience or market.",
+  operations:
+    "For this Operations role, background fit means: evidence of owning processes, budgets or teams (operations, finance, people or strategy), scale match between what they ran and what this role needs, analytical and tooling fluency, and any market-specific or regulatory knowledge the role names.",
+};
+
+// The response contract is part of the SHARED core: every family returns the same
+// JSON shape, subscore keys and evidence rules, so the parser/blender/viz never
+// branch on family.
+const SCORE_RESPONSE_CONTRACT = `Return ONLY a JSON object, no other text: {"score": <number 0-5>, "reason": "<one short plain-spoken sentence, no jargon, no em-dashes>", "fit_bullets": ["<3 to 4 short second-person bullets, each at most 12 words, naming a SPECIFIC overlap between THIS person's CV/background and THIS role (e.g. 'Your marketplace growth work maps to their two-sided model'). Ground every bullet in their actual CV and the role; never generic filler; no jargon, no em-dashes. If their CV is weak for this role, say so honestly in fewer bullets.>"], "subscores": [{"key": "seniority", "score": <0-5>}, {"key": "geography", "score": <0-5>}, {"key": "work_auth", "score": <0-5>}, {"key": "language", "score": <0-5>}, {"key": "background", "score": <0-5>}], "evidence": [<3 to 6 objects, each {"label": "<2-4 word factor name>", "cv_line": "<quote copied word-for-word from their CV, at most 12 words, or an empty string if nothing in the CV supports this factor>", "jd_phrase": "<quote copied word-for-word from the role description, at most 12 words, or an empty string>", "contribution": <-1 to 1, negative when this factor pulled the score DOWN>}. Cover the strongest pushes in BOTH directions. Quotes must be exact substrings of the CV or the description; never invent or paraphrase a quote, use an empty string instead.>]}.`;
+
+/**
+ * Build the scoring system prompt for one row's role family: shared core
+ * (weighing order + response contract, identical across families) + that
+ * family's fit block. Replaces the old hard-wired "a Product Manager role"
+ * SYSTEM constant (#34). Pass the row's jobs.role_family; null falls back to
+ * product (pre-all-vertical rows).
+ */
+export function buildScoreSystem(roleFamily?: string | null): string {
+  const family = normalizeRoleFamily(roleFamily);
+  const label = ROLE_FAMILY_LABELS[family];
+  const article = /^[aeiou]/i.test(label) ? "an" : "a";
+  return `You score how strong a match ${article} ${label} role is for a specific job-seeker, on a 0 to 5 scale (one decimal). 5 means an excellent fit they should prioritize; 0 means a poor fit or one they realistically can't get. Weigh, in roughly this order: seniority match (their target level vs the role's), geography and accessibility (is it in a target city, or remote if they're open to remote), work authorization (their citizenship and EU authorization vs where the role is), language fit, and how well their CV and background match the role. ${FAMILY_FIT_BLOCKS[family]} ${SCORE_RESPONSE_CONTRACT}`;
+}
 
 /** Build the user-turn message for one profile×job. Identical shaping for the
  *  live reveal and the nightly run so scores never diverge by caller. */

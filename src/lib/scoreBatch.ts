@@ -60,11 +60,17 @@ export interface BatchRequest {
  * this is a cost change and not a behaviour change. Do not add fields here that the
  * synchronous path does not send.
  *
+ * Since #34 (all-vertical) the system prompt varies per ROW (the row's
+ * role_family selects its fit block — buildScoreSystem), so each item may carry
+ * its own `system`; `opts.system` is the fallback for items without one. The
+ * synchronous path builds the identical per-row system, so the byte-identity
+ * argument holds per request.
+ *
  * Items beyond BATCH_MAX_REQUESTS are NOT silently dropped: the caller gets back
  * only what fits and re-submits the rest on the next tick (see `chunkForBatch`).
  */
 export function buildBatchRequests(
-  items: { id: string; userMessage: string }[],
+  items: { id: string; userMessage: string; system?: string }[],
   opts: { model: string; maxTokens: number; system: string },
 ): BatchRequest[] {
   return items.slice(0, BATCH_MAX_REQUESTS).map((it) => ({
@@ -72,7 +78,7 @@ export function buildBatchRequests(
     params: {
       model: opts.model,
       max_tokens: opts.maxTokens,
-      system: opts.system,
+      system: it.system ?? opts.system,
       messages: [{ role: "user" as const, content: it.userMessage }],
     },
   }));

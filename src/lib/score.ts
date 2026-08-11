@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
-  SYSTEM,
+  buildScoreSystem,
   SCORE_MAX_TOKENS,
   buildScoreUserMessage,
   parseScoreResponse,
@@ -30,7 +30,8 @@ export async function scoreJob(
       kind: "score",
       model: "claude-haiku-4-5-20251001",
       max_tokens: SCORE_MAX_TOKENS,
-      system: SYSTEM,
+      // #34 all-vertical: the system prompt carries the row's role-family fit block.
+      system: buildScoreSystem(job.role_family),
       messages: [{ role: "user", content: userMsg }],
     },
   });

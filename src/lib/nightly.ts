@@ -62,6 +62,8 @@ export type NightlyJob = {
   jd_text?: string | null;
   yoe_min?: number | null;
   geo_eligibility?: string | null;
+  /** jobs.role_family (#34): selects the per-family scoring fit block. */
+  role_family?: string | null;
   sector?: string | null;
   first_seen_at?: string | null;
   posted_at?: string | null;

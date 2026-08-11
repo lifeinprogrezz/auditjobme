@@ -11,7 +11,7 @@
 // Env: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / RESEND_API_KEY / CRON_SECRET
 // (same contract as api/nightly.ts).
 import { createClient } from "@supabase/supabase-js";
-import { SYSTEM, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION, type ParsedScore } from "../src/lib/scorePrompt.js";
+import { buildScoreSystem, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION, type ParsedScore } from "../src/lib/scorePrompt.js";
 import { cronAuthResult } from "../src/lib/nightly.js";
 import {
   RUN_BUDGET_MS,
@@ -50,6 +50,8 @@ type LiveJob = {
   remote: boolean;
   seniority: string | null;
   extraction: { yoe_min?: number | null; geo_eligibility?: string | null } | null;
+  /** jobs.role_family (#34): selects the per-family scoring fit block. */
+  role_family: string | null;
 };
 
 /** Score one job for one user through the proxy's service-role path. Never throws.
@@ -59,6 +61,7 @@ async function scoreViaProxy(
   proxyUrl: string,
   serviceKey: string,
   targetUserId: string,
+  system: string,
   userMsg: string,
   sources: { cvText: string | null; jdText: string | null },
 ): Promise<ParsedScore | null> {
@@ -76,7 +79,7 @@ async function scoreViaProxy(
         kind: "score",
         model: HAIKU,
         max_tokens: SCORE_MAX_TOKENS,
-        system: SYSTEM,
+        system,
         target_user_id: targetUserId,
         messages: [{ role: "user", content: userMsg }],
       }),
@@ -198,7 +201,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await admin
       .from("jobs")
-      .select("id, company, title, location, remote, seniority, extraction")
+      .select("id, company, title, location, remote, seniority, extraction, role_family")
       .eq("is_live", true)
       .range(from, from + PAGE - 1);
     if (error) {
@@ -396,8 +399,10 @@ export default async function handler(req: Req, res: Res): Promise<void> {
           const requests = buildBatchRequests(
             head.map((j) => ({
               id: j.id,
-              // Byte-identical to the synchronous path's prompt — same rubric, same
-              // shaping, same grounding facts. Only the transport differs.
+              // Byte-identical to the synchronous path's prompt — same rubric
+              // (incl. the row's role-family fit block, #34), same shaping, same
+              // grounding facts. Only the transport differs.
+              system: buildScoreSystem(j.role_family),
               userMessage: buildScoreUserMessage(profile, {
                 id: j.id,
                 company: j.company,
@@ -410,7 +415,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
                 geo_eligibility: j.extraction?.geo_eligibility ?? null,
               }),
             })),
-            { model: HAIKU, maxTokens: SCORE_MAX_TOKENS, system: SYSTEM },
+            { model: HAIKU, maxTokens: SCORE_MAX_TOKENS, system: buildScoreSystem(null) },
           );
           const submitted = await proxyBatchOp(proxyUrl, serviceKey, { op: "batch_submit", requests });
           const providerBatchId = submitted?.id;
@@ -447,6 +452,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
               proxyUrl,
               serviceKey,
               userId,
+              buildScoreSystem(j.role_family), // #34: per-row role-family rubric
               buildScoreUserMessage(profile, {
                 id: j.id,
                 company: j.company,

@@ -1,8 +1,10 @@
 # auditjob.me — the product (public repo)
 
-Free product for Product Managers job-hunting in Europe: daily-scraped job pool, scored
-against YOUR profile, with an apply bundle (tailored CV + letter + company audit) and an
-application tracker. This repo is **public (MIT)** — never commit secrets, strategy docs,
+Free product for job-hunting in Europe: daily-scraped job pool across five role
+verticals (`jobs.role_family`: product · engineering · sales · marketing ·
+operations — Design and Data/AI analyst/scientist seats deferred; issue #34),
+scored against YOUR profile with a per-family rubric, with an apply bundle
+(tailored CV + letter + company audit) and an application tracker. This repo is **public (MIT)** — never commit secrets, strategy docs,
 or personal data. Design authority: the v1 design spec (private planning repo,
 `docs/specs/2026-06-13-agent-built-auditjobme-v1-design.md`); agents get task-level
 context via GitHub Issues.

@@ -127,7 +127,7 @@ describe("classifyRoleFamily", () => {
 
   it("every family carries decided query terms and one seed query", () => {
     for (const f of ROLE_FAMILIES) {
-      expect(FAMILY_QUERIES[f].length).toBeGreaterThan(0);
+      expect(FAMILY_QUERIES[f as keyof typeof FAMILY_QUERIES].length).toBeGreaterThan(0);
     }
     expect(FAMILY_SEED_QUERIES).toHaveLength(ROLE_FAMILIES.length);
     expect(FAMILY_SEED_QUERIES).toContain("product manager");
