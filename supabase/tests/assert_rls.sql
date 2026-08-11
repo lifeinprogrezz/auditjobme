@@ -307,7 +307,8 @@ declare
   seeded text[] := array[
     'applications.user_id', 'artifacts.user_id', 'audits.user_id',
     'company_requests.user_id', 'daily_matches.user_id', 'device_fingerprints.user_id',
-    'dismissed_jobs.user_id', 'feedback.user_id', 'profiles.id', 'purchases.user_id',
+    'dismissed_jobs.user_id', 'feedback.user_id', 'inbound_emails.user_id',
+    'inbound_tokens.user_id', 'profiles.id', 'purchases.user_id',
     'saved_jobs.user_id', 'score_batches.user_id', 'scores.user_id', 'status_events.user_id',
     'usage_events.user_id'
   ];
@@ -378,6 +379,11 @@ begin
   insert into public.score_batches (user_id, provider_batch_id, worker, rubric_version)
     values (mine, 'msgbatch_ci_fixture_mine', 'backlog', 'v6'),
            (theirs, 'msgbatch_ci_fixture_theirs', 'backlog', 'v6');
+  -- Inbox forwarding (auditjobme#75): the token is unique, so distinct fixtures.
+  insert into public.inbound_tokens (user_id, token)
+    values (mine, 'cifixturetokenmine'), (theirs, 'cifixturetokentheirs');
+  insert into public.inbound_emails (user_id, classification, action)
+    values (mine, 'confirmation', 'confirmed'), (theirs, 'confirmation', 'confirmed');
 
   -- Everything is really there before the delete, or the assertions below prove nothing.
   foreach pair in array seeded loop
@@ -532,5 +538,136 @@ begin
 
   perform set_config('role', 'none', true);
   raise notice 'audit privacy check passed: private by default, invisible to anon until published, only the owner can publish, published audits are readable by anon AND by a different signed-in user, unpublished audits stay invisible to both.';
+end $$;
+rollback;
+
+-- ---------------------------------------------------------------------------
+-- Inbox forwarding (auditjobme#75): per-user forwarding tokens + the inbound
+-- parse ledger + applications.confirmed_at. Shape first: both tables are
+-- server-written only (own-row SELECT, zero client write privilege), the token
+-- RPC is definer-rights with a pinned search_path, and the confirmed_at guard
+-- trigger is in place. confirmed_at is what the referral qualifying event (#78)
+-- will pay out on, so a client-stampable path here is a fraud path.
+do $$
+declare
+  bad text;
+  n int;
+  secdef boolean;
+  cfg text[];
+  tbl text;
+  role_name text;
+  priv text;
+begin
+  foreach tbl in array array['inbound_tokens', 'inbound_emails'] loop
+    if to_regclass('public.' || tbl) is null then
+      raise exception '% is missing -- the inbox-forwarding path (auditjobme#75) must exist', tbl;
+    end if;
+
+    select string_agg(policyname || ' (' || cmd || ')', ', ' order by policyname)
+      into bad
+      from pg_policies
+      where schemaname = 'public' and tablename = tbl and cmd <> 'SELECT';
+    if bad is not null then
+      raise exception '% must have SELECT-only policies (server-role writes only); found: %', tbl, bad;
+    end if;
+
+    select count(*) into n
+      from pg_policies
+      where schemaname = 'public' and tablename = tbl
+        and cmd = 'SELECT' and qual like '%user_id%' and qual like '%uid%';
+    if n <> 1 then
+      raise exception '% needs exactly one own-row (auth.uid() = user_id) SELECT policy; found %', tbl, n;
+    end if;
+
+    foreach role_name in array array['authenticated', 'anon'] loop
+      foreach priv in array array['INSERT', 'UPDATE', 'DELETE'] loop
+        if has_table_privilege(role_name::name, 'public.' || tbl, priv) then
+          raise exception 'role % still has % on % -- inbox rows must be server-written only', role_name, priv, tbl;
+        end if;
+      end loop;
+    end loop;
+  end loop;
+
+  -- Token creation RPC: definer-rights (clients have no INSERT), pinned search_path,
+  -- callable by authenticated only -- anon must never mint a token.
+  if to_regprocedure('public.get_or_create_forwarding_token()') is null then
+    raise exception 'get_or_create_forwarding_token() is missing';
+  end if;
+  select p.prosecdef, p.proconfig into secdef, cfg
+    from pg_proc p where p.oid = to_regprocedure('public.get_or_create_forwarding_token()')::oid;
+  if not secdef then
+    raise exception 'get_or_create_forwarding_token() must be SECURITY DEFINER -- it writes a table the caller cannot';
+  end if;
+  if cfg is null or not exists (select 1 from unnest(cfg) c where c like 'search_path=%') then
+    raise exception 'get_or_create_forwarding_token() must pin its search_path (SET search_path = ...)';
+  end if;
+  if has_function_privilege('anon', 'public.get_or_create_forwarding_token()', 'EXECUTE') then
+    raise exception 'anon must not be able to execute get_or_create_forwarding_token()';
+  end if;
+  if not has_function_privilege('authenticated', 'public.get_or_create_forwarding_token()', 'EXECUTE') then
+    raise exception 'authenticated must be able to execute get_or_create_forwarding_token() -- Settings creates the address with it';
+  end if;
+
+  if not exists (
+    select 1 from pg_trigger t
+    where t.tgrelid = 'public.applications'::regclass
+      and t.tgname = 'applications_protect_confirmed_at'
+  ) then
+    raise exception 'trigger applications_protect_confirmed_at is missing -- confirmed_at would be client-stampable (the #78 fraud path)';
+  end if;
+
+  raise notice 'inbox-forwarding shape check passed: server-written tables, own-row SELECT only, definer-rights token RPC, confirmed_at guard trigger present.';
+end $$;
+
+-- Behavioural pin: a signed-in client must NOT be able to stamp confirmed_at (their
+-- ordinary edits still work); the server path (no JWT) must. And the token RPC must
+-- mint once and then return the same token forever. All rolled back.
+begin;
+do $$
+declare
+  uid uuid := gen_random_uuid();
+  jid uuid;
+  aid uuid;
+  ts timestamptz;
+  tok1 text;
+  tok2 text;
+begin
+  insert into auth.users (id, email) values (uid, 'inbox-forwarding-ci@example.invalid');
+  insert into public.jobs (company, title, url)
+    values ('CI Fixture', 'Product Manager', 'https://example.invalid/ci/inbox-forwarding')
+    returning id into jid;
+  insert into public.applications (user_id, job_id, status)
+    values (uid, jid, 'applied') returning id into aid;
+
+  -- Client context = a JWT present, so auth.uid() resolves (that is the exact test
+  -- the guard trigger makes). The role stays the harness role on purpose: table
+  -- grants for authenticated aren't what this block pins, and the ephemeral CI DB
+  -- doesn't carry the hosted stack's default-privilege grants on applications.
+  perform set_config('request.jwt.claims', json_build_object('sub', uid::text)::text, true);
+  update public.applications set confirmed_at = now(), notes = 'client edit' where id = aid;
+  select confirmed_at into ts from public.applications where id = aid;
+  if ts is not null then
+    raise exception 'a signed-in client stamped their own confirmed_at -- the #78 qualifying event is forgeable';
+  end if;
+
+  -- The token RPC works for the signed-in user and is idempotent.
+  select public.get_or_create_forwarding_token() into tok1;
+  select public.get_or_create_forwarding_token() into tok2;
+  if tok1 is null or length(tok1) < 16 then
+    raise exception 'get_or_create_forwarding_token() returned a weak or empty token: %', tok1;
+  end if;
+  if tok1 <> tok2 then
+    raise exception 'get_or_create_forwarding_token() must return the SAME token on every call; got % then %', tok1, tok2;
+  end if;
+
+  -- Server context (no JWT): the inbound endpoint's write sticks.
+  perform set_config('request.jwt.claims', '', true);
+  update public.applications set confirmed_at = now() where id = aid;
+  select confirmed_at into ts from public.applications where id = aid;
+  if ts is null then
+    raise exception 'the server-side confirmed_at write was blocked -- the guard trigger is too broad';
+  end if;
+
+  raise notice 'inbox-forwarding behaviour check passed: client cannot stamp confirmed_at, server can, token RPC is idempotent.';
 end $$;
 rollback;

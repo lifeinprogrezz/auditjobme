@@ -51,6 +51,18 @@ export const USER_DATA_TABLES: readonly UserDataTable[] = [
     label: "the device signal we use to keep free usage fair",
   },
   { table: "purchases", column: "user_id", label: "any purchase records" },
+  // Issue #75 — not in the generated Database types until the migration is applied
+  // and types.ts is regenerated (same note as delete_own_account in Settings.tsx).
+  {
+    table: "inbound_tokens" as UserTableName,
+    column: "user_id",
+    label: "your email forwarding address",
+  },
+  {
+    table: "inbound_emails" as UserTableName,
+    column: "user_id",
+    label: "the processing record of each application email you forwarded (never the email itself)",
+  },
 ] as const;
 
 /** Tables whose rows point at a role in the shared catalogue, so the export can carry it. */
