@@ -2,6 +2,10 @@ import { describe, it, expect } from "vitest";
 import { parseScoreResponse } from "@/lib/score";
 import {
   buildScoreUserMessage,
+  buildScoreSystem,
+  normalizeRoleFamily,
+  ROLE_FAMILY_LABELS,
+  FAMILY_FIT_BLOCKS,
   blendSubscores,
   groundEvidence,
   isGroundedQuote,
@@ -306,5 +310,47 @@ describe("parseScoreResponse — grounds evidence when sources are supplied", ()
   it("leaves evidence untouched when no sources are passed (existing callers)", () => {
     const json = '{"score":4,"reason":"ok","evidence":[{"label":"X","cv_line":"anything","jd_phrase":"y","contribution":0.2}]}';
     expect(parseScoreResponse(json)?.evidence[0].cvLine).toBe("anything");
+  });
+});
+
+// #34 all-vertical: the scoring system prompt is a shared core + the row's
+// role-family fit block. These pin the un-hard-wiring of "a Product Manager role".
+describe("buildScoreSystem — shared core + per-family fit block (#34)", () => {
+  it("null / absent / unknown role_family falls back to the product family", () => {
+    expect(normalizeRoleFamily(null)).toBe("product");
+    expect(normalizeRoleFamily(undefined)).toBe("product");
+    expect(normalizeRoleFamily("something-else")).toBe("product");
+    expect(buildScoreSystem(null)).toBe(buildScoreSystem("product"));
+    expect(buildScoreSystem(null)).toContain("a Product Manager role");
+  });
+
+  it("each family gets its own opening line and its own fit block", () => {
+    const families = Object.keys(ROLE_FAMILY_LABELS) as (keyof typeof ROLE_FAMILY_LABELS)[];
+    for (const family of families) {
+      const system = buildScoreSystem(family);
+      expect(system).toContain(FAMILY_FIT_BLOCKS[family]);
+      // Exactly one family's fit block — never a mix.
+      for (const other of families) {
+        if (other !== family) expect(system).not.toContain(FAMILY_FIT_BLOCKS[other]);
+      }
+    }
+    expect(buildScoreSystem("engineering")).toContain("an Engineering role");
+    expect(buildScoreSystem("sales")).toContain("a Sales role");
+  });
+
+  it("the response contract is shared core: identical JSON shape across families", () => {
+    const contract = (s: string) => s.slice(s.indexOf("Return ONLY a JSON object"));
+    const product = contract(buildScoreSystem("product"));
+    expect(product).toContain('"subscores"');
+    for (const family of ["engineering", "sales", "marketing", "operations"]) {
+      expect(contract(buildScoreSystem(family))).toBe(product);
+    }
+  });
+
+  it("the weighing order (shared core) is identical across families", () => {
+    const weighing = 'Weigh, in roughly this order:';
+    for (const family of Object.keys(ROLE_FAMILY_LABELS)) {
+      expect(buildScoreSystem(family)).toContain(weighing);
+    }
   });
 });

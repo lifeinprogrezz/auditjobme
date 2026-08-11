@@ -29,7 +29,10 @@
 scrapes roles from dozens of sources every day, scores each one against a deep
 personal profile, and hands back a ranked, personalized shortlist. Today that
 power serves exactly one person. **auditjob.me is that same engine, opened up for
-other people** — a suite of career-ops superpowers for **Product Managers (PMs)**.
+other people** — a suite of career-ops superpowers for job-seekers in Europe. It
+launched as a Product-Manager wedge; since issue #34 the engine is
+**all-vertical**, covering five role families (product · engineering · sales ·
+marketing · operations).
 
 The company audit (the thing auditjob.me's landing page sells today —
 *"show them you already did the job"*) is **one feature inside the suite**, not the
@@ -47,14 +50,20 @@ AI key — is the **DEFERRED power-user tier** (prototype parked at
 path is validated. Decided 2026-06-12 (brainstorm, strategic call #2) and locked
 in the v1 design spec.
 
-**Scope at launch (deliberately narrow):**
-- **Role type:** Product Manager roles only. It's the archetype the engine is
-  already tuned for, so quality is real on day one.
-- **Geography:** Europe-first — same reason, same fit.
-- **Not** "every role in the world." Widening comes after the PM/Europe wedge works.
+**Scope (deliberately bounded):**
+- **Role type:** five `role_family` verticals — product, engineering, sales,
+  marketing, operations (issue #34; vertical set decided 2026-07-26). The
+  product launched PM-only; the PM wedge proved the quality bar, then the gate
+  widened. **Design** and **Data/AI** (analyst/scientist seats) are deliberately
+  deferred: design because a CV-vs-JD rubric is portfolio-blind, Data/AI because
+  it is too small to earn its own fit block yet.
+- **Geography:** Europe-first — the engine's home turf, so quality is real.
+- **Not** "every role in the world." Each widening is a decided, evidence-backed
+  step, not a default.
 
 **Explicitly out of scope for now:** the landing page copy and the product name
-(both already exist, both fine), visual design polish, and any role type beyond PM.
+(both already exist, both fine), visual design polish, and the two deferred
+verticals above.
 
 ---
 

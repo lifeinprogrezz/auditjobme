@@ -11,7 +11,8 @@
  *
  * Shape, same as the Greenhouse/Lever/Ashby siblings in scripts/scrape.mjs:
  *   { company, title, url, location, remote, source, posted_at, jd_text, seniority }
- * filtered through the shared job-filters (isPM(title) && isEU(location)).
+ * filtered through the shared job-filters (isInScope(title) && isEU(location))
+ * — the five role_family verticals since #34, not PM-only.
  * The feed carries the FULL description inline (`content_html`), so unlike the
  * SmartRecruiters/Workable/Workday list endpoints these rows land with jd_text.
  *
@@ -22,7 +23,7 @@
  * A bad tenant throws and scrape.mjs logs it per board, so one dead career site
  * never halts the run.
  */
-import { isPM, isEU, inferSeniority, stripHtml, EU_RE } from "../job-filters.mjs";
+import { isInScope, isEU, inferSeniority, stripHtml, EU_RE } from "../job-filters.mjs";
 
 const fetchOpts = () => ({
   signal: AbortSignal.timeout(20000), // fresh signal per call
@@ -109,12 +110,12 @@ export function isTeamtailorFeed(feed) {
   return /\/jobs\.json$/.test(String(feed.feed_url || ""));
 }
 
-/** Pure parse: feed document -> the European Product rows it contains. */
+/** Pure parse: feed document -> the European in-scope rows it contains. */
 export function parseTeamtailorFeed(feed, company) {
   const name = company || String((feed || {}).title || "").trim() || null;
   return ((feed || {}).items || [])
     .map((it) => normalizeTeamtailorItem(it, name))
-    .filter((j) => j.company && j.url && isPM(j.title) && isEU(j.location));
+    .filter((j) => j.company && j.url && isInScope(j.title) && isEU(j.location));
 }
 
 export const teamtailorHost = (b) => b.host || `${b.token}.teamtailor.com`;

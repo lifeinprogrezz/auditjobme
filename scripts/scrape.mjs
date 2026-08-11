@@ -3,7 +3,7 @@
  * Daily job scrape -> shared `jobs` pool. v1 sources: Greenhouse + Lever + Ashby public APIs
  * (no auth to read). Run by .github/workflows/scrape.yml (daily cron). Needs SUPABASE_URL +
  * SUPABASE_SERVICE_ROLE_KEY (GitHub repo secrets) to WRITE; without them it dry-runs.
- * Filters: Product roles, Europe only (drops design/eng + clearly-US roles). `--sql` emits a
+ * Filters: the five role_family verticals (#34: product/engineering/sales/marketing/operations), Europe only. `--sql` emits a
  * seed INSERT (no jd_text) for admin-tooling seeding before the cron is live.
  *
  * Extensible: add tokens to scripts/boards.json; add more ATS fetchers as the pool grows.
@@ -12,7 +12,7 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { isPM, isEU, inferSeniority, stripHtml } from "./job-filters.mjs";
+import { isInScope, classifyRoleFamily, isEU, inferSeniority, stripHtml } from "./job-filters.mjs";
 import { resolveWorkplace } from "./workplace-lib.mjs";
 import { isRecruitmentFirm } from "./recruitment-firms.mjs";
 import { BOARD_KINDS } from "./liveness-lib.mjs";
@@ -37,7 +37,7 @@ async function fetchGreenhouse(b) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   return (data.jobs || [])
-    .filter((j) => isPM(j.title))
+    .filter((j) => isInScope(j.title))
     .map((j) => {
       const location = (j.location || {}).name || null;
       return {
@@ -60,7 +60,7 @@ async function fetchLever(b) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   return (Array.isArray(data) ? data : [])
-    .filter((p) => isPM(p.text))
+    .filter((p) => isInScope(p.text))
     .map((p) => {
       const location = (p.categories || {}).location || null;
       return {
@@ -79,7 +79,7 @@ async function fetchAshby(b) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   return (data.jobs || [])
-    .filter((j) => isPM(j.title))
+    .filter((j) => isInScope(j.title))
     .map((j) => {
       const location = j.location || null;
       return {
@@ -126,7 +126,7 @@ async function fetchWorkable(b) {
     token = data.nextPage;
     if (!token) break;
   }
-  return all.filter((j) => j.url && isPM(j.title) && isEU(j.location));
+  return all.filter((j) => j.url && isInScope(j.title) && isEU(j.location));
 }
 
 // SmartRecruiters — paginated GET, offset until totalFound exhausted. List
@@ -160,7 +160,7 @@ async function fetchSmartRecruiters(b) {
     }
     offset += 100;
   }
-  return all.filter((j) => j.url && isPM(j.title) && isEU(j.location));
+  return all.filter((j) => j.url && isInScope(j.title) && isEU(j.location));
 }
 
 // Board classes eligible for the vanished-role retirement diff below (only rows
@@ -203,7 +203,7 @@ async function main() {
       try {
         const jobs = await s.run();
         if (s.kind) scannedOk.add(`${s.company}::${s.kind}`);
-        if (jobs.length) console.error(`${s.company}: ${jobs.length} EU PM role(s)`);
+        if (jobs.length) console.error(`${s.company}: ${jobs.length} EU role(s) in scope`);
         all.push(...jobs);
       } catch (e) {
         console.error(`${s.company} failed: ${e.message}`);
@@ -232,6 +232,12 @@ async function main() {
     } catch { return u; }
   };
   all = all.map((j) => ({ ...j, url: canonUrl(j.url) }));
+  // All-vertical (#34): stamp jobs.role_family on EVERY row, centrally, so each
+  // source (incl. sources/*.mjs) writes it without per-adapter code. The nightly
+  // upsert keeps it fresh; existing rows are covered by
+  // scripts/backfill-role-family.mjs. The ingest gate (isInScope) and this stamp
+  // are the same classifier, so by construction every surviving row is non-null.
+  all = all.map((j) => ({ ...j, role_family: classifyRoleFamily(j.title) }));
   // Workplace mode (remote|hybrid|onsite) for EVERY source: authoritative structured
   // value (Lever workplaceType) ?? location string ?? JD text ?? weak remote flag
   // (Ashby isRemote & co — "remote allowed", never overrides location/JD). Runs
@@ -263,14 +269,14 @@ async function main() {
   all = all.filter((j) => !isRecruitmentFirm(j.company));
   const firmDropped = beforeFirms - all.length;
   if (firmDropped) console.error(`Dropped ${firmDropped} recruitment-firm/aggregator role(s).`);
-  console.error(`Total: ${all.length} EU PM roles.`);
+  console.error(`Total: ${all.length} EU roles in scope.`);
 
   if (process.argv.includes("--sql")) {
     const esc = (s) => (s == null ? "NULL" : "'" + String(s).replace(/'/g, "''") + "'");
     const rows = all
-      .map((j) => `(${esc(j.company)}, ${esc(j.title)}, ${esc(j.url)}, ${esc(j.location)}, ${j.remote ? "true" : "false"}, ${esc(j.workplace)}, ${esc(j.source)}, ${esc(j.seniority)})`)
+      .map((j) => `(${esc(j.company)}, ${esc(j.title)}, ${esc(j.url)}, ${esc(j.location)}, ${j.remote ? "true" : "false"}, ${esc(j.workplace)}, ${esc(j.source)}, ${esc(j.seniority)}, ${esc(j.role_family)})`)
       .join(",\n");
-    console.log(`INSERT INTO public.jobs (company, title, url, location, remote, workplace, source, seniority) VALUES\n${rows}\nON CONFLICT (url) DO NOTHING;`);
+    console.log(`INSERT INTO public.jobs (company, title, url, location, remote, workplace, source, seniority, role_family) VALUES\n${rows}\nON CONFLICT (url) DO NOTHING;`);
     return;
   }
   if (dry) {

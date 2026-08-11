@@ -13,7 +13,8 @@
  *
  * Shape, same as the Greenhouse/Lever/Ashby/Teamtailor siblings:
  *   { company, title, url, location, remote, source, posted_at, jd_text, seniority }
- * filtered through the shared job-filters (isPM(title) && isEU(location)).
+ * filtered through the shared job-filters (isInScope(title) && isEU(location))
+ * — the five role_family verticals since #34, not PM-only.
  * The feed carries the FULL description inline (`<jobDescriptions>` CDATA), so
  * rows land with jd_text. Posting url: `https://{host}/job/{id}` — the format
  * jd-backfill and logo-lib already recognise.
@@ -34,7 +35,7 @@
  * its location is null — honestly unknown, which the pool keeps (same stance as
  * the ats-extra null-location stubs); the `remote` flag carries the signal.
  */
-import { isPM, isEU, inferSeniority, stripHtml, EU_RE } from "../job-filters.mjs";
+import { isInScope, isEU, inferSeniority, stripHtml, EU_RE } from "../job-filters.mjs";
 
 const fetchOpts = () => ({
   signal: AbortSignal.timeout(20000), // fresh signal per call
@@ -208,7 +209,7 @@ export function parsePersonioXml(xml, company, host) {
   for (const m of String(xml || "").matchAll(/<position>([\s\S]*?)<\/position>/gi)) {
     rows.push(normalizePersonioPosition(parsePosition(m[1]), company, host));
   }
-  return rows.filter((j) => j.company && j.url && isPM(j.title) && isEU(j.location));
+  return rows.filter((j) => j.company && j.url && isInScope(j.title) && isEU(j.location));
 }
 
 export const personioHost = (b) => b.host || `${b.token}.jobs.personio.de`;

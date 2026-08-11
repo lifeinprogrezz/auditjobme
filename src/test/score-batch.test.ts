@@ -18,7 +18,9 @@ import {
   parseBatchResults,
   partitionOnboarding,
 } from "@/lib/scoreBatch";
-import { SYSTEM, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse } from "@/lib/scorePrompt";
+import { buildScoreSystem, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse } from "@/lib/scorePrompt";
+
+const SYSTEM = buildScoreSystem(null); // pre-#34 rows: product-family rubric
 
 const HAIKU = "claude-haiku-4-5-20251001";
 const PROFILE = {
@@ -265,5 +267,28 @@ describe("anthropic-proxy batch guards", () => {
 
   it("agrees with src/lib/scoreBatch.ts on the per-batch request cap", () => {
     expect(proxy).toMatch(new RegExp(`const BATCH_MAX_REQUESTS = ${BATCH_MAX_REQUESTS};`));
+  });
+});
+
+describe("per-row role-family system prompts (#34 all-vertical)", () => {
+  it("an item's own system wins; opts.system is the fallback", () => {
+    const engineering = buildScoreSystem("engineering");
+    const [withOwn, withFallback] = buildBatchRequests(
+      [
+        { id: "a", userMessage: "x", system: engineering },
+        { id: "b", userMessage: "y" },
+      ],
+      { model: HAIKU, maxTokens: SCORE_MAX_TOKENS, system: SYSTEM },
+    );
+    expect(withOwn.params.system).toBe(engineering);
+    expect(withFallback.params.system).toBe(SYSTEM);
+  });
+
+  it("a per-item system adds no extra request field", () => {
+    const [req] = buildBatchRequests(
+      [{ id: "a", userMessage: "x", system: buildScoreSystem("sales") }],
+      { model: HAIKU, maxTokens: SCORE_MAX_TOKENS, system: SYSTEM },
+    );
+    expect(Object.keys(req.params).sort()).toEqual(["max_tokens", "messages", "model", "system"]);
   });
 });

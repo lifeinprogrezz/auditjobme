@@ -20,7 +20,8 @@
  *
  * CONTRACT (shared with scripts/scrape.mjs): every emitted job is
  *   { company, title, url, location, remote, source, posted_at, jd_text, seniority }
- * and is kept only when isPM(title) AND isEU(location). seniority = inferSeniority(title).
+ * and is kept only when isInScope(title) AND isEU(location) — the five role_family
+ * verticals since #34, not PM-only. seniority = inferSeniority(title).
  * jd_text is null for these boards — none expose the JD body in their list API
  * (the apply URL is ATS-direct, so the body is fetched downstream at score time,
  * same as scrape.mjs does for Meta/Apple). We never fabricate a body.
@@ -29,7 +30,7 @@
  * The orchestrator in scrape.mjs spreads these into SOURCES alongside the
  * Greenhouse/Lever/Ashby boards. `run()` returns the filtered EU-PM array.
  */
-import { isPM, isEU, inferSeniority, stripHtml } from "../job-filters.mjs";
+import { isInScope, isEU, inferSeniority, stripHtml, FAMILY_SEED_QUERIES } from "../job-filters.mjs";
 import { resolveGetroJobs } from "../getro-lib.mjs";
 import { pfetch } from "./_proxy.mjs";
 
@@ -66,7 +67,7 @@ async function fetchScalingEurope() {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const rows = await res.json();
   return (Array.isArray(rows) ? rows : [])
-    .filter((r) => r.url && isPM(r.title))
+    .filter((r) => r.url && isInScope(r.title))
     .map((r) => {
       const location = r.location || null;
       return {
@@ -101,18 +102,21 @@ const CONSIDER_BOARDS = [
   { name: "Creandum",      source: "vc:creandum",      host: "careers.creandum.com",   slug: "creandum" },
 ];
 const CONSIDER_PAGE_SIZE = 100; // platform returns up to this many per page
-const CONSIDER_MAX_PAGES = 6;   // safety bound; 5×100 covers every board's `total` today
+// All-vertical (#34): the jobTypes:["product-manager"] facet is GONE — the boards
+// now return every function and isInScope() narrows locally, so the safety bound
+// grows to cover full-board totals (drain still early-stops on `total`).
+const CONSIDER_MAX_PAGES = 30;
 
 async function fetchConsiderBoard(board) {
   const endpoint = `https://${board.host}/api-boards/search-jobs`;
   const collected = [];
   let sequence = null;
-  for (let page = 0; page < CONSIDER_PAGE_SIZE && page < CONSIDER_MAX_PAGES; page++) {
+  for (let page = 0; page < CONSIDER_MAX_PAGES; page++) {
     const meta = sequence ? { size: CONSIDER_PAGE_SIZE, sequence } : { size: CONSIDER_PAGE_SIZE };
     const body = {
       meta,
       board: { id: board.slug, isParent: true },
-      query: { jobTypes: ["product-manager"], locations: ["Europe"], promoteFeatured: true },
+      query: { jobTypes: [], locations: ["Europe"], promoteFeatured: true },
     };
     const res = await fetch(endpoint, fetchOpts({
       method: "POST",
@@ -134,7 +138,7 @@ async function fetchConsiderBoard(board) {
     if (!sequence || jobs.length === 0 || collected.length >= total) break;
   }
   return collected
-    .filter((j) => isPM(j.title))
+    .filter((j) => isInScope(j.title))
     .map((j) => {
       const location = Array.isArray(j.locations) ? j.locations.join(", ") : j.locations || null;
       return {
@@ -174,7 +178,7 @@ async function fetchAllConsider() {
 // { hitsPerPage, page, query, filters } and gets { results:{ jobs:[...], count } }.
 // The API caps each page at ~20 regardless of hitsPerPage, and `query` is a loose
 // full-text match (so `count` is large) — we fetch a bounded number of pages and
-// let the strict isPM(title) filter do the narrowing. Job carries the ATS-direct
+// let the strict isInScope(title) filter do the narrowing. Job carries the ATS-direct
 // `url`, `organization.name`, `locations[]`, and `created_at` (UNIX seconds).
 const GETRO_BOARDS = [
   { name: "Entrepreneur First", source: "vc:getro:ef",      collectionId: 228,   origin: "https://portfolio.joinef.com" },
@@ -182,31 +186,35 @@ const GETRO_BOARDS = [
   { name: "Cherry",             source: "vc:getro:cherry",  collectionId: 44081, origin: "https://talent.cherry.vc" },
 ];
 const GETRO_HITS_PER_PAGE = 100;
-const GETRO_MAX_PAGES = 4; // API returns ~20/page; 4 pages of "product manager" drains the real PM tail
+const GETRO_MAX_PAGES = 4; // per QUERY; API returns ~20/page — 4 pages per family seed query drains each family's real tail
 
 async function fetchGetroBoard(board) {
   const endpoint = `https://api.getro.com/api/v2/collections/${board.collectionId}/search/jobs`;
   const collected = [];
-  for (let page = 0; page < GETRO_MAX_PAGES; page++) {
-    const res = await fetch(endpoint, fetchOpts({
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": UA,
-        Origin: board.origin,
-        Referer: `${board.origin}/`,
-      },
-      body: JSON.stringify({ hitsPerPage: GETRO_HITS_PER_PAGE, page, query: "product manager", filters: {} }),
-    }));
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const jobs = (data.results && data.results.jobs) || [];
-    if (jobs.length === 0) break;
-    collected.push(...jobs);
+  // All-vertical (#34): one loose full-text query per family; the strict
+  // isInScope(title) filter below does the precision work.
+  for (const query of FAMILY_SEED_QUERIES) {
+    for (let page = 0; page < GETRO_MAX_PAGES; page++) {
+      const res = await fetch(endpoint, fetchOpts({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "User-Agent": UA,
+          Origin: board.origin,
+          Referer: `${board.origin}/`,
+        },
+        body: JSON.stringify({ hitsPerPage: GETRO_HITS_PER_PAGE, page, query, filters: {} }),
+      }));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const jobs = (data.results && data.results.jobs) || [];
+      if (jobs.length === 0) break;
+      collected.push(...jobs);
+    }
   }
   return collected
-    .filter((j) => isPM(j.title))
+    .filter((j) => isInScope(j.title))
     .map((j) => {
       const location = Array.isArray(j.locations)
         ? j.locations.join(", ")
@@ -286,7 +294,7 @@ async function fetchStartupmap() {
   const jobs = extractArray(await jobsRes.json(), "jobs");
 
   return jobs
-    .filter((j) => j.visible !== false && isPM(j.job_title))
+    .filter((j) => j.visible !== false && isInScope(j.job_title))
     .map((j) => {
       const co = companiesById.get(j.startup_id);
       const location =
@@ -330,7 +338,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   for (const s of sources) {
     try {
       const jobs = await s.run();
-      console.error(`${s.company}: ${jobs.length} EU PM role(s)`);
+      console.error(`${s.company}: ${jobs.length} EU role(s) in scope`);
       all.push(...jobs);
     } catch (e) {
       console.error(`${s.company} failed: ${e.message}`);
@@ -338,7 +346,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   }
   const seen = new Set();
   const deduped = all.filter((j) => (seen.has(j.url) ? false : seen.add(j.url)));
-  console.error(`Total (deduped): ${deduped.length} EU PM roles`);
+  console.error(`Total (deduped): ${deduped.length} EU roles in scope`);
   for (const j of deduped.slice(0, 40)) {
     console.error(`  [${j.source}] ${j.company} — ${j.title} [${j.location}]`);
   }
