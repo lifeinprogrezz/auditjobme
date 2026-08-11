@@ -121,18 +121,22 @@ describe("parsePosition + normalizePersonioPosition", () => {
 describe("parsePersonioXml", () => {
   const rows = parsePersonioXml(xml, "1KOMMA5°", HOST);
 
-  it("keeps only European Product roles", () => {
+  it("keeps only European in-scope roles (#34 all-vertical: engineering now included)", () => {
     expect(rows.map((r) => r.title)).toEqual([
       "(Senior) Product Manager Smart Metering & Steering (m/f/d)", // Hamburg, via the city map
+      "Staff Software Engineer, Data Platform", // engineering family — in scope since #34
     ]);
   });
 
-  it("drops the engineering seats (shared NEG_RE, incl. an -Engineering-suffixed Product title)", () => {
+  it("drops out-of-scope seats: trade roles and ambiguous product×engineering titles", () => {
     const all = [...xml.matchAll(/<position>/g)];
     expect(all.length).toBe(4);
     const titles = rows.map((r) => r.title);
+    // Non-software trade role — no family claims it.
     expect(titles).not.toContain("Elektriker / Elektroniker Energie- und Gebäudetechnik (m/w/d) - Photovoltaik, Wärmepumpen & Energiesysteme - 1KOMMA5° Düsseldorf");
-    expect(titles).not.toContain("Staff Software Engineer, Data Platform");
+    // Carries BOTH product-manager and engineering vocabulary: the product family
+    // rejects it (family-scoped negative) and the engineering family refuses PM_RE
+    // titles, so it stays out — same reach as the old global NEG_RE.
     expect(titles).not.toContain("(Lead/Senior) Technical Product Manager - Platform Engineering (m/f/d)");
   });
 

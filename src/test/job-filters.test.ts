@@ -175,3 +175,10 @@ describe("stripHtml", () => {
     expect(stripHtml(null)).toBe("");
   });
 });
+
+describe("ambiguous product×engineering titles (family-scoped negative, both directions)", () => {
+  it("a PM title with engineering vocabulary is neither product nor engineering", () => {
+    expect(classifyRoleFamily("(Lead/Senior) Technical Product Manager - Platform Engineering (m/f/d)")).toBe(null);
+    expect(classifyRoleFamily("Product Manager, Engineering Tools")).toBe(null);
+  });
+});

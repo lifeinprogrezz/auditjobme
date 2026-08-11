@@ -112,13 +112,18 @@ const OPERATIONS_RE =
 const ENGINEERING_RE =
   /\b(software|backend|back[- ]?end|frontend|front[- ]?end|full[- ]?stack|platform|infrastructure|site reliability|devops|mobile|ios|android|data|machine[- ]learning|ml|ai|security|cloud|qa|test|embedded|blockchain|analytics) engineer(ing)?\b|\bengineering manager\b|\b(staff|principal|senior|founding|lead) engineer\b|\bsoftware developer\b|\bweb developer\b|\bsre\b|\btech(nical)? lead\b|head of engineering|\bvp,? (of )?engineering\b|director of engineering/i;
 
-/** Precedence-ordered [family, matcher] pairs. First match wins. */
+/** Precedence-ordered [family, matcher] pairs. First match wins.
+ *  The engineering matcher excludes PM_RE titles: a title carrying BOTH
+ *  product-manager and engineering vocabulary ("Technical Product Manager -
+ *  Platform Engineering") is a product seat the product negative rejected as
+ *  ambiguous — labelling it engineering would be a misclassification, so it
+ *  stays out entirely (exactly the old global-NEG_RE behavior). */
 const FAMILY_MATCHERS = [
   ["product", (t) => PM_RE.test(t) && !PRODUCT_NEG_RE.test(t)],
   ["sales", (t) => SALES_RE.test(t)],
   ["marketing", (t) => MARKETING_RE.test(t)],
   ["operations", (t) => OPERATIONS_RE.test(t)],
-  ["engineering", (t) => ENGINEERING_RE.test(t)],
+  ["engineering", (t) => ENGINEERING_RE.test(t) && !PM_RE.test(t)],
 ];
 
 /**
