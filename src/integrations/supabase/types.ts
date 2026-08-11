@@ -17,6 +17,7 @@ export type Database = {
       applications: {
         Row: {
           applied_at: string
+          confirmed_at: string | null
           id: string
           job_id: string
           notes: string | null
@@ -25,6 +26,7 @@ export type Database = {
         }
         Insert: {
           applied_at?: string
+          confirmed_at?: string | null
           id?: string
           job_id: string
           notes?: string | null
@@ -33,6 +35,7 @@ export type Database = {
         }
         Update: {
           applied_at?: string
+          confirmed_at?: string | null
           id?: string
           job_id?: string
           notes?: string | null
@@ -414,6 +417,95 @@ export type Database = {
         }
         Relationships: []
       }
+      headcount_bucket_backup_20260726: {
+        Row: {
+          captured_at: string
+          headcount_bucket: string | null
+          slug: string
+        }
+        Insert: {
+          captured_at?: string
+          headcount_bucket?: string | null
+          slug: string
+        }
+        Update: {
+          captured_at?: string
+          headcount_bucket?: string | null
+          slug?: string
+        }
+        Relationships: []
+      }
+      inbound_emails: {
+        Row: {
+          action: string
+          application_id: string | null
+          ats: string | null
+          classification: string
+          detail: string | null
+          from_domain: string | null
+          id: string
+          message_id: string | null
+          received_at: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          application_id?: string | null
+          ats?: string | null
+          classification: string
+          detail?: string | null
+          from_domain?: string | null
+          id?: string
+          message_id?: string | null
+          received_at?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          application_id?: string | null
+          ats?: string | null
+          classification?: string
+          detail?: string | null
+          from_domain?: string | null
+          id?: string
+          message_id?: string | null
+          received_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbound_emails_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbound_tokens: {
+        Row: {
+          created_at: string
+          gmail_confirmation_at: string | null
+          gmail_confirmation_code: string | null
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          gmail_confirmation_at?: string | null
+          gmail_confirmation_code?: string | null
+          token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          gmail_confirmation_at?: string | null
+          gmail_confirmation_code?: string | null
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       jobs: {
         Row: {
           city: string | null
@@ -622,6 +714,45 @@ export type Database = {
           },
         ]
       }
+      score_batches: {
+        Row: {
+          batch_date: string | null
+          id: string
+          job_ids: string[]
+          provider_batch_id: string
+          retrieved_at: string | null
+          rubric_version: string
+          status: string
+          submitted_at: string
+          user_id: string
+          worker: string
+        }
+        Insert: {
+          batch_date?: string | null
+          id?: string
+          job_ids?: string[]
+          provider_batch_id: string
+          retrieved_at?: string | null
+          rubric_version: string
+          status?: string
+          submitted_at?: string
+          user_id: string
+          worker: string
+        }
+        Update: {
+          batch_date?: string | null
+          id?: string
+          job_ids?: string[]
+          provider_batch_id?: string
+          retrieved_at?: string | null
+          rubric_version?: string
+          status?: string
+          submitted_at?: string
+          user_id?: string
+          worker?: string
+        }
+        Relationships: []
+      }
       scores: {
         Row: {
           id: string
@@ -662,7 +793,7 @@ export type Database = {
       }
       status_events: {
         Row: {
-          application_id: string
+          application_id: string | null
           changed_at: string
           from_status: string | null
           id: string
@@ -670,7 +801,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          application_id: string
+          application_id?: string | null
           changed_at?: string
           from_status?: string | null
           id?: string
@@ -678,7 +809,7 @@ export type Database = {
           user_id: string
         }
         Update: {
-          application_id?: string
+          application_id?: string | null
           changed_at?: string
           from_status?: string | null
           id?: string
@@ -694,45 +825,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      score_batches: {
-        Row: {
-          batch_date: string | null
-          id: string
-          job_ids: string[]
-          provider_batch_id: string
-          retrieved_at: string | null
-          rubric_version: string
-          status: string
-          submitted_at: string
-          user_id: string
-          worker: string
-        }
-        Insert: {
-          batch_date?: string | null
-          id?: string
-          job_ids?: string[]
-          provider_batch_id: string
-          retrieved_at?: string | null
-          rubric_version: string
-          status?: string
-          submitted_at?: string
-          user_id: string
-          worker: string
-        }
-        Update: {
-          batch_date?: string | null
-          id?: string
-          job_ids?: string[]
-          provider_batch_id?: string
-          retrieved_at?: string | null
-          rubric_version?: string
-          status?: string
-          submitted_at?: string
-          user_id?: string
-          worker?: string
-        }
-        Relationships: []
       }
       usage_events: {
         Row: {
@@ -820,11 +912,13 @@ export type Database = {
         Args: { p_fingerprint: string }
         Returns: number
       }
+      delete_own_account: { Args: never; Returns: undefined }
       generate_audit_slug: {
         Args: { p_company: string; p_user_id: string }
         Returns: string
       }
       get_global_avg_duration: { Args: never; Returns: number }
+      get_or_create_forwarding_token: { Args: never; Returns: string }
       link_jobs_to_companies: { Args: never; Returns: number }
     }
     Enums: {
