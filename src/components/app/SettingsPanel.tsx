@@ -3,8 +3,9 @@
 // "a proper good definition on the app"). Same data contract the modal had, so the
 // pinned states carry over: CV-on-file vs empty, Replace wiring, editable target
 // roles / industries, Save persistence. Paper idiom throughout (§3.2 sections).
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   cvWordCount,
   formatUploadedDate,
@@ -15,6 +16,7 @@ import {
   filterSectorSearch,
 } from "@/lib/labels";
 import { USER_DATA_TABLES } from "@/lib/account";
+import { parseConnectionsCsv, type ParsedConnection } from "@/lib/connections";
 import type { FilterOption } from "@/components/roles/FilterChip";
 import type { RoleJob } from "@/lib/roles";
 
@@ -42,10 +44,30 @@ export type SettingsPanelProps = {
   onExportData: () => Promise<boolean>;
   /** Delete the account for real. Resolves false on failure; on success the app signs out. */
   onDeleteAccount: () => Promise<boolean>;
+  /** Stored LinkedIn-connections rows (issue #41): 0 when nothing is uploaded. */
+  connectionsCount: number;
+  /** When the current connections upload landed. */
+  connectionsUpdatedAt: string | null;
+  /** Persist a freshly parsed Connections.csv (replaces any stored upload). */
+  onSaveConnections: (rows: ParsedConnection[]) => Promise<boolean>;
+  /** Remove the whole upload; every warm marker disappears with it. */
+  onRemoveConnections: () => Promise<boolean>;
 };
 
 /** The word someone has to type before the delete button does anything. */
 export const DELETE_CONFIRM_WORD = "delete";
+
+/** Read an uploaded file as text; FileReader fallback for environments whose
+ *  File lacks .text() (older WebKit, jsdom). */
+function readFileText(file: File): Promise<string> {
+  if (typeof file.text === "function") return file.text();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read the file"));
+    reader.readAsText(file);
+  });
+}
 
 /** Toggle a value in/out of a capped list — ignores extra picks past the cap. */
 function toggleCapped(list: string[], value: string, cap: number): string[] {
@@ -73,6 +95,10 @@ export default function SettingsPanel({
   onRestoreDismissed,
   onExportData,
   onDeleteAccount,
+  connectionsCount,
+  connectionsUpdatedAt,
+  onSaveConnections,
+  onRemoveConnections,
 }: SettingsPanelProps) {
   // Edits stay null until the first touch, then own the render — no effect-seeding
   // race against the async profile load (the ProfileModal open-seeding lesson,
@@ -89,6 +115,12 @@ export default function SettingsPanel({
   const [confirmWord, setConfirmWord] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
+
+  // Connections upload (issue #41): file is read + parsed HERE (pure lib), the
+  // parent only persists rows — so the panel stays testable without a network.
+  const [connBusy, setConnBusy] = useState(false);
+  const [connError, setConnError] = useState("");
+  const connFileRef = useRef<HTMLInputElement>(null);
 
   const roles = editRoles ?? targetRoles;
   const sectors = editSectors ?? targetSectors;
@@ -122,6 +154,38 @@ export default function SettingsPanel({
     setExporting(false);
     if (!ok) setExportFailed(true);
   };
+
+  const handleConnectionsFile = async (file: File | undefined) => {
+    if (!file || connBusy) return;
+    setConnBusy(true);
+    setConnError("");
+    try {
+      const rows = parseConnectionsCsv(await readFileText(file));
+      if (rows.length === 0) {
+        setConnError(
+          "We couldn't read connections from that file. It should be the Connections.csv file from your LinkedIn download, unchanged.",
+        );
+        return;
+      }
+      const ok = await onSaveConnections(rows);
+      if (!ok) setConnError("We couldn't save your connections just now. Give it another try in a moment.");
+    } catch {
+      setConnError("We couldn't read that file. Give it another try.");
+    } finally {
+      setConnBusy(false);
+    }
+  };
+
+  const handleRemoveConnections = async () => {
+    if (connBusy) return;
+    setConnBusy(true);
+    setConnError("");
+    const ok = await onRemoveConnections();
+    if (!ok) setConnError("We couldn't remove your connections just now. Give it another try in a moment.");
+    setConnBusy(false);
+  };
+
+  const connectionsUploaded = formatUploadedDate(connectionsUpdatedAt);
 
   const confirmed = confirmWord.trim().toLowerCase() === DELETE_CONFIRM_WORD;
 
@@ -170,6 +234,99 @@ export default function SettingsPanel({
               Add your CV
             </Button>
           </>
+        )}
+      </section>
+
+      {/* LinkedIn connections upload (issue #41). Optional, alongside the CV — the
+          user's own export of their own network, treated with the CV's privacy
+          posture. The match is information on the cards, never a score change. */}
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
+        <h2 className="inline-flex items-center gap-2 font-display text-section text-foreground">
+          Your LinkedIn connections
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="How your connections are used"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border font-mono text-caption text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+              >
+                i
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 text-caption text-muted-foreground" align="start">
+              <p className="text-pretty">
+                <b className="text-foreground">Getting the file:</b> on LinkedIn, open Settings &amp; Privacy, then
+                Data privacy, then "Get a copy of your data", and tick Connections. LinkedIn emails you a small file
+                called Connections.csv.
+              </p>
+              <p className="mt-2 text-pretty">
+                <b className="text-foreground">What we do with it:</b> we keep the list with your account and match
+                company names, so roles can show who you already know. Only you can see it. It never changes your
+                match scores, we never contact anyone on it, it's part of your data download, and deleting it here or
+                deleting your account removes it completely.
+              </p>
+            </PopoverContent>
+          </Popover>
+        </h2>
+        <input
+          ref={connFileRef}
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = ""; // allow re-selecting the same file
+            void handleConnectionsFile(f);
+          }}
+        />
+        {connectionsCount > 0 ? (
+          <>
+            <p className="mt-3 inline-flex flex-wrap items-center gap-2 text-body text-foreground">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              Connections on file
+              <span className="font-mono text-caption text-muted-foreground">
+                {connectionsCount.toLocaleString()} people
+              </span>
+              <button
+                type="button"
+                onClick={() => connFileRef.current?.click()}
+                disabled={connBusy}
+                className="text-control font-medium text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
+              >
+                Replace
+              </button>
+              <button
+                type="button"
+                onClick={handleRemoveConnections}
+                disabled={connBusy}
+                className="text-control font-medium text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
+              >
+                Remove
+              </button>
+            </p>
+            {connectionsUploaded && (
+              <p className="mt-1 text-caption text-muted-foreground">Uploaded {connectionsUploaded}</p>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="mt-3 text-body text-muted-foreground text-pretty">
+              <b className="text-foreground">Optional.</b> LinkedIn lets you download the list of people you're
+              connected with (a file called Connections.csv). Add it here and roles at companies where you already
+              know someone get a quiet "You know 2 people here", with the names waiting on the application page.
+              It never changes your match scores.
+            </p>
+            <Button className="mt-4" onClick={() => connFileRef.current?.click()} disabled={connBusy}>
+              {connBusy ? "Reading your file…" : "Add your connections"}
+            </Button>
+          </>
+        )}
+        {connError && (
+          <p className="mt-3 text-caption text-muted-foreground" role="alert">
+            {connError}
+          </p>
         )}
       </section>
 

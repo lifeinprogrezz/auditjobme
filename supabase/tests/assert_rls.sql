@@ -306,7 +306,7 @@ declare
   -- Every table this check seeds and then asserts empty, as 'table.user_column'.
   seeded text[] := array[
     'applications.user_id', 'artifacts.user_id', 'audits.user_id',
-    'company_requests.user_id', 'daily_matches.user_id', 'device_fingerprints.user_id',
+    'company_requests.user_id', 'connections.user_id', 'daily_matches.user_id', 'device_fingerprints.user_id',
     'dismissed_jobs.user_id', 'feedback.user_id', 'inbound_emails.user_id',
     'inbound_tokens.user_id', 'profiles.id', 'purchases.user_id',
     'saved_jobs.user_id', 'score_batches.user_id', 'scores.user_id', 'status_events.user_id',
@@ -366,6 +366,10 @@ begin
   insert into public.audits (user_id, company_name, audit_data)
     values (theirs, 'CI Fixture Co', '{}'::jsonb) returning id into audit_theirs;
   insert into public.company_requests (user_id, company_name) values (mine, 'CI Fixture Co'), (theirs, 'CI Fixture Co');
+  -- connections: the user's own LinkedIn export rows (issue #41) must go with the account.
+  insert into public.connections (user_id, full_name, company, company_key)
+    values (mine, 'CI Fixture Person', 'CI Fixture Co', 'ci fixture co'),
+           (theirs, 'CI Fixture Person', 'CI Fixture Co', 'ci fixture co');
   insert into public.daily_matches (user_id, job_url)
     values (mine, 'https://example.invalid/ci/gdpr-delete'), (theirs, 'https://example.invalid/ci/gdpr-delete');
   insert into public.device_fingerprints (fingerprint_id, user_id, audit_id)

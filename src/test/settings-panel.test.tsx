@@ -17,6 +17,8 @@ function renderPanel(props: Partial<React.ComponentProps<typeof SettingsPanel>> 
   const onSaveTargets = vi.fn(async () => true);
   const onExportData = vi.fn(async () => true);
   const onDeleteAccount = vi.fn(async () => true);
+  const onSaveConnections = vi.fn(async () => true);
+  const onRemoveConnections = vi.fn(async () => true);
   const utils = render(
     <SettingsPanel
       cvText={null}
@@ -29,10 +31,14 @@ function renderPanel(props: Partial<React.ComponentProps<typeof SettingsPanel>> 
       email="rober@example.com"
       onExportData={onExportData}
       onDeleteAccount={onDeleteAccount}
+      connectionsCount={0}
+      connectionsUpdatedAt={null}
+      onSaveConnections={onSaveConnections}
+      onRemoveConnections={onRemoveConnections}
       {...props}
     />,
   );
-  return { onReplaceCv, onSaveTargets, onExportData, onDeleteAccount, ...utils };
+  return { onReplaceCv, onSaveTargets, onExportData, onDeleteAccount, onSaveConnections, onRemoveConnections, ...utils };
 }
 
 describe("SettingsPanel", () => {
@@ -152,5 +158,54 @@ describe("SettingsPanel — account section (issue #84)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Delete everything/i }));
     expect(onDeleteAccount).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/still here/i));
+  });
+});
+
+describe("SettingsPanel — LinkedIn connections (issue #41)", () => {
+  beforeEach(() => cleanup());
+
+  const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
+
+  const VALID_CSV = [
+    "First Name,Last Name,URL,Email Address,Company,Position,Connected On",
+    "Jane,Doe,https://www.linkedin.com/in/janedoe,,Spotify AB,Product Manager,07 Mar 2021",
+  ].join("\n");
+
+  it("no upload → explains the optional file, never a fabricated count", () => {
+    renderPanel({ connectionsCount: 0 });
+    expect(screen.getByText(/Your LinkedIn connections/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add your connections/i })).toBeInTheDocument();
+    expect(screen.getByText(/never changes your match scores/i)).toBeInTheDocument();
+    expect(screen.queryByText(/people$/i)).not.toBeInTheDocument();
+  });
+
+  it("a valid Connections.csv is parsed in the panel and handed over as rows", async () => {
+    const { onSaveConnections } = renderPanel({ connectionsCount: 0 });
+    const file = new File([VALID_CSV], "Connections.csv", { type: "text/csv" });
+    fireEvent.change(fileInput(), { target: { files: [file] } });
+    await waitFor(() => expect(onSaveConnections).toHaveBeenCalledTimes(1));
+    expect(onSaveConnections).toHaveBeenCalledWith([
+      expect.objectContaining({ fullName: "Jane Doe", company: "Spotify AB", companyKey: "spotify" }),
+    ]);
+  });
+
+  it("a file that is not a Connections.csv is refused with a readable error", async () => {
+    const { onSaveConnections } = renderPanel({ connectionsCount: 0 });
+    const file = new File(["nothing,useful\nhere,either"], "resume.csv", { type: "text/csv" });
+    fireEvent.change(fileInput(), { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/couldn't read connections/i));
+    expect(onSaveConnections).not.toHaveBeenCalled();
+  });
+
+  it("upload on file → shows the count, Replace, and a working Remove", async () => {
+    const { onRemoveConnections } = renderPanel({
+      connectionsCount: 1234,
+      connectionsUpdatedAt: "2026-08-01T09:00:00.000Z",
+    });
+    expect(screen.getByText(/Connections on file/i)).toBeInTheDocument();
+    expect(screen.getByText(/1,234 people/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Replace$/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Remove$/i }));
+    await waitFor(() => expect(onRemoveConnections).toHaveBeenCalledTimes(1));
   });
 });

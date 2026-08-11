@@ -24,6 +24,7 @@ import {
   type QueueEntry,
 } from "@/lib/product";
 import { geoVerdict, postedAgo, type RoleJob } from "@/lib/roles";
+import { warmContactsFor, warmMarkerLabel } from "@/lib/connections";
 import { RUBRIC_VERSION } from "@/lib/score";
 import { DEV_FIXTURE, devFixtureBatch } from "@/lib/devFixture";
 import FitChip from "@/components/roles/FitChip";
@@ -71,6 +72,7 @@ export default function Today() {
     dismissed,
     toggleDismissed,
     inFlightCompanies,
+    warmIndex,
     scoreMore,
   } = useRolesData();
   const daily = useDailyMatches();
@@ -174,6 +176,10 @@ export default function Today() {
     const isApplied = applied.has(job.id);
     const isSaved = saved.has(job.id);
     const isOpen = expanded.has(job.id);
+    // Warm marker (issue #41): knowing someone changes what you do BEFORE opening
+    // Apply, so it belongs on the card. Information only — the rank above and the
+    // score chip to the right are untouched by it, deliberately.
+    const warmLabel = warmMarkerLabel(warmContactsFor(job.company, warmIndex).length);
     return (
       <li
         key={job.id}
@@ -208,6 +214,16 @@ export default function Today() {
                 </>
               )}
             </div>
+            {warmLabel && (
+              <p className="mt-1 inline-flex items-center gap-1.5 text-caption font-medium text-foreground">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                {warmLabel}
+              </p>
+            )}
             {/* The "why you" line is the ranked sections' earned privilege; the
                 More-matches tail stays a scannable index without it, same as
                 Saved (Rober 7-16). The full reasoning lives on the prep page. */}

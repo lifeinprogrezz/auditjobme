@@ -290,6 +290,42 @@ export type Database = {
         }
         Relationships: []
       }
+      connections: {
+        Row: {
+          company: string
+          company_key: string
+          connected_on: string | null
+          created_at: string
+          full_name: string
+          id: string
+          linkedin_url: string | null
+          position: string | null
+          user_id: string
+        }
+        Insert: {
+          company: string
+          company_key: string
+          connected_on?: string | null
+          created_at?: string
+          full_name: string
+          id?: string
+          linkedin_url?: string | null
+          position?: string | null
+          user_id: string
+        }
+        Update: {
+          company?: string
+          company_key?: string
+          connected_on?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          linkedin_url?: string | null
+          position?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       daily_matches: {
         Row: {
           batch_date: string

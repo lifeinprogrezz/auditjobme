@@ -25,6 +25,7 @@ import { downloadCvPdf, downloadCoverPdf } from "@/lib/pdf";
 import { domainFor } from "@/lib/logodev";
 import { cityOf } from "@/lib/geo";
 import { auditHref } from "@/lib/auditLink";
+import { companyKey, type WarmContact } from "@/lib/connections";
 import { track } from "@/lib/analytics";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -132,6 +133,9 @@ export default function Apply() {
   const [qas, setQas] = useState<{ q: string; a: string }[]>([]);
   const [hasApplied, setHasApplied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  // Warm contacts (issue #41): who the user knows at THIS company, from their own
+  // LinkedIn connections upload. Own-row read; empty for users without an upload.
+  const [warmContacts, setWarmContacts] = useState<WarmContact[]>([]);
   // Per-role context (issue #76): "anything specific for this one?" — feeds the
   // three generated surfaces for THIS role only, never the profile. Empty box =
   // every prompt stays byte-identical to before (pinned in tailor.test.ts).
@@ -148,6 +152,7 @@ export default function Apply() {
     setQuestion("");
     setQas([]);
     setRoleContext("");
+    setWarmContacts([]);
     async function load() {
       if (!user) {
         setLoading(false);
@@ -168,14 +173,31 @@ export default function Apply() {
       if (jobData) {
         // The fit score + applied state both key on job_id — fetch them together so
         // the context header can show the FitChip that motivated the apply (§6.1 AP3).
-        const [{ data: app }, { data: scoreRow }, { data: savedRow }] = await Promise.all([
+        // Warm contacts (issue #41) ride along: the stored company_key was computed by
+        // the same companyKey() at upload time, so the two sides always agree.
+        const [{ data: app }, { data: scoreRow }, { data: savedRow }, { data: connRows }] = await Promise.all([
           supabase.from("applications").select("id").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
           supabase.from("scores").select("score").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
           supabase.from("saved_jobs").select("id").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
+          supabase
+            .from("connections")
+            .select("full_name, company, company_key, position, linkedin_url")
+            .eq("user_id", user.id)
+            .eq("company_key", companyKey((jobData as Job).company)),
         ]);
         if (active && app) setHasApplied(true);
         if (active && scoreRow) setScore(scoreRow.score ?? null);
         if (active && savedRow) setIsSaved(true);
+        if (active)
+          setWarmContacts(
+            (connRows ?? []).map((r) => ({
+              fullName: r.full_name,
+              company: r.company,
+              companyKey: r.company_key,
+              position: r.position,
+              linkedinUrl: r.linkedin_url,
+            })),
+          );
       }
       if (active) setLoading(false);
     }
@@ -460,6 +482,40 @@ export default function Apply() {
           </Button>
         )}
       </header>
+
+      {/* Warm contacts panel (issue #41): who you already know here, from your own
+          LinkedIn connections upload. Independent of the CV and of every generated
+          artifact below — it renders whenever there is a match, changes nothing
+          else, and stays private to the signed-in user (own-row read). */}
+      {warmContacts.length > 0 && (
+        <div className="mt-8">
+          <Section eyebrow="Your network" title={`Who you know at ${job.company}`}>
+            <p className="mt-2 text-caption text-muted-foreground text-pretty">
+              From the connections file you uploaded in Settings. Only you can see this, and it doesn't change your
+              match score. A short message to one of them often does more than a perfect cover letter.
+            </p>
+            <ul className="mt-4 flex flex-col gap-3">
+              {warmContacts.map((c, i) => (
+                <li key={i} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  {c.linkedinUrl ? (
+                    <a
+                      href={c.linkedinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-display text-body text-foreground underline-offset-2 hover:underline"
+                    >
+                      {c.fullName}
+                    </a>
+                  ) : (
+                    <span className="font-display text-body text-foreground">{c.fullName}</span>
+                  )}
+                  {c.position && <span className="text-caption text-muted-foreground">{c.position}</span>}
+                </li>
+              ))}
+            </ul>
+          </Section>
+        </div>
+      )}
 
       {!cvText ? (
         <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-page">
