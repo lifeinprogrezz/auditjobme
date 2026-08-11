@@ -721,6 +721,45 @@ export type Database = {
         }
         Relationships: []
       }
+      referral_tokens: {
+        Row: {
+          created_at: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          created_at: string
+          referee_id: string
+          referrer_id: string
+          signed_up_at: string
+        }
+        Insert: {
+          created_at?: string
+          referee_id: string
+          referrer_id: string
+          signed_up_at?: string
+        }
+        Update: {
+          created_at?: string
+          referee_id?: string
+          referrer_id?: string
+          signed_up_at?: string
+        }
+        Relationships: []
+      }
       saved_jobs: {
         Row: {
           id: string
@@ -944,6 +983,10 @@ export type Database = {
       }
     }
     Functions: {
+      claim_referral: {
+        Args: { ref_token: string }
+        Returns: boolean
+      }
       count_audits_by_fingerprint: {
         Args: { p_fingerprint: string }
         Returns: number
@@ -955,6 +998,7 @@ export type Database = {
       }
       get_global_avg_duration: { Args: never; Returns: number }
       get_or_create_forwarding_token: { Args: never; Returns: string }
+      get_or_create_referral_token: { Args: never; Returns: string }
       link_jobs_to_companies: { Args: never; Returns: number }
     }
     Enums: {
