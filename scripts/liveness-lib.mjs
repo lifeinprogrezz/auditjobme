@@ -18,7 +18,7 @@
 // we re-scan daily). Everything else — vc:*, startupmap, workday, factorial,
 // bigtech, seed — has NO retirement path except the liveness sweep.
 // Single source of truth: scripts/scrape.mjs imports this list.
-export const BOARD_KINDS = ["greenhouse", "lever", "ashby", "workable", "smartrecruiters", "teamtailor"];
+export const BOARD_KINDS = ["greenhouse", "lever", "ashby", "workable", "smartrecruiters", "teamtailor", "personio"];
 
 const NEVER_FETCH_HOST_RE = /(^|\.)linkedin\.com$/i;
 

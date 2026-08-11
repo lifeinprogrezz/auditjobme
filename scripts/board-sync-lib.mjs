@@ -26,6 +26,9 @@ export const ATS_PATTERNS = {
   workable: [/apply\.workable\.com\/([A-Za-z0-9_-]+)/],
   smartrecruiters: [/(?:careers|jobs)\.smartrecruiters\.com\/([A-Za-z0-9_-]+)/],
   teamtailor: [/\/\/([A-Za-z0-9-]+)\.teamtailor\.com/],
+  // .de and .com serve the identical tenant feed (verified 2026-08-11); the
+  // token is the same either way and sources/personio.mjs reads .de canonically.
+  personio: [/\/\/([A-Za-z0-9-]+)\.jobs\.personio\.(?:de|com)/],
 };
 
 // A Greenhouse/Lever/Ashby path segment that is a route, not a company token.
