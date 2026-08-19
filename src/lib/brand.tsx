@@ -32,11 +32,9 @@ export const MARK_SOUTH_STROKE = 3.4;
 
 // The product name is defined in ./brandName, a JSX-free module, so the email
 // builders and the api/ Vercel Functions can share it without pulling React into
-// a serverless bundle. Re-exported here so every React surface keeps importing
-// the whole identity (mark, lockup, name) from one place.
-/** The product name. The domain cutover (#106) swaps hosts, never this string. */
-// eslint-disable-next-line react-refresh/only-export-components -- re-export of one shared constant, not a component
-
+// a serverless bundle. Consumers import the constants straight from there;
+// this file deliberately exports COMPONENTS ONLY, which is what keeps fast
+// refresh working on every brand surface.
 
 type MarkProps = {
   /** Rendered size in pixels. Square by construction. */
