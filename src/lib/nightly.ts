@@ -354,30 +354,40 @@ export function buildEmailBody(
 /**
  * Decide whether a finished nightly run should report success.
  *
- * The handler used to answer `200 {ok:true}` unconditionally: the per-user loop
- * catches every error into a `console.warn` and keeps going, so a run in which
- * EVERY user failed looked exactly like a quiet night. The scheduled Action saw a
- * 200 and went green, and two days of digests were lost with no signal at all.
+ * The handler used to answer `200 {ok:true}` unconditionally, so a run in which nothing
+ * happened for anybody looked exactly like a quiet night: the scheduled Action went green
+ * and three days of digests (2026-08-10, 08-14, 08-17) were lost with no signal at all.
  *
- * The distinction that matters is not "did we produce matches" — zero matches is a
- * perfectly normal night when nothing new was scraped. It is "did the users we
- * tried to process fail". Total failure is a real outage and must go red so the
- * Action surfaces it; partial failure stays a success but carries the count, so it
- * is visible in the response body instead of only in logs nobody reads.
+ * The first attempt at this guard asked `processed > 0 && failed >= processed`, and it was
+ * INERT. `summary.processed++` lives deep inside the per-user try, behind eight `continue`
+ * statements, and the catch increments only `failed` — so a real outage is
+ * {processed:0, failed:N}, and `processed > 0` is never true. The 08-17 run did not even
+ * throw: `proxyBatchOp` returns null on a non-ok response, the batch id check fails, and
+ * control `continue`s without touching ANY counter, giving {processed:0, failed:0}.
+ *
+ * So this counts SUCCESS against the users we set out to serve, rather than trying to
+ * count the ways a user can die. However a user is lost — a throw, a silent `continue`, a
+ * null batch response, an uncounted insert failure — the one thing an outage cannot fake
+ * is a user actually getting through. `users` comes from `active.length` and is known
+ * before the loop starts, so it cannot be skipped by any path inside it.
+ *
+ * Zero active users remains a success: that is a genuinely quiet night, not an outage.
  */
-export function nightlyRunVerdict(run: { processed: number; failed: number }): {
+export function nightlyRunVerdict(run: { users: number; processed: number; failed: number }): {
   ok: boolean;
   status: 200 | 500;
   failed: number;
   reason?: string;
 } {
-  const { processed, failed } = run;
-  if (processed > 0 && failed >= processed) {
+  const { users, processed, failed } = run;
+  if (users > 0 && processed === 0) {
     return {
       ok: false,
       status: 500,
       failed,
-      reason: `every user failed (${failed}/${processed}) — treating as an outage, not a quiet night`,
+      reason:
+        `no user completed: ${users} active, 0 processed, ${failed} recorded as failed — ` +
+        `treating as an outage, not a quiet night`,
     };
   }
   return { ok: true, status: 200, failed };
