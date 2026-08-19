@@ -57,7 +57,7 @@ const APP_URL = "https://northgoing.com/";
 // Only the DISPLAY NAME follows the rebrand. The address stays on
 // lifeinprogrezz.com because that is the domain verified in Resend; sending from
 // an unverified northgoing.com would make Resend reject every send.
-const EMAIL_FROM = `${BRAND_NAME} <matches@lifeinprogrezz.com>`;
+const EMAIL_FROM = `${BRAND_NAME} <matches@northgoing.com>`;
 const HAIKU = "claude-haiku-4-5-20251001";
 const JOB_FETCH_LIMIT = 800; // recent-jobs candidate window (newest first)
 
@@ -184,7 +184,7 @@ async function sendEmail(
         // List-Unsubscribe biases the Updates tab over Promotions and keeps us out of
         // spam. mailto for now; a hosted one-click endpoint is a later slice.
         headers: {
-          "List-Unsubscribe": "<mailto:hello@lifeinprogrezz.com?subject=Unsubscribe%20AuditJob%20matches>",
+          "List-Unsubscribe": "<mailto:hello@lifeinprogrezz.com?subject=Unsubscribe%20Northgoing%20matches>",
         },
       }),
     });

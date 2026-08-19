@@ -40,7 +40,7 @@ type Res = { status: (code: number) => Res; json: (body: unknown) => void };
 const APP_URL = "https://northgoing.com/";
 // Display name only. The address stays on lifeinprogrezz.com, the Resend-verified
 // domain — same split as api/nightly.ts, and both must move together.
-const EMAIL_FROM = `${BRAND_NAME} <matches@lifeinprogrezz.com>`;
+const EMAIL_FROM = `${BRAND_NAME} <matches@northgoing.com>`;
 const HAIKU = "claude-haiku-4-5-20251001";
 const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page past it.
 const JD_BATCH = 50; // jd_text is multi-KB: fetch it only for the rows about to score.
@@ -151,7 +151,7 @@ async function sendEmail(
         text: body.text,
         html: body.html,
         headers: {
-          "List-Unsubscribe": "<mailto:hello@lifeinprogrezz.com?subject=Unsubscribe%20AuditJob%20matches>",
+          "List-Unsubscribe": "<mailto:hello@lifeinprogrezz.com?subject=Unsubscribe%20Northgoing%20matches>",
         },
       }),
     });
