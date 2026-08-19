@@ -10,6 +10,7 @@ import {
   decideTransition,
   extractCompanyRole,
   extractForwardingToken,
+  extractGmailConfirmationLink,
   parseResendInboundEvent,
   extractGmailConfirmationCode,
   FORWARDING_DOMAIN,
@@ -439,5 +440,53 @@ describe("parseResendInboundEvent (#118)", () => {
     expect(parseResendInboundEvent({ type: "email.received" })).toBeNull();
     expect(parseResendInboundEvent(null)).toBeNull();
     expect(parseResendInboundEvent({ type: "email.received", data: { from: "x" } })).toBeNull();
+  });
+});
+
+describe("extractGmailConfirmationLink (the real Gmail flow)", () => {
+  // Captured verbatim from the mail Gmail actually sent on 2026-08-19. The design
+  // assumed a numeric code in the subject ("(#123456789) Gmail Forwarding
+  // Confirmation"). Gmail does not send one: the subject carries no code at all
+  // and the body carries a CLICKABLE link instead. Reading the subject for digits
+  // therefore always returned null, the code never reached Settings, and setup
+  // dead-ended at its first step with nothing broken-looking anywhere.
+  const REAL_BODY = [
+    "quinterostudio3@gmail.com has requested to automatically forward mail",
+    "to your email",
+    "address u-cd4b7288dfac41c389c34b0fe78193ce@northgoing.com.",
+    "",
+    "please click the link below to confirm the request:",
+    "",
+    "https://mail.google.com/mail/vf-%5BANGjdJ-AzkPg8TYF11_M3_1FQsJ-hpHMV77GQ4n2subtnOSFuiYqfxy7KGXB1-YwXSsL_eKSm9o%5D-8JA0s_VWEX",
+    "",
+    "If you do not approve of this request, no further action is required.",
+    "click this link to cancel this",
+    "verification:",
+    "https://mail.google.com/mail/uf-%5BANGjdJ8lD5qR5FyuGLKUzxmx1odsM_wMxybG6L9Wa7I%5D-8JA0s_VWEX",
+  ].join("\n");
+
+  it("returns the CONFIRM link", () => {
+    expect(extractGmailConfirmationLink(REAL_BODY)).toBe(
+      "https://mail.google.com/mail/vf-%5BANGjdJ-AzkPg8TYF11_M3_1FQsJ-hpHMV77GQ4n2subtnOSFuiYqfxy7KGXB1-YwXSsL_eKSm9o%5D-8JA0s_VWEX",
+    );
+  });
+
+  it("never returns the CANCEL link, which sits in the same mail and undoes the setup", () => {
+    // The two differ by one letter: /mail/vf- confirms, /mail/uf- cancels. Handing
+    // a user the cancel link would silently undo the thing they are trying to do.
+    const link = extractGmailConfirmationLink(REAL_BODY);
+    expect(link).not.toContain("/mail/uf-");
+    expect(link).toContain("/mail/vf-");
+  });
+
+  it("finds the link in html mail too, where it arrives inside an anchor", () => {
+    const html = '<p>confirm: <a href="https://mail.google.com/mail/vf-%5BABC%5D-XYZ">Confirm</a></p>';
+    expect(extractGmailConfirmationLink(html)).toBe("https://mail.google.com/mail/vf-%5BABC%5D-XYZ");
+  });
+
+  it("returns null when there is no confirmation link, rather than guessing", () => {
+    expect(extractGmailConfirmationLink("no link here")).toBeNull();
+    expect(extractGmailConfirmationLink("")).toBeNull();
+    expect(extractGmailConfirmationLink(null)).toBeNull();
   });
 });
