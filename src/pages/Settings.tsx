@@ -12,6 +12,7 @@ import { useRolesData } from "@/hooks/useRolesData";
 import { useMemo } from "react";
 import type { FilterOption } from "@/components/roles/FilterChip";
 import { supabase } from "@/integrations/supabase/client";
+import { pickableSectors, sectorLiquidity } from "@/lib/sectors";
 import {
   buildAccountExport,
   accountExportFilename,
@@ -102,15 +103,17 @@ export default function Settings() {
     return true;
   };
 
-  // Plain live-catalog sector counts (no facet cross-filtering here — the picker
-  // wants the whole vocabulary, same contract the ProfileModal had).
-  const sectorOptions = useMemo<FilterOption[]>(() => {
-    const m = new Map<string, number>();
-    for (const j of jobs) if (j.sector) m.set(j.sector, (m.get(j.sector) ?? 0) + 1);
-    return [...m.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([value, count]) => ({ value, label: value, count }));
-  }, [jobs]);
+  // Industries this user may PICK. No facet cross-filtering (the picker is about
+  // the catalog, not the current view), but gated on live liquidity (issue #70):
+  // this pick carries no visible count and is AND-ed into the paid scoring
+  // prefilter, so offering an industry that cannot return roles costs the user
+  // their whole score run. Already-stored picks are re-admitted even if they no
+  // longer pass, so a saved target is never invisible and unclearable.
+  const targetSectors = useMemo(() => profileMeta?.targetSectors ?? [], [profileMeta]);
+  const sectorOptions = useMemo<FilterOption[]>(
+    () => pickableSectors(sectorLiquidity(jobs), targetSectors),
+    [jobs, targetSectors],
+  );
 
   // HARD gate on the profile fetch (adversarial review 7-25, P1): the hook loads
   // profiles LAST in its chain, so an ungated render shows "No CV on file" +
@@ -132,7 +135,7 @@ export default function Settings() {
       <SettingsPanel
         cvText={cvText}
         targetRoles={profileMeta?.targetRoles ?? []}
-        targetSectors={profileMeta?.targetSectors ?? []}
+        targetSectors={targetSectors}
         cvUpdatedAt={profileMeta?.cvUpdatedAt ?? null}
         // The CV-unlock flow lives on the map — deep-link it open rather than
         // rebuilding the parsed-upload modal on paper.

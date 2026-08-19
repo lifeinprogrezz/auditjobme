@@ -7,7 +7,8 @@ import type { ScoreSubscore, ScoreEvidence } from "@/lib/scorePrompt";
 import { applyLandedScores, byScore, type RoleJob, type RoleExtraction } from "@/lib/roles";
 import { inFlightCompanyKeys } from "@/lib/product";
 import { isInFlightStatus } from "@/lib/tracker";
-import { hashCv, readCvStash, clearCvStash } from "@/lib/labels";
+import { hashCv, readCvStash, clearCvStash, normalizeTargetRoles } from "@/lib/labels";
+import { normalizeTargetSectors } from "@/lib/sectors";
 import { prefilterJobs } from "@/lib/scorePrefilter";
 import { shouldPromptCv } from "@/lib/deviceSession";
 import { cityOf, coordsOf } from "@/lib/geo";
@@ -611,9 +612,14 @@ export function useRolesData() {
       if (runRef.current !== runId) return;
       if (prof) {
         setProfile(prof as ScoreableProfile);
+        // Vocabulary shim (issue #70). The migration rewrites the stored rows, but
+        // a profile written between deploy and migration — or by a browser tab
+        // still running the previous bundle — can still hold a retired archetype
+        // or sector variant. Translating on read means such a value narrows the
+        // view instead of matching nothing and rendering permanent "Not scored".
         setProfileMeta({
-          targetRoles: prof.target_roles ?? [],
-          targetSectors: prof.target_sectors ?? [],
+          targetRoles: normalizeTargetRoles(prof.target_roles),
+          targetSectors: normalizeTargetSectors(prof.target_sectors),
           cvUpdatedAt: prof.updated_at ?? null,
         });
       } else if (DEV_FIXTURE) {
@@ -621,7 +627,9 @@ export function useRolesData() {
         // user has no profile row, so without this /today never leaves its
         // "add your CV" empty state and the walk sees nothing.
         setProfile(DEV_FIXTURE_PROFILE);
-        setProfileMeta({ targetRoles: ["Product Manager"], targetSectors: [], cvUpdatedAt: null });
+        // A jobs.role_family value, not a display string: "Product Manager" was in
+        // none of the three old vocabularies and matched nothing (issue #70).
+        setProfileMeta({ targetRoles: ["product"], targetSectors: [], cvUpdatedAt: null });
       }
       if (!DEV_FIXTURE && !prof?.cv_text?.trim()) {
         // Post-OAuth handoff (Phase A): a CV stashed before the sign-in redirect
@@ -636,8 +644,13 @@ export function useRolesData() {
             {
               cv_text: stash.cv_text,
               cv_hash: stash.cv_hash,
-              target_roles: stash.target_roles,
-              target_sectors: stash.target_sectors,
+              // Same shim as the profile read above, and it matters MORE here: the
+              // stash is written by the bundle the user had before the OAuth
+              // redirect and read by the one they have after, so a sign-up started
+              // before this deploy would otherwise write a retired archetype into
+              // a brand-new profile row (issue #70).
+              target_roles: normalizeTargetRoles(stash.target_roles),
+              target_sectors: normalizeTargetSectors(stash.target_sectors),
             },
             merged,
           );

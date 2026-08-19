@@ -49,12 +49,21 @@ describe("prefilterJobs — role labels", () => {
     expect(ids(prefilterJobs(jobs, { roles: ["Product"], sectors: [] }))).toEqual(["legacy-pm"]);
   });
 
-  it("matches family-less archetypes (Growth) via the title", () => {
+  it("gives a retired archetype (Growth) the family it now belongs to", () => {
+    // Issue #70: the picker no longer offers "Growth", but a profile written
+    // before the change still holds it. archetypeToFamily places it on
+    // `marketing`, so the slice WIDENS from the title-matched rows to the whole
+    // family. Widening is the safe direction — the alternative was an empty
+    // slice and a map that renders "Not scored" forever.
     const jobs = [
       job("growth", { title: "Growth Manager", role_family: "marketing" }),
       job("brand", { title: "Brand Manager", role_family: "marketing" }),
+      job("pm", { title: "Product Manager", role_family: "product" }),
     ];
-    expect(ids(prefilterJobs(jobs, { roles: ["Growth"], sectors: [] }))).toEqual(["growth"]);
+    expect(ids(prefilterJobs(jobs, { roles: ["Growth"], sectors: [] })).sort()).toEqual([
+      "brand",
+      "growth",
+    ]);
   });
 
   it("unions multiple role labels", () => {

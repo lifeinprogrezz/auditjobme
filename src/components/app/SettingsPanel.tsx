@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   cvWordCount,
   formatUploadedDate,
-  ROLE_ARCHETYPES,
+  ROLE_FAMILY_OPTIONS,
   LABEL_CAP,
   TOP_SECTOR_CHIPS,
   visibleSectorChips,
@@ -29,7 +29,8 @@ export type SettingsPanelProps = {
   cvUpdatedAt: string | null;
   /** Routes into the CV-unlock flow on the map — Replace reuses it, never rebuilds it. */
   onReplaceCv: () => void;
-  /** Live catalog sectors — the industry picker's options. */
+  /** Industries a user may PICK: the live catalog's sectors, gated on liquidity so
+   *  a chosen one can actually return roles (issue #70). */
   sectorOptions: FilterOption[];
   /** Persist edited target roles + industries. Resolves false on failure. */
   onSaveTargets: (roles: string[], sectors: string[]) => Promise<boolean>;
@@ -334,14 +335,14 @@ export default function SettingsPanel({
         <h2 className="font-display text-section text-foreground">Target roles</h2>
         <p className="mt-1 text-caption text-muted-foreground">Pick up to {LABEL_CAP}.</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {ROLE_ARCHETYPES.map((r) => (
+          {ROLE_FAMILY_OPTIONS.map((r) => (
             <button
-              key={r}
+              key={r.value}
               type="button"
-              className={roles.includes(r) ? CHIP_ON : CHIP_OFF}
-              onClick={() => setEditRoles(toggleCapped(roles, r, LABEL_CAP))}
+              className={roles.includes(r.value) ? CHIP_ON : CHIP_OFF}
+              onClick={() => setEditRoles(toggleCapped(roles, r.value, LABEL_CAP))}
             >
-              {r}
+              {r.label}
             </button>
           ))}
         </div>

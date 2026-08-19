@@ -1,12 +1,135 @@
 // Phase A (overnight-job-hunter, spec 2026-07-07): the CV-unlock front door's
-// pure logic — CV hashing, the role/industry label vocabularies, the role
-// archetype inference, the label→scoring-slice filter, and the localStorage
+// pure logic — CV hashing, the ROLE vocabulary, the role-matching rule, the
+// industry chip helpers, the label→scoring-slice filter, and the localStorage
 // stash that survives the Google-OAuth full-page redirect.
+// The INDUSTRY vocabulary lives in scripts/sector-lib.mjs with its writer-side
+// normalizer, and its liquidity gate in src/lib/sectors.ts — deliberately not
+// here, because this module is reachable from api/ and must stay light.
 // Pinned by src/test/labels.test.ts.
 import type { RoleJob } from "@/lib/roles";
+import { ROLE_FAMILY_LABELS, type RoleFamily } from "./scorePrompt.js";
 
-/** Target-role archetypes the user can pick (cap 3). Product-first: the catalog
- *  is PM-centric today, so most roles infer to Product (see roleArchetypeOf). */
+// ── The ONE role vocabulary (issue #70) ──────────────────────────────────────
+// Three vocabularies used to be live at once: these ten Title-Case archetypes in
+// the pickers, the five lowercase `jobs.role_family` values in the database, and
+// the raw family string in the /roles Role facet, which showed the user chips
+// reading "engineering", "sales", "product". A user could not express the same
+// idea on two surfaces, and the words did not match.
+//
+// The five families win, because they are what the catalog is labelled with and
+// what the scorer already branches on. Their display names are ROLE_FAMILY_LABELS
+// from scorePrompt.ts, reused rather than reinvented — a fourth spelling of
+// "Sales" is the thing this issue exists to remove.
+
+/** The five role verticals, in the order the pickers render them. */
+export const ROLE_FAMILIES: readonly RoleFamily[] = [
+  "product",
+  "engineering",
+  "sales",
+  "marketing",
+  "operations",
+] as const;
+
+/** Picker chips: the stored value plus the one display name for it. */
+export const ROLE_FAMILY_OPTIONS: { value: RoleFamily; label: string }[] = ROLE_FAMILIES.map(
+  (value) => ({ value, label: ROLE_FAMILY_LABELS[value] }),
+);
+
+/**
+ * Retired picker archetypes → the family that now carries them. Five mapped 1:1
+ * onto a family already; the other five had no family at all, and a naive switch
+ * would have matched them to nothing — a stored "Growth" would have emptied that
+ * user's scoring slice and put permanent "Not scored" copy on every card, which
+ * reads as a scoring outage rather than a vocabulary change.
+ *
+ * The five family-less dispositions, decided explicitly:
+ *   Growth   → marketing   (growth seats classify as marketing in job-filters.mjs)
+ *   Data     → engineering (the same boundary rule: data, machine-learning and
+ *                           analytics engineering are engineering; analyst and
+ *                           scientist seats are a DEFERRED vertical and are not
+ *                           in the catalog at all)
+ *   Strategy → operations  (chief-of-staff and strategy-and-operations seats)
+ *   Founding → product     (a founding seat in this catalog is a product seat)
+ *   Design   → null        (a deferred vertical with no home — see
+ *                           normalizeTargetRoles for what happens to the value)
+ */
+export const FAMILY_BY_ARCHETYPE: Record<string, RoleFamily> = {
+  Product: "product",
+  Engineering: "engineering",
+  Marketing: "marketing",
+  "Sales/BD": "sales",
+  Operations: "operations",
+  Growth: "marketing",
+  Data: "engineering",
+  Strategy: "operations",
+  Founding: "product",
+};
+
+/** Is this one of the five families? */
+export function isRoleFamily(value: unknown): value is RoleFamily {
+  return typeof value === "string" && (ROLE_FAMILIES as readonly string[]).includes(value);
+}
+
+/**
+ * Any stored target-role value → a family, or null when it maps to none.
+ *
+ * Accepts a family (already current), a retired archetype, and "Product Manager"
+ * — the string the Role facet used to show for unlabelled rows and the one the
+ * dev fixture seeded, which belonged to none of the three old vocabularies.
+ */
+export function archetypeToFamily(value: string | null | undefined): RoleFamily | null {
+  if (!value) return null;
+  if (isRoleFamily(value)) return value;
+  if (value === "Product Manager") return "product";
+  return FAMILY_BY_ARCHETYPE[value] ?? null;
+}
+
+/**
+ * A stored `profiles.target_roles` (or CV-stash) array → current families.
+ *
+ * Unmappable values are DROPPED rather than kept, and dropping the last one
+ * leaves an empty array — which every consumer reads as "no role preference" and
+ * therefore as "everything is eligible". That is the non-stranding answer: a user
+ * whose only pick was the retired "Design" gets the whole catalog back, not an
+ * empty scoring slice and a permanently "Not scored" map.
+ */
+export function normalizeTargetRoles(stored: readonly string[] | null | undefined): RoleFamily[] {
+  const out: RoleFamily[] = [];
+  for (const v of stored ?? []) {
+    const f = archetypeToFamily(v);
+    if (f && !out.includes(f)) out.push(f);
+  }
+  return out;
+}
+
+/**
+ * Does this row satisfy the user's chosen roles? The ONE role-matching rule, so
+ * the nightly digest and the paid backlog worker can never disagree about what a
+ * label means. They did: the nightly matched on the title regex alone, which
+ * finds 65% of live `sales` rows and 48% of live `operations` rows.
+ *
+ * Hybrid on purpose. The family is the primary key — it is what the catalog is
+ * labelled with, and it is far more complete than any title inference. The title
+ * archetype is the fallback, covering rows with no family and any legacy
+ * archetype still sitting in a profile or in a pre-deploy CV stash.
+ */
+export function roleMatchesTargets(
+  job: { title: string; role_family?: string | null },
+  roles: readonly string[],
+): boolean {
+  if (roles.length === 0) return true;
+  const families = normalizeTargetRoles(roles);
+  if (job.role_family != null && families.includes(job.role_family as RoleFamily)) return true;
+  const archetype = roleArchetypeOf(job.title);
+  if (archetype == null) return false;
+  if (roles.includes(archetype)) return true; // a legacy archetype, matched by title
+  const inferred = archetypeToFamily(archetype);
+  return inferred != null && families.includes(inferred);
+}
+
+/** Title-inference archetypes. NOT a picker vocabulary any more (issue #70) —
+ *  this is the internal keyword taxonomy roleArchetypeOf emits, used only as the
+ *  fallback in roleMatchesTargets when a row carries no `role_family`. */
 export const ROLE_ARCHETYPES = [
   "Product",
   "Growth",
@@ -20,23 +143,6 @@ export const ROLE_ARCHETYPES = [
   "Founding",
 ] as const;
 export type RoleArchetype = (typeof ROLE_ARCHETYPES)[number];
-
-/** Fallback industry list when the live catalog has no sector data to derive from.
- *  When sectors exist we offer the ACTUAL sector strings so the filter matches. */
-export const FALLBACK_SECTORS = [
-  "Fintech",
-  "Health",
-  "Climate",
-  "Crypto",
-  "AI/ML",
-  "Marketplace",
-  "SaaS/B2B",
-  "Consumer",
-  "Gaming",
-  "DevTools",
-  "Mobility",
-  "Edtech",
-];
 
 /** How many label chips of each kind a user may select. */
 export const LABEL_CAP = 3;
@@ -53,15 +159,19 @@ type SectorOption = { value: string; label: string; count: number };
  * Chips to render in the CV-unlock modal's industry picker: the top N sectors
  * by frequency (sectorOptions arrives pre-sorted desc), PLUS any already-
  * selected sector that falls outside the top N — a picked tail sector can
- * never disappear from view (issue #44, rule 3). Falls back to
- * FALLBACK_SECTORS when the live catalog has nothing to derive from.
+ * never disappear from view (issue #44, rule 3).
+ *
+ * An empty catalog now renders NOTHING (issue #70). It used to fall back to a
+ * hardcoded FALLBACK_SECTORS list, eight of whose twelve entries matched zero
+ * live roles — so the picker offered choices that could only ever return an
+ * empty page. Showing nothing is the honest answer; see src/lib/sectors.ts.
  */
 export function visibleSectorChips(
   sectorOptions: SectorOption[],
   selected: string[],
   topN: number = TOP_SECTOR_CHIPS,
 ): string[] {
-  if (sectorOptions.length === 0) return FALLBACK_SECTORS;
+  if (sectorOptions.length === 0) return [];
   const top = sectorOptions.slice(0, topN).map((o) => o.value);
   const topSet = new Set(top);
   const strandedSelected = selected.filter((s) => !topSet.has(s));
@@ -115,9 +225,11 @@ export function formatUploadedDate(iso: string | null | undefined): string | nul
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** Infer a coarse function archetype from a role title. Product wins for any PM
- *  title (the PM-centric catalog); other functions fall out of keyword hits;
- *  null when nothing matches (that role then can't satisfy a role-label filter). */
+/** Infer a coarse function archetype from a role title — the FALLBACK for rows
+ *  the catalog left unlabelled (roleMatchesTargets). Product wins for any PM
+ *  title; other functions fall out of keyword hits; null when nothing matches.
+ *  Title inference is lossy by nature (it misses a third of live sales rows and
+ *  half the operations rows), which is why `jobs.role_family` leads. */
 export function roleArchetypeOf(title: string | null | undefined): RoleArchetype | null {
   const t = (title ?? "").toLowerCase();
   if (!t) return null;
@@ -146,13 +258,18 @@ export type Labels = { roles: string[]; sectors: string[] };
 
 /**
  * The deterministic scoring slice: narrow the catalog to the user's labels before
- * any LLM call (the primary cost lever, spec §3). A job passes when its inferred
- * archetype is among the chosen roles AND its sector is among the chosen sectors
- * (each dimension ignored when its selection is empty — OR-within, AND-across,
- * mirroring filterJobs). With no labels, or when the filter would empty the slice,
- * fall back to the full list so the reveal always has something to score.
+ * any LLM call (the primary cost lever, spec §3). A job passes when it satisfies
+ * the chosen roles AND its sector is among the chosen sectors (each dimension
+ * ignored when its selection is empty — OR-within, AND-across, mirroring
+ * filterJobs). With no labels, or when the filter would empty the slice, fall
+ * back to the full list so the reveal always has something to score.
+ *
+ * The role test is roleMatchesTargets, the same rule the paid backlog prefilter
+ * uses (issue #70). It used to be the title regex alone, so the nightly digest
+ * and the backlog worker disagreed about what a label meant — the nightly found
+ * only 65% of live `sales` rows and 48% of live `operations` rows.
  */
-export function pickScoringSlice<T extends Pick<RoleJob, "title" | "sector">>(
+export function pickScoringSlice<T extends Pick<RoleJob, "title" | "sector" | "role_family">>(
   jobs: T[],
   labels: Labels,
 ): T[] {
@@ -160,9 +277,8 @@ export function pickScoringSlice<T extends Pick<RoleJob, "title" | "sector">>(
   const sectors = labels.sectors ?? [];
   if (roles.length === 0 && sectors.length === 0) return jobs;
   const filtered = jobs.filter((j) => {
-    const roleOk = roles.length === 0 || roles.includes(roleArchetypeOf(j.title) ?? "");
     const sectorOk = sectors.length === 0 || (j.sector != null && sectors.includes(j.sector));
-    return roleOk && sectorOk;
+    return roleMatchesTargets(j, roles) && sectorOk;
   });
   return filtered.length ? filtered : jobs;
 }

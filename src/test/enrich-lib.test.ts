@@ -42,7 +42,15 @@ describe("parseEnrichment", () => {
   });
   it("drops a null / out-of-range year and a too-short description", () => {
     const out = parseEnrichment('{"description":"tiny","sector":"AI","founded_year":1200}');
-    expect(out).toEqual({ sector: "AI" });
+    // "AI" folds onto its canonical industry at the parse boundary (issue #70).
+    expect(out).toEqual({ sector: "AI & machine learning" });
+  });
+  it("drops a sector outside the canonical industry vocabulary (issue #70)", () => {
+    // A free-text answer is how one column ended up carrying 54 strings for 28
+    // industries. Nothing downstream ever sees an unrecognised one now.
+    expect(parseEnrichment('{"sector":"SaaS"}')).toEqual({});
+    expect(parseEnrichment('{"sector":"vibes-as-a-service"}')).toEqual({});
+    expect(parseEnrichment('{"sector":"Health Tech"}')).toEqual({ sector: "Healthtech" });
   });
   it("returns {} on non-JSON or garbage", () => {
     expect(parseEnrichment("the model refused")).toEqual({});

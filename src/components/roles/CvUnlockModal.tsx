@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  ROLE_ARCHETYPES,
+  ROLE_FAMILY_OPTIONS,
   LABEL_CAP,
   TOP_SECTOR_CHIPS,
   visibleSectorChips,
@@ -26,7 +26,8 @@ export type CvUnlockModalProps = {
   open: boolean;
   onClose: () => void;
   signedIn: boolean;
-  /** Live catalog sectors (from RolesMap) — the real strings so the label filter matches. */
+  /** Industries a user may PICK (from RolesMap): the live catalog's sectors, gated
+   *  on liquidity so a chosen one can actually return roles (issue #70). */
   sectorOptions: FilterOption[];
   /** Writes the CV + labels to the profile and reveals + scores in-session (signed-in path). */
   onSubmit: (text: string, labels: { roles: string[]; sectors: string[] }) => Promise<boolean>;
@@ -256,14 +257,14 @@ export default function CvUnlockModal({
                 Target roles <span className="cvcap">pick up to {LABEL_CAP}</span>
               </div>
               <div className="cvchips">
-                {ROLE_ARCHETYPES.map((r) => (
+                {ROLE_FAMILY_OPTIONS.map((r) => (
                   <button
-                    key={r}
+                    key={r.value}
                     type="button"
-                    className={"cvchip" + (roles.includes(r) ? " on" : "")}
-                    onClick={() => setRoles((cur) => toggleCapped(cur, r, LABEL_CAP))}
+                    className={"cvchip" + (roles.includes(r.value) ? " on" : "")}
+                    onClick={() => setRoles((cur) => toggleCapped(cur, r.value, LABEL_CAP))}
                   >
-                    {r}
+                    {r.label}
                   </button>
                 ))}
               </div>

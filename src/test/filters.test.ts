@@ -115,30 +115,39 @@ describe("filterJobs — Workplace discovery facet", () => {
 });
 
 describe("roleFamily", () => {
-  it("falls back to Product Manager while the pipeline is PM-gated (null / absent)", () => {
-    expect(roleFamily(mk({}))).toBe("Product Manager");
-    expect(roleFamily(mk({ role_family: null }))).toBe("Product Manager");
+  it("reads an unlabelled row as 'other', NOT as Product (issue #70)", () => {
+    // A null role_family is structural, not backfill lag: classifyRoleFamily
+    // returns null for the deferred verticals, so every live null row is a UX
+    // seat. Calling those Product mislabelled them in the facet.
+    expect(roleFamily(mk({}))).toBe("other");
+    expect(roleFamily(mk({ role_family: null }))).toBe("other");
   });
   it("a written role_family wins over the fallback", () => {
-    expect(roleFamily(mk({ role_family: "Data" }))).toBe("Data");
+    expect(roleFamily(mk({ role_family: "engineering" }))).toBe("engineering");
   });
 });
 
 describe("filterJobs — roles facet", () => {
-  const jobs = [mk({ id: "a" }), mk({ id: "b", role_family: "Data" })];
+  const jobs = [mk({ id: "a" }), mk({ id: "b", role_family: "engineering" })];
   it("empty selection shows the full catalog", () => {
     expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: [] })).toHaveLength(2);
   });
-  it("selecting Product Manager matches null-role_family rows via the fallback", () => {
-    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: ["Product Manager"] }).map((j) => j.id)).toEqual(["a"]);
+  it("selecting Other matches the unlabelled rows", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: ["other"] }).map((j) => j.id)).toEqual(["a"]);
+  });
+  it("compares the stored VALUE, not the label the chip shows (issue #70)", () => {
+    // The headbar chip reads "Engineering"; the filter still matches "engineering".
+    // Splitting value from label is what let the chips stop shouting in lowercase.
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: ["engineering"] }).map((j) => j.id)).toEqual(["b"]);
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: ["Engineering"] })).toHaveLength(0);
   });
   it("selecting a written family matches only it (OR-within)", () => {
-    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: ["Data"] }).map((j) => j.id)).toEqual(["b"]);
-    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: ["Data", "Product Manager"] })).toHaveLength(2);
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: ["engineering"] }).map((j) => j.id)).toEqual(["b"]);
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, roles: ["engineering", "other"] })).toHaveLength(2);
   });
   it("ANDs across facets (roles + cities)", () => {
-    const mix = [mk({ id: "a", city: "Berlin" }), mk({ id: "b", city: "Paris", role_family: "Data" })];
-    expect(filterJobs(mix, { ...EMPTY_FILTERS, roles: ["Data"], cities: ["Berlin"] })).toHaveLength(0);
+    const mix = [mk({ id: "a", city: "Berlin" }), mk({ id: "b", city: "Paris", role_family: "engineering" })];
+    expect(filterJobs(mix, { ...EMPTY_FILTERS, roles: ["engineering"], cities: ["Berlin"] })).toHaveLength(0);
   });
   it("fixtures without a roles key still filter (optional field)", () => {
     expect(filterJobs(jobs, EMPTY_FILTERS)).toHaveLength(2);
