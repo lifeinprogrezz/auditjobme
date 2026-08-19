@@ -2,8 +2,6 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.5
 import {
   capUsdFromEnv,
   globalCapVerdict,
-  monthStartIso,
-  sumCostUsd,
   type CapVerdict,
 } from './cap.ts';
 
@@ -106,13 +104,17 @@ async function enforceGlobalCap(admin: SupabaseClient): Promise<Response | null>
   const capUsd = capUsdFromEnv(Deno.env.get('GLOBAL_MONTHLY_CAP_USD'));
   let verdict: CapVerdict;
   try {
-    const { data, error } = await admin
-      .from('usage_events')
-      .select('cost_usd')
-      .gte('created_at', monthStartIso(new Date()));
+    // Summed IN THE DATABASE. Selecting the rows and adding them up here is what
+    // broke this: PostgREST returns its first 1000 rows and says nothing, so on
+    // 2026-08-19 the cap saw $2.58 of a real $35.03 across 15,422 events — about 7%,
+    // widening as usage grows. $300 was unreachable, and the kill switch was inert.
+    const { data, error } = await admin.rpc('global_month_spend_usd');
+    const total = data == null ? undefined : Number(data);
     verdict = globalCapVerdict({
       capUsd,
-      monthTotalUsd: sumCostUsd(data),
+      // A non-numeric answer is treated as unreadable, and globalCapVerdict fails
+      // closed on that — an unreadable ledger must never read as "spend is zero".
+      monthTotalUsd: Number.isFinite(total) ? total : undefined,
       readError: error ?? undefined,
     });
   } catch (e) {
