@@ -81,15 +81,34 @@ A Node command-line system, file-based, single-user today. What it does:
 
 ### The shell — Northgoing (the product)
 A Vite + React single-page app (TypeScript), styled with Tailwind + shadcn/ui,
-backed by Supabase (Postgres + Google sign-in). What's already
-built and working:
-- Landing page, brand/color system (sage `#8a9a8a` on dark charcoal), **Google
-  sign-in**, public audit display at `/a/:username/:slug`, legal pages.
-- Database schema already present: `audits`, `profiles`, `purchases` (Stripe),
-  `whitelisted_emails`, `device_fingerprints`, `feedback`.
-- **Not** built yet: any sourcing/scoring, the audit-generation engine itself,
-  dashboards, profile ingestion. Today it is a **display + auth + marketing shell**
-  waiting for an engine behind it.
+backed by Supabase (Postgres + row-level security + Google sign-in), deployed on
+Vercel. Measured against production on 2026-08-19:
+
+- **Sourcing is live and shared.** 9,266 roles ingested from 24 distinct sources,
+  7,981 of them currently live, across 598 companies. A daily GitHub Action scrapes;
+  the pool is identical for every user, so it is paid for once.
+- **Scoring is live and per-user.** 12,553 scores computed by Claude Haiku through
+  the `anthropic-proxy` edge function, which holds the model allowlist, the
+  server-side spend cap and the `usage_events` meter. A deterministic prefilter
+  bounds what a new signup costs; a worker drains the backlog every 10 minutes.
+- **The map IS the landing page** (`/`), with prerendered city pages for search.
+  Google sign-in, saved and dismissed roles, an application tracker that advances
+  itself from forwarded ATS email, tailored CV and cover-letter generation, the
+  company-audit artifact at `/a/:username/:slug`, and the legal pages.
+- **27 tables in production**, not the six this document used to list — including
+  `jobs`, `companies`, `scores`, `daily_matches`, `applications`, `status_events`,
+  `usage_events`, `inbound_emails`, `connections`, `referrals`.
+
+The palette is ink (`#0b1f26`) on near-white, with a full dark theme — **not** the
+sage-on-charcoal system this section described until 2026-08-19. That palette is
+retired everywhere except the company-audit artifact, which deliberately keeps its
+own editorial identity and tints itself to the *target company's* brand colour.
+
+> Corrected 2026-08-19. The previous text claimed "**not** built yet: any
+> sourcing/scoring … today it is a display + auth + marketing shell". That had been
+> false for months. This file is the public-safe map others read to understand the
+> product, so a stale claim here is worse than no claim: treat every number in it as
+> needing a re-measure, not a re-copy.
 
 ### The three repositories
 | # | Layout | GitHub remote | Role |
@@ -280,6 +299,13 @@ the decisions are.
 ---
 
 ## 4. Recommended build sequence
+
+> **Status 2026-08-19: this sequence is largely executed — read it as history, not
+> as a plan.** Orders 1-3 (multi-tenant data model, onboarding, shared sourcing) are
+> shipped and running in production; see section 1 for the measured state. What
+> remains open is tracked as GitHub issues on `lifeinprogrezz/northgoing`, which is
+> the live backlog. This table is kept for the *reasoning* about ordering, which is
+> still sound, not as a to-do list.
 
 Dependency-driven, **backend foundation first** (you can't build features on
 multi-tenant data that doesn't exist yet). Reorderable, but this is the order that
