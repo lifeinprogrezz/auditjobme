@@ -440,23 +440,45 @@ describe("nightlyBudgetExhausted (F6 durable execution)", () => {
 // The trap is that "0 matches" is genuinely fine some nights — nothing new arrived.
 // So the verdict cannot key on the match count. It keys on whether users FAILED.
 describe("nightlyRunVerdict (a total failure must not report success)", () => {
+  // The first version of this guard asked `processed > 0 && failed >= processed`, and it
+  // was INERT. `summary.processed++` sits at api/nightly.ts:488/592/694, deep inside the
+  // per-user try and behind eight `continue` statements; the catch increments only
+  // `failed`. So a real outage is {processed:0, failed:N} — or, for the shape that
+  // actually lost 2026-08-17, {processed:0, failed:0}, because proxyBatchOp returns null
+  // on a non-ok response and control falls to `continue` without touching ANY counter.
+  //
+  // Its test fixture {processed:3, failed:3} encoded a counter state the worker cannot
+  // produce: a green test over a live bug. Verified against the merged code before
+  // rewriting.
+  //
+  // So the verdict counts SUCCESS against the users we set out to serve, not failures.
+  // Whether a user died by throw, by silent `continue`, or by a null batch response, the
+  // one thing an outage cannot fake is a user actually getting through.
   it("succeeds on a normal run", () => {
-    expect(nightlyRunVerdict({ processed: 5, failed: 0 }).ok).toBe(true);
+    expect(nightlyRunVerdict({ users: 5, processed: 5, failed: 0 }).ok).toBe(true);
   });
 
-  it("succeeds on a genuinely quiet night — no users to process is not a failure", () => {
-    expect(nightlyRunVerdict({ processed: 0, failed: 0 }).ok).toBe(true);
+  it("succeeds on a genuinely quiet night — nobody to serve is not a failure", () => {
+    expect(nightlyRunVerdict({ users: 0, processed: 0, failed: 0 }).ok).toBe(true);
   });
 
-  it("FAILS when every processed user failed", () => {
-    const v = nightlyRunVerdict({ processed: 3, failed: 3 });
+  it("FAILS when there were users and not one of them got through", () => {
+    const v = nightlyRunVerdict({ users: 3, processed: 0, failed: 3 });
     expect(v.ok).toBe(false);
     expect(v.status).toBe(500);
-    expect(v.reason).toMatch(/every/i);
+  });
+
+  it("FAILS on the 2026-08-17 shape, where nothing threw and no counter moved", () => {
+    // The run that lost a day: users:1, processed:0, failed:0, and it answered
+    // {"ok":true}. This is the case the previous guard could not see.
+    const v = nightlyRunVerdict({ users: 1, processed: 0, failed: 0 });
+    expect(v.ok).toBe(false);
+    expect(v.status).toBe(500);
+    expect(v.reason).toMatch(/no user/i);
   });
 
   it("still succeeds on a partial failure, but reports the count so it is visible", () => {
-    const v = nightlyRunVerdict({ processed: 5, failed: 2 });
+    const v = nightlyRunVerdict({ users: 5, processed: 3, failed: 2 });
     expect(v.ok).toBe(true);
     expect(v.status).toBe(200);
     expect(v.failed).toBe(2);

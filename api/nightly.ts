@@ -741,7 +741,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   // A run that failed for every user used to answer 200 {ok:true}, so the scheduled
   // Action went green through a total outage. Zero matches is still a fine night;
   // zero SURVIVING users is not. See nightlyRunVerdict + its tests.
-  const verdict = nightlyRunVerdict({ processed: summary.processed, failed: summary.failed });
+  const verdict = nightlyRunVerdict({ users: summary.users, processed: summary.processed, failed: summary.failed });
   if (!verdict.ok) console.error(`[nightly] ${verdict.reason}`);
   res.status(verdict.status).json({ ok: verdict.ok, date: today, ...summary, ...(verdict.reason ? { reason: verdict.reason } : {}) });
 }
