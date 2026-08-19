@@ -67,6 +67,18 @@ function sectorOk(j: PrefilterJob, sectors: string[]): boolean {
  * No labels — or labels that match nothing — fall back to the newest
  * FALLBACK_CAP rows of the whole list (never empty, never the full catalog).
  */
+/** How a role's fit should be presented. Before the prefilter, every unscored
+ *  role was genuinely mid-pass; now a role outside the paid slice never scores,
+ *  so "scoring…" copy would be a permanent lie. Pinned by score-status.test.ts. */
+export type ScoreStatus = "scored" | "scoring" | "not-scored";
+
+/** The single decision point for that distinction — every surface that renders a
+ *  pending state MUST route through here rather than testing `score == null`. */
+export function scoreStatusOf(score: number | null | undefined, eligible: boolean): ScoreStatus {
+  if (score != null) return "scored";
+  return eligible ? "scoring" : "not-scored";
+}
+
 export function prefilterJobs<T extends PrefilterJob>(jobs: T[], labels: Labels): T[] {
   const roles = labels.roles ?? [];
   const sectors = labels.sectors ?? [];

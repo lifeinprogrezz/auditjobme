@@ -672,6 +672,7 @@ export function useRolesData() {
     [jobs, profileMeta],
   );
   const hasUnscored = eligibleJobs.some((j) => j.score == null);
+  const eligibleIds = useMemo(() => new Set(eligibleJobs.map((j) => j.id)), [eligibleJobs]);
   const hasCv = Boolean(profile?.cv_text?.trim());
   useEffect(() => {
     if (!user || !hasCv || !hasUnscored || loading) return;
@@ -941,6 +942,10 @@ export function useRolesData() {
     // (the worker runs regardless; this drives the panel's progress bar).
     scoring: Boolean(user) && hasCv && hasUnscored && !loading,
     remaining: eligibleJobs.filter((j) => j.score == null).length,
+    /** Ids of the roles this user's paid pass covers (#114). Surfaces that render
+     *  a pending state need it: an unscored role OUTSIDE this set never scores,
+     *  so "Scoring this role…" would be a permanent lie (see scoreStatusOf). */
+    eligibleIds,
     applied,
     markApplied,
     saved,

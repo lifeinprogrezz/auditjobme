@@ -22,6 +22,7 @@ import {
   type RolesFilters,
 } from "@/lib/roles";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
+import { scoreStatusOf } from "@/lib/scorePrefilter";
 import { useTheme } from "@/lib/theme";
 import { track } from "@/lib/analytics";
 import ScoreBreakdown from "./ScoreBreakdown";
@@ -41,6 +42,9 @@ export type RolesPanelProps = {
   loading: boolean;
   scoring: boolean;
   remaining: number;
+  /** Roles the paid scoring pass covers (#114). An unscored role outside this
+   *  set will never score, so it must not claim to be scoring. */
+  eligibleIds: Set<string>;
   detailJob: RoleJob | null;
   applied: Set<string>;
   saved: Set<string>;
@@ -111,6 +115,7 @@ export default function RolesPanel({
   loading,
   scoring,
   remaining,
+  eligibleIds,
   detailJob,
   applied,
   saved,
@@ -555,12 +560,23 @@ export default function RolesPanel({
                   <div className="hlt">{fitLabel(job.score)}</div>
                 </div>
               </>
-            ) : (
+            ) : scoreStatusOf(job.score, eligibleIds.has(job.id)) === "scoring" ? (
               <>
                 <FitChip score={null} size="lg" />
                 <div className="dhl">
                   <div className="hlt">Scoring this role…</div>
                   <div className="hls">Your fit lands in a moment.</div>
+                </div>
+              </>
+            ) : (
+              // Outside the paid slice (#114): it matches no target you picked, or
+              // sits past the freshest-first cut. Saying "scoring" here would never
+              // come true, so name the real state and point at the one control.
+              <>
+                <FitChip score={null} size="lg" pendingLabel="Not scored" />
+                <div className="dhl">
+                  <div className="hlt">Not scored</div>
+                  <div className="hls">We score your newest matching roles first. Widen your targets in Settings to include this one.</div>
                 </div>
               </>
             )}
