@@ -97,6 +97,9 @@ const JOB_REFERENCE_TABLES: readonly UserTableName[] = [
   "artifacts",
 ];
 
+/** Rows per page when exporting. Matches PostgREST's implicit ceiling. */
+const EXPORT_PAGE = 1000;
+
 export const ACCOUNT_EXPORT_FORMAT = `${BRAND_NAME} account export`;
 export const ACCOUNT_EXPORT_VERSION = 1;
 
@@ -119,7 +122,12 @@ type QueryResult = { data: ExportRow[] | null; error: { message: string } | null
 export type ExportClient = {
   from(table: string): {
     select(columns: string): {
-      eq(column: string, value: string): PromiseLike<QueryResult>;
+      // `.eq()` must be rangeable: the export pages, because an un-ranged select
+      // returns PostgREST's first 1000 rows and reports nothing, which would answer
+      // a data-subject access request with a partial file that looks complete.
+      eq(column: string, value: string): PromiseLike<QueryResult> & {
+        range(from: number, to: number): PromiseLike<QueryResult>;
+      };
       in(column: string, values: string[]): PromiseLike<QueryResult>;
     };
   };
@@ -161,19 +169,44 @@ export async function buildAccountExport(
   const data: Record<string, ExportRow[]> = {};
 
   for (const spec of USER_DATA_TABLES) {
-    const { data: rows, error } = await client.from(spec.table).select("*").eq(spec.column, userId);
-    if (error) throw new Error(`Could not read ${spec.table}: ${error.message}`);
+    // PAGED, and this one is a legal obligation rather than a nicety: an un-ranged
+    // select returns PostgREST's first 1000 rows and says nothing, so a data-subject
+    // access request would have answered with ~8% of this user's scores and looked
+    // complete. Measured 2026-08-19: one user holds 11,813 score rows.
+    const rows: ExportRow[] = [];
+    for (let page = 0; ; page++) {
+      const from = page * EXPORT_PAGE;
+      const { data: chunk, error } = await client
+        .from(spec.table)
+        .select("*")
+        .eq(spec.column, userId)
+        .range(from, from + EXPORT_PAGE - 1);
+      if (error) throw new Error(`Could not read ${spec.table}: ${error.message}`);
+      const got = (chunk ?? []) as ExportRow[];
+      rows.push(...got);
+      // An export that silently truncates is worse than one that fails, so this
+      // throws rather than returning a plausible-looking partial answer.
+      if (got.length < EXPORT_PAGE) break;
+      if (page > 200) throw new Error(`Refusing to export ${spec.table}: more than ${201 * EXPORT_PAGE} rows`);
+    }
     // A table can appear once per user column (referrals: referee_id + referrer_id);
     // the directions are disjoint rows, merged under the one table key.
     data[spec.table] = [...(data[spec.table] ?? []), ...(rows ?? [])];
   }
 
   const jobIds = referencedJobIds(data);
-  let jobs: ExportRow[] = [];
+  const jobs: ExportRow[] = [];
   if (jobIds.length > 0) {
-    const { data: rows, error } = await client.from("jobs").select("*").in("id", jobIds);
-    if (error) throw new Error(`Could not read jobs: ${error.message}`);
-    jobs = rows ?? [];
+    // jobIds is derived from the rows above and can exceed 1000 now that those are
+    // complete, so the id list is chunked rather than assumed small.
+    for (let i = 0; i < jobIds.length; i += EXPORT_PAGE) {
+      const { data: rows, error } = await client
+        .from("jobs")
+        .select("*")
+        .in("id", jobIds.slice(i, i + EXPORT_PAGE));
+      if (error) throw new Error(`Could not read jobs: ${error.message}`);
+      jobs.push(...((rows ?? []) as ExportRow[]));
+    }
   }
 
   return {
