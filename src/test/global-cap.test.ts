@@ -3,6 +3,8 @@
 // enforceGlobalCap wires it to usage_events. Rule + code move together: change
 // the cap's behavior only alongside cap.ts and this file.
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   GLOBAL_MONTHLY_CAP_DEFAULT_USD,
   capUsdFromEnv,
@@ -106,5 +108,35 @@ describe("globalCapVerdict — the fail-closed kill-switch", () => {
       status: 429,
       message: CAP_TRIPPED_MESSAGE,
     });
+  });
+});
+
+describe("the cap must not read a truncated ledger (#audit P0)", () => {
+  // What shipped: the proxy summed month-to-date spend with
+  //   .from('usage_events').select('cost_usd').gte('created_at', monthStart)
+  // PostgREST caps that at 1000 rows, silently. Measured on production 2026-08-19:
+  // 15,422 events this month, true total $35.03, what the cap could see $2.58.
+  // The gap WIDENS with usage, so $300 was unreachable — it would have needed
+  // $0.30 an event, about 120x the real cost. The kill switch was inert.
+  it("a row-array sum is exactly the shape that under-reported, so the proxy must not use one", () => {
+    const source = readFileSync(join(process.cwd(), "supabase/functions/anthropic-proxy/index.ts"), "utf8");
+    // The fix is a database-side aggregate. Selecting cost_usd rows to add up in JS
+    // is the bug, whatever the row count happens to be today.
+    expect(
+      /\.from\(\s*['"]usage_events['"]\s*\)[\s\S]{0,200}?\.select\(\s*['"]cost_usd['"]\s*\)/.test(source),
+      "the proxy selects cost_usd rows and sums them in JS — PostgREST returns only the first 1000, so the cap under-reports",
+    ).toBe(false);
+    expect(
+      source.includes("global_month_spend_usd"),
+      "the proxy should call the global_month_spend_usd() aggregate instead",
+    ).toBe(true);
+  });
+
+  it("under-reporting is unsafe in the one direction that matters", () => {
+    // A truncated read makes the total look SMALLER, so the cap stays open. Pin the
+    // direction: at or over the cap must block, and a missing total must block too.
+    expect(globalCapVerdict({ capUsd: 300, monthTotalUsd: 299.99 }).allowed).toBe(true);
+    expect(globalCapVerdict({ capUsd: 300, monthTotalUsd: 300 }).allowed).toBe(false);
+    expect(globalCapVerdict({ capUsd: 300, monthTotalUsd: undefined }).allowed).toBe(false);
   });
 });
