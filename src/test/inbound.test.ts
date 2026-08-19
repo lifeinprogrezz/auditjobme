@@ -25,37 +25,50 @@ import {
 const D = (iso: string) => new Date(iso);
 
 describe("FORWARDING_DOMAIN", () => {
-  it("still names the domain the live MX records serve", () => {
-    // INFRA-BOUND, not brand. The Northgoing rebrand (#106) deliberately left this
-    // alone. MX for track.auditjob.me is what actually accepts the mail, every
-    // existing user already completed Gmail's per-address forwarding verification
-    // against that exact address, and the database stores only the token, never
-    // the address (supabase/migrations/20260811210000_inbox_forwarding.sql), so
-    // this constant is the sole binding. Renaming it does not move DNS: mail keeps
-    // arriving at the old address, extractForwardingToken stops matching it, and
-    // every tracker silently stops auto-advancing.
+  it("names the domain the MX records are expected to serve", () => {
+    // INFRA-BOUND, not brand: this constant is the sole binding between a user and
+    // their forwarding address, because the database stores only the token, never
+    // the address (supabase/migrations/20260811210000_inbox_forwarding.sql).
+    //
+    // Moved to northgoing.com on 2026-08-19, and the reason it was SAFE to move is
+    // worth recording, because the usual reason it is not was asserted and turned
+    // out to be false. Measured against production that day: track.auditjob.me had
+    // NO MX record, inbound_tokens held ZERO rows, and zero users had completed
+    // Gmail's per-address verification. The feature was shipped but dormant, so
+    // there was no mail in flight and nobody to strand.
+    //
+    // That is no longer true the moment MX exists and one user verifies. From then
+    // on, renaming this does not move DNS: mail keeps arriving at the old address,
+    // extractForwardingToken stops matching it, and every tracker silently stops
+    // auto-advancing, with no error anywhere.
     //
     // The fixtures below are pinned to the same domain, so on their own a
-    // find-and-replace would rewrite constant and fixtures together and stay
-    // green. This assertion is the tripwire that goes red instead. Change it only
-    // in the commit that actually moves the MX records and re-verifies every user.
-    expect(FORWARDING_DOMAIN).toBe("track.auditjob.me");
+    // find-and-replace would rewrite constant and fixtures together and stay green.
+    // This assertion is the tripwire that goes red instead. Change it only in the
+    // commit that actually moves the MX records.
+    expect(FORWARDING_DOMAIN).toBe("track.northgoing.com");
   });
 });
 
 describe("extractForwardingToken", () => {
   it("parses the bare address", () => {
-    expect(extractForwardingToken("u-abc123@track.auditjob.me")).toBe("abc123");
+    expect(extractForwardingToken("u-abc123@track.northgoing.com")).toBe("abc123");
   });
 
   it("parses display-name and list forms, case-insensitively", () => {
-    expect(extractForwardingToken('"Me" <U-DEF456@Track.AuditJob.Me>')).toBe("def456");
-    expect(extractForwardingToken(["other@example.com", "u-tok9@track.auditjob.me"])).toBe("tok9");
+    expect(extractForwardingToken('"Me" <U-DEF456@Track.NorthGoing.Com>')).toBe("def456");
+    expect(extractForwardingToken(["other@example.com", "u-tok9@track.northgoing.com"])).toBe("tok9");
   });
 
   it("returns null for other domains and malformed recipients — never guesses", () => {
     expect(extractForwardingToken("u-abc@track.evil.me")).toBeNull();
-    expect(extractForwardingToken("someone@auditjob.me")).toBeNull();
+    // OUR apex, not the subdomain: mail to northgoing.com itself is not forwarding
+    // mail, and matching it would let any address at the bare domain drive a
+    // tracker. Pinned to the CURRENT apex on purpose — pointed at the retired one
+    // it would pass without testing anything.
+    expect(extractForwardingToken("someone@northgoing.com")).toBeNull();
+    // The retired brand must not keep working either, or the migration is a no-op.
+    expect(extractForwardingToken("u-abc123@track.auditjob.me")).toBeNull();
     expect(extractForwardingToken(null)).toBeNull();
     expect(extractForwardingToken(undefined)).toBeNull();
   });
