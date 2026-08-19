@@ -266,6 +266,31 @@ begin
     raise exception 'user_id column(s) with no foreign key to auth.users -- deleting the account would leave these rows behind: %', bad;
   end if;
 
+  -- 1b. Snapshot tables are invisible to the cascade. `create table as select` copies
+  --     data but NOT constraints, so a backup has no foreign key and rule 1 above also
+  --     misses it whenever its user column is not literally named user_id — which is
+  --     exactly how profiles_targets_backup_20260819 kept deleted users' job targets
+  --     (found 2026-08-19; its user column is `id`, copied from profiles).
+  --     So: any *backup* table holding a uuid user key must be named explicitly in
+  --     delete_own_account(). Company-keyed snapshots hold no personal data and pass.
+  select string_agg(c.relname, ', ' order by c.relname)
+    into bad
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r' and c.relname like '%backup%'
+      and exists (
+        select 1 from pg_attribute a join pg_type t on t.oid = a.atttypid
+        where a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+          and a.attname in ('user_id', 'id') and t.typname = 'uuid'
+      )
+      and not exists (
+        select 1 from pg_proc p
+        where p.proname = 'delete_own_account' and p.prosrc like '%' || c.relname || '%'
+      );
+  if bad is not null then
+    raise exception 'snapshot table(s) hold a user key but are not cleared by delete_own_account() -- erasure would leave the data behind: %', bad;
+  end if;
+
   -- 2. Every foreign key from public into auth.users must be ON DELETE CASCADE.
   --    Covers profiles.id too (keyed by id, not user_id), and catches a future
   --    SET NULL / NO ACTION that would orphan rows instead of removing them.
