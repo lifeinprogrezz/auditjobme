@@ -106,10 +106,24 @@ export default function AppShell({
           <AccountMenu variant="paper" />
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-4 pb-24 pt-8 sm:px-6">
+      <main className="mx-auto max-w-3xl px-4 pb-12 pt-8 sm:px-6">
         {title && <h1 className="text-balance font-display text-page">{title}</h1>}
         {children}
       </main>
+      {/* Privacy and Terms shipped UNREACHABLE — routed, but linked from nowhere in
+          the app. A signed-in user handing over a CV should be one click from both,
+          on every page, not only on the map. */}
+      <footer className="mx-auto max-w-3xl px-4 pb-16 sm:px-6">
+        <div className="flex items-center gap-3 border-t border-border pt-6 text-caption text-muted-foreground">
+          <NavLink to="/privacy" className="hover:text-foreground">
+            Privacy
+          </NavLink>
+          <span aria-hidden="true">·</span>
+          <NavLink to="/terms" className="hover:text-foreground">
+            Terms
+          </NavLink>
+        </div>
+      </footer>
     </div>
   );
 }
