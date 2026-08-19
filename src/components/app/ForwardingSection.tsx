@@ -13,7 +13,7 @@ import { ATS_SENDER_DOMAINS, forwardingAddress } from "@/lib/inbound";
 // inbound_tokens is not in the generated types until the migration is applied to the
 // project and src/integrations/supabase/types.ts is regenerated (same note as
 // delete_own_account in Settings.tsx).
-type TokenRow = { token: string; gmail_confirmation_code: string | null };
+type TokenRow = { token: string; gmail_confirmation_code: string | null; gmail_confirmation_url: string | null };
 type InboundClient = {
   from: (table: string) => {
     select: (cols: string) => { limit: (n: number) => Promise<{ data: TokenRow[] | null; error: unknown }> };
@@ -50,7 +50,7 @@ export default function ForwardingSection() {
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
-    const { data } = await db.from("inbound_tokens").select("token, gmail_confirmation_code").limit(1);
+    const { data } = await db.from("inbound_tokens").select("token, gmail_confirmation_code, gmail_confirmation_url").limit(1);
     setRow(data?.[0] ?? null);
     setChecked(true);
   }, []);
@@ -108,17 +108,29 @@ export default function ForwardingSection() {
           <ol className="mt-4 list-decimal space-y-2 pl-5 text-body text-muted-foreground">
             <li>
               In Gmail, open Settings, then "Forwarding and POP/IMAP", and add the address above as a forwarding
-              address. Gmail will ask for a verification code.
+              address. Gmail then emails a confirmation to that address, which means to us, not to you.
             </li>
             <li>
-              The code arrives here, not in your inbox: refresh below and it will show up.
-              {row.gmail_confirmation_code ? (
+              {/* Gmail sends a LINK, not a code (measured 2026-08-19 against real mail).
+                  The code branch stays for the older "(#123456789)" subject some
+                  accounts still receive. */}
+              Confirm it here: refresh below and the button appears.
+              {row.gmail_confirmation_url ? (
+                <a
+                  className="ml-2 inline-flex items-center rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background"
+                  href={row.gmail_confirmation_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Confirm forwarding in Gmail
+                </a>
+              ) : row.gmail_confirmation_code ? (
                 <span className="ml-1 font-medium text-foreground">
                   Your code: <code>{row.gmail_confirmation_code}</code>
                 </span>
               ) : (
                 <Button variant="ghost" size="sm" className="ml-2" onClick={() => void load()}>
-                  Refresh for code
+                  Refresh
                 </Button>
               )}
             </li>

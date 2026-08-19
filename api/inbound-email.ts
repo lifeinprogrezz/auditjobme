@@ -29,6 +29,7 @@ import {
   extractCompanyRole,
   extractForwardingToken,
   extractGmailConfirmationCode,
+  extractGmailConfirmationLink,
   isGmailForwardingConfirmation,
   matchApplication,
   secretAuthResult,
@@ -255,15 +256,24 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   // Gmail's add-forwarding-address verification lands HERE, not in the user's
   // inbox — park the code on the token row so Settings can show it back.
   if (isGmailForwardingConfirmation(from)) {
+    // Gmail sends a LINK, not a code (measured 2026-08-19). The code path stays
+    // for the older "(#123456789)" subject some accounts still get, but the link
+    // is what live mail actually carries, so it is read from the BODY.
     const code = extractGmailConfirmationCode(subject);
-    if (code) {
+    const link = extractGmailConfirmationLink(text);
+    if (code || link) {
       await admin
         .from("inbound_tokens")
-        .update({ gmail_confirmation_code: code, gmail_confirmation_at: new Date().toISOString() })
+        .update({
+          ...(code ? { gmail_confirmation_code: code } : {}),
+          ...(link ? { gmail_confirmation_url: link } : {}),
+          gmail_confirmation_at: new Date().toISOString(),
+        })
         .eq("user_id", userId);
     }
-    await log({ classification: "gmail_confirmation", action: "gmail_confirmation", detail: code ? "code stored" : "no code found" });
-    res.status(200).json({ ok: true, action: "gmail_confirmation", codeStored: Boolean(code) });
+    const detail = link ? "link stored" : code ? "code stored" : "no code or link found";
+    await log({ classification: "gmail_confirmation", action: "gmail_confirmation", detail });
+    res.status(200).json({ ok: true, action: "gmail_confirmation", stored: Boolean(code || link) });
     return;
   }
 

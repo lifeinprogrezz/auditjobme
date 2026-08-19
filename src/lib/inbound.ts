@@ -111,6 +111,28 @@ export function extractGmailConfirmationCode(subject: string | undefined | null)
   return m ? m[1] : null;
 }
 
+/**
+ * The link Gmail ACTUALLY sends. Measured 2026-08-19 against a real confirmation
+ * mail: there is no numeric code anywhere. The subject reads
+ * "(Gmail Forwarding confirmation – Receive mail from …" with no code at all, and
+ * the body carries a link the user clicks instead. extractGmailConfirmationCode
+ * above therefore returns null on live mail; it is kept only for the older
+ * "(#123456789)" format some accounts may still receive.
+ *
+ * The same mail contains TWO links that differ by a single letter:
+ *   /mail/vf-…  confirms the forwarding request
+ *   /mail/uf-…  CANCELS it
+ * Handing someone the cancel link would silently undo the setup they are trying
+ * to complete, so this matches vf- only and never falls back to "the first
+ * google link in the body".
+ */
+export function extractGmailConfirmationLink(body: string | undefined | null): string | null {
+  // Stops at whitespace, quotes and angle brackets, so it reads the same out of
+  // plain text and out of an href in html mail.
+  const m = (body ?? "").match(/https:\/\/mail\.google\.com\/mail\/vf-[^\s"'<>]+/i);
+  return m ? m[0] : null;
+}
+
 // ---------------------------------------------------------------------------
 // Classifier
 // ---------------------------------------------------------------------------
