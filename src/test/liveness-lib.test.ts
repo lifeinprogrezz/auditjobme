@@ -124,6 +124,17 @@ describe("checkUrl", () => {
 
 describe("BOARD_KINDS", () => {
   it("stays the exact board-diff set — the sweep covers its complement", () => {
-    expect(BOARD_KINDS).toEqual(["greenhouse", "lever", "ashby", "workable", "smartrecruiters", "teamtailor", "personio"]);
+    // Membership here is a claim about the SOURCE, not a formality: a kind listed
+    // here is retired when a role vanishes from a successfully re-scanned feed,
+    // so it may only contain sources whose feed is the COMPLETE live set. Adding
+    // a partial or paginated feed would silently retire live roles. recruitee and
+    // join qualify: each serves every open role for a company in one response
+    // (recruitee /api/offers/ carried status "published" on all 661 probed offers
+    // with no close_at; join's PublicJobsList is the live board). A source left
+    // OUT of this list is not unprotected — it falls to the liveness sweep.
+    expect(BOARD_KINDS).toEqual([
+      "greenhouse", "lever", "ashby", "workable", "smartrecruiters", "teamtailor",
+      "personio", "recruitee", "join",
+    ]);
   });
 });

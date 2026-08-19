@@ -1,5 +1,5 @@
 {
- "_comment": "Greenhouse/Lever/Ashby/Workable/SmartRecruiters/Teamtailor/Personio public-API boards, seeded from career-ops portals.yml + startupmap_discovered.yml by app-seed-export.mjs and kept in sync by `node scripts/sync-boards.mjs --engine=<career-ops> --write` (monthly; verifies liveness, idempotent). Teamtailor entries carry `token` for a *.teamtailor.com subdomain or `host` for a custom career domain. Personio entries carry `token` for a *.jobs.personio.de tenant (the .com mirror serves the same feed). Dead boards fail non-fatally in scrape.mjs.",
+ "_comment": "Greenhouse/Lever/Ashby/Workable/SmartRecruiters/Teamtailor/Personio/Recruitee/Join public-API boards, seeded from career-ops portals.yml + startupmap_discovered.yml by app-seed-export.mjs and kept in sync by `node scripts/sync-boards.mjs --engine=<career-ops> --write` (monthly; verifies liveness, idempotent). Teamtailor entries carry `token` for a *.teamtailor.com subdomain or `host` for a custom career domain. Personio entries carry `token` for a *.jobs.personio.de tenant (the .com mirror serves the same feed). Dead boards fail non-fatally in scrape.mjs. Recruitee entries carry `token` for a *.recruitee.com tenant or `host` for a custom career domain. Join entries carry `token` (the company slug) plus `companyId`, which lets a run skip the rate-limited slug lookup. `_excluded_boards` records tenants deliberately NOT seeded because they host other companies’ roles.",
  "greenhouse": [
   {
    "company": "Vercel",
@@ -4489,5 +4489,295 @@
    "company": "Yaba",
    "token": "yaba"
   }
- ]
+ ],
+ "recruitee": [
+  {
+   "company": "Sequra",
+   "token": "sequra"
+  },
+  {
+   "company": "Aikidosecurity",
+   "token": "aikidosecurity"
+  },
+  {
+   "company": "Matera",
+   "token": "matera"
+  },
+  {
+   "company": "Legalfly",
+   "token": "legalfly"
+  },
+  {
+   "company": "Epilot",
+   "token": "epilot"
+  },
+  {
+   "company": "Tether",
+   "token": "tether"
+  },
+  {
+   "company": "Aquablu",
+   "token": "aquablu"
+  },
+  {
+   "company": "Tylko",
+   "token": "tylko"
+  },
+  {
+   "company": "Azumuta",
+   "token": "azumuta"
+  },
+  {
+   "company": "Peripass",
+   "token": "peripass"
+  },
+  {
+   "company": "Droppie",
+   "token": "droppie"
+  },
+  {
+   "company": "Justrussel",
+   "token": "justrussel"
+  },
+  {
+   "company": "Kaizo",
+   "token": "kaizo"
+  },
+  {
+   "company": "Superlinear",
+   "token": "superlinear"
+  },
+  {
+   "company": "Intelic",
+   "token": "intelic"
+  },
+  {
+   "company": "Greyparrotai",
+   "token": "greyparrotai"
+  },
+  {
+   "company": "Lleverage",
+   "token": "lleverage"
+  },
+  {
+   "company": "Leydenlabs",
+   "token": "leydenlabs"
+  },
+  {
+   "company": "Deepsea",
+   "token": "deepsea"
+  },
+  {
+   "company": "Causalens",
+   "token": "causalens"
+  },
+  {
+   "company": "Happeo",
+   "token": "happeo"
+  },
+  {
+   "company": "Twisto",
+   "token": "twisto"
+  },
+  {
+   "company": "Passionfroot",
+   "token": "passionfroot"
+  },
+  {
+   "company": "Staxxer",
+   "token": "staxxer"
+  },
+  {
+   "company": "Enersee",
+   "token": "enersee"
+  },
+  {
+   "company": "Ethonai",
+   "token": "ethonai"
+  },
+  {
+   "company": "Forwardearth",
+   "token": "forwardearth"
+  },
+  {
+   "company": "Landlifecompany",
+   "token": "landlifecompany"
+  },
+  {
+   "company": "Verticalcompute",
+   "token": "verticalcompute"
+  },
+  {
+   "company": "Switchojob",
+   "token": "switchojob"
+  },
+  {
+   "company": "Fashioncloudgmbh",
+   "token": "fashioncloudgmbh"
+  },
+  {
+   "company": "Markmi",
+   "token": "markmi"
+  }
+ ],
+ "join": [
+  {
+   "company": "Pflegia",
+   "token": "pflegia",
+   "companyId": 22808
+  },
+  {
+   "company": "Omnisent",
+   "token": "omnisent",
+   "companyId": 157757
+  },
+  {
+   "company": "Motor Ai",
+   "token": "motor-ai",
+   "companyId": 5740
+  },
+  {
+   "company": "Getweflowcom",
+   "token": "getweflowcom",
+   "companyId": 160348
+  },
+  {
+   "company": "Taurusgroup",
+   "token": "taurusgroup",
+   "companyId": 5743
+  },
+  {
+   "company": "Acemate",
+   "token": "acemate",
+   "companyId": 144453
+  },
+  {
+   "company": "Gokonfetti",
+   "token": "gokonfetti",
+   "companyId": 28170
+  },
+  {
+   "company": "Introw",
+   "token": "introw",
+   "companyId": 156883
+  },
+  {
+   "company": "Noah Labs",
+   "token": "noah-labs",
+   "companyId": 133206
+  },
+  {
+   "company": "Spotixxcom",
+   "token": "spotixxcom",
+   "companyId": 176789
+  },
+  {
+   "company": "Voltraceu",
+   "token": "voltraceu",
+   "companyId": 163142
+  },
+  {
+   "company": "Arc Intelligencede",
+   "token": "arc-intelligencede",
+   "companyId": 182142
+  },
+  {
+   "company": "Loucoapp",
+   "token": "loucoapp",
+   "companyId": 163565
+  },
+  {
+   "company": "Ordio",
+   "token": "ordio",
+   "companyId": 35267
+  },
+  {
+   "company": "Cocrafter",
+   "token": "cocrafter",
+   "companyId": 121551
+  },
+  {
+   "company": "Everphone",
+   "token": "everphone",
+   "companyId": 217
+  },
+  {
+   "company": "Shyfter",
+   "token": "shyfter",
+   "companyId": 56085
+  },
+  {
+   "company": "Tangany",
+   "token": "tangany",
+   "companyId": 2079
+  },
+  {
+   "company": "Ai Coustics",
+   "token": "ai-coustics",
+   "companyId": 61468
+  },
+  {
+   "company": "Anytax",
+   "token": "anytax",
+   "companyId": 154204
+  },
+  {
+   "company": "Bling",
+   "token": "bling",
+   "companyId": 36999
+  },
+  {
+   "company": "Agicap",
+   "token": "agicap",
+   "companyId": 26174
+  },
+  {
+   "company": "Hoshii",
+   "token": "hoshii",
+   "companyId": 150038
+  },
+  {
+   "company": "Join",
+   "token": "join",
+   "companyId": 54
+  },
+  {
+   "company": "Textcortex",
+   "token": "textcortex",
+   "companyId": 31959
+  },
+  {
+   "company": "Leapingai",
+   "token": "leapingai",
+   "companyId": 101477
+  },
+  {
+   "company": "Senvo",
+   "token": "senvo",
+   "companyId": 143084
+  },
+  {
+   "company": "Shayp",
+   "token": "shayp",
+   "companyId": 49617
+  },
+  {
+   "company": "Catawiki",
+   "token": "catawiki",
+   "companyId": 6084
+  }
+ ],
+ "_excluded_boards": {
+  "_why": "Tenants that host OTHER companies' roles. Their payload reports the board owner in every field, so a row would upsert under the wrong employer (the #68 Getro class). Re-attribution is impossible because the real employer appears only inside the title. Do not re-add: a wrong employer poisons the tracker and any outreach built on it, while a missing row costs nothing.",
+  "recruitee": [
+   {
+    "token": "jobsatlanticvc",
+    "why": "Atlantic Labs venture talent board. 13 of 14 offers under department 'Portfolio Company', company_name 'atlantic.vc' on all of them, employers anonymised in the title ('@ DeepTech Scale-Up'). Also caught defensively by isForeignListing."
+   },
+   {
+    "token": "wisemen",
+    "why": "Belgian agency posting client roles ('Head of Sales - EEVEE Mobility') under department 'Sales', which no department guard can catch. Its own two rows are an internship and a spontaneous application, both out of scope."
+   }
+  ]
+ }
 }
