@@ -10,6 +10,7 @@ import {
   decideTransition,
   extractCompanyRole,
   extractForwardingToken,
+  parseResendInboundEvent,
   extractGmailConfirmationCode,
   FORWARDING_DOMAIN,
   forwardingAddress,
@@ -37,6 +38,13 @@ describe("FORWARDING_DOMAIN", () => {
     // Gmail's per-address verification. The feature was shipped but dormant, so
     // there was no mail in flight and nobody to strand.
     //
+    // It is the APEX, not a track.* subdomain, because that is where the MX
+    // actually points: enabling Resend receiving put
+    // `northgoing.com MX -> inbound-smtp.eu-west-1.amazonaws.com` on the apex and
+    // left track.northgoing.com empty. The address follows the MX, never the other
+    // way round. Receiving on a subdomain would mean registering it in Resend as
+    // its own domain first.
+    //
     // That is no longer true the moment MX exists and one user verifies. From then
     // on, renaming this does not move DNS: mail keeps arriving at the old address,
     // extractForwardingToken stops matching it, and every tracker silently stops
@@ -46,26 +54,25 @@ describe("FORWARDING_DOMAIN", () => {
     // find-and-replace would rewrite constant and fixtures together and stay green.
     // This assertion is the tripwire that goes red instead. Change it only in the
     // commit that actually moves the MX records.
-    expect(FORWARDING_DOMAIN).toBe("track.northgoing.com");
+    expect(FORWARDING_DOMAIN).toBe("northgoing.com");
   });
 });
 
 describe("extractForwardingToken", () => {
   it("parses the bare address", () => {
-    expect(extractForwardingToken("u-abc123@track.northgoing.com")).toBe("abc123");
+    expect(extractForwardingToken("u-abc123@northgoing.com")).toBe("abc123");
   });
 
   it("parses display-name and list forms, case-insensitively", () => {
-    expect(extractForwardingToken('"Me" <U-DEF456@Track.NorthGoing.Com>')).toBe("def456");
-    expect(extractForwardingToken(["other@example.com", "u-tok9@track.northgoing.com"])).toBe("tok9");
+    expect(extractForwardingToken('"Me" <U-DEF456@NorthGoing.Com>')).toBe("def456");
+    expect(extractForwardingToken(["other@example.com", "u-tok9@northgoing.com"])).toBe("tok9");
   });
 
   it("returns null for other domains and malformed recipients — never guesses", () => {
     expect(extractForwardingToken("u-abc@track.evil.me")).toBeNull();
-    // OUR apex, not the subdomain: mail to northgoing.com itself is not forwarding
-    // mail, and matching it would let any address at the bare domain drive a
-    // tracker. Pinned to the CURRENT apex on purpose — pointed at the retired one
-    // it would pass without testing anything.
+    // The apex now receives ALL mail for the domain, so this guard matters more
+    // than it did: an address at the bare domain that is not a u-{token} address
+    // must never drive a tracker. Only the u- prefix plus a token qualifies.
     expect(extractForwardingToken("someone@northgoing.com")).toBeNull();
     // The retired brand must not keep working either, or the migration is a no-op.
     expect(extractForwardingToken("u-abc123@track.auditjob.me")).toBeNull();
@@ -379,5 +386,58 @@ describe("decideTransition", () => {
     expect(
       decideTransition({ kind: "unknown", currentStatus: "applied", emailDate: now, lastChangedAt: null, now }).action,
     ).toBe("skip");
+  });
+});
+
+describe("parseResendInboundEvent (#118)", () => {
+  // Shape taken verbatim from Resend's receiving documentation. The webhook is
+  // METADATA ONLY: no text, no html, no headers. The body must be fetched
+  // separately, which is why this returns an emailId rather than a payload.
+  const event = {
+    type: "email.received",
+    created_at: "2026-02-22T23:41:12.126Z",
+    data: {
+      email_id: "56761188-7520-42d8-8898-ff6fc54ce618",
+      created_at: "2026-02-22T23:41:11.894Z",
+      from: "Greenhouse <no-reply@greenhouse.io>",
+      to: ["u-abc123@northgoing.com"],
+      cc: [],
+      bcc: [],
+      received_for: [],
+      message_id: "<111-222-333@email.example.com>",
+      subject: "Your application to Acme",
+      attachments: [],
+    },
+  };
+
+  it("maps the documented shape onto the recipient fields the pipeline reads", () => {
+    const got = parseResendInboundEvent(event);
+    expect(got?.emailId).toBe("56761188-7520-42d8-8898-ff6fc54ce618");
+    expect(got?.from).toBe("Greenhouse <no-reply@greenhouse.io>");
+    expect(got?.subject).toBe("Your application to Acme");
+    expect(got?.messageId).toBe("<111-222-333@email.example.com>");
+    expect(extractForwardingToken(got?.to ?? [])).toBe("abc123");
+  });
+
+  it("also considers received_for, where a forwarded recipient actually lands", () => {
+    // Gmail forwarding puts the mailbox that forwarded in received_for while `to`
+    // still names the ORIGINAL recipient. Reading only `to` loses the token and
+    // the whole feature silently does nothing.
+    const forwarded = {
+      ...event,
+      data: { ...event.data, to: ["rober@gmail.com"], received_for: ["u-tok9@northgoing.com"] },
+    };
+    expect(extractForwardingToken(parseResendInboundEvent(forwarded)?.to ?? [])).toBe("tok9");
+  });
+
+  it("prefers the message's own date over the delivery timestamp for the stale-guard", () => {
+    expect(parseResendInboundEvent(event)?.date).toBe("2026-02-22T23:41:11.894Z");
+  });
+
+  it("returns null for any other event type, so a delivery ping cannot drive a tracker", () => {
+    expect(parseResendInboundEvent({ ...event, type: "email.delivered" })).toBeNull();
+    expect(parseResendInboundEvent({ type: "email.received" })).toBeNull();
+    expect(parseResendInboundEvent(null)).toBeNull();
+    expect(parseResendInboundEvent({ type: "email.received", data: { from: "x" } })).toBeNull();
   });
 });

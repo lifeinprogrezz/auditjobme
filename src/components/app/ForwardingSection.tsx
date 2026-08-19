@@ -1,5 +1,5 @@
 // Issue #75 — the Settings surface for inbox auto-advance (Option A: forwarding
-// address). Shows the user's personal `u-{token}@track.northgoing.com` address and the
+// address). Shows the user's personal `u-{token}@northgoing.com` address and the
 // one guided Gmail filter that makes their tracker move itself. Reads the own token
 // row through row-level security; creation goes through the server-side
 // get_or_create_forwarding_token() function, so a client can never choose a token.

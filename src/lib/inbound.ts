@@ -15,7 +15,7 @@ import type { Status } from "./tracker"; // type-only: erased at compile, so the
 
 /** The inbound domain users forward to. DNS + the inbound provider for this domain
  *  are external setup (see the PR body's needs-human checklist). */
-export const FORWARDING_DOMAIN = "track.northgoing.com";
+export const FORWARDING_DOMAIN = "northgoing.com";
 
 /** How stale a rejection email may be (versus "now") and still flip a card. */
 export const REJECTION_RECENCY_DAYS = 10;
@@ -27,7 +27,7 @@ export function forwardingAddress(token: string): string {
 /**
  * Pull the per-user token out of the recipient list. Accepts a single address, a
  * comma-separated header, or an array (providers differ); the address may carry a
- * display name. Case-insensitive; returns null when no `u-{token}@track.northgoing.com`
+ * display name. Case-insensitive; returns null when no `u-{token}@northgoing.com`
  * recipient is present (the endpoint then rejects the delivery).
  */
 export function extractForwardingToken(to: string | string[] | undefined | null): string | null {
@@ -364,4 +364,60 @@ export function decideTransition(input: {
   }
 
   return { action: "advance", to: "rejected" };
+}
+
+// ---------------------------------------------------------------------------
+// Resend inbound webhook (#118)
+// ---------------------------------------------------------------------------
+
+/** What Resend's `email.received` webhook actually carries. */
+export type ResendInboundMeta = {
+  /** Fetch the body with this; the webhook does not contain one. */
+  emailId: string;
+  to: string[];
+  from: string;
+  subject: string | null;
+  messageId: string | null;
+  date: string | null;
+};
+
+/**
+ * Read Resend's `email.received` event into the fields the pipeline needs.
+ *
+ * The webhook is METADATA ONLY — Resend's documentation is explicit that it
+ * carries no body, headers or attachments, only their metadata — so this cannot
+ * return a finished payload. It returns an `emailId` the caller exchanges for
+ * the content at GET /emails/receiving/{id}.
+ *
+ * Recipients come from `to` AND `received_for`, and that union is load-bearing:
+ * when a mailbox forwards, `to` keeps naming the ORIGINAL recipient while the
+ * forwarding address lands in `received_for`. Reading only `to` would lose the
+ * token on exactly the mail this feature exists to process.
+ *
+ * Returns null for any other event type, so a delivery or bounce ping can never
+ * be mistaken for received mail and drive somebody's tracker.
+ */
+export function parseResendInboundEvent(event: unknown): ResendInboundMeta | null {
+  if (!event || typeof event !== "object") return null;
+  const e = event as { type?: unknown; data?: unknown };
+  if (e.type !== "email.received" || !e.data || typeof e.data !== "object") return null;
+
+  const d = e.data as Record<string, unknown>;
+  const emailId = typeof d.email_id === "string" ? d.email_id : null;
+  const from = typeof d.from === "string" ? d.from : null;
+  if (!emailId || !from) return null;
+
+  const list = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : typeof v === "string" ? [v] : [];
+
+  return {
+    emailId,
+    to: [...list(d.to), ...list(d.received_for)],
+    from,
+    subject: typeof d.subject === "string" ? d.subject : null,
+    messageId: typeof d.message_id === "string" ? d.message_id : null,
+    // The message's own timestamp, not the envelope's: the stale-guard compares
+    // against when the mail was SENT, and an outer delivery time drifts from it.
+    date: typeof d.created_at === "string" ? d.created_at : null,
+  };
 }
