@@ -290,11 +290,14 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     res.status(500).json({ error: `profiles read failed: ${pErr.message}` });
     return;
   }
+  // A CV is the only real requirement. Labels used to be required too, but the #70
+  // vocabulary migration rewrites an all-unmappable stored array to '{}', so a
+  // user whose every old label retired would have silently stopped receiving the
+  // digest — no error, no notice, just no more mail. Empty labels already mean
+  // "no preference" everywhere else (prefilterWithTier's newest tier, and
+  // pickScoringSlice's early return), so they must not mean "not a user" here.
   const active = (profiles ?? []).filter(
-    (p) =>
-      typeof p.cv_text === "string" &&
-      p.cv_text.trim().length > 0 &&
-      ((p.target_roles?.length ?? 0) > 0 || (p.target_sectors?.length ?? 0) > 0),
+    (p) => typeof p.cv_text === "string" && p.cv_text.trim().length > 0,
   );
 
   // ── Candidate jobs (newest first) + company→sector for the label slice ────

@@ -45,6 +45,13 @@ comment on table public.companies_sector_backup_20260819 is
 comment on table public.profiles_targets_backup_20260819 is
   'Pre-#70 profiles.target_roles / target_sectors. Restore source for the vocabulary migration; no policies, so only the service role reads it.';
 
+-- RLS with no policy stops READS, not writes made with a table-level grant. This
+-- project's default ACL grants ALL (delete and truncate included) on new tables to
+-- anon and authenticated, so without this the only rollback path for the rewrite
+-- below would be destroyable by any signed-in user.
+revoke all on public.companies_sector_backup_20260819 from anon, authenticated;
+revoke all on public.profiles_targets_backup_20260819 from anon, authenticated;
+
 -- 1. The mapping, as a function so the three rewrites below share ONE copy of it.
 --    Matching is case- and punctuation-insensitive (the same fold as `tidy` in
 --    scripts/sector-lib.mjs), so only genuinely different words need an entry.
@@ -194,8 +201,24 @@ set target_roles = coalesce(
 where p.target_roles is not null
   and array_length(p.target_roles, 1) > 0;
 
+-- 4b. One SEMANTIC correction, because folding spellings while leaving this in
+--     place would have made the outcome worse than the problem. Company slug
+--     `wise_it` is Wise, the money-transfer fintech (every live URL is
+--     jobs.smartrecruiters.com/Wise/, titles include "Principal Product Manager -
+--     KYC/KYB"), and it is filed under "Medtech & devices" with 108 live roles.
+--     It is the largest single-employer sector in the catalogue, so the liquidity
+--     gate would have HIDDEN the error rather than surfaced it: someone picking
+--     Fintech would silently miss Wise's roles, and Medtech would no longer be
+--     offered for them to find another way. The backup table above covers this.
+update public.companies set sector = 'Fintech' where slug = 'wise_it';
+
 -- 5. Pin it. The scrapers write with the service role, and a CHECK applies to the
 --    service role too, so no enrichment run can reintroduce a variant.
+--    Guarded: `add constraint` has no IF NOT EXISTS, so an unguarded re-run fails
+--    and the migration is not idempotent, whatever the report claims.
+alter table public.companies
+  drop constraint if exists companies_sector_vocabulary;
+
 alter table public.companies
   add constraint companies_sector_vocabulary
   check (

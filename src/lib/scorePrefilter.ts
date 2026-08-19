@@ -11,7 +11,8 @@
 // literally. Without it the deployed function dies at import with
 // ERR_MODULE_NOT_FOUND while every local gate stays green. Pinned by
 // src/test/api-esm-imports.test.ts, which walks the whole api/ import graph.
-import { roleMatchesTargets, type Labels } from "./labels.js";
+import { normalizeTargetRoles, roleMatchesTargets, type Labels } from "./labels.js";
+import { normalizeTargetSectors } from "./sectors.js";
 
 /** Hard per-user slice ceiling (~$3.60 at ~$0.0024/batch-score). A cost dial,
  *  not a scoring judgment — the cap sheds the OLDEST rows, so the slice is
@@ -99,8 +100,14 @@ export function prefilterWithTier<T extends PrefilterJob>(
   jobs: T[],
   labels: Labels,
 ): { jobs: T[]; tier: PrefilterTier } {
-  const roles = labels.roles ?? [];
-  const sectors = labels.sectors ?? [];
+  // Normalized HERE, not at the call sites. A stored label can predate the #70
+  // vocabulary, and the client and the paid workers must resolve it identically
+  // or they select different slices: the client waits on roles the worker never
+  // buys, the progress bar never reaches zero, and the ready email never sends.
+  // Shimming at the call sites is what caused exactly that — one of the three
+  // got the shim and the two that spend money did not.
+  const roles = normalizeTargetRoles(labels.roles);
+  const sectors = normalizeTargetSectors(labels.sectors);
   const byNewest = (a: T, b: T) => seenMs(b) - seenMs(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const take = (rows: T[], cap: number) => rows.sort(byNewest).slice(0, cap);
 
