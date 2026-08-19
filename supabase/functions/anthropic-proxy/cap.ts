@@ -73,3 +73,35 @@ export function globalCapVerdict(input: {
   }
   return { allowed: true };
 }
+
+/**
+ * Request-size ceiling.
+ *
+ * `MAX_TOKENS_CEILING` in index.ts bounds only the OUTPUT a caller may request. The
+ * `messages` and `system` fields were forwarded to Anthropic with no size validation, so
+ * one signed-in account could send an arbitrarily large prompt and pay for it out of the
+ * shared monthly budget. A production call has already billed 151,394 input tokens.
+ *
+ * This is request SHAPING, not a per-user cap — the standing decision is that no real
+ * user should ever hit a limit. The ceiling therefore sits far above anything the product
+ * has ever sent. Measured across all 20,068 calls ever made: average input 1,503 tokens,
+ * five calls above 8k, three above 32k, and the last of those was 2026-06-18 from the
+ * since-retired audit feature. 128KB is roughly 32k tokens, so it would not have touched
+ * a single call in over two months while still bounding a runaway or abusive one.
+ */
+export const MAX_REQUEST_BYTES = 128 * 1024;
+
+/** Serialized byte size of the parts of a proxy request that are sent to Anthropic. */
+export function requestBytes(body: { system?: unknown; messages?: unknown }): number {
+  const payload = JSON.stringify({ system: body.system ?? "", messages: body.messages ?? [] });
+  // Bytes, not characters: multi-byte text would otherwise understate the real payload
+  // (one CJK character is three UTF-8 bytes), which is the obvious way past a char check.
+  return new TextEncoder().encode(payload).length;
+}
+
+export function isOversizedRequest(
+  body: { system?: unknown; messages?: unknown },
+  maxBytes: number = MAX_REQUEST_BYTES,
+): boolean {
+  return requestBytes(body) > maxBytes;
+}

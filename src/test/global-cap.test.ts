@@ -13,6 +13,8 @@ import {
   globalCapVerdict,
   CAP_TRIPPED_MESSAGE,
   CAP_READ_ERROR_MESSAGE,
+  MAX_REQUEST_BYTES,
+  isOversizedRequest,
 } from "../../supabase/functions/anthropic-proxy/cap.ts";
 
 describe("capUsdFromEnv", () => {
@@ -138,5 +140,57 @@ describe("the cap must not read a truncated ledger (#audit P0)", () => {
     expect(globalCapVerdict({ capUsd: 300, monthTotalUsd: 299.99 }).allowed).toBe(true);
     expect(globalCapVerdict({ capUsd: 300, monthTotalUsd: 300 }).allowed).toBe(false);
     expect(globalCapVerdict({ capUsd: 300, monthTotalUsd: undefined }).allowed).toBe(false);
+  });
+});
+
+// ── Request shaping (2026-08-19 audit) ───────────────────────────────────────
+// MAX_TOKENS_CEILING bounds only the OUTPUT. `messages` and `system` were forwarded to
+// Anthropic with no size validation at all, so a single signed-in account could send an
+// arbitrarily large prompt. One production call already billed 151,394 input tokens.
+//
+// The ceiling is deliberately set FAR above anything the product has ever legitimately
+// sent, so it shapes abuse without ever touching a real user. Measured over all 20,068
+// calls ever made: average input 1,503 tokens, only 5 calls above 8k, only 3 above 32k —
+// and the last of those was 2026-06-18, from the since-retired audit feature.
+describe("request size ceiling", () => {
+  const big = (bytes: number) => "x".repeat(bytes);
+
+  it("passes a typical request by a wide margin", () => {
+    // ~1,500 tokens is the measured average; roughly 6KB.
+    expect(isOversizedRequest({ system: "sys", messages: [{ role: "user", content: big(6_000) }] })).toBe(false);
+  });
+
+  it("still passes the largest shape the live product sends", () => {
+    // Highest per-kind maximum measured in usage_events was ~3,106 input tokens.
+    expect(isOversizedRequest({ system: big(4_000), messages: [{ role: "user", content: big(12_000) }] })).toBe(false);
+  });
+
+  it("rejects a payload far beyond anything the product sends", () => {
+    expect(isOversizedRequest({ messages: [{ role: "user", content: big(200_000) }] })).toBe(true);
+  });
+
+  it("counts the system prompt too, so it cannot be used to smuggle size past the check", () => {
+    expect(isOversizedRequest({ system: big(200_000), messages: [] })).toBe(true);
+  });
+
+  it("measures bytes, not characters — multi-byte text cannot understate the payload", () => {
+    // "日" is 3 bytes in UTF-8. 60k of them is 180KB, over the ceiling, though only 60k chars.
+    expect(isOversizedRequest({ messages: [{ role: "user", content: "日".repeat(60_000) }] })).toBe(true);
+  });
+
+  it("keeps the ceiling well above the largest legitimate call ever recorded", () => {
+    expect(MAX_REQUEST_BYTES).toBeGreaterThan(64 * 1024);
+  });
+});
+
+describe("DEFAULT_MODEL", () => {
+  it("is Haiku, so omitting the model fails cheap on a Haiku-only product", () => {
+    // It was claude-sonnet-4-6: a caller who omitted `model` was silently upgraded to the
+    // ~6x pricier model. All four real call sites pass HAIKU explicitly (score.ts,
+    // tailor.ts, nightly.ts, score-backlog.ts), so the default was reachable only by a
+    // hand-crafted request — which is exactly the caller who should not get Sonnet.
+    const src = readFileSync(join(process.cwd(), "supabase/functions/anthropic-proxy/index.ts"), "utf8");
+    const m = src.match(/const DEFAULT_MODEL\s*=\s*['"]([^'"]+)['"]/);
+    expect(m?.[1]).toBe("claude-haiku-4-5-20251001");
   });
 });
