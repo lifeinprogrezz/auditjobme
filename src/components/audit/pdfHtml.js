@@ -1,4 +1,5 @@
 import { safeAccent } from "./utils.js";
+import { BRAND_NAME } from "@/lib/brand";
 
 /* ═══════════════════ PDF HTML GENERATOR ═══════════════════ */
 export function generatePDFHTML(data) {
@@ -233,7 +234,7 @@ ${aboutHTML}
 <!-- FOOTER -->
 <div class="footer">
   BUILT FOR ${e(company?.company).toUpperCase()} \u2014 APPLYING FOR <a href="${company?.role_url||''}">${e(company?.role).toUpperCase()}</a>
-  <div style="margin-top:12px;font-size:.5rem;font-weight:400;letter-spacing:.08em;opacity:.5">MADE WITH AUDITJOB.ME</div>
+  <div style="margin-top:12px;font-size:.5rem;font-weight:400;letter-spacing:.08em;opacity:.5">MADE WITH ${BRAND_NAME.toUpperCase()}</div>
 </div>
 </body></html>`;
   return html;

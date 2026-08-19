@@ -15,9 +15,21 @@
   "redirects": [
     {
       "source": "/((?!api/).*)",
+      "has": [{ "type": "host", "value": "auditjob\\.me" }],
+      "destination": "https://northgoing.com/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/).*)",
+      "has": [{ "type": "host", "value": "www\\.auditjob\\.me" }],
+      "destination": "https://northgoing.com/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/).*)",
       "has": [{ "type": "host", "value": "(?<sub>.+)\\.vercel\\.app" }],
-      "destination": "https://auditjob.me/$1",
-      "permanent": false
+      "destination": "https://northgoing.com/$1",
+      "permanent": true
     }
   ],
   "rewrites": [

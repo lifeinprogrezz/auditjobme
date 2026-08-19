@@ -10,6 +10,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
 import AccountMenu from "@/components/app/AccountMenu";
+import { BRAND_NAME } from "@/lib/brand";
 
 const NAV = [
   { to: "/today", label: "Today" },
@@ -67,7 +68,7 @@ export default function AppShell({
       >
         <div className="mx-auto flex h-14 max-w-3xl items-center gap-1 px-4 sm:px-6">
           <NavLink to="/" className="font-display text-body font-semibold tracking-tight">
-            auditjob.me
+            {BRAND_NAME}
           </NavLink>
           <span className="mx-2 h-4 w-px bg-border" aria-hidden="true" />
           <nav className="flex items-center gap-1" aria-label="Product sections">

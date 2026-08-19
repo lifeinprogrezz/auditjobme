@@ -1,4 +1,4 @@
-# auditjob.me — everything public is crawlable, and AI crawlers are explicitly
+# Northgoing — everything public is crawlable, and AI crawlers are explicitly
 # welcome (GEO: being cited by answer engines is distribution, not a threat —
 # research bible §GEO-3). Named UAs below are the allow-list an engine checks
 # before crawling; the catch-all keeps everyone else in too.
@@ -73,4 +73,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://auditjob.me/sitemap.xml
+Sitemap: https://northgoing.com/sitemap.xml

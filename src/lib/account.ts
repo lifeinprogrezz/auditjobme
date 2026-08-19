@@ -10,6 +10,7 @@
 // is pinned in supabase/tests/assert_rls.sql (every foreign key to auth.users
 // cascades, and delete_own_account() really empties the account).
 import type { Database } from "@/integrations/supabase/types";
+import { BRAND_NAME } from "@/lib/brandName";
 
 export type UserTableName = keyof Database["public"]["Tables"];
 
@@ -96,11 +97,11 @@ const JOB_REFERENCE_TABLES: readonly UserTableName[] = [
   "artifacts",
 ];
 
-export const ACCOUNT_EXPORT_FORMAT = "auditjob.me account export";
+export const ACCOUNT_EXPORT_FORMAT = `${BRAND_NAME} account export`;
 export const ACCOUNT_EXPORT_VERSION = 1;
 
 export const ACCOUNT_EXPORT_README =
-  "Everything auditjob.me holds about your account, straight from the database. " +
+  `Everything ${BRAND_NAME} holds about your account, straight from the database. ` +
   "Each key under `data` is one table, and each row is exactly as we store it. " +
   "`jobs` carries the roles your applications, saved roles, dismissals and generated " +
   "documents point at, so the file reads on its own. Roles you have not acted on come from the " +
@@ -188,7 +189,7 @@ export async function buildAccountExport(
 
 /** File name for the download, dated so repeat exports never overwrite each other. */
 export function accountExportFilename(now: Date = new Date()): string {
-  return `auditjob-me-data-${now.toISOString().slice(0, 10)}.json`;
+  return `northgoing-data-${now.toISOString().slice(0, 10)}.json`;
 }
 
 /** The file body: pretty-printed so it opens readably in any text editor. */

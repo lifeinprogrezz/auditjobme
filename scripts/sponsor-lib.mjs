@@ -1,4 +1,4 @@
-// UK Home Office "Skilled Worker" sponsor matcher for auditjob.me companies.
+// UK Home Office "Skilled Worker" sponsor matcher for Northgoing companies.
 //
 // Ported from career-ops/sponsor-match.mjs (+ the CSV parse of sponsor-fetch.mjs),
 // adapted to the app's companies.uk_sponsor_status vocabulary:

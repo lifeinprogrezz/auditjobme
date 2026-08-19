@@ -11,6 +11,7 @@ import {
   extractCompanyRole,
   extractForwardingToken,
   extractGmailConfirmationCode,
+  FORWARDING_DOMAIN,
   forwardingAddress,
   isGmailForwardingConfirmation,
   matchApplication,
@@ -22,6 +23,25 @@ import {
 } from "@/lib/inbound";
 
 const D = (iso: string) => new Date(iso);
+
+describe("FORWARDING_DOMAIN", () => {
+  it("still names the domain the live MX records serve", () => {
+    // INFRA-BOUND, not brand. The Northgoing rebrand (#106) deliberately left this
+    // alone. MX for track.auditjob.me is what actually accepts the mail, every
+    // existing user already completed Gmail's per-address forwarding verification
+    // against that exact address, and the database stores only the token, never
+    // the address (supabase/migrations/20260811210000_inbox_forwarding.sql), so
+    // this constant is the sole binding. Renaming it does not move DNS: mail keeps
+    // arriving at the old address, extractForwardingToken stops matching it, and
+    // every tracker silently stops auto-advancing.
+    //
+    // The fixtures below are pinned to the same domain, so on their own a
+    // find-and-replace would rewrite constant and fixtures together and stay
+    // green. This assertion is the tripwire that goes red instead. Change it only
+    // in the commit that actually moves the MX records and re-verifies every user.
+    expect(FORWARDING_DOMAIN).toBe("track.auditjob.me");
+  });
+});
 
 describe("extractForwardingToken", () => {
   it("parses the bare address", () => {

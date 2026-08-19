@@ -1,6 +1,6 @@
 # Architecture
 
-How auditjob.me is built, for a developer (human or agent) landing in this repo for the
+How Northgoing is built, for a developer (human or agent) landing in this repo for the
 first time. Written 2026-07-25 (issue #60). Companion docs: [`DATA_CONTRACT.md`](./DATA_CONTRACT.md)
 for the job-row schema, [`scoring-benchmarks.md`](./scoring-benchmarks.md) for scorer calibration.
 
@@ -192,9 +192,11 @@ Two stages, no preview environments:
 
 - **`localhost:8080`** — `npm run dev`. It talks to the *production* Supabase, so saving a
   role or marking one applied writes real rows.
-- **`main` → auditjob.me** — pushing to `main` deploys the frontend on Vercel, and any commit
+- **`main` → northgoing.com** — pushing to `main` deploys the frontend on Vercel, and any commit
   touching `supabase/functions/**` deploys the edge function through
-  `deploy-edge-functions.yml`. One push ships both.
+  `deploy-edge-functions.yml`. One push ships both. The old `auditjob.me` still resolves
+  and 308-redirects to `northgoing.com` (`vercel.json`), except under `/api`, which both
+  hosts continue to serve.
 
 Branch preview deployments are disabled in `vercel.json` (`git.deploymentEnabled`). They
 caused two stale-build reviews and reviewed nothing.

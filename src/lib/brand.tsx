@@ -14,6 +14,7 @@
 //
 // public/favicon.svg carries the SAME two paths and is pinned to these
 // constants by src/test/brand-mark.test.ts. Edit one, edit both, in one commit.
+import { BRAND_NAME as PRODUCT_NAME } from "./brandName";
 
 /** Shared coordinate space for every rendering of the mark. */
 export const MARK_VIEWBOX = "0 0 64 64";
@@ -27,8 +28,13 @@ export const MARK_SOUTH = "M32 60 L47 38.5 L32 44.5 L17 38.5 Z";
 /** Outline weight of the south half, in viewBox units. */
 export const MARK_SOUTH_STROKE = 3.4;
 
-/** The product name. The cutover (#106) swaps domains, never this string. */
-export const BRAND_NAME = "Northgoing";
+// The product name is defined in ./brandName, a JSX-free module, so the email
+// builders and the api/ Vercel Functions can share it without pulling React into
+// a serverless bundle. Re-exported here so every React surface keeps importing
+// the whole identity (mark, lockup, name) from one place.
+/** The product name. The domain cutover (#106) swaps hosts, never this string. */
+// eslint-disable-next-line react-refresh/only-export-components -- re-export of one shared constant, not a component
+export const BRAND_NAME = PRODUCT_NAME;
 
 type MarkProps = {
   /** Rendered size in pixels. Square by construction. */

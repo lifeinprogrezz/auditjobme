@@ -171,7 +171,7 @@ describe("buildAccountExport", () => {
 
 describe("the downloaded file", () => {
   it("is dated so repeat exports do not overwrite each other", () => {
-    expect(accountExportFilename(new Date("2026-07-26T23:59:00.000Z"))).toBe("auditjob-me-data-2026-07-26.json");
+    expect(accountExportFilename(new Date("2026-07-26T23:59:00.000Z"))).toBe("northgoing-data-2026-07-26.json");
   });
 
   it("is readable JSON that round-trips", async () => {

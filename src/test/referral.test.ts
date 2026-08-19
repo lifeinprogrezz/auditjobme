@@ -81,7 +81,7 @@ describe("capture: ?ref survives the sign-up flow via localStorage", () => {
 
 describe("invite link", () => {
   it("always mints against production with the ref parameter", () => {
-    expect(inviteLink(TOKEN)).toBe(`https://auditjob.me/?ref=${TOKEN}`);
+    expect(inviteLink(TOKEN)).toBe(`https://northgoing.com/?ref=${TOKEN}`);
   });
 });
 

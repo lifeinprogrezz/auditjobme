@@ -13,7 +13,7 @@ const OPAQUE_VALUE = "zt5q4h2wnbkd";
 // The shape PostHog actually recorded in production on 2026-07-26 after a Google
 // sign-in: Supabase's implicit flow puts the whole session in the URL fragment.
 const LEAKED_URL =
-  `https://auditjob.me/#access_token=${FAKE_JWT}` +
+  `https://northgoing.com/#access_token=${FAKE_JWT}` +
   `&expires_at=1785093815&expires_in=3600&provider_token=${FAKE_GOOGLE_TOKEN}` +
   `&refresh_token=${OPAQUE_VALUE}&token_type=bearer`;
 
@@ -42,29 +42,29 @@ function expectNoCredentials(value: unknown) {
 
 describe("sanitizeUrl", () => {
   it("drops the whole fragment carrying the OAuth session", () => {
-    expect(sanitizeUrl(LEAKED_URL)).toBe("https://auditjob.me/");
+    expect(sanitizeUrl(LEAKED_URL)).toBe("https://northgoing.com/");
     expectNoCredentials(sanitizeUrl(LEAKED_URL));
   });
 
   it("leaves a harmless query string byte-identical", () => {
-    const url = "https://auditjob.me/roles?utm_source=newsletter&utm_medium=email&q=product+manager";
+    const url = "https://northgoing.com/roles?utm_source=newsletter&utm_medium=email&q=product+manager";
     expect(sanitizeUrl(url)).toBe(url);
   });
 
   it("strips credential params from the QUERY too (Supabase PKCE puts `code` there)", () => {
-    expect(sanitizeUrl("https://auditjob.me/auth/callback?code=8d3f-secret&state=xyz")).toBe(
-      "https://auditjob.me/auth/callback?state=xyz",
+    expect(sanitizeUrl("https://northgoing.com/auth/callback?code=8d3f-secret&state=xyz")).toBe(
+      "https://northgoing.com/auth/callback?state=xyz",
     );
     // Query with nothing left loses the `?` entirely.
-    expect(sanitizeUrl("https://auditjob.me/auth/callback?code=8d3f-secret")).toBe(
-      "https://auditjob.me/auth/callback",
+    expect(sanitizeUrl("https://northgoing.com/auth/callback?code=8d3f-secret")).toBe(
+      "https://northgoing.com/auth/callback",
     );
     // Percent-encoded parameter names are matched too.
-    expect(sanitizeUrl("https://auditjob.me/?%61ccess_token=abc&keep=1")).toBe("https://auditjob.me/?keep=1");
+    expect(sanitizeUrl("https://northgoing.com/?%61ccess_token=abc&keep=1")).toBe("https://northgoing.com/?keep=1");
   });
 
   it("strips the fragment and the query credentials in the same pass", () => {
-    expect(sanitizeUrl("https://auditjob.me/x?code=abc&ok=1#access_token=def")).toBe("https://auditjob.me/x?ok=1");
+    expect(sanitizeUrl("https://northgoing.com/x?code=abc&ok=1#access_token=def")).toBe("https://northgoing.com/x?ok=1");
   });
 
   it("never throws on odd input", () => {
@@ -73,7 +73,7 @@ describe("sanitizeUrl", () => {
     expect(sanitizeUrl("/roles/123")).toBe("/roles/123");
     expect(sanitizeUrl("not a url at all")).toBe("not a url at all");
     expect(sanitizeUrl("http://[malformed")).toBe("http://[malformed");
-    expect(sanitizeUrl("https://auditjob.me/?%E0%A4%A=1&keep=2")).toContain("keep=2");
+    expect(sanitizeUrl("https://northgoing.com/?%E0%A4%A=1&keep=2")).toContain("keep=2");
     expect(sanitizeUrl("#")).toBe("");
   });
 });
@@ -88,18 +88,18 @@ describe("sanitizeAnalyticsProperties", () => {
         $referrer: LEAKED_URL,
         $initial_referrer: LEAKED_URL,
         $pathname: "/",
-        $host: "auditjob.me",
+        $host: "northgoing.com",
         $prev_pageview_pathname: "/roles",
       },
       "$pageview",
     );
 
     expectNoCredentials(props);
-    expect(props.$current_url).toBe("https://auditjob.me/");
-    expect(props.$initial_current_url).toBe("https://auditjob.me/");
-    expect(props.$session_entry_url).toBe("https://auditjob.me/");
-    expect(props.$referrer).toBe("https://auditjob.me/");
-    expect(props.$initial_referrer).toBe("https://auditjob.me/");
+    expect(props.$current_url).toBe("https://northgoing.com/");
+    expect(props.$initial_current_url).toBe("https://northgoing.com/");
+    expect(props.$session_entry_url).toBe("https://northgoing.com/");
+    expect(props.$referrer).toBe("https://northgoing.com/");
+    expect(props.$initial_referrer).toBe("https://northgoing.com/");
   });
 
   // Measured in the live project: one sign-in session of 6 events had the tokens on
@@ -112,17 +112,17 @@ describe("sanitizeAnalyticsProperties", () => {
       {
         $session_entry_url: LEAKED_URL,
         $session_entry_pathname: "/",
-        $session_entry_host: "auditjob.me",
+        $session_entry_host: "northgoing.com",
         $session_entry_referrer: "$direct",
-        $current_url: "https://auditjob.me/roles",
+        $current_url: "https://northgoing.com/roles",
         $web_vitals_LCP_value: 812,
       },
       "$web_vitals",
     );
 
     expectNoCredentials(props);
-    expect(props.$session_entry_url).toBe("https://auditjob.me/");
-    expect(props.$current_url).toBe("https://auditjob.me/roles");
+    expect(props.$session_entry_url).toBe("https://northgoing.com/");
+    expect(props.$current_url).toBe("https://northgoing.com/roles");
     expect(props.$session_entry_referrer).toBe("$direct");
     expect(props.$web_vitals_LCP_value).toBe(812);
   });
@@ -137,21 +137,21 @@ describe("sanitizeAnalyticsProperties", () => {
     const props = sanitizeAnalyticsProperties(
       {
         $set: { $current_url: LEAKED_URL },
-        $set_once: { $initial_current_url: LEAKED_URL, $initial_referring_domain: "auditjob.me" },
+        $set_once: { $initial_current_url: LEAKED_URL, $initial_referring_domain: "northgoing.com" },
       },
       "$pageview",
     );
 
     expectNoCredentials(props);
-    expect((props.$set as Record<string, unknown>).$current_url).toBe("https://auditjob.me/");
-    expect((props.$set_once as Record<string, unknown>).$initial_current_url).toBe("https://auditjob.me/");
-    expect((props.$set_once as Record<string, unknown>).$initial_referring_domain).toBe("auditjob.me");
+    expect((props.$set as Record<string, unknown>).$current_url).toBe("https://northgoing.com/");
+    expect((props.$set_once as Record<string, unknown>).$initial_current_url).toBe("https://northgoing.com/");
+    expect((props.$set_once as Record<string, unknown>).$initial_referring_domain).toBe("northgoing.com");
   });
 
   it("catches a leaked URL arriving under a key this module has never heard of", () => {
     const props = sanitizeAnalyticsProperties({ some_future_property: LEAKED_URL }, "$pageview");
     expectNoCredentials(props);
-    expect(props.some_future_property).toBe("https://auditjob.me/");
+    expect(props.some_future_property).toBe("https://northgoing.com/");
   });
 
   it("preserves every other property exactly", () => {
@@ -161,7 +161,7 @@ describe("sanitizeAnalyticsProperties", () => {
       $time: 1785093815.123,
       $lib: "web",
       role_title: "Product Manager #3 (remote)",
-      $host: "auditjob.me",
+      $host: "northgoing.com",
       $pathname: "/roles",
       flags: ["a", "b"],
       nested: { count: 2, label: "fine" },
@@ -193,7 +193,7 @@ describe("sanitizeAnalyticsProperties", () => {
     const cyclic: Record<string, unknown> = { $current_url: LEAKED_URL };
     cyclic.self = cyclic;
     expect(() => sanitizeAnalyticsProperties(cyclic)).not.toThrow();
-    expect(sanitizeAnalyticsProperties(cyclic).$current_url).toBe("https://auditjob.me/");
+    expect(sanitizeAnalyticsProperties(cyclic).$current_url).toBe("https://northgoing.com/");
   });
 });
 

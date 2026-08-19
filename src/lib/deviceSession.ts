@@ -10,6 +10,8 @@
 //    invariant rather than a door policy: whichever way someone signs in, a
 //    session with no CV on the profile (and no pre-redirect stash about to fill
 //    it) gets the CV modal opened in front of them.
+// Keeps its pre-rebrand prefix ON PURPOSE (#106): the key names a slot in browsers
+// we do not control, so a rename makes every returning device read as brand new.
 export const SESSION_SEEN_KEY = "auditjobme.hadSession";
 
 /** Stamp "this device has held a session". Storage-safe: private-mode / quota

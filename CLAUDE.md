@@ -1,4 +1,4 @@
-# auditjob.me — the product (public repo)
+# Northgoing — the product (public repo)
 
 Free product for job-hunting in Europe: daily-scraped job pool across five role
 verticals (`jobs.role_family`: product · engineering · sales · marketing ·
@@ -15,7 +15,9 @@ context via GitHub Issues.
   (schema changes ALWAYS go through migrations + human review — never the dashboard).
 - `src/pages/` routes · `src/components/` · `src/integrations/supabase/` (regenerate
   `types.ts` after any schema change — it's generated, never hand-edit).
-- Hosted on **Vercel**: `main` deploys to production (auditjob.me). Branch preview
+- Hosted on **Vercel**: `main` deploys to production (northgoing.com; the old
+  `auditjob.me` redirects there, and the Vercel PROJECT is still named `auditjobme`).
+  Branch preview
   deployments are disabled in `vercel.json` — review on `localhost:8080`, not a preview URL.
 
 ## Economics — sponsored compute (v1)

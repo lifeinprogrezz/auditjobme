@@ -1,5 +1,5 @@
 // ScoreBreakdown — the F1 explainable-score viz for the /roles detail panel
-// (auditjob.me #38). Renders the two-layer score's inner workings: per-dimension
+// (auditjobme#38). Renders the two-layer score's inner workings: per-dimension
 // rubric bars (the v4 subscores the deterministic blend is computed from) and the
 // cited cv_line↔jd_phrase evidence rows (grounded before persistence). All styling
 // comes from src/styles/roles.css (.roles-theme scope) on the ink-glass token layer;

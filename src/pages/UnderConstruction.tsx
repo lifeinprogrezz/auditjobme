@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
+import { BRAND_NAME } from "@/lib/brand";
 
 // Coming-soon placeholder (Rober 7-06). The interactive /roles map is the only live
-// surface of auditjob.me for now; every onward flow (sign-in, CV upload, profile,
+// surface of Northgoing for now; every onward flow (sign-in, CV upload, profile,
 // apply) routes here until those pages ship. Liquid-glass card over blurred colour
 // blobs to match the app; self-contained so it stands alone, theme-aware.
 export default function UnderConstruction() {
@@ -10,11 +11,11 @@ export default function UnderConstruction() {
       <div className="uc-blob uc-blob-a" aria-hidden="true" />
       <div className="uc-blob uc-blob-b" aria-hidden="true" />
       <div className="uc-card">
-        <span className="uc-brand">auditjob.me</span>
+        <span className="uc-brand">{BRAND_NAME}</span>
         <div className="uc-emoji" aria-hidden="true">🚧</div>
         <h1>Under construction</h1>
         <p>
-          This part of auditjob.me isn&rsquo;t live yet, but the interactive roles
+          This part of {BRAND_NAME} isn&rsquo;t live yet, but the interactive roles
           map is. Explore product roles across Europe while we build the rest.
         </p>
         <Link className="uc-btn" to="/">Back to the map</Link>

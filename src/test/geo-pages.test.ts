@@ -58,7 +58,7 @@ const input = (jobs: SiteInput["jobs"], generated_at = GENERATED_AT): SiteInput 
   companies,
   generated_at,
 });
-const opts = { origin: "https://auditjob.me", now: NOW };
+const opts = { origin: "https://northgoing.com", now: NOW };
 
 describe("slugify", () => {
   it("folds diacritics and non-alphanumerics to hyphen slugs", () => {
@@ -118,7 +118,7 @@ describe("leadSentence (GEO self-citing lead)", () => {
     const s = leadSentence(p, "2026-07-12");
     expect(s).toContain("As of 12 July 2026");
     expect(s).toContain("5 Product Manager roles in Berlin");
-    expect(s).toContain("across 5 companies on auditjob.me");
+    expect(s).toContain("across 5 companies on Northgoing");
     expect(s).toContain("posted in the last 7 days");
     expect(s).not.toContain("—"); // no em-dashes in user-facing copy
   });
@@ -135,12 +135,12 @@ describe("renderPage HTML + JSON-LD", () => {
     job({ id: "nodate", company: "NoDate", company_id: "nd", posted_at: null }),
   ];
   const [page] = buildPages(input(jobs), opts);
-  const html = renderPage(page, [], new Map(), { origin: "https://auditjob.me", generatedAt: GENERATED_AT });
+  const html = renderPage(page, [], new Map(), { origin: "https://northgoing.com", generatedAt: GENERATED_AT });
 
   it("emits a real HTML document with the H1 and canonical", () => {
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect(html).toContain("<h1>Product Manager jobs in Berlin</h1>");
-    expect(html).toContain('<link rel="canonical" href="https://auditjob.me/jobs/berlin/product/">');
+    expect(html).toContain('<link rel="canonical" href="https://northgoing.com/jobs/berlin/product/">');
     expect(html).toContain('<meta name="robots" content="index,follow">');
   });
 
@@ -185,26 +185,26 @@ describe("renderSite bundle", () => {
 
   it("sitemap lists home, hub and every city page", () => {
     const xml = files.find((f) => f.path === "sitemap.xml")!.content;
-    expect(xml).toContain("<loc>https://auditjob.me/</loc>");
-    expect(xml).toContain("<loc>https://auditjob.me/jobs/</loc>");
-    expect(xml).toContain("<loc>https://auditjob.me/jobs/berlin/product/</loc>");
+    expect(xml).toContain("<loc>https://northgoing.com/</loc>");
+    expect(xml).toContain("<loc>https://northgoing.com/jobs/</loc>");
+    expect(xml).toContain("<loc>https://northgoing.com/jobs/berlin/product/</loc>");
     expect(xml).toContain("<?xml");
   });
 
   it("llms.txt is a dated, self-citing agent index", () => {
     const txt = renderLlmsTxt(buildPages(input(berlinPool(6)), opts), {
-      origin: "https://auditjob.me",
+      origin: "https://northgoing.com",
       generatedAt: GENERATED_AT,
     });
-    expect(txt).toContain("# auditjob.me");
+    expect(txt).toContain("# Northgoing");
     expect(txt).toContain("Last updated 2026-07-12");
-    expect(txt).toContain("[Product Manager jobs in Berlin](https://auditjob.me/jobs/berlin/product/)");
+    expect(txt).toContain("[Product Manager jobs in Berlin](https://northgoing.com/jobs/berlin/product/)");
   });
 
   it("always emits a valid sitemap even with zero qualifying pages", () => {
     const files0 = renderSite(input(berlinPool(2)), opts); // below threshold
     const xml = files0.find((f) => f.path === "sitemap.xml")!.content;
-    expect(xml).toContain("<loc>https://auditjob.me/</loc>");
+    expect(xml).toContain("<loc>https://northgoing.com/</loc>");
     expect(files0.some((f) => f.path === "jobs/index.html")).toBe(false); // no thin hub
   });
 });
@@ -234,7 +234,7 @@ describe("sitemap lastmod", () => {
   it("uses the freshest job date per page", () => {
     const jobs = berlinPool(5).map((j, i) => (i === 0 ? { ...j, posted_at: "2026-07-01T00:00:00Z" } : j));
     const pages = buildPages(input(jobs), opts);
-    const xml = renderSitemap(pages, { origin: "https://auditjob.me", generatedAt: GENERATED_AT });
+    const xml = renderSitemap(pages, { origin: "https://northgoing.com", generatedAt: GENERATED_AT });
     // freshest of the pool is 3 days ago (2026-07-09), not the 2026-07-01 outlier
     expect(xml).toContain("<lastmod>2026-07-09</lastmod>");
   });
@@ -301,7 +301,7 @@ describe("renderPage market-pulse section", () => {
       ...berlinPool(4).map((j, i) => ({ ...j, id: `p${i}`, source: "greenhouse", posted_at: daysAgo(2) })),
     ];
     const [page] = buildPages(input(jobs), opts);
-    const html = renderPage(page, [], new Map(), { origin: "https://auditjob.me", generatedAt: GENERATED_AT });
+    const html = renderPage(page, [], new Map(), { origin: "https://northgoing.com", generatedAt: GENERATED_AT });
     expect(html).toContain("<h2>Market pulse</h2>");
     expect(html).toContain("This week ·");
     expect(html).toContain("This month ·");
@@ -311,7 +311,7 @@ describe("renderPage market-pulse section", () => {
   it("shows only the Undated chip (no fabricated fresh counts) when all roles are undated", () => {
     const jobs = berlinPool(5).map((j) => ({ ...j, posted_at: null, source: "greenhouse" }));
     const [page] = buildPages(input(jobs), opts);
-    const html = renderPage(page, [], new Map(), { origin: "https://auditjob.me", generatedAt: GENERATED_AT });
+    const html = renderPage(page, [], new Map(), { origin: "https://northgoing.com", generatedAt: GENERATED_AT });
     expect(html).toContain("Undated · 5");
     expect(html).not.toContain("This week ·");
     expect(html).not.toContain("This month ·");
@@ -380,7 +380,7 @@ describe("JobPosting JSON-LD enrichment (#54)", () => {
   it("emits a real image logo (icon.horse) and never the company website as logo", () => {
     const jobs = berlinPool(5).map((j) => ({ ...j, company: "Acme", company_id: "acme" }));
     const [page] = buildPages(input(jobs), opts);
-    const html = renderPage(page, [], map, { origin: "https://auditjob.me", generatedAt: GENERATED_AT });
+    const html = renderPage(page, [], map, { origin: "https://northgoing.com", generatedAt: GENERATED_AT });
     const [jp] = postingsFrom(html);
     const org = jp.hiringOrganization as Record<string, unknown>;
     expect(org.logo).toBe("https://icon.horse/icon/acme.com");
@@ -393,7 +393,7 @@ describe("JobPosting JSON-LD enrichment (#54)", () => {
     const jobs = berlinPool(5).map((j) => ({ ...j, company: "Acme", company_id: "acme" }));
     const [page] = buildPages(input(jobs), opts);
     const html = renderPage(page, [], new Map(noLogo.map((c) => [c.slug, c])), {
-      origin: "https://auditjob.me",
+      origin: "https://northgoing.com",
       generatedAt: GENERATED_AT,
     });
     const [jp] = postingsFrom(html);
@@ -403,7 +403,7 @@ describe("JobPosting JSON-LD enrichment (#54)", () => {
   it("adds validThrough = datePosted + the documented window", () => {
     const jobs = berlinPool(5).map((j) => ({ ...j, posted_at: "2026-07-01T00:00:00.000Z" }));
     const [page] = buildPages(input(jobs), opts);
-    const html = renderPage(page, [], new Map(), { origin: "https://auditjob.me", generatedAt: GENERATED_AT });
+    const html = renderPage(page, [], new Map(), { origin: "https://northgoing.com", generatedAt: GENERATED_AT });
     const [jp] = postingsFrom(html);
     const expected = new Date(Date.parse("2026-07-01T00:00:00.000Z") + POSTING_VALID_DAYS * 86_400_000).toISOString();
     expect(jp.validThrough).toBe(expected);
@@ -415,7 +415,7 @@ describe("JobPosting JSON-LD enrichment (#54)", () => {
       ...berlinPool(4),
     ];
     const [page] = buildPages(input(jobs), opts);
-    const html = renderPage(page, [], new Map(), { origin: "https://auditjob.me", generatedAt: GENERATED_AT });
+    const html = renderPage(page, [], new Map(), { origin: "https://northgoing.com", generatedAt: GENERATED_AT });
     const postings = postingsFrom(html);
     const internJp = postings.find((p: Record<string, unknown>) => p.title === "Product Manager Intern");
     expect(internJp.employmentType).toBe("INTERN");
@@ -430,7 +430,7 @@ describe("JobPosting JSON-LD enrichment (#54)", () => {
       ...berlinPool(4), // extraction: null → no band
     ];
     const [page] = buildPages(input(jobs), opts);
-    const html = renderPage(page, [], new Map(), { origin: "https://auditjob.me", generatedAt: GENERATED_AT });
+    const html = renderPage(page, [], new Map(), { origin: "https://northgoing.com", generatedAt: GENERATED_AT });
     const postings = postingsFrom(html);
     const withBand = postings.filter((p: Record<string, unknown>) => p.baseSalary);
     expect(withBand).toHaveLength(1); // only the one stated band, the other 4 omit it
@@ -446,7 +446,7 @@ describe("JobPosting JSON-LD enrichment (#54)", () => {
       job({ id: `m${i}`, company: `Co${i}`, company_id: `co${i}`, posted_at: daysAgo((i % 20) + 1) }),
     );
     const [page] = buildPages(input(many), opts);
-    const html = renderPage(page, [], new Map(), { origin: "https://auditjob.me", generatedAt: GENERATED_AT });
+    const html = renderPage(page, [], new Map(), { origin: "https://northgoing.com", generatedAt: GENERATED_AT });
     expect(html).toContain(`per-page cap ${MAX_JOBPOSTINGS}`); // cap documented in the page
     expect(html).toContain(`JobPosting ItemList: ${MAX_JOBPOSTINGS} of ${MAX_JOBPOSTINGS + 12} dated roles`);
     const postings = postingsFrom(html);
@@ -464,12 +464,12 @@ describe("snippets artifact", () => {
 
   it("snippetFor carries real numbers, the URL, warm voice and no em-dashes", () => {
     const [p] = buildPages(input(berlinPool(6)), opts);
-    const snip = snippetFor(p, "2026-07-12", "https://auditjob.me");
+    const snip = snippetFor(p, "2026-07-12", "https://northgoing.com");
     expect(snip.roles).toBe(6);
     expect(snip.companies).toBe(6);
-    expect(snip.url).toBe("https://auditjob.me/jobs/berlin/product/");
+    expect(snip.url).toBe("https://northgoing.com/jobs/berlin/product/");
     expect(snip.short).toContain("6 Product Manager roles live in Berlin");
-    expect(snip.short).toContain("https://auditjob.me/jobs/berlin/product/");
+    expect(snip.short).toContain("https://northgoing.com/jobs/berlin/product/");
     expect(snip.text).toContain("As of 12 July 2026");
     expect(snip.text).toContain("Every one is scored against your CV, free.");
     expect(snip.text).not.toContain("—");
@@ -478,7 +478,7 @@ describe("snippets artifact", () => {
 
   it("omits any salary claim from the snippet when extraction is empty", () => {
     const [p] = buildPages(input(berlinPool(6)), opts);
-    const snip = snippetFor(p, "2026-07-12", "https://auditjob.me");
+    const snip = snippetFor(p, "2026-07-12", "https://northgoing.com");
     expect(snip.salary).toBeNull();
     expect(snip.text).not.toMatch(/median/i);
   });
@@ -487,19 +487,19 @@ describe("snippets artifact", () => {
     const band = { salary_min: 80000, salary_currency: "EUR", salary_period: "year" };
     const jobs = berlinPool(6).map((j) => ({ ...j, extraction: band }));
     const [p] = buildPages(input(jobs), opts);
-    const snip = snippetFor(p, "2026-07-12", "https://auditjob.me");
+    const snip = snippetFor(p, "2026-07-12", "https://northgoing.com");
     expect(snip.salary).toEqual({ currency: "EUR", median: 80000 });
     expect(snip.text).toContain("median advertised base is €80,000");
   });
 
   it("renderSnippets is valid, deterministic JSON with a stable count", () => {
     const pages = buildPages(input(berlinPool(6)), opts);
-    const ctx = { origin: "https://auditjob.me", generatedAt: GENERATED_AT };
+    const ctx = { origin: "https://northgoing.com", generatedAt: GENERATED_AT };
     const a = renderSnippets(pages, ctx);
     const b = renderSnippets(pages, ctx);
     expect(a).toBe(b); // byte-stable
     const parsed = JSON.parse(a);
-    expect(parsed.site).toBe("auditjob.me");
+    expect(parsed.site).toBe("Northgoing");
     expect(parsed.count).toBe(pages.length);
     expect(parsed.snippets).toHaveLength(pages.length);
     expect(parsed.snippets[0].city).toBe("Berlin");

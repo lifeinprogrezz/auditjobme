@@ -41,6 +41,7 @@ import {
   type RankedMatch,
 } from "../src/lib/nightly.js";
 import { companyKey } from "../src/lib/connections.js";
+import { BRAND_NAME } from "../src/lib/brandName.js";
 import {
   buildBatchRequests,
   isBatchStale,
@@ -52,8 +53,11 @@ import {
 type Req = { method?: string; headers: Record<string, string | string[] | undefined> };
 type Res = { status: (code: number) => Res; json: (body: unknown) => void };
 
-const APP_URL = "https://auditjob.me/";
-const EMAIL_FROM = "AuditJob.me <matches@lifeinprogrezz.com>";
+const APP_URL = "https://northgoing.com/";
+// Only the DISPLAY NAME follows the rebrand. The address stays on
+// lifeinprogrezz.com because that is the domain verified in Resend; sending from
+// an unverified northgoing.com would make Resend reject every send.
+const EMAIL_FROM = `${BRAND_NAME} <matches@lifeinprogrezz.com>`;
 const HAIKU = "claude-haiku-4-5-20251001";
 const JOB_FETCH_LIMIT = 800; // recent-jobs candidate window (newest first)
 

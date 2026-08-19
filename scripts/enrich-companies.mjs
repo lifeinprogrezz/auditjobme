@@ -81,7 +81,7 @@ async function fetchHomepage(domain) {
   try {
     const res = await fetch(`https://${domain}`, {
       redirect: "follow",
-      headers: { "user-agent": "auditjobme-enrich/1.0 (+https://auditjob.me)" },
+      headers: { "user-agent": "northgoing-enrich/1.0 (+https://northgoing.com)" },
       signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return null;

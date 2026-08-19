@@ -13,6 +13,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { buildScoreSystem, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION, type ParsedScore } from "../src/lib/scorePrompt.js";
 import { cronAuthResult } from "../src/lib/nightly.js";
+import { BRAND_NAME } from "../src/lib/brandName.js";
 import {
   RUN_BUDGET_MS,
   SCORE_CONCURRENCY,
@@ -36,8 +37,10 @@ import {
 type Req = { method?: string; headers: Record<string, string | string[] | undefined> };
 type Res = { status: (code: number) => Res; json: (body: unknown) => void };
 
-const APP_URL = "https://auditjob.me/";
-const EMAIL_FROM = "AuditJob.me <matches@lifeinprogrezz.com>";
+const APP_URL = "https://northgoing.com/";
+// Display name only. The address stays on lifeinprogrezz.com, the Resend-verified
+// domain — same split as api/nightly.ts, and both must move together.
+const EMAIL_FROM = `${BRAND_NAME} <matches@lifeinprogrezz.com>`;
 const HAIKU = "claude-haiku-4-5-20251001";
 const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page past it.
 const JD_BATCH = 50; // jd_text is multi-KB: fetch it only for the rows about to score.

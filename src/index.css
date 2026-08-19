@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* auditjob.me design tokens — THE product-wide token layer (Track D S3, 2026-07-11).
+/* Northgoing design tokens — THE product-wide token layer (Track D S3, 2026-07-11).
  *
  * Source of truth for every screen OUTSIDE the /roles map. Values are lifted from
  * the live map system (src/styles/roles.css, which stays self-scoped under

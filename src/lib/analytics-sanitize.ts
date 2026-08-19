@@ -5,7 +5,7 @@
  * Why this exists (confirmed live in the production PostHog project, 2026-07-26):
  * Supabase signs users in with Google OAuth over the implicit flow, which returns
  * the whole session in the URL *fragment* —
- * `https://auditjob.me/#access_token=...&provider_token=...&refresh_token=...`.
+ * `https://northgoing.com/#access_token=...&provider_token=...&refresh_token=...`.
  * With `capture_pageview: "history_change"` PostHog records `$current_url` verbatim,
  * so every sign-in wrote that user's access token, Google provider token and refresh
  * token into a third-party analytics store. The refresh token is the serious one: it

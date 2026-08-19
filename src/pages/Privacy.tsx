@@ -1,12 +1,13 @@
 // Privacy policy (issue #42): real content on the token layer, product-accurate for
 // the job-search product (not just the audit tool). Warm voice, no em-dashes.
 import LegalLayout, { LegalSection } from "@/components/app/LegalLayout";
+import { BRAND_NAME } from "@/lib/brand";
 
 export default function Privacy() {
   return (
     <LegalLayout title="Privacy Policy" updated="12 July 2026">
       <p className="text-sm text-muted-foreground">
-        auditjob.me helps Product Managers find and apply to jobs in Europe. This is a free product, and job hunting
+        {BRAND_NAME} helps Product Managers find and apply to jobs in Europe. This is a free product, and job hunting
         is private by design. Here's exactly what we hold and why.
       </p>
 

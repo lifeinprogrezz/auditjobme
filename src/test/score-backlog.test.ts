@@ -89,14 +89,14 @@ describe("email copy", () => {
     expect(buildReadySubject(0)).toBe("Your roles are scored");
   });
   it("body links to the map and reports totals", () => {
-    const { text, html } = buildReadyBody(3, 764, "https://auditjob.me/");
+    const { text, html } = buildReadyBody(3, 764, "https://northgoing.com/");
     expect(text).toContain("764");
     // The globe IS the landing at the bare domain (Rober 7-12) — email links the canonical root.
-    expect(text).toContain("https://auditjob.me/");
-    expect(html).toContain('href="https://auditjob.me/"');
+    expect(text).toContain("https://northgoing.com/");
+    expect(html).toContain('href="https://northgoing.com/"');
   });
   it("zero-strong body stays honest, no fabricated matches", () => {
-    const { text } = buildReadyBody(0, 100, "https://auditjob.me/");
+    const { text } = buildReadyBody(0, 100, "https://northgoing.com/");
     expect(text).toContain("None cleared the strong-match bar");
   });
 });

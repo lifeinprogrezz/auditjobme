@@ -1,7 +1,7 @@
 // Issue #78 — referral ATTRIBUTION only (the reward half is blocked on #35; nothing
 // here grants anything). Pure logic for the client half of the loop:
 //
-//   1. Landing capture: `auditjob.me/?ref={token}` stashes the token in localStorage,
+//   1. Landing capture: `northgoing.com/?ref={token}` stashes the token in localStorage,
 //      because Google OAuth redirects back to the bare origin — the query string does
 //      not survive the sign-up flow, localStorage does.
 //   2. Post-sign-in claim: once a session exists, the stashed token is handed to the
@@ -26,7 +26,7 @@ export const REF_TOKEN_RE = /^[a-f0-9]{16,64}$/;
 
 /** The origin invite links are minted against — links are for sharing, so they always
  *  point at production regardless of where the Settings page is running. */
-export const INVITE_ORIGIN = "https://auditjob.me";
+export const INVITE_ORIGIN = "https://northgoing.com";
 
 /** The shareable invite link for a token. */
 export function inviteLink(token: string): string {

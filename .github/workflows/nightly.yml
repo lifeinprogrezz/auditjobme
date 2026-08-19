@@ -39,4 +39,4 @@ jobs:
         run: |
           curl -fsS --max-time 90 \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            https://auditjob.me/api/nightly
+            https://northgoing.com/api/nightly

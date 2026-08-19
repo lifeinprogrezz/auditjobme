@@ -13,9 +13,10 @@
 // "doorway" pages (a page exists only when it has ≥ MIN_ROLES_PER_PAGE live roles).
 
 import { cityOf } from "./geo";
+import { BRAND_NAME } from "./brandName";
 import type { DataplaneJob, DataplaneCompany } from "./dataplane";
 
-export const DEFAULT_ORIGIN = "https://auditjob.me";
+export const DEFAULT_ORIGIN = "https://northgoing.com";
 /** Doorway-page guard: below this many live roles a (city, vertical) page is thin
  *  boilerplate, so it is NOT generated (never indexed). The single most important
  *  GEO rule — every page must carry unique, verifiable data. */
@@ -34,7 +35,7 @@ const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
  *  validThrough is NEVER emitted without a real posted_at (cite-or-omit). */
 export const POSTING_VALID_DAYS = 60;
 
-const SITE_NAME = "auditjob.me";
+const SITE_NAME = BRAND_NAME;
 const SITE_TAGLINE =
   "The live map of tech jobs in Europe. Every opening scraped daily from the companies' own career pages and scored against your CV. Free.";
 
