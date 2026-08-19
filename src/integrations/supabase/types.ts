@@ -636,6 +636,7 @@ export type Database = {
           avatar_url: string | null
           citizenship: string | null
           created_at: string
+          cv_changed_at: string | null
           cv_hash: string | null
           cv_text: string | null
           display_name: string | null
@@ -646,6 +647,7 @@ export type Database = {
           onboarded_at: string | null
           open_to_remote: boolean | null
           scores_ready_notified_at: string | null
+          stale_refreshed_at: string | null
           target_cities: string[] | null
           target_roles: string[] | null
           target_sectors: string[] | null
@@ -657,6 +659,7 @@ export type Database = {
           avatar_url?: string | null
           citizenship?: string | null
           created_at?: string
+          cv_changed_at?: string | null
           cv_hash?: string | null
           cv_text?: string | null
           display_name?: string | null
@@ -667,6 +670,7 @@ export type Database = {
           onboarded_at?: string | null
           open_to_remote?: boolean | null
           scores_ready_notified_at?: string | null
+          stale_refreshed_at?: string | null
           target_cities?: string[] | null
           target_roles?: string[] | null
           target_sectors?: string[] | null
@@ -678,6 +682,7 @@ export type Database = {
           avatar_url?: string | null
           citizenship?: string | null
           created_at?: string
+          cv_changed_at?: string | null
           cv_hash?: string | null
           cv_text?: string | null
           display_name?: string | null
@@ -688,6 +693,7 @@ export type Database = {
           onboarded_at?: string | null
           open_to_remote?: boolean | null
           scores_ready_notified_at?: string | null
+          stale_refreshed_at?: string | null
           target_cities?: string[] | null
           target_roles?: string[] | null
           target_sectors?: string[] | null
@@ -833,6 +839,7 @@ export type Database = {
       }
       scores: {
         Row: {
+          cv_hash: string | null
           id: string
           job_id: string
           rubric_version: string
@@ -842,6 +849,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cv_hash?: string | null
           id?: string
           job_id: string
           rubric_version?: string
@@ -851,6 +859,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cv_hash?: string | null
           id?: string
           job_id?: string
           rubric_version?: string
