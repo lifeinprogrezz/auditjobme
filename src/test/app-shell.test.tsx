@@ -4,6 +4,8 @@
 // lands on the §2.1 `page` token (24px) — never the off-scale `sm:text-3xl` (30px).
 // Rule + code move together: this test moves with AppShell.tsx.
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { render, screen, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import AppShell from "@/components/app/AppShell";
@@ -67,5 +69,27 @@ describe("AppShell — D-class page chrome (§6.0)", () => {
     expect(h1.className).toContain("text-page");
     expect(h1.className).not.toContain("text-3xl");
     expect(h1.className).not.toContain("text-2xl");
+  });
+});
+
+describe("legal pages are reachable (#audit)", () => {
+  // They shipped ROUTED BUT UNLINKED: the only /privacy reference in src/ was the
+  // <Route>, and the one occurrence in the deployed HTML sat inside <noscript>,
+  // which no JavaScript user ever sees. For an EU product that asks for a CV,
+  // "the page exists at a URL" is not the same as having provided the information.
+  it("every product page links to Privacy and Terms", () => {
+    render(
+      <MemoryRouter>
+        <AppShell title="Test">content</AppShell>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: /privacy/i })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("link", { name: /terms/i })).toHaveAttribute("href", "/terms");
+  });
+
+  it("the map footer links them too, since it is the only surface an anon sees", () => {
+    const source = readFileSync(join(process.cwd(), "src/pages/RolesMap.tsx"), "utf8");
+    expect(source).toContain('to="/privacy"');
+    expect(source).toContain('to="/terms"');
   });
 });
