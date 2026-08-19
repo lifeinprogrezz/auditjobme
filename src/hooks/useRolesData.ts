@@ -8,6 +8,7 @@ import { applyLandedScores, byScore, type RoleJob, type RoleExtraction } from "@
 import { inFlightCompanyKeys } from "@/lib/product";
 import { isInFlightStatus } from "@/lib/tracker";
 import { hashCv, readCvStash, clearCvStash } from "@/lib/labels";
+import { prefilterJobs } from "@/lib/scorePrefilter";
 import { shouldPromptCv } from "@/lib/deviceSession";
 import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
@@ -656,11 +657,22 @@ export function useRolesData() {
     };
   }, [user]);
 
-  // ── Score poll (issue #33): while the signed-in user has a CV and any role is
-  // still unscored, pull landed scores every SCORE_POLL_MS so the server pass
-  // fills the map in front of them. Stops on its own when nothing is unscored
-  // (interval not re-armed) and on signout/unmount (cleanup).
-  const hasUnscored = jobs.some((j) => j.score == null);
+  // ── Score poll (issue #33): while the signed-in user has a CV and any ELIGIBLE
+  // role is still unscored, pull landed scores every SCORE_POLL_MS so the server
+  // pass fills the map in front of them. Eligibility is the SAME prefilter the
+  // worker pays by (#114) — judged over the full catalog would keep the poll and
+  // the progress bar alive forever, since pruned-out rows never score. Stops on
+  // its own when the eligible slice is fully scored and on signout/unmount.
+  const eligibleJobs = useMemo(
+    () =>
+      prefilterJobs(jobs, {
+        roles: profileMeta?.targetRoles ?? [],
+        sectors: profileMeta?.targetSectors ?? [],
+      }),
+    [jobs, profileMeta],
+  );
+  const hasUnscored = eligibleJobs.some((j) => j.score == null);
+  const eligibleIds = useMemo(() => new Set(eligibleJobs.map((j) => j.id)), [eligibleJobs]);
   const hasCv = Boolean(profile?.cv_text?.trim());
   useEffect(() => {
     if (!user || !hasCv || !hasUnscored || loading) return;
@@ -774,8 +786,9 @@ export function useRolesData() {
   };
 
   // Persist edited target labels to the profile (Settings, Rober 7-15). Roles/sectors
-  // don't feed the 5 score subscores, so no re-score is needed — just update the row
-  // + local profile/meta so the profile view reflects the change immediately.
+  // don't feed the 5 score subscores, so cached scores stay valid — but they DO drive
+  // the scoring prefilter (#114): a widened selection surfaces new unscored eligible
+  // rows here, and the worker picks them up as fresh backlog on its next tick.
   const saveTargets = async (roles: string[], sectors: string[]): Promise<boolean> => {
     if (!user) return false;
     const { error } = await supabase
@@ -928,7 +941,11 @@ export function useRolesData() {
     // "Scoring" now means the SERVER pass hasn't drained this user's backlog yet
     // (the worker runs regardless; this drives the panel's progress bar).
     scoring: Boolean(user) && hasCv && hasUnscored && !loading,
-    remaining: jobs.filter((j) => j.score == null).length,
+    remaining: eligibleJobs.filter((j) => j.score == null).length,
+    /** Ids of the roles this user's paid pass covers (#114). Surfaces that render
+     *  a pending state need it: an unscored role OUTSIDE this set never scores,
+     *  so "Scoring this role…" would be a permanent lie (see scoreStatusOf). */
+    eligibleIds,
     applied,
     markApplied,
     saved,

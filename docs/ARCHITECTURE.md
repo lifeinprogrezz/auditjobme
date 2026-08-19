@@ -53,7 +53,8 @@ changing either — the split is deliberate, not accidental.
 ### Ingestion — `scripts/scrape.mjs`
 
 Runs daily at 05:00 UTC. Reads `scripts/boards.json` (verified Greenhouse / Lever / Ashby /
-Workable / SmartRecruiters / Teamtailor / Personio tokens) and the modules in `scripts/sources/`:
+Workable / SmartRecruiters / Teamtailor / Personio / Recruitee / Join tokens) and the modules
+in `scripts/sources/`:
 
 - `ats-extra.mjs` — SmartRecruiters, Workable, Workday, Factorial
 - `teamtailor.mjs` — Teamtailor's official `{site}/jobs.json` syndication feed. One request
@@ -65,6 +66,15 @@ Workable / SmartRecruiters / Teamtailor / Personio tokens) and the modules in `s
   per company, full description inline, no auth. Personio emits bare city names with no
   country, so the connector translates the European hub cities (native spellings included)
   into the shared filter's vocabulary
+- `recruitee.mjs` — Recruitee's public per-tenant `/api/offers/` document
+  (`{token}.recruitee.com/api/offers/`, or `{host}/api/offers/` on a custom career domain).
+  One request per company, no auth, no pagination, and both bodies (`description` plus
+  `requirements`) inline. Offers filed under a "Portfolio Company" department are DROPPED:
+  a venture talent board carries other companies' roles while reporting its own name in
+  every field, so there is nothing to re-attribute to (issue #68's Getro class)
+- `joincom.mjs` — Join.com's public candidate GraphQL. Entries carry `token` (the company
+  slug) and `companyId`, and a seeded id skips the slug lookup, so it is one request per
+  company. Skews to the German-speaking small-company long tail
 - `bigtech.mjs` — Google, Amazon, Microsoft, Apple (Meta is a documented known gap: its
   endpoint rejects datacenter and budget-residential IPs; only a premium proxy pool would
   change that, so the scraper skips it gracefully)

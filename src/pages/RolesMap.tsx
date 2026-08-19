@@ -48,6 +48,7 @@ export default function RolesMap() {
     loading,
     scoring,
     remaining,
+    eligibleIds,
     applied,
     saved,
     toggleSaved,
@@ -505,6 +506,7 @@ export default function RolesMap() {
           signedIn={signedIn}
           loading={loading}
           scoring={scoring}
+          eligibleIds={eligibleIds}
           remaining={remaining}
           detailJob={detailLive}
           applied={applied}

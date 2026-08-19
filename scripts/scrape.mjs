@@ -21,6 +21,8 @@ import { sources as bigtechSources } from "./sources/bigtech.mjs";
 import { sources as vcSources } from "./sources/vc-startupmap.mjs";
 import { fetchTeamtailor } from "./sources/teamtailor.mjs";
 import { fetchPersonio } from "./sources/personio.mjs";
+import { fetchRecruitee } from "./sources/recruitee.mjs";
+import { fetchJoin } from "./sources/joincom.mjs";
 
 // Board tokens live in boards.json (verified Greenhouse/Lever/Ashby public APIs, sourced from the
 // career-ops portals.yml). Dead boards fail non-fatally below; add/curate tokens there, not here.
@@ -188,6 +190,13 @@ async function main() {
     // description inline. Entries carry `token` (a *.jobs.personio.de tenant).
     // See sources/personio.mjs.
     ...(BOARDS.personio || []).map((b) => ({ company: b.company, kind: "personio", run: () => fetchPersonio(b) })),
+    // Recruitee's public per-tenant /api/offers/ document — one request per
+    // company, both bodies inline. Entries carry `token` (a *.recruitee.com
+    // tenant) or `host` (a custom career domain). See sources/recruitee.mjs.
+    ...(BOARDS.recruitee || []).map((b) => ({ company: b.company, kind: "recruitee", run: () => fetchRecruitee(b) })),
+    // Join.com's public candidate GraphQL — entries carry `token` (the company
+    // slug) and `companyId` (join's numeric id). See sources/joincom.mjs.
+    ...(BOARDS.join || []).map((b) => ({ company: b.company, kind: "join", run: () => fetchJoin(b) })),
     ...atsExtraSources,
     ...bigtechSources,
     ...vcSources,

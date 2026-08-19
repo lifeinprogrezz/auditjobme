@@ -32,6 +32,10 @@ export type FitChipProps = {
    * reduced-motion, renders the final value with no animation.
    */
   reveal?: boolean;
+  /** Screen-reader wording for the pending (score == null) state. Defaults to
+   *  "Scoring" — pass "Not scored" for a role outside the paid slice (#114),
+   *  which will never score and so must not announce work in progress. */
+  pendingLabel?: string;
 };
 
 /** Numeral that survives the pending→scored transition so the reveal count-up
@@ -77,14 +81,20 @@ function FitNumeral({ value, reveal }: { value: number | null; reveal: boolean }
   );
 }
 
-export default function FitChip({ score, size = "md", showTier = true, reveal = false }: FitChipProps) {
+export default function FitChip({
+  score,
+  size = "md",
+  showTier = true,
+  reveal = false,
+  pendingLabel = "Scoring",
+}: FitChipProps) {
   const pending = score == null;
   const bucket: ScoreBucket | null = pending ? null : scoreBucket(score);
   const tier = bucket ? TIER_WORD[bucket] : null;
   return (
     <span
       className={`fitchip fitchip--${size} ${pending ? "fitchip--pending" : `fitchip--${bucket}`}`}
-      aria-label={pending ? "Scoring" : `Fit ${score.toFixed(1)} out of 5, ${tier}`}
+      aria-label={pending ? pendingLabel : `Fit ${score.toFixed(1)} out of 5, ${tier}`}
     >
       <FitNumeral value={score} reveal={reveal} />
       {!pending &&

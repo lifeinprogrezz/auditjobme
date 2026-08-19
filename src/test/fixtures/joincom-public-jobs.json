@@ -1,0 +1,305 @@
+{
+  "data": {
+    "publicJobs": {
+      "items": [
+        {
+          "id": 16550254,
+          "idParam": "16550254-product-manager",
+          "title": "Product Manager",
+          "createdAt": "2026-08-07T12:51:28.983Z",
+          "updatedAt": "2026-08-17T08:57:06.624Z",
+          "status": "ONLINE",
+          "workplaceType": "HYBRID",
+          "remoteType": null,
+          "descriptionHtml": "<p>At JOIN, we believe hiring should be easy, fast, and fair – for companies and candidates alike. That’s why we’re building intuitive, powerful recruiting software that helps businesses of all sizes find the right people effortlessly.</p><p>As our <strong>Product Manager</strong>, you’ll play a key role in shaping the direction of our product. You’ll define strategy, align stakeholders, and turn customer needs into …",
+          "company": {
+            "id": 54,
+            "name": "JOIN",
+            "domain": "join"
+          },
+          "city": {
+            "cityName": "Barcelona",
+            "countryName": "Spain"
+          },
+          "country": {
+            "iso3166": "ES",
+            "name": "Spain"
+          },
+          "remoteRegion": null,
+          "category": {
+            "name": "Product Management"
+          },
+          "employmentType": {
+            "name": "Employee"
+          },
+          "hybrid": {
+            "type": "FLEXIBLE",
+            "weeklyInOfficeDays": 3
+          }
+        },
+        {
+          "id": 16279737,
+          "idParam": "16592519-founding-product-manager-y-combinator-startup",
+          "title": "Founding Product Manager (Y Combinator Startup)",
+          "createdAt": "2026-06-08T19:39:29.381Z",
+          "updatedAt": "2026-08-17T16:30:39.613Z",
+          "status": "ONLINE",
+          "workplaceType": "ONSITE",
+          "remoteType": null,
+          "descriptionHtml": null,
+          "company": {
+            "id": 121551,
+            "name": "CoCrafter (YC W24)",
+            "domain": "cocrafter"
+          },
+          "city": {
+            "cityName": "Munich",
+            "countryName": "Germany"
+          },
+          "country": {
+            "iso3166": "DE",
+            "name": "Germany"
+          },
+          "remoteRegion": null,
+          "category": {
+            "name": "Product Management"
+          },
+          "employmentType": {
+            "name": "Employee"
+          },
+          "hybrid": null
+        },
+        {
+          "id": 16575732,
+          "idParam": "16575732-product-owner-f-x-m",
+          "title": "Product Owner (f/x/m)",
+          "createdAt": "2026-08-13T12:13:33.772Z",
+          "updatedAt": "2026-08-17T12:23:34.864Z",
+          "status": "ONLINE",
+          "workplaceType": "HYBRID",
+          "remoteType": null,
+          "descriptionHtml": null,
+          "company": {
+            "id": 176789,
+            "name": "spotixx GmbH",
+            "domain": "spotixxcom"
+          },
+          "city": {
+            "cityName": "Frankfurt am Main",
+            "countryName": "Germany"
+          },
+          "country": {
+            "iso3166": "DE",
+            "name": "Germany"
+          },
+          "remoteRegion": null,
+          "category": {
+            "name": "Product Management"
+          },
+          "employmentType": {
+            "name": "Employee"
+          },
+          "hybrid": null
+        },
+        {
+          "id": 14153667,
+          "idParam": "16597285-junior-key-account-manager-m-w-d",
+          "title": "Junior Key Account Manager (m/w/d)",
+          "createdAt": "2025-05-14T07:39:21.045Z",
+          "updatedAt": "2026-08-18T17:30:34.064Z",
+          "status": "ONLINE",
+          "workplaceType": "REMOTE",
+          "remoteType": "COUNTRY",
+          "descriptionHtml": null,
+          "company": {
+            "id": 22808,
+            "name": "Pflegia",
+            "domain": "pflegia"
+          },
+          "city": {
+            "cityName": "Berlin",
+            "countryName": "Germany"
+          },
+          "country": {
+            "iso3166": "DE",
+            "name": "Germany"
+          },
+          "remoteRegion": null,
+          "category": {
+            "name": "Shop Sales (Trade)"
+          },
+          "employmentType": {
+            "name": "Employee"
+          },
+          "hybrid": null
+        },
+        {
+          "id": 16163480,
+          "idParam": "16559940-pre-sales-engineer-dubai",
+          "title": "Pre-Sales Engineer [Dubai]",
+          "createdAt": "2026-05-15T15:14:22.939Z",
+          "updatedAt": "2026-08-09T18:00:42.495Z",
+          "status": "ONLINE",
+          "workplaceType": "HYBRID",
+          "remoteType": null,
+          "descriptionHtml": null,
+          "company": {
+            "id": 5743,
+            "name": "Taurus SA",
+            "domain": "taurusgroup"
+          },
+          "city": {
+            "cityName": "Dubai",
+            "countryName": "United Arab Emirates"
+          },
+          "country": {
+            "iso3166": "AE",
+            "name": "United Arab Emirates"
+          },
+          "remoteRegion": null,
+          "category": {
+            "name": "Engineering"
+          },
+          "employmentType": {
+            "name": "Employee"
+          },
+          "hybrid": null
+        },
+        {
+          "id": 14635769,
+          "idParam": "16597394-data-scientist-ai-and-experimentation-m-f-d",
+          "title": "Data Scientist - AI & Experimentation (m/f/d) ",
+          "createdAt": "2025-08-05T19:27:44.261Z",
+          "updatedAt": "2026-08-18T18:00:37.369Z",
+          "status": "ONLINE",
+          "workplaceType": "REMOTE",
+          "remoteType": "ANYWHERE",
+          "descriptionHtml": null,
+          "company": {
+            "id": 22808,
+            "name": "Pflegia",
+            "domain": "pflegia"
+          },
+          "city": {
+            "cityName": "Berlin",
+            "countryName": "Germany"
+          },
+          "country": {
+            "iso3166": "DE",
+            "name": "Germany"
+          },
+          "remoteRegion": null,
+          "category": {
+            "name": "Data Scientist"
+          },
+          "employmentType": {
+            "name": "Employee"
+          },
+          "hybrid": null
+        },
+        {
+          "id": 16537932,
+          "idParam": "16588938-mechanical-engineer-f-m-d",
+          "title": "MECHANICAL ENGINEER (f/m/d)",
+          "createdAt": "2026-08-04T14:58:19.559Z",
+          "updatedAt": "2026-08-17T08:01:07.244Z",
+          "status": "ONLINE",
+          "workplaceType": "ONSITE",
+          "remoteType": null,
+          "descriptionHtml": null,
+          "company": {
+            "id": 157757,
+            "name": "Omnisent",
+            "domain": "omnisent"
+          },
+          "city": {
+            "cityName": "Munich",
+            "countryName": "Germany"
+          },
+          "country": {
+            "iso3166": "DE",
+            "name": "Germany"
+          },
+          "remoteRegion": null,
+          "category": {
+            "name": "Mechanical Engineering"
+          },
+          "employmentType": {
+            "name": "Employee"
+          },
+          "hybrid": null
+        },
+        {
+          "id": 16012449,
+          "idParam": "16579411-senior-devops-engineer-m-f-d-hybrid-infrastructure",
+          "title": "Senior DevOps Engineer (m/f/d) Hybrid Infrastructure",
+          "createdAt": "2026-04-15T10:23:26.720Z",
+          "updatedAt": "2026-08-14T11:30:33.364Z",
+          "status": "ONLINE",
+          "workplaceType": "ONSITE",
+          "remoteType": null,
+          "descriptionHtml": null,
+          "company": {
+            "id": 5740,
+            "name": "MOTOR Ai",
+            "domain": "motor-ai"
+          },
+          "city": {
+            "cityName": "Berlin",
+            "countryName": "Germany"
+          },
+          "country": {
+            "iso3166": "DE",
+            "name": "Germany"
+          },
+          "remoteRegion": null,
+          "category": {
+            "name": "Consulting, Engineering"
+          },
+          "employmentType": {
+            "name": "Employee"
+          },
+          "hybrid": null
+        },
+        {
+          "id": 16249810,
+          "idParam": "16557311-group-financial-controller-and-risk-manager-geneva",
+          "title": "Group Financial Controller & Risk Manager [Geneva]",
+          "createdAt": "2026-06-02T14:56:04.281Z",
+          "updatedAt": "2026-08-09T11:00:46.632Z",
+          "status": "ONLINE",
+          "workplaceType": "HYBRID",
+          "remoteType": null,
+          "descriptionHtml": null,
+          "company": {
+            "id": 5743,
+            "name": "Taurus SA",
+            "domain": "taurusgroup"
+          },
+          "city": {
+            "cityName": "Geneva",
+            "countryName": "Switzerland"
+          },
+          "country": {
+            "iso3166": "CH",
+            "name": "Switzerland"
+          },
+          "remoteRegion": null,
+          "category": {
+            "name": "Controlling"
+          },
+          "employmentType": {
+            "name": "Employee"
+          },
+          "hybrid": null
+        }
+      ],
+      "pageInfo": {
+        "page": 1,
+        "pageCount": 1,
+        "pageSize": 9,
+        "rowCount": 9
+      }
+    }
+  }
+}

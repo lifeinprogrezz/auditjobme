@@ -1,5 +1,6 @@
 // Server-side scoring backlog worker (issue #33) — sibling of api/nightly.ts.
-// Scores every user's UNSCORED live roles into `scores` (the exact shape /roles
+// Scores every user's UNSCORED slice of the live catalog — prefiltered to
+// their labels and capped (#114, scorePrefilter.ts) — into `scores` (the exact shape /roles
 // reads) without the user being on the page, then sends ONE "your roles are
 // scored" email when their backlog hits zero. Invoked every 10 minutes by
 // .github/workflows/score-backlog.yml (Vercel Hobby crons are daily-only);
@@ -24,6 +25,7 @@ import {
   buildReadySubject,
   buildReadyBody,
 } from "../src/lib/scoreBacklog.js";
+import { prefilterWithTier } from "../src/lib/scorePrefilter.js";
 import {
   SYNC_ONBOARDING_SLICE,
   buildBatchRequests,
@@ -55,6 +57,10 @@ type LiveJob = {
   extraction: { yoe_min?: number | null; geo_eligibility?: string | null } | null;
   /** jobs.role_family (#34): selects the per-family scoring fit block. */
   role_family: string | null;
+  /** Prefilter dimensions (#114): freshness ordering + the sector label match. */
+  first_seen_at: string | null;
+  posted_at: string | null;
+  sector: string | null;
 };
 
 /** Score one job for one user through the proxy's service-role path. Never throws.
@@ -185,11 +191,11 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   const proxyUrl = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/anthropic-proxy`;
   const admin = createClient(supabaseUrl, serviceKey);
 
-  // ── Users with a CV (the only requirement for a full-catalog pass) ─────────
+  // ── Users with a CV (their pass covers the prefiltered slice, #114) ────────
   const { data: profiles, error: pErr } = await admin
     .from("profiles")
     .select(
-      "id, cv_text, target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, scores_ready_notified_at",
+      "id, cv_text, target_roles, target_sectors, target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, scores_ready_notified_at",
     );
   if (pErr) {
     res.status(500).json({ error: `profiles read failed: ${pErr.message}` });
@@ -204,14 +210,28 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await admin
       .from("jobs")
-      .select("id, company, title, location, remote, seniority, extraction, role_family")
+      // sector lives on companies — embedded here so the prefilter's sector
+      // dimension (#114) sees the same value the map's dataplane join carries.
+      .select(
+        "id, company, title, location, remote, seniority, extraction, role_family, first_seen_at, posted_at, companies:company_id (sector)",
+      )
       .eq("is_live", true)
       .range(from, from + PAGE - 1);
     if (error) {
       res.status(500).json({ error: `jobs read failed: ${error.message}` });
       return;
     }
-    liveJobs = liveJobs.concat((data ?? []) as LiveJob[]);
+    // The FK embed is an object at runtime (to-one), but the generated types
+    // call it an array — tolerate both shapes rather than trusting either.
+    type EmbeddedRow = Omit<LiveJob, "sector"> & {
+      companies: { sector: string | null } | { sector: string | null }[] | null;
+    };
+    liveJobs = liveJobs.concat(
+      ((data ?? []) as unknown as EmbeddedRow[]).map(({ companies, ...j }) => ({
+        ...j,
+        sector: (Array.isArray(companies) ? companies[0]?.sector : companies?.sector) ?? null,
+      })),
+    );
     if (!data || data.length < PAGE) break;
   }
 
@@ -320,6 +340,16 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         cv_text: (p.cv_text as string | null) ?? null,
       };
 
+      // #114: the deterministic prune — this user's paid pass covers ONLY the
+      // slice their labels select (capped, newest-first). Backlog, completion
+      // math, and the ready email all run over `eligible`; a pruned-out job
+      // must never hold the pass open or be paid for. Label edits widen the
+      // slice and manifest as new backlog on the next tick, no extra plumbing.
+      const { jobs: eligible, tier } = prefilterWithTier(liveJobs, {
+        roles: (p.target_roles as string[] | null) ?? [],
+        sectors: (p.target_sectors as string[] | null) ?? [],
+      });
+
       // ── Phase 1: retrieve anything this user already has in flight ──────────
       // Submission and retrieval are DIFFERENT cron ticks: a batch outlives the 60s
       // invocation that started it. Retrieval runs first so a drained batch frees
@@ -377,7 +407,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       }
 
       // ── Phase 2: what is still unscored and not already in flight ───────────
-      const backlog = selectBacklog(liveJobs, new Set(scoreByJob.keys())).filter(
+      const backlog = selectBacklog(eligible, new Set(scoreByJob.keys())).filter(
         (j) => !inFlightJobIds.has(j.id),
       );
 
@@ -508,15 +538,15 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // never a false "ready" email. Roles sitting in an OPEN batch are likewise
       // absent from scoreByJob, so the "your roles are scored" email waits for the
       // batch tail to drain rather than firing on the synchronous slice alone.
-      const remaining = liveJobs.filter((j) => !scoreByJob.has(j.id)).length;
+      const remaining = eligible.filter((j) => !scoreByJob.has(j.id)).length;
 
       if (
-        liveJobs.length > 0 &&
+        eligible.length > 0 &&
         shouldSendReadyEmail(remaining, (p.scores_ready_notified_at as string | null) ?? null)
       ) {
         summary.completed++;
         if (resendKey) {
-          const strong = liveJobs.filter(
+          const strong = eligible.filter(
             (j) => Number(scoreByJob.get(j.id) ?? 0) >= STRONG_SCORE,
           ).length;
           const { data: authUser } = await admin.auth.admin.getUserById(userId);
@@ -527,7 +557,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
               resendKey,
               to,
               buildReadySubject(strong ?? 0),
-              buildReadyBody(strong ?? 0, liveJobs.length, APP_URL),
+              buildReadyBody(strong ?? 0, eligible.length, APP_URL, tier),
             ))
           ) {
             // Stamp ONLY on send-success so a soft Resend failure retries next tick.
