@@ -280,10 +280,36 @@ describe("groundEvidence (Stage-2 — blank hallucinated citations)", () => {
     expect(out[0]).toEqual({ label: "Factor", cvLine: "grew GMV to $375M", jdPhrase: "", contribution: 0.5 });
   });
 
-  it("does not verify a side whose source is not provided (can't check → keep)", () => {
+  // This previously asserted the opposite ("can't check → keep"), and that assertion was
+  // the bug. Measured on production 2026-08-19: 10,477 stored jdPhrase citations belong to
+  // a job whose jd_text is empty, 9,120 of them on roles live today, and 3,575 quote text
+  // that appears in NO structured fact either — invented, and rendered to the user inside
+  // quote marks by ScoreBreakdown.tsx.
+  //
+  // "We could not verify it, so we kept it" is exactly backwards for a product whose rule
+  // is cite-or-refuse. An unverifiable quote is not a possibly-real quote worth saving; it
+  // is an unsupported claim being shown as a citation. The label and contribution survive,
+  // because those are the model's honest reasoning — only the unverifiable QUOTE is blanked.
+  it("blanks a quote whose source is absent — unverifiable is not citable", () => {
     const out = groundEvidence([ev("unverifiable cv quote", "unverifiable jd quote")], {});
-    expect(out[0].cvLine).toBe("unverifiable cv quote");
-    expect(out[0].jdPhrase).toBe("unverifiable jd quote");
+    expect(out[0].cvLine).toBe("");
+    expect(out[0].jdPhrase).toBe("");
+  });
+
+  it("keeps the label and contribution when it blanks an unverifiable quote", () => {
+    const out = groundEvidence([ev("unverifiable cv quote", "unverifiable jd quote")], {});
+    expect(out[0].label).toBe("Factor");
+    expect(out[0].contribution).toBe(0.5);
+  });
+
+  it("regression: the real LANCH row — German prose quoted from a job description that does not exist", () => {
+    // jobs.jd_text was empty for LANCH "Account Manager (m/w/d)", yet the stored evidence
+    // cited: "Du baust eigenständig Analysen in Metabase und gehst bei Bedarf direkt in SQL".
+    const out = groundEvidence(
+      [ev("", "Du baust eigenständig Analysen in Metabase und gehst bei Bedarf direkt in SQL")],
+      { jdText: null },
+    );
+    expect(out[0].jdPhrase).toBe("");
   });
 
   it("blanks a claimed quote when its source is provided but empty", () => {

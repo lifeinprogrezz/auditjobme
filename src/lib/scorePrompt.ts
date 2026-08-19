@@ -235,20 +235,32 @@ export function isGroundedQuote(quote: string, source: string): boolean {
 /**
  * Stage-2 extractive citation grounding: blank any cited quote that is NOT a verbatim
  * (normalized) substring of its source, killing hallucinated citations while keeping
- * the honest factor label + contribution. A side is only verified when its source is
- * actually provided (a `string`); an absent source (undefined/null) leaves that side
- * untouched — we can't verify, so we don't destroy a possibly-real quote. Pure.
+ * the honest factor label + contribution.
+ *
+ * This FAILS CLOSED. An absent source (undefined/null) blanks the quote, exactly as an
+ * empty one does. The earlier version kept unverifiable quotes on the reasoning that we
+ * "can't verify, so we don't destroy a possibly-real quote" — which is backwards for a
+ * product whose rule is cite-or-refuse. Measured on production 2026-08-19: 10,477 stored
+ * jdPhrase citations belonged to a job with no jd_text, 9,120 on roles live that day, and
+ * 3,575 quoted text found in no structured fact either. One real example — LANCH,
+ * "Account Manager (m/w/d)", jd_text empty — carried the invented German sentence
+ * "Du baust eigenständig Analysen in Metabase und gehst bei Bedarf direkt in SQL",
+ * rendered to the user in quote marks by ScoreBreakdown.
+ *
+ * An unverifiable quote is not a possibly-real quote worth keeping; it is an unsupported
+ * claim being displayed as a citation. The label and contribution survive — those are the
+ * model's honest reasoning — and only the quote is dropped. Pure.
  */
 export function groundEvidence(
   evidence: ScoreEvidence[],
   sources: { cvText?: string | null; jdText?: string | null },
 ): ScoreEvidence[] {
-  const cv = typeof sources.cvText === "string" ? sources.cvText : null;
-  const jd = typeof sources.jdText === "string" ? sources.jdText : null;
+  const cv = typeof sources.cvText === "string" ? sources.cvText : "";
+  const jd = typeof sources.jdText === "string" ? sources.jdText : "";
   return evidence.map((e) => ({
     ...e,
-    cvLine: cv == null || isGroundedQuote(e.cvLine, cv) ? e.cvLine : "",
-    jdPhrase: jd == null || isGroundedQuote(e.jdPhrase, jd) ? e.jdPhrase : "",
+    cvLine: isGroundedQuote(e.cvLine, cv) ? e.cvLine : "",
+    jdPhrase: isGroundedQuote(e.jdPhrase, jd) ? e.jdPhrase : "",
   }));
 }
 
