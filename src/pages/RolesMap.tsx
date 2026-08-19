@@ -16,6 +16,7 @@ import {
   companyCityRoles,
   filterJobs,
   roleFamily,
+  ROLE_FAMILY_OTHER,
   workplaceOf,
   WORKPLACES,
   sizeBand,
@@ -23,6 +24,8 @@ import {
   type RoleJob,
   type RolesFilters,
 } from "@/lib/roles";
+import { ROLE_FAMILY_OPTIONS } from "@/lib/labels";
+import { pickableSectors, sectorLiquidity } from "@/lib/sectors";
 import { coordsOf } from "@/lib/geo";
 import { useRolesData } from "@/hooks/useRolesData";
 import { useTheme } from "@/lib/theme";
@@ -163,15 +166,26 @@ export default function RolesMap() {
   // so you can always still switch or add that facet's values. Size keeps the canonical
   // ladder order; city/sector/language rank by count. (Supersedes the old full-catalog
   // counts — an option with 0 roles under the current filters simply drops out.)
-  // Role vertical facet — one bucket ("Product Manager") until the engine goes
-  // all-vertical (#34); cross-faceted like the rest, count-desc.
+  // Role vertical facet — the five families, cross-faceted like the rest.
+  // VALUE and LABEL are split (issue #70): the filter clause compares against
+  // roleFamily(j), which is the lowercase stored value, so the chips can read
+  // "Sales" instead of "sales" without breaking the comparison. Fixed vocabulary
+  // order (not count-desc) so the list does not reshuffle as you filter; an
+  // option with no roles under the current filters drops out, as before.
+  // "Other" is appended only when unlabelled rows are actually present.
   const roleOptions = useMemo(() => {
     const m = new Map<string, number>();
     for (const j of filterJobs(pool, { ...filters, roles: [] }))
       m.set(roleFamily(j), (m.get(roleFamily(j)) ?? 0) + 1);
-    return [...m.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([value, count]) => ({ value, label: value, count }));
+    const known = ROLE_FAMILY_OPTIONS.filter((o) => (m.get(o.value) ?? 0) > 0).map((o) => ({
+      value: o.value as string,
+      label: o.label,
+      count: m.get(o.value) ?? 0,
+    }));
+    const other = m.get(ROLE_FAMILY_OTHER) ?? 0;
+    return other > 0
+      ? [...known, { value: ROLE_FAMILY_OTHER, label: "Other", count: other }]
+      : known;
   }, [pool, filters]);
   const levelOptions = useMemo(() => {
     const m = new Map<string, number>();
@@ -206,6 +220,17 @@ export default function RolesMap() {
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([value, count]) => ({ value, label: value, count }));
   }, [pool, filters]);
+  // The CV-unlock modal's industry picker is a DIFFERENT list from the headbar
+  // facet above (issue #70). The facet shows every live sector with a count beside
+  // it, which is its own honesty mechanism. The target picker shows no count and
+  // its pick is AND-ed into the paid scoring prefilter, so a sector that cannot
+  // return roles costs the user their whole score run — only sectors with live
+  // liquidity may be offered. Derived from the full catalog, not the filtered
+  // pool: the scoring pass runs over the catalog too.
+  const targetSectorOptions = useMemo(
+    () => pickableSectors(sectorLiquidity(jobs)),
+    [jobs],
+  );
   const sizeOptions = useMemo(() => {
     const m = new Map<string, number>();
     for (const j of filterJobs(pool, { ...filters, sizes: [] })) {
@@ -579,7 +604,7 @@ export default function RolesMap() {
         open={cvModalOpen}
         onClose={() => setCvModalOpen(false)}
         signedIn={signedIn}
-        sectorOptions={sectorOptions}
+        sectorOptions={targetSectorOptions}
         onSubmit={submitCv}
       />
       {/* ProfileModal is GONE (Rober 7-25): its settings body lives on the routed

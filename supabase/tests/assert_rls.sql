@@ -17,7 +17,21 @@ declare
   no_rls text;
   no_policy text;
   -- Tables intentionally RLS-enabled with zero policies (deny-all, service-role-only).
-  deny_all_allowlist text[] := array['whitelisted_emails'];
+  -- Tables whose lockdown is INTENTIONAL: RLS on, no policy, so nothing but the
+  -- service role can read them.
+  --   whitelisted_emails         -- owner-only list, never user-facing
+  --   *_backup_2026*             -- pre-migration snapshots. They hold the only
+  --     record of what a row said before a one-way value rewrite, so they are the
+  --     rollback path and must not be readable by the users they protect against.
+  --     The migrations that create them also REVOKE the project's default
+  --     anon/authenticated grants, because RLS without a policy blocks reads but
+  --     not writes made through a table-level grant, and that default includes
+  --     DELETE and TRUNCATE.
+  deny_all_allowlist text[] := array[
+    'whitelisted_emails',
+    'companies_sector_backup_20260819',
+    'profiles_targets_backup_20260819'
+  ];
 begin
   select string_agg(c.relname, ', ' order by c.relname)
     into no_rls

@@ -273,8 +273,10 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
           onPointerCancel={onRowPointerUp}
           onClickCapture={onRowClickCapture}
         >
-        {/* Chip order: what → where → company (spec 2026-07-10). Role leads — one
-            "Product Manager" bucket until the engine goes all-vertical (#34). */}
+        {/* Chip order: what → where → company (spec 2026-07-10). Role leads. Its
+            options carry a separate value and label (issue #70): the value is the
+            stored jobs.role_family the filter compares against, the label is the
+            one display name the target pickers use too. */}
         <FilterChip
           label="Role"
           options={roleOptions}

@@ -28,6 +28,7 @@ import {
   linkedinFromHtml,
 } from "./enrich-lib.mjs";
 import { normalizeHeadcountBucket } from "./headcount-lib.mjs";
+import { SECTORS, normalizeSector } from "./sector-lib.mjs";
 
 const arg = (name, def) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -49,7 +50,7 @@ async function haikuExtract(company, jd) {
   const t0 = Date.now();
   const prompt = `From the job description(s) below for the company "${company}", extract ONLY facts that are EXPLICITLY stated. Do not guess or infer beyond the text. Return one JSON object, no prose:
 {"description": "<one plain sentence on what the company does, <=200 chars, or null>",
- "sector": "<short industry label e.g. Fintech, or null>",
+ "sector": "<EXACTLY ONE of these, copied character for character, or null if none fits: ${SECTORS.join(" | ")}>",
  "stage": "<funding stage if stated: seed|series_a|series_b|series_c|series_d|public, else null>",
  "team_size": "<WHOLE-COMPANY headcount if stated, e.g. 51-200 or 340; NOT the size of the hiring team or squad; else null>",
  "founded_year": <integer year if stated, else null>}
@@ -143,7 +144,15 @@ async function enrichOne(co) {
     const y = (await wikidataFounded(co.name)) ?? ai.founded_year ?? null;
     if (y) update.founded_year = y;
   }
-  if (co.sector == null && ai.sector) update.sector = ai.sector;
+  if (co.sector == null && ai.sector) {
+    // The ONE way into sector (issue #70): a free-text model answer becomes a
+    // canonical industry or nothing. Writing it raw is how one column ended up
+    // carrying 54 strings for 28 industries — Healthtech, Health Tech and
+    // Digital Health were three chips for the same thing, and picking one hid
+    // the roles filed under the other two.
+    const sector = normalizeSector(ai.sector);
+    if (sector) update.sector = sector;
+  }
   if (co.stage == null && ai.stage) update.stage = ai.stage;
   if (co.headcount_bucket == null && ai.team_size) {
     // The ONE way into headcount_bucket (issue #68 item 6): a free-text model

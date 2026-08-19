@@ -9,10 +9,16 @@ import {
   writeCvStash,
   clearCvStash,
   CV_STASH_KEY,
-  FALLBACK_SECTORS,
   visibleSectorChips,
   filterSectorSearch,
+  ROLE_FAMILIES,
+  ROLE_FAMILY_OPTIONS,
+  archetypeToFamily,
+  isRoleFamily,
+  normalizeTargetRoles,
+  roleMatchesTargets,
 } from "@/lib/labels";
+import { ROLE_FAMILY_LABELS } from "@/lib/scorePrompt";
 import type { RoleJob } from "@/lib/roles";
 
 // Minimal RoleJob factory — only the fields the label logic reads matter.
@@ -110,41 +116,179 @@ describe("roleArchetypeOf", () => {
   });
 });
 
+// ── The ONE role vocabulary (issue #70) ──────────────────────────────────────
+// Three vocabularies used to be live at once — ten Title-Case archetypes in the
+// pickers, five lowercase families in the database, and the raw family string in
+// the /roles facet. A user could not express the same idea on two surfaces.
+describe("the role vocabulary", () => {
+  it("is the five jobs.role_family values, in a fixed order", () => {
+    expect([...ROLE_FAMILIES]).toEqual([
+      "product",
+      "engineering",
+      "sales",
+      "marketing",
+      "operations",
+    ]);
+  });
+
+  it("takes its display names from the scorer's map rather than inventing a fourth", () => {
+    for (const o of ROLE_FAMILY_OPTIONS) expect(o.label).toBe(ROLE_FAMILY_LABELS[o.value]);
+    expect(ROLE_FAMILY_OPTIONS.map((o) => o.value)).toEqual([...ROLE_FAMILIES]);
+  });
+
+  it("stores the value the catalog uses, not the label the user reads", () => {
+    // The facet compares the chip value against jobs.role_family, so a chip
+    // labelled "Sales" must still carry "sales".
+    expect(ROLE_FAMILY_OPTIONS.find((o) => o.label === "Sales")?.value).toBe("sales");
+    expect(isRoleFamily("sales")).toBe(true);
+    expect(isRoleFamily("Sales")).toBe(false);
+  });
+});
+
+describe("archetypeToFamily", () => {
+  it("passes a current family through", () => {
+    for (const f of ROLE_FAMILIES) expect(archetypeToFamily(f)).toBe(f);
+  });
+
+  it("maps the five archetypes that already had a family", () => {
+    expect(archetypeToFamily("Product")).toBe("product");
+    expect(archetypeToFamily("Engineering")).toBe("engineering");
+    expect(archetypeToFamily("Marketing")).toBe("marketing");
+    expect(archetypeToFamily("Sales/BD")).toBe("sales");
+    expect(archetypeToFamily("Operations")).toBe("operations");
+  });
+
+  it("places the five that had NO family — the real breakage", () => {
+    // Under a naive swap a stored "Growth" would have matched nothing, emptied
+    // that user's scoring slice and put permanent "Not scored" copy on every
+    // card. Growth and Data reached 286 and 522 live rows; not rounding errors.
+    expect(archetypeToFamily("Growth")).toBe("marketing");
+    expect(archetypeToFamily("Data")).toBe("engineering");
+    expect(archetypeToFamily("Strategy")).toBe("operations");
+    expect(archetypeToFamily("Founding")).toBe("product");
+    expect(archetypeToFamily("Design")).toBeNull(); // a deferred vertical, no home
+  });
+
+  it("understands the dev fixture's stray 'Product Manager'", () => {
+    // It belonged to none of the three old vocabularies and matched nothing.
+    expect(archetypeToFamily("Product Manager")).toBe("product");
+  });
+
+  it("returns null for anything else", () => {
+    expect(archetypeToFamily("Astronaut")).toBeNull();
+    expect(archetypeToFamily("")).toBeNull();
+    expect(archetypeToFamily(null)).toBeNull();
+  });
+});
+
+describe("normalizeTargetRoles", () => {
+  it("translates a stored profile that predates the vocabulary", () => {
+    expect(normalizeTargetRoles(["Product", "Growth"])).toEqual(["product", "marketing"]);
+  });
+
+  it("dedupes two archetypes that land on one family", () => {
+    expect(normalizeTargetRoles(["Marketing", "Growth"])).toEqual(["marketing"]);
+  });
+
+  it("is idempotent, so re-reading an already-migrated profile is a no-op", () => {
+    expect(normalizeTargetRoles(["product", "sales"])).toEqual(["product", "sales"]);
+  });
+
+  it("does not strand a user whose only pick has no home", () => {
+    // An empty array reads as "no role preference" everywhere, which shows the
+    // whole catalog — not an empty scoring slice and a permanently unscored map.
+    expect(normalizeTargetRoles(["Design"])).toEqual([]);
+    expect(normalizeTargetRoles(null)).toEqual([]);
+  });
+});
+
+describe("roleMatchesTargets", () => {
+  it("matches on jobs.role_family first — the label the catalog carries", () => {
+    const j = { title: "Enterprise Account Director", role_family: "sales" };
+    expect(roleMatchesTargets(j, ["sales"])).toBe(true);
+    expect(roleMatchesTargets(j, ["product"])).toBe(false);
+  });
+
+  it("recovers rows the title regex misses — the whole point of leading with family", () => {
+    // Measured 2026-08-19: the title regex finds 65% of live `sales` rows and 48%
+    // of live `operations` rows, and 607 live rows match no archetype at all.
+    // The nightly digest used to run on that regex alone.
+    expect(roleMatchesTargets({ title: "Client Partner", role_family: "sales" }, ["sales"])).toBe(
+      true,
+    );
+  });
+
+  it("falls back to the title when the catalog left the row unlabelled", () => {
+    expect(roleMatchesTargets({ title: "Product Manager", role_family: null }, ["product"])).toBe(
+      true,
+    );
+    expect(roleMatchesTargets({ title: "Software Engineer", role_family: null }, ["product"])).toBe(
+      false,
+    );
+  });
+
+  it("honours a legacy archetype still sitting in a profile or a stale CV stash", () => {
+    // A sign-up begun before the deploy and finished after it writes the old value.
+    expect(roleMatchesTargets({ title: "Growth Manager", role_family: "marketing" }, ["Growth"])).toBe(
+      true,
+    );
+    expect(roleMatchesTargets({ title: "Brand Manager", role_family: "marketing" }, ["Growth"])).toBe(
+      true, // via Growth → marketing; widened, never narrowed
+    );
+    expect(roleMatchesTargets({ title: "Backend Engineer", role_family: "engineering" }, ["Data"])).toBe(
+      true,
+    );
+  });
+
+  it("an empty selection matches everything", () => {
+    expect(roleMatchesTargets({ title: "anything", role_family: null }, [])).toBe(true);
+  });
+});
+
 describe("pickScoringSlice", () => {
   const jobs = [
-    job({ id: "1", title: "Product Manager", sector: "Fintech" }),
-    job({ id: "2", title: "Growth Lead", sector: "Consumer" }),
-    job({ id: "3", title: "Data Scientist", sector: "Fintech" }),
-    job({ id: "4", title: "Product Manager", sector: null }),
+    job({ id: "1", title: "Product Manager", role_family: "product", sector: "Fintech" }),
+    job({ id: "2", title: "Growth Lead", role_family: "marketing", sector: "Consumer" }),
+    job({ id: "3", title: "Data Scientist", role_family: null, sector: "Fintech" }),
+    job({ id: "4", title: "Product Manager", role_family: "product", sector: null }),
+    // The recall case: a sales seat no title regex claims.
+    job({ id: "5", title: "Client Partner", role_family: "sales", sector: "Fintech" }),
   ];
 
   it("returns the full list when no labels are set", () => {
-    expect(pickScoringSlice(jobs, { roles: [], sectors: [] })).toHaveLength(4);
+    expect(pickScoringSlice(jobs, { roles: [], sectors: [] })).toHaveLength(5);
   });
 
-  it("narrows by role archetype", () => {
-    const out = pickScoringSlice(jobs, { roles: ["Product"], sectors: [] });
+  it("narrows by role family", () => {
+    const out = pickScoringSlice(jobs, { roles: ["product"], sectors: [] });
     expect(out.map((j) => j.id).sort()).toEqual(["1", "4"]);
+  });
+
+  it("uses the SAME role rule as the paid backlog prefilter", () => {
+    // These two workers disagreed: the nightly matched titles only, so a "Client
+    // Partner" filed as sales was invisible to a Sales selection here while the
+    // backlog worker scored it. One rule now (roleMatchesTargets).
+    expect(pickScoringSlice(jobs, { roles: ["sales"], sectors: [] }).map((j) => j.id)).toEqual(["5"]);
   });
 
   it("narrows by sector", () => {
     const out = pickScoringSlice(jobs, { roles: [], sectors: ["Fintech"] });
-    expect(out.map((j) => j.id).sort()).toEqual(["1", "3"]);
+    expect(out.map((j) => j.id).sort()).toEqual(["1", "3", "5"]);
   });
 
   it("AND-across role and sector", () => {
-    const out = pickScoringSlice(jobs, { roles: ["Product"], sectors: ["Fintech"] });
+    const out = pickScoringSlice(jobs, { roles: ["product"], sectors: ["Fintech"] });
     expect(out.map((j) => j.id)).toEqual(["1"]);
   });
 
   it("falls back to the full list when the filter would empty the slice", () => {
-    const out = pickScoringSlice(jobs, { roles: ["Design"], sectors: ["Gaming"] });
-    expect(out).toHaveLength(4);
+    const out = pickScoringSlice(jobs, { roles: ["operations"], sectors: ["Gaming"] });
+    expect(out).toHaveLength(5);
   });
 
   it("excludes rows missing a sector when a sector is required", () => {
-    const out = pickScoringSlice(jobs, { roles: ["Product"], sectors: ["Consumer"] });
-    expect(out).toHaveLength(4); // no Product+Consumer row → fall back to all
+    const out = pickScoringSlice(jobs, { roles: ["product"], sectors: ["Consumer"] });
+    expect(out).toHaveLength(5); // no product+Consumer row → fall back to all
   });
 });
 
@@ -156,9 +300,12 @@ describe("visibleSectorChips", () => {
     count: 15 - i,
   }));
 
-  it("falls back to FALLBACK_SECTORS when the catalog is empty", () => {
-    expect(visibleSectorChips([], [], 12)).toEqual(FALLBACK_SECTORS);
-    expect(visibleSectorChips([], ["Anything"], 12)).toEqual(FALLBACK_SECTORS);
+  it("offers NOTHING when the catalog is empty (issue #70)", () => {
+    // It used to fall back to a hardcoded FALLBACK_SECTORS list, eight of whose
+    // twelve entries matched zero live roles. A chip that can only return an
+    // empty page is worse than no chip: the user reads it as "no jobs for me".
+    expect(visibleSectorChips([], [], 12)).toEqual([]);
+    expect(visibleSectorChips([], ["Anything"], 12)).toEqual([]);
   });
 
   it("returns only the top N when nothing outside it is selected", () => {

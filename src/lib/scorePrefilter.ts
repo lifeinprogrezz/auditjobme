@@ -11,7 +11,8 @@
 // literally. Without it the deployed function dies at import with
 // ERR_MODULE_NOT_FOUND while every local gate stays green. Pinned by
 // src/test/api-esm-imports.test.ts, which walks the whole api/ import graph.
-import { roleArchetypeOf, type Labels } from "./labels.js";
+import { normalizeTargetRoles, roleMatchesTargets, type Labels } from "./labels.js";
+import { normalizeTargetSectors } from "./sectors.js";
 
 /** Hard per-user slice ceiling (~$3.60 at ~$0.0024/batch-score). A cost dial,
  *  not a scoring judgment — the cap sheds the OLDEST rows, so the slice is
@@ -28,17 +29,6 @@ export const PREFILTER_CAP = 1500;
  *  (only ~38% of live rows carry a sector, so a role plus sector pair misses
  *  often). "Not scored" copy on those rows points at Settings instead. */
 export const FALLBACK_CAP = 1000;
-
-/** The five archetypes that map 1:1 onto jobs.role_family (#34). The other
- *  five (Growth/Data/Design/Strategy/Founding) have no family — they match
- *  via roleArchetypeOf(title) below. */
-export const FAMILY_BY_ARCHETYPE: Record<string, string> = {
-  Product: "product",
-  Engineering: "engineering",
-  Marketing: "marketing",
-  "Sales/BD": "sales",
-  Operations: "operations",
-};
 
 export type PrefilterJob = {
   /** Stable tiebreaker for the ordering below, which cannot rely on dates alone. */
@@ -57,14 +47,11 @@ function seenMs(j: PrefilterJob): number {
   return Number.isFinite(t) && t > 0 ? t : 0;
 }
 
-/** Role dimension: the row's family is among the families the chosen
- *  archetypes map to, OR its title infers to a chosen archetype (covers
- *  family-less archetypes and role_family=null rows). */
+/** Role dimension: roleMatchesTargets in labels.ts — the ONE rule (issue #70),
+ *  shared with pickScoringSlice so the nightly digest and this paid worker can
+ *  never disagree about what a label means. */
 function roleOk(j: PrefilterJob, roles: string[]): boolean {
-  if (roles.length === 0) return true;
-  const families = roles.map((r) => FAMILY_BY_ARCHETYPE[r]).filter(Boolean);
-  if (j.role_family != null && families.includes(j.role_family)) return true;
-  return roles.includes(roleArchetypeOf(j.title) ?? "");
+  return roleMatchesTargets(j, roles);
 }
 
 /** Sector dimension: OR-within, AND-across (same semantics as
@@ -113,8 +100,14 @@ export function prefilterWithTier<T extends PrefilterJob>(
   jobs: T[],
   labels: Labels,
 ): { jobs: T[]; tier: PrefilterTier } {
-  const roles = labels.roles ?? [];
-  const sectors = labels.sectors ?? [];
+  // Normalized HERE, not at the call sites. A stored label can predate the #70
+  // vocabulary, and the client and the paid workers must resolve it identically
+  // or they select different slices: the client waits on roles the worker never
+  // buys, the progress bar never reaches zero, and the ready email never sends.
+  // Shimming at the call sites is what caused exactly that — one of the three
+  // got the shim and the two that spend money did not.
+  const roles = normalizeTargetRoles(labels.roles);
+  const sectors = normalizeTargetSectors(labels.sectors);
   const byNewest = (a: T, b: T) => seenMs(b) - seenMs(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const take = (rows: T[], cap: number) => rows.sort(byNewest).slice(0, cap);
 

@@ -3,6 +3,8 @@
 // a real source (a JD, a site's meta tags, or Wikidata) or it is null — never
 // guessed. Kept pure so they can be unit-tested (src/test/enrich-lib.test.ts).
 
+import { normalizeSector } from "./sector-lib.mjs";
+
 // Matches the app's model choice (src/lib/score.ts, src/lib/tailor.ts).
 export const MODEL = "claude-haiku-4-5-20251001";
 
@@ -46,7 +48,13 @@ export function parseEnrichment(text) {
   const out = {};
   const desc = sanitizeDescription(obj.description);
   if (desc) out.description = desc;
-  if (typeof obj.sector === "string" && obj.sector.trim()) out.sector = obj.sector.trim().slice(0, 60);
+  // The parse boundary is where a model answer becomes a field, so the industry
+  // vocabulary is enforced HERE too (issue #70): nothing downstream ever sees a
+  // free-text sector. An answer outside the 28 canonical industries is dropped
+  // rather than stored — a wrong industry files a company behind a chip its roles
+  // do not belong to, and the user who picks that chip never sees them.
+  const sector = normalizeSector(obj.sector);
+  if (sector) out.sector = sector;
   if (typeof obj.stage === "string" && obj.stage.trim()) out.stage = obj.stage.trim().toLowerCase().slice(0, 40);
   if (typeof obj.team_size === "string" && obj.team_size.trim()) out.team_size = obj.team_size.trim().slice(0, 40);
   const yr = Number(obj.founded_year);

@@ -49,12 +49,21 @@ describe("prefilterJobs — role labels", () => {
     expect(ids(prefilterJobs(jobs, { roles: ["Product"], sectors: [] }))).toEqual(["legacy-pm"]);
   });
 
-  it("matches family-less archetypes (Growth) via the title", () => {
+  it("gives a retired archetype (Growth) the family it now belongs to", () => {
+    // Issue #70: the picker no longer offers "Growth", but a profile written
+    // before the change still holds it. archetypeToFamily places it on
+    // `marketing`, so the slice WIDENS from the title-matched rows to the whole
+    // family. Widening is the safe direction — the alternative was an empty
+    // slice and a map that renders "Not scored" forever.
     const jobs = [
       job("growth", { title: "Growth Manager", role_family: "marketing" }),
       job("brand", { title: "Brand Manager", role_family: "marketing" }),
+      job("pm", { title: "Product Manager", role_family: "product" }),
     ];
-    expect(ids(prefilterJobs(jobs, { roles: ["Growth"], sectors: [] }))).toEqual(["growth"]);
+    expect(ids(prefilterJobs(jobs, { roles: ["Growth"], sectors: [] })).sort()).toEqual([
+      "brand",
+      "growth",
+    ]);
   });
 
   it("unions multiple role labels", () => {
@@ -193,5 +202,32 @@ describe("prefilterJobs — determinism at the cap boundary", () => {
     const b = prefilterJobs(build([...forward].reverse()), { roles: ["Product"], sectors: [] });
     expect(a).toHaveLength(PREFILTER_CAP);
     expect(ids(a)).toEqual(ids(b));
+  });
+});
+
+describe("legacy stored labels are shimmed inside the predicate (#70 P1)", () => {
+  // The vocabulary shim first landed at the CALL SITES, and only one of the three
+  // got it: the client normalized while the two paid workers passed the stored
+  // value raw. That is the divergence scorePrefilter's own header forbids — the
+  // client waits on roles the worker never buys, the bar never reaches zero, and
+  // the ready email never sends. Normalizing inside the predicate makes every
+  // caller correct by construction, so these pin the behaviour, not the wiring.
+  const rows = [
+    job("pm", { sector: "Healthtech" }),
+    job("eng", { title: "Backend Engineer", role_family: "engineering", sector: "Healthtech" }),
+  ];
+
+  it("resolves a retired sector spelling to its canonical form", () => {
+    // "Health Tech" was one of three spellings of one sector before the migration.
+    const out = prefilterJobs(rows, { roles: [], sectors: ["Health Tech"] });
+    expect(ids(out).sort()).toEqual(["eng", "pm"]);
+  });
+
+  it("treats an archetype that maps to nothing as no preference, not as an empty slice", () => {
+    // "Design" was offered by the old picker and has no role_family. Raw, it fell
+    // through to a title regex and returned a near-empty slice with no signal why.
+    const out = prefilterJobs(rows, { roles: ["Design"], sectors: [] });
+    expect(out.length).toBe(rows.length);
+    expect(prefilterTierOf(rows, { roles: ["Design"], sectors: [] })).toBe("newest");
   });
 });

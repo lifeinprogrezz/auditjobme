@@ -65,9 +65,8 @@ function resolveSpec(fromFile: string, spec: string): string | null {
     ? join(ROOT, "src", spec.slice(2))
     : resolve(dirname(fromFile), spec);
   const stripped = base.replace(/\.js$/, "");
-  for (const cand of [`${stripped}.ts`, `${stripped}.tsx`, base, join(stripped, "index.ts")]) {
-    if (existsSync(cand) && cand.endsWith(".ts")) return cand;
-    if (existsSync(cand) && cand.endsWith(".tsx")) return cand;
+  for (const cand of [`${stripped}.ts`, `${stripped}.tsx`, `${stripped}.mjs`, base, join(stripped, "index.ts")]) {
+    if (existsSync(cand) && /\.(ts|tsx|mjs)$/.test(cand)) return cand;
   }
   return null;
 }
@@ -99,7 +98,7 @@ function reachableFromApi(): { file: string; offenders: string[] }[] {
       // The "@/" alias is a bundler convention. Node has never heard of it, so a
       // value import through it is as fatal as a missing extension.
       if (isAlias) offenders.push(`${spec} (path alias, Node cannot resolve it)`);
-      else if (!spec.endsWith(".js") && !spec.endsWith(".json")) offenders.push(spec);
+      else if (![".js", ".mjs", ".json"].some((ext) => spec.endsWith(ext))) offenders.push(spec);
 
       const next = resolveSpec(file, spec);
       if (next && next.startsWith(ROOT) && !next.includes("node_modules")) queue.push(next);

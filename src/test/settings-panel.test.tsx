@@ -68,35 +68,37 @@ describe("SettingsPanel", () => {
   it("targets render pre-selected and Save persists the current picks", () => {
     const { onSaveTargets } = renderPanel({
       cvText: "a CV",
-      targetRoles: ["Product"],
+      // The chip VALUE is the stored jobs.role_family, the chip LABEL is what the
+      // user reads (issue #70) — the two must not be the same string.
+      targetRoles: ["product"],
       targetSectors: ["Fintech"],
       sectorOptions: [{ value: "Fintech", label: "Fintech", count: 12 }],
     });
     expect(screen.getByText(/Target roles/i)).toBeInTheDocument();
     expect(screen.getByText(/Target industries/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Product" }).classList.contains("on")).toBe(true);
+    expect(screen.getByRole("button", { name: "Product Manager" }).classList.contains("on")).toBe(true);
     expect(screen.getByRole("button", { name: "Fintech" }).classList.contains("on")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: /Save changes/i }));
     expect(onSaveTargets).toHaveBeenCalledTimes(1);
-    expect(onSaveTargets).toHaveBeenCalledWith(["Product"], ["Fintech"]);
+    expect(onSaveTargets).toHaveBeenCalledWith(["product"], ["Fintech"]);
   });
 
   it("toggling a chip changes what Save sends; failed save keeps the edits", async () => {
     const onSaveTargets = vi.fn(async () => false);
     renderPanel({
       cvText: "a CV",
-      targetRoles: ["Product"],
+      targetRoles: ["product"],
       targetSectors: [],
       onSaveTargets,
     });
     // Deselect the stored pick, then save — the edited (empty) list is sent.
-    fireEvent.click(screen.getByRole("button", { name: "Product" }));
+    fireEvent.click(screen.getByRole("button", { name: "Product Manager" }));
     fireEvent.click(screen.getByRole("button", { name: /Save changes/i }));
     expect(onSaveTargets).toHaveBeenCalledWith([], []);
     await Promise.resolve();
     await Promise.resolve();
     // Save failed → the edit survives for the retry (chip still deselected).
-    expect(screen.getByRole("button", { name: "Product" }).classList.contains("on")).toBe(false);
+    expect(screen.getByRole("button", { name: "Product Manager" }).classList.contains("on")).toBe(false);
   });
 
   it("shows the signed-in identity caption", () => {

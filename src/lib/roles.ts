@@ -37,8 +37,9 @@ export type RoleJob = {
   remote: boolean;
   source: string | null;
   seniority: string | null;
-  /** Role vertical (jobs.role_family). Null = pre-all-vertical row → roleFamily()
-   *  maps it to "Product Manager" while the pipeline is PM-gated (issue #34). */
+  /** Role vertical (jobs.role_family): product | engineering | sales | marketing |
+   *  operations. Null = a deferred vertical the classifier declined to label →
+   *  roleFamily() reads it as "other" (issue #70). */
   role_family?: string | null;
   /** Workplace mode (jobs.workplace, scrape-owned): remote | hybrid | onsite.
    *  Null = unknown → workplaceOf() falls back to extraction.remote_policy, then
@@ -179,11 +180,14 @@ export const LEVELS: { value: Level; label: string }[] = [
 export type RolesFilters = {
   query: string;
   levels: Level[];
-  // City + sector are opt-in multi-selects (Rober 7-06). Only dimensions with
-  // near-complete coverage are filterable: every role has a resolvable city, and
-  // ~80% of companies carry a sector — so an empty selection always shows the full
-  // catalog and no company silently disappears from the default view. Sparse fields
-  // (founded year, funding round) are deliberately NOT filters for that reason.
+  // City + sector are opt-in multi-selects (Rober 7-06): an empty selection always
+  // shows the full catalog, so no company silently disappears from the default
+  // view. That property carries the sector filter, because coverage does NOT —
+  // measured 2026-08-19, about 62% of live roles have no sector at all (their
+  // company row has none, or the row has no company_id), and a sector selection is
+  // AND-ed across, so choosing one discards every unlabelled role. Which sectors
+  // may be OFFERED is therefore gated on live liquidity (src/lib/sectors.ts).
+  // Sparse fields (founded year, funding round) are not filters at all.
   cities: string[];
   sectors: string[];
   sizes: string[]; // canonical size bands (sizeBand); ~84% company coverage
@@ -278,12 +282,19 @@ export function requiredLanguages(job: RoleJob): string[] {
   );
 }
 
-/** Role vertical for the Role facet. Null = pre-all-vertical row (the pipeline is
- *  PM-gated), mapped to "Product Manager" — the single null→PM source shared by the
- *  filter clause and the facet counter so they never disagree. Real values win the
- *  moment the engine writes them (issue #34). */
+/** The facet value for a row the catalog left unlabelled. */
+export const ROLE_FAMILY_OTHER = "other";
+
+/** Role vertical for the Role facet — the single source shared by the filter
+ *  clause and the facet counter, so they never disagree.
+ *
+ *  Null is now "other", NOT "Product Manager" (issue #70). A null role_family is
+ *  structural, not backfill lag: classifyRoleFamily returns null for the deferred
+ *  verticals, so the three live null rows are all UX seats. Coercing them to
+ *  Product labelled a UX role as Product in the facet, and every new
+ *  deferred-vertical scrape would add more. Three of 7,981 live rows today. */
 export function roleFamily(job: RoleJob): string {
-  return job.role_family ?? "Product Manager";
+  return job.role_family ?? ROLE_FAMILY_OTHER;
 }
 
 /** Fixed option order + display labels for the Workplace facet. */
