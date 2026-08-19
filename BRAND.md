@@ -21,8 +21,13 @@ reading, that one direction is answered and the other is still open.
   it is ink on the light stage and pale on the dark map with no theme branching. Never
   give it a color: the score palette below already means fit, and a colored mark would
   make the accent say two different things.
-- **Wordmark:** Space Grotesk 600, letter-spacing `-0.03em`, set beside the mark at
-  roughly 0.86 of the mark's height.
+- **Wordmark:** lowercase `northgoing`, Space Grotesk 600, letter-spacing `-0.03em`, set
+  beside the mark at roughly 0.86 of the mark's height. The lowercase is the LETTERING,
+  not the name: `BRAND_WORDMARK` is what the logo draws (map headbar, page headers, social
+  card, email masthead), and `BRAND_NAME` stays `Northgoing` everywhere the name is spoken
+  in prose, titles, legal copy and email bodies. Both live in `src/lib/brandName.ts`.
+  Pick by the ROLE the text plays, never by the file you happen to be editing: lowercase
+  in a sentence reads as a typo and breaks the moment the name starts one.
 - **Grounds:** tab icons are the ink mark on transparency. App icons and the social card
   put the pale mark on the ink ground, because iOS, Android, and Open Graph readers all
   composite transparency onto a ground you do not control.

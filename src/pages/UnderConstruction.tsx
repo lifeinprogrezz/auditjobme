@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { BRAND_NAME } from "@/lib/brand";
+import { BRAND_NAME, BRAND_WORDMARK } from "@/lib/brand";
 
 // Coming-soon placeholder (Rober 7-06). The interactive /roles map is the only live
 // surface of Northgoing for now; every onward flow (sign-in, CV upload, profile,
@@ -11,7 +11,7 @@ export default function UnderConstruction() {
       <div className="uc-blob uc-blob-a" aria-hidden="true" />
       <div className="uc-blob uc-blob-b" aria-hidden="true" />
       <div className="uc-card">
-        <span className="uc-brand">{BRAND_NAME}</span>
+        <span className="uc-brand">{BRAND_WORDMARK}</span>
         <div className="uc-emoji" aria-hidden="true">🚧</div>
         <h1>Under construction</h1>
         <p>

@@ -115,7 +115,7 @@ function ogHtml(paths) {
   </style></head><body>
   <div class="grat">${lines.join("")}<div class="halo"></div></div>
   <div class="in">
-    <div class="lock">${markSvg(paths, 92, PALE)}<span class="name">Northgoing</span></div>
+    <div class="lock">${markSvg(paths, 92, PALE)}<span class="name">northgoing</span></div>
     <p class="tag">The live map of tech jobs in Europe, <b>scored against your CV</b>.</p>
   </div></body></html>`;
 }

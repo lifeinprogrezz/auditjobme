@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { BRAND_WORDMARK } from "@/lib/brandName";
 import {
   jobSeenMs,
   selectNewJobsSince,
@@ -242,8 +243,13 @@ describe("buildEmailBody (issue #72 slice 3)", () => {
 
   it("keeps the brand header and the see-them-all link", () => {
     const { text, html } = buildEmailBody(ranked(2), "https://northgoing.com/");
-    expect(text.startsWith("Northgoing")).toBe(true);
-    expect(html).toContain("Northgoing</div>");
+    // The masthead is the LOGO, so it carries the lowercase wordmark, not the
+    // proper noun. Asserting the constant rather than the literal keeps this
+    // honest if the lettering ever changes again, while still proving the email
+    // does not fall back to the prose form.
+    expect(text.startsWith(BRAND_WORDMARK)).toBe(true);
+    expect(html).toContain(`${BRAND_WORDMARK}</div>`);
+    expect(BRAND_WORDMARK).toBe("northgoing");
     expect(text).toContain("See them all: https://northgoing.com/");
     expect(html).toContain('href="https://northgoing.com/"');
   });
