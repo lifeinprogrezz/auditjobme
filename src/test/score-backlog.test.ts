@@ -89,14 +89,28 @@ describe("email copy", () => {
     expect(buildReadySubject(0)).toBe("Your roles are scored");
   });
   it("body links to the map and reports totals", () => {
-    const { text, html } = buildReadyBody(3, 764, "https://auditjob.me/");
+    const { text, html } = buildReadyBody(3, 764, "https://auditjob.me/", "targeted");
     expect(text).toContain("764");
+    // #114: the pass covers the user's prefiltered slice, not the whole live
+    // catalog, and the cap can truncate even that — so no "all", and no claim
+    // of a match the prefilter did not actually make.
+    expect(text).toContain("match your targets");
+    expect(text).not.toContain("live roles");
+    expect(text).not.toContain("all ");
     // The globe IS the landing at the bare domain (Rober 7-12) — email links the canonical root.
     expect(text).toContain("https://auditjob.me/");
     expect(html).toContain('href="https://auditjob.me/"');
   });
+  it("never calls the no-labels slice a match, because nothing was matched", () => {
+    // The newest-N slice for a user who picked no labels is not a set of
+    // "matching roles". Saying so would assert the opposite of what happened.
+    const { text } = buildReadyBody(2, 1000, "https://auditjob.me/", "newest");
+    expect(text).toContain("newest");
+    expect(text).not.toContain("match your targets");
+  });
+
   it("zero-strong body stays honest, no fabricated matches", () => {
-    const { text } = buildReadyBody(0, 100, "https://auditjob.me/");
+    const { text } = buildReadyBody(0, 100, "https://auditjob.me/", "targeted");
     expect(text).toContain("None cleared the strong-match bar");
   });
 });

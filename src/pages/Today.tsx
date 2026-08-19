@@ -28,6 +28,7 @@ import { warmContactsFor, warmMarkerLabel } from "@/lib/connections";
 import { RUBRIC_VERSION } from "@/lib/score";
 import { DEV_FIXTURE, devFixtureBatch } from "@/lib/devFixture";
 import FitChip from "@/components/roles/FitChip";
+import { scoreStatusOf } from "@/lib/scorePrefilter";
 
 // §3.3 secondary CTA — the ONE idiom for every list-row action on this page (there is
 // no second primary): control type (13/600), radius 10, a hairline ink/20 border that
@@ -64,6 +65,7 @@ export default function Today() {
     scored,
     scoring,
     remaining,
+    eligibleIds,
     applied,
     markApplied,
     saved,
@@ -263,7 +265,13 @@ export default function Today() {
               </div>
             )}
           </div>
-          <FitChip score={job.score} size="sm" />
+          <FitChip
+            score={job.score}
+            size="sm"
+            pendingLabel={
+              scoreStatusOf(job.score, eligibleIds.has(job.id)) === "scoring" ? "Scoring" : "Not scored"
+            }
+          />
         </div>
         {/* Footer: exactly ONE secondary CTA ("Prepare application") plus meta-weight
             affordances — never a second button (design direction §5.5 "one secondary
@@ -333,7 +341,7 @@ export default function Today() {
       </p>
       {scoring && (
         <p className="mt-3 font-mono text-caption text-muted-foreground" role="status" aria-live="polite">
-          Scoring the pool against your profile · {remaining} to go. New matches drop in as they land.
+          Scoring the roles that match your targets · {remaining} to go. New matches drop in as they land.
         </p>
       )}
 
