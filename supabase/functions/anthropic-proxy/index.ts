@@ -3,6 +3,8 @@ import {
   capUsdFromEnv,
   globalCapVerdict,
   type CapVerdict,
+  MAX_REQUEST_BYTES,
+  isOversizedRequest,
 } from './cap.ts';
 
 const corsHeaders = {
@@ -26,7 +28,13 @@ const MAX_TOKENS_CEILING = 8192;    // hard ceiling: a caller can't request a hu
 // priceUsd only knows haiku vs sonnet rates, so an unlisted (e.g. pricier) model would be
 // under-metered and could outrun the caps — accept only the two the product actually uses.
 const ALLOWED_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-4-6'];
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
+// Haiku, deliberately. This was 'claude-sonnet-4-6', so a caller who omitted `model` was
+// silently upgraded to the ~6x pricier one on a Haiku-only product. All four real call
+// sites (score.ts, tailor.ts, nightly.ts, score-backlog.ts) pass HAIKU explicitly, so the
+// default is reachable only by a hand-crafted request — exactly the caller who should not
+// get the expensive model by default. Sonnet stays on the allowlist for the audit feature,
+// which must now ask for it by name. Pinned by src/test/global-cap.test.ts.
+const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 
 // ── Message Batches (issue #96, lever 2) ─────────────────────────────────────
 // Batch is a flat 50% discount on input AND output. Only the service-role workers
@@ -144,6 +152,15 @@ type ScoreParams = {
  */
 async function runScoring(admin: SupabaseClient, apiKey: string, userId: string, params: ScoreParams) {
   const { messages, model, max_tokens, system, tools, kind } = params;
+
+  // Request SHAPING, before the cap and before any spend. MAX_TOKENS_CEILING bounds only
+  // the output; without this, `messages`/`system` went to Anthropic unbounded and one
+  // account could burn the shared monthly budget on a single prompt (a real call has
+  // already billed 151,394 input tokens). The ceiling sits far above anything the product
+  // sends — no call since 2026-06-18 comes close — so it never touches a real user.
+  if (isOversizedRequest({ system, messages })) {
+    return json({ error: `request too large: messages + system must be under ${MAX_REQUEST_BYTES} bytes` }, 413);
+  }
 
   const blocked = await enforceGlobalCap(admin);
   if (blocked) return blocked;
