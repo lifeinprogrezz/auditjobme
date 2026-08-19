@@ -91,6 +91,10 @@ describe("email copy", () => {
   it("body links to the map and reports totals", () => {
     const { text, html } = buildReadyBody(3, 764, "https://auditjob.me/");
     expect(text).toContain("764");
+    // #114: the pass covers the user's prefiltered slice, not the whole live
+    // catalog — the copy must not overclaim.
+    expect(text).toContain("matching roles");
+    expect(text).not.toContain("live roles");
     // The globe IS the landing at the bare domain (Rober 7-12) — email links the canonical root.
     expect(text).toContain("https://auditjob.me/");
     expect(html).toContain('href="https://auditjob.me/"');

@@ -83,13 +83,13 @@ export function buildReadyBody(
       ? `${strongCount} of them look like strong matches for you.`
       : "None cleared the strong-match bar yet, but new roles land daily.";
   const text = [
-    `We finished scoring all ${totalScored} live roles against your CV.`,
+    `We finished scoring all ${totalScored} matching roles against your CV.`,
     strongLine,
     ``,
     `Open your map: ${appUrl}`,
   ].join("\n");
   const html = [
-    `<p>We finished scoring all <b>${totalScored}</b> live roles against your CV.</p>`,
+    `<p>We finished scoring all <b>${totalScored}</b> matching roles against your CV.</p>`,
     `<p>${strongLine}</p>`,
     `<p><a href="${appUrl}">Open your map</a></p>`,
   ].join("\n");
