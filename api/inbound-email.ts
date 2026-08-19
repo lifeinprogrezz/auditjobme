@@ -1,10 +1,10 @@
 // Issue #75 — inbox → tracker auto-advance (Option A: forwarding address).
 // A Node serverless function (Vercel), SEPARATE from the Vite bundle. The inbound
-// email provider for track.northgoing.com (e.g. a Cloudflare Email Routing worker —
+// email provider for northgoing.com (e.g. a Cloudflare Email Routing worker —
 // external setup, see the PR body) POSTs each delivered message here as normalized
 // JSON, authenticated with INBOUND_EMAIL_SECRET. The pipeline is:
 //
-//   recipient `u-{token}@track.northgoing.com` → inbound_tokens → user
+//   recipient `u-{token}@northgoing.com` → inbound_tokens → user
 //   → Gmail forwarding-confirmation? store the code on the token row (Settings shows it)
 //   → classify (rejection | confirmation | interview) → fuzzy-match a tracked
 //     application → stale-guarded transition (src/lib/inbound.ts, pinned by its test)
@@ -15,7 +15,7 @@
 //
 // Payload contract (provider-agnostic; the forwarding worker maps into this):
 //   POST { to, from, subject?, text?, html?, messageId?, date? }
-//   to: string | string[] — recipient(s); one must be u-{token}@track.northgoing.com
+//   to: string | string[] — recipient(s); one must be u-{token}@northgoing.com
 //   from: string — the From header ("Acme Hiring" <no-reply@greenhouse.io>)
 //   date: string — the Date header (RFC 2822 or ISO); powers the stale-guard
 //
@@ -36,6 +36,8 @@ import {
   type TrackedApp,
 } from "../src/lib/inbound.js";
 import { normStatus } from "../src/lib/tracker.js";
+import { parseResendInboundEvent } from "../src/lib/inbound.js";
+import { verifySvixSignature } from "../src/lib/svix.js";
 
 // Minimal Vercel Node handler types (avoids a @vercel/node dependency).
 type Req = {
@@ -44,6 +46,45 @@ type Req = {
   body?: unknown;
 };
 type Res = { status: (code: number) => Res; json: (body: unknown) => void };
+
+// Svix signs the RAW bytes. Vercel's default JSON parsing re-serialises them, and a
+// re-serialised body does not verify (key order and whitespace both move), so the
+// parser is off and both providers are parsed by hand below.
+export const config = { api: { bodyParser: false } };
+
+/** The unmodified request body. Falls back to whatever Vercel already gave us if
+ *  the stream was consumed upstream, so a runtime change cannot silently 500. */
+async function readRawBody(req: Req): Promise<string> {
+  const anyReq = req as unknown as AsyncIterable<Buffer> & { body?: unknown };
+  if (typeof anyReq[Symbol.asyncIterator] === "function") {
+    const chunks: Buffer[] = [];
+    for await (const chunk of anyReq) chunks.push(Buffer.from(chunk));
+    if (chunks.length > 0) return Buffer.concat(chunks).toString("utf8");
+  }
+  if (typeof anyReq.body === "string") return anyReq.body;
+  if (anyReq.body && typeof anyReq.body === "object") return JSON.stringify(anyReq.body);
+  return "";
+}
+
+/** Exchange a Resend email_id for the content the webhook deliberately omits. */
+async function fetchResendContent(
+  emailId: string,
+  apiKey: string,
+): Promise<{ text?: string; html?: string; subject?: string } | null> {
+  try {
+    const r = await fetch(`https://api.resend.com/emails/receiving/${encodeURIComponent(emailId)}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!r.ok) {
+      console.warn(`[inbound] Resend content fetch ${r.status} for ${emailId}`);
+      return null;
+    }
+    return (await r.json()) as { text?: string; html?: string; subject?: string };
+  } catch (e) {
+    console.warn("[inbound] Resend content fetch failed:", e);
+    return null;
+  }
+}
 
 type InboundPayload = {
   to?: string | string[];
@@ -78,15 +119,6 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     res.status(405).json({ error: "POST only" });
     return;
   }
-  const authError = secretAuthResult(
-    "INBOUND_EMAIL_SECRET",
-    process.env.INBOUND_EMAIL_SECRET,
-    req.headers["authorization"],
-  );
-  if (authError) {
-    res.status(authError.status).json({ error: authError.error });
-    return;
-  }
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
@@ -94,7 +126,65 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     return;
   }
 
-  const body = (typeof req.body === "string" ? safeParse(req.body) : req.body) as InboundPayload | null;
+  // TWO providers, two trust boundaries. Resend signs with Svix over the raw bytes;
+  // any other forwarder uses the shared bearer secret this endpoint was built for.
+  // The provider is decided by the presence of Svix headers, never by the payload,
+  // so a forged body cannot pick the weaker check for itself.
+  const raw = await readRawBody(req);
+  const parsed = safeParse(raw);
+  const isSvix = Boolean(req.headers["svix-id"] || req.headers["svix-signature"]);
+
+  let body: InboundPayload | null;
+  if (isSvix) {
+    const one = (h: string | string[] | undefined) => (Array.isArray(h) ? h[0] : h);
+    const svixError = verifySvixSignature({
+      id: one(req.headers["svix-id"]),
+      timestamp: one(req.headers["svix-timestamp"]),
+      signature: one(req.headers["svix-signature"]),
+      rawBody: raw,
+      secret: process.env.RESEND_WEBHOOK_SECRET,
+      nowSec: Math.floor(Date.now() / 1000),
+    });
+    if (svixError) {
+      res.status(svixError.status).json({ error: svixError.error });
+      return;
+    }
+    const meta = parseResendInboundEvent(parsed);
+    if (!meta) {
+      // A delivery or bounce ping, not received mail. Acknowledged so Resend stops
+      // retrying; ignoring it is the correct outcome, not an error.
+      res.status(200).json({ ok: true, ignored: "not an email.received event" });
+      return;
+    }
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      res.status(500).json({ error: "RESEND_API_KEY not configured" });
+      return;
+    }
+    // The webhook carries no body by design, so the content is a second call.
+    const content = await fetchResendContent(meta.emailId, apiKey);
+    body = {
+      to: meta.to,
+      from: meta.from,
+      subject: content?.subject ?? meta.subject ?? undefined,
+      text: content?.text,
+      html: content?.html,
+      messageId: meta.messageId ?? meta.emailId,
+      date: meta.date ?? undefined,
+    };
+  } else {
+    const authError = secretAuthResult(
+      "INBOUND_EMAIL_SECRET",
+      process.env.INBOUND_EMAIL_SECRET,
+      req.headers["authorization"],
+    );
+    if (authError) {
+      res.status(authError.status).json({ error: authError.error });
+      return;
+    }
+    body = parsed as InboundPayload | null;
+  }
+
   if (!body || typeof body !== "object") {
     res.status(400).json({ error: "JSON body required" });
     return;
