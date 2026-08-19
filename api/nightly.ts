@@ -39,7 +39,9 @@ import {
   type NightlyJob,
   type ScoredMatch,
   type RankedMatch,
+  nightlyRunVerdict,
 } from "../src/lib/nightly.js";
+import { fetchAllPages } from "../src/lib/pagedSelect.js";
 import { companyKey } from "../src/lib/connections.js";
 import { BRAND_NAME } from "../src/lib/brandName.js";
 import {
@@ -311,7 +313,13 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     res.status(500).json({ error: `jobs read failed: ${jErr.message}` });
     return;
   }
-  const { data: cos } = await admin.from("companies").select("slug, sector");
+  // Paged, and the error is read. This was an un-ranged select whose error was
+  // discarded: past 1000 companies the sector map silently loses entries and the
+  // digest labels those roles null, with nothing in the logs to say why.
+  const cos = await fetchAllPages<{ slug: string; sector: string | null }>(
+    () => admin.from("companies").select("slug, sector"),
+    { label: "companies:nightly" },
+  );
   const sectorBySlug = new Map<string, string | null>();
   (cos ?? []).forEach((c) => sectorBySlug.set(c.slug, c.sector));
   const jobs: NightlyJob[] = (jobRows ?? []).map((r) => ({
@@ -348,6 +356,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     inFlight: 0,
     deadlineHit: false,
     batchAvailable: true,
+    failed: 0,
   };
 
   // Issue #96 lever 2: the nightly slice is scored through the Message Batches API
@@ -722,9 +731,17 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         summary.emailed++;
       }
     } catch (e) {
+      // Counted, not just logged: a run where EVERY user lands here is an outage,
+      // and the verdict below turns that into a non-200 so the Action goes red.
+      summary.failed++;
       console.warn(`[nightly] user ${userId} failed:`, e);
     }
   }
 
-  res.status(200).json({ ok: true, date: today, ...summary });
+  // A run that failed for every user used to answer 200 {ok:true}, so the scheduled
+  // Action went green through a total outage. Zero matches is still a fine night;
+  // zero SURVIVING users is not. See nightlyRunVerdict + its tests.
+  const verdict = nightlyRunVerdict({ processed: summary.processed, failed: summary.failed });
+  if (!verdict.ok) console.error(`[nightly] ${verdict.reason}`);
+  res.status(verdict.status).json({ ok: verdict.ok, date: today, ...summary, ...(verdict.reason ? { reason: verdict.reason } : {}) });
 }

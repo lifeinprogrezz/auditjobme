@@ -427,12 +427,19 @@ export function useRolesData() {
           rows = rows.concat(data as JobsRow[]);
           if (data.length < PAGE) break;
         }
-        const { data: cos } = await supabase
-          .from("companies")
-          .select(
-            "slug, logo_domain, lat, lng, website, sector, stage, headcount_bucket, hq_city, hq_country, linkedin_url, description, founded_year, uk_sponsor_status",
-          );
-        cosRows = (cos ?? []) as DataplaneCompany[];
+        // Paged: 598 companies today, but the catalogue grows and PostgREST would
+        // silently return the first 1000. A company missing from this list loses its
+        // logo, sector, headcount and map position — quietly, on an arbitrary subset.
+        const cos = await fetchAllPages<DataplaneCompany>(
+          () =>
+            supabase
+              .from("companies")
+              .select(
+                "slug, logo_domain, lat, lng, website, sector, stage, headcount_bucket, hq_city, hq_country, linkedin_url, description, founded_year, uk_sponsor_status",
+              ),
+          { label: "companies:dataplane" },
+        );
+        cosRows = cos;
         const { data: offs } = await supabase.from("company_offices").select("company_slug, lat, lng");
         offRows = (offs ?? []) as DataplaneOffice[];
       }

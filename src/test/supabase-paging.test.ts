@@ -19,7 +19,13 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /** Tables that can hold more than 1000 rows for ONE user or one page load. */
-const HIGH_VOLUME = ["scores", "jobs", "daily_matches", "inbound_emails", "usage_events", "connections"];
+// `companies` was missing here until 2026-08-19, which is why the first sweep left an
+// un-ranged read of it in api/nightly.ts. It sits at 598 rows — under the cap today, so
+// nothing is visibly broken — but it grows with every catalogue expansion, and the
+// failure at 1,000 is silent: the sector lookup map just stops containing companies, and
+// the digest labels them null. A guard that only lists tables already known to be large
+// catches the bug you already found, not the next one.
+const HIGH_VOLUME = ["scores", "jobs", "daily_matches", "inbound_emails", "usage_events", "connections", "companies"];
 
 /** Reading a bounded slice on purpose is fine; these prove the author thought about it.
  *  `.in(list)` counts: the caller controls the list, so the query is as bounded as the
@@ -34,6 +40,10 @@ const BOUNDED = [
   // Reviewed and judged bounded by its own filters; the comment says why.
   "paging-ok:",
 ];
+
+/** Proof that legitimately sits BEFORE the `.from(` — a wrapper call or a reviewed-and-ok
+ *  comment. Everything else in BOUNDED is part of the chain and therefore comes after. */
+const WRAPPERS = ["fetchAllPages", "paging-ok:"];
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -54,12 +64,27 @@ function selectsOn(src: string, table: string): string[] {
   const re = new RegExp(`\\.from\\(\\s*["'\`]${table}["'\`]\\s*\\)`, "g");
     let m: RegExpExecArray | null;
   while ((m = re.exec(src)) !== null) {
-    // Look BEHIND as well as ahead. `fetchAllPages(() => supabase.from(...))` and a
-    // `paging-ok:` comment both sit before the `.from(`, so a forward-only window
-    // reports them as unbounded — which is how this guard first flagged its own fix.
-    const start = Math.max(0, m.index - 300);
+    // The two kinds of proof live in different places, so look for them separately.
+    // An earlier version read a flat 300-character window in BOTH directions, and that
+    // window reached into the PREVIOUS statement: `api/nightly.ts` reads `jobs` with
+    // `.limit(JOB_FETCH_LIMIT)` and then reads `companies` un-ranged five lines later,
+    // and the neighbour's `.limit(` vouched for it. The guard reported all clear.
+    //
+    //   `.range()` / `.limit()` / `.in()` are links in THIS chain and always come
+    //   after `.from(`, so a forward-only window is exactly right for them. Reading
+    //   backwards for them is what let a neighbouring statement's `.limit()` vouch
+    //   for an unbounded read.
+    //
+    //   `fetchAllPages(...)` and a `paging-ok:` comment legitimately sit BEFORE the
+    //   `.from(`, so those — and only those — get the wider look-behind. It cannot be
+    //   anchored to the previous `;` either: a generic like
+    //   `fetchAllPages<{ job_id: string; score: number }>(() => …)` contains
+    //   semicolons of its own, and anchoring there cuts the wrapper off its own call.
     const end = src.indexOf(";", m.index);
-    const chain = src.slice(start, end === -1 ? src.length : end + 1);
+    const forward = src.slice(m.index, end === -1 ? src.length : end + 1);
+    const behind = src.slice(Math.max(0, m.index - 300), m.index);
+    const wrappers = WRAPPERS.filter((w) => behind.includes(w)).join(" ");
+    const chain = `${wrappers} ${forward}`;
     if (chain.includes(".select(")) out.push(chain);
   }
   return out;
