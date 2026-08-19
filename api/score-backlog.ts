@@ -26,6 +26,7 @@ import {
   buildReadyBody,
 } from "../src/lib/scoreBacklog.js";
 import { prefilterWithTier } from "../src/lib/scorePrefilter.js";
+import { isDebounced, selectStaleRefresh, shouldRefreshStale, STALE_REFRESH_BUDGET } from "../src/lib/scoreRefresh.js";
 import {
   SYNC_ONBOARDING_SLICE,
   buildBatchRequests,
@@ -195,7 +196,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   const { data: profiles, error: pErr } = await admin
     .from("profiles")
     .select(
-      "id, cv_text, target_roles, target_sectors, target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, scores_ready_notified_at",
+      "id, cv_text, cv_hash, cv_changed_at, stale_refreshed_at, target_roles, target_sectors, target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, scores_ready_notified_at",
     );
   if (pErr) {
     res.status(500).json({ error: `profiles read failed: ${pErr.message}` });
@@ -245,6 +246,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     emailed: 0,
     completed: 0,
     deadlineHit: false,
+    staleRefreshed: 0,
     batchAvailable: true,
   };
 
@@ -262,6 +264,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     jsonl: string,
     profile: { cv_text: string | null },
     jdByJob: Map<string, string | null>,
+    cvHash: string | null,
   ): Promise<string[]> => {
     const landed: string[] = [];
     for (const r of parseBatchResults(jsonl)) {
@@ -283,6 +286,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
           job_id: r.customId,
           score: parsed.score,
           rubric_version: RUBRIC_VERSION,
+          cv_hash: cvHash, // which CV this judgment was made from (#123)
           signals: {
             reason: parsed.reason,
             fit_bullets: parsed.fitBullets,
@@ -313,11 +317,11 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // Paged read — a fully-scored catalog (~764 rows now, growing) would be
       // silently truncated by PostgREST's 1000-row default otherwise, making
       // scored rows look unscored and re-charging for them every tick.
-      let scoredRows: { job_id: string; score: number | null }[] = [];
+      let scoredRows: { job_id: string; score: number | null; cv_hash: string | null }[] = [];
       for (let from = 0; ; from += PAGE) {
         const { data, error } = await admin
           .from("scores")
-          .select("job_id, score")
+          .select("job_id, score, cv_hash")
           .eq("user_id", userId)
           .eq("rubric_version", RUBRIC_VERSION)
           .range(from, from + PAGE - 1);
@@ -345,6 +349,8 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // math, and the ready email all run over `eligible`; a pruned-out job
       // must never hold the pass open or be paid for. Label edits widen the
       // slice and manifest as new backlog on the next tick, no extra plumbing.
+      const cvHash = (p.cv_hash as string | null) ?? null;
+
       const { jobs: eligible, tier } = prefilterWithTier(liveJobs, {
         roles: (p.target_roles as string[] | null) ?? [],
         sectors: (p.target_sectors as string[] | null) ?? [],
@@ -394,7 +400,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
           }
           const { data: jdRows } = await admin.from("jobs").select("id, jd_text").in("id", jobIds);
           const jdByJob = new Map((jdRows ?? []).map((r) => [r.id as string, r.jd_text as string | null]));
-          const landed = await persistBatchResults(userId, jsonl, profile, jdByJob);
+          const landed = await persistBatchResults(userId, jsonl, profile, jdByJob, cvHash);
           summary.batchScored += landed.length;
           // Feeds both the backlog predicate below and the completion math further
           // down, so a role scored by this tick's retrieval is not re-queued.
@@ -407,9 +413,44 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       }
 
       // ── Phase 2: what is still unscored and not already in flight ───────────
-      const backlog = selectBacklog(eligible, new Set(scoreByJob.keys())).filter(
+      // Roles this user has never had scored at all.
+      const unscored = selectBacklog(eligible, new Set(scoreByJob.keys())).filter(
         (j) => !inFlightJobIds.has(j.id),
       );
+
+      // Roles whose score was computed from a PREVIOUS CV (#123). They already
+      // show a real number, so they are not urgent; they are refreshed
+      // highest-first on a per-pass budget, and only once editing has stopped.
+      // A user who edits and never returns never has their long tail re-bought.
+      const eligibleIds = new Set(eligible.map((j) => j.id));
+      // Two gates, both required. The debounce waits for the user to stop
+      // editing; the interval stops the every-10-minutes worker from draining
+      // the whole tail in an afternoon, which a per-pass budget alone cannot do.
+      const canRefreshStale =
+        !isDebounced(p.cv_changed_at as string | null, Date.now()) &&
+        shouldRefreshStale(p.stale_refreshed_at as string | null, Date.now());
+      const staleIds = !canRefreshStale
+        ? []
+        : selectStaleRefresh(
+            scoredRows.filter((r) => eligibleIds.has(r.job_id) && !inFlightJobIds.has(r.job_id)),
+            cvHash,
+            STALE_REFRESH_BUDGET,
+          );
+      const staleSet = new Set(staleIds);
+      const staleJobs = eligible.filter((j) => staleSet.has(j.id));
+      summary.staleRefreshed += staleJobs.length;
+      if (staleJobs.length > 0) {
+        // Stamped BEFORE the work, so a crash mid-batch cannot let the next tick
+        // start another one immediately and undo the pacing.
+        await admin
+          .from("profiles")
+          .update({ stale_refreshed_at: new Date().toISOString() })
+          .eq("id", userId);
+      }
+
+      // Unscored first: a row with no number at all is worth more to the user
+      // than a slightly out-of-date one.
+      const backlog = [...unscored, ...staleJobs];
 
       if (backlog.length > 0) {
         // The split (issue #96): a brand-new user gets SYNC_ONBOARDING_SLICE roles
@@ -509,6 +550,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
                 job_id: j.id,
                 score: result.score,
                 rubric_version: RUBRIC_VERSION,
+                cv_hash: cvHash, // which CV this judgment was made from (#123)
                 signals: {
                   reason: result.reason,
                   fit_bullets: result.fitBullets,

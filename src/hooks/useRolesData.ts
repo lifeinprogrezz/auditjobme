@@ -341,12 +341,21 @@ export function useRolesData() {
     }
 
     if (changed) {
-      // Clear stale scores from the old CV (DB + local) so they re-score fresh.
-      await supabase.from("scores").delete().eq("user_id", userId);
-      // New pass ⇒ new completion email (issue #33): reset the exactly-once
-      // stamp the backlog worker checks. Separate best-effort update so a
-      // pre-migration prod (column missing) can't block the CV write above.
-      await supabase.from("profiles").update({ scores_ready_notified_at: null }).eq("id", userId);
+      // Scores are NOT deleted (#123). Deleting them re-bought the user's whole
+      // slice at ~$3.69 per edit, and blanked their map until the worker drained
+      // — so the most engaged user, the one who iterates on their CV, was the
+      // most expensive and got the worst experience. The old numbers stay on
+      // screen, marked against the CV that produced them, and the worker
+      // refreshes the best ones first on a paced budget (src/lib/scoreRefresh.ts).
+      //
+      // Stamping the change time is what lets the worker wait for editing to
+      // stop: eight saves in one sitting become one refresh.
+      await supabase.from("profiles").update({ cv_changed_at: new Date().toISOString() }).eq("id", userId);
+      // scores_ready_notified_at is deliberately NOT reset. That email says "we
+      // finished scoring your roles", which is true once, on the first pass. A
+      // refresh happens behind a user who is already here, and with scores kept
+      // the completion check would read zero-pending immediately and fire a mail
+      // claiming work that has not happened yet.
     }
 
     // Fresh scoreable profile — OLD columns only, so this read is pre-migration safe.
