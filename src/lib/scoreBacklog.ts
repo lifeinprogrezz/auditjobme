@@ -9,6 +9,8 @@
 /** Wall-clock budget for STARTING new score calls in one invocation. Vercel caps
  *  the function at 60s (vercel.json maxDuration); at ~3s per Haiku score a call
  *  started at 45s lands well inside the cap, and the next cron tick resumes. */
+import type { PrefilterTier } from "./scorePrefilter.js";
+
 export const RUN_BUDGET_MS = 45_000;
 
 /** Concurrent in-flight score calls. The nightly matcher's Promise.all bursts ≤10;
@@ -77,19 +79,27 @@ export function buildReadyBody(
   strongCount: number,
   totalScored: number,
   appUrl: string,
+  /** Which rung of the prefilter produced the slice (#114). The copy must
+   *  describe what actually happened: a no-labels slice is the newest N roles,
+   *  not a set of matches, and the cap means we can never claim "all". */
+  tier: PrefilterTier = "targeted",
 ): { text: string; html: string } {
   const strongLine =
     strongCount > 0
       ? `${strongCount} of them look like strong matches for you.`
       : "None cleared the strong-match bar yet, but new roles land daily.";
+  const what =
+    tier === "newest"
+      ? `the ${totalScored} newest roles`
+      : `the ${totalScored} roles that match your targets`;
   const text = [
-    `We finished scoring all ${totalScored} matching roles against your CV.`,
+    `We finished scoring ${what} against your CV.`,
     strongLine,
     ``,
     `Open your map: ${appUrl}`,
   ].join("\n");
   const html = [
-    `<p>We finished scoring all <b>${totalScored}</b> matching roles against your CV.</p>`,
+    `<p>We finished scoring <b>${what}</b> against your CV.</p>`,
     `<p>${strongLine}</p>`,
     `<p><a href="${appUrl}">Open your map</a></p>`,
   ].join("\n");

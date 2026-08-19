@@ -24,7 +24,7 @@ import {
   buildReadySubject,
   buildReadyBody,
 } from "../src/lib/scoreBacklog.js";
-import { prefilterJobs } from "../src/lib/scorePrefilter.js";
+import { prefilterWithTier } from "../src/lib/scorePrefilter.js";
 import {
   SYNC_ONBOARDING_SLICE,
   buildBatchRequests,
@@ -342,7 +342,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // math, and the ready email all run over `eligible`; a pruned-out job
       // must never hold the pass open or be paid for. Label edits widen the
       // slice and manifest as new backlog on the next tick, no extra plumbing.
-      const eligible = prefilterJobs(liveJobs, {
+      const { jobs: eligible, tier } = prefilterWithTier(liveJobs, {
         roles: (p.target_roles as string[] | null) ?? [],
         sectors: (p.target_sectors as string[] | null) ?? [],
       });
@@ -554,7 +554,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
               resendKey,
               to,
               buildReadySubject(strong ?? 0),
-              buildReadyBody(strong ?? 0, eligible.length, APP_URL),
+              buildReadyBody(strong ?? 0, eligible.length, APP_URL, tier),
             ))
           ) {
             // Stamp ONLY on send-success so a soft Resend failure retries next tick.

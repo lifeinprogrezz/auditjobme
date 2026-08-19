@@ -7,6 +7,7 @@ import {
   FALLBACK_CAP,
   PREFILTER_CAP,
   prefilterJobs,
+  prefilterTierOf,
 } from "@/lib/scorePrefilter";
 
 type J = {
@@ -62,10 +63,11 @@ describe("prefilterJobs — role labels", () => {
       job("ops", { title: "Logistics Operations Manager", role_family: "operations" }),
       job("eng", { title: "Platform Engineer", role_family: "engineering" }),
     ];
-    expect(ids(prefilterJobs(jobs, { roles: ["Product", "Operations"], sectors: [] }))).toEqual([
-      "pm",
-      "ops",
-    ]);
+    // Membership, not order: these rows share a first_seen_at, so their relative
+    // order is decided by the id tiebreak and belongs to the ordering tests below.
+    expect(
+      ids(prefilterJobs(jobs, { roles: ["Product", "Operations"], sectors: [] })).sort(),
+    ).toEqual(["ops", "pm"]);
   });
 });
 
@@ -117,7 +119,13 @@ describe("prefilterJobs — order and caps", () => {
   });
 });
 
-describe("prefilterJobs — fallback (never empty, never full-catalog)", () => {
+describe("prefilterJobs — fallback", () => {
+  it("reports which rung of the ladder produced the slice", () => {
+    const jobs = [job("pm", { sector: "Fintech" })];
+    expect(prefilterTierOf(jobs, { roles: ["Product"], sectors: ["Fintech"] })).toBe("targeted");
+    expect(prefilterTierOf(jobs, { roles: [], sectors: [] })).toBe("newest");
+  });
+
   it("no labels at all → newest-first slice capped at FALLBACK_CAP", () => {
     const jobs = Array.from({ length: FALLBACK_CAP + 5 }, (_, i) =>
       job(`j${i}`, {
@@ -131,8 +139,59 @@ describe("prefilterJobs — fallback (never empty, never full-catalog)", () => {
     expect(out[0].id).toBe(`j${FALLBACK_CAP + 4}`);
   });
 
-  it("labels that match nothing → same capped fallback instead of an empty slice", () => {
+  it("role plus sector that matches nothing → drops the sector, keeps the role", () => {
+    // 62% of live rows carry no sector at all, and the modal's offline chip list
+    // holds sector names the live catalog never uses ("Health" vs "Healthtech"),
+    // so a two-chip pick lands on zero matches often. Buying 1000 unrelated roles
+    // punishes precise targeting; scoring nothing punishes a typo in our own
+    // vocabulary. Honouring the dimension that DID match is the only answer that
+    // serves the user, so the sector is what gives way.
+    const jobs = [
+      job("pm-nosector", { sector: null }),
+      job("pm-fintech", { sector: "Fintech" }),
+      job("eng", { title: "Backend Engineer", role_family: "engineering", sector: "Health" }),
+    ];
+    const out = prefilterJobs(jobs, { roles: ["Product"], sectors: ["Insurtech"] });
+    expect(ids(out).sort()).toEqual(["pm-fintech", "pm-nosector"]);
+    expect(prefilterTierOf(jobs, { roles: ["Product"], sectors: ["Insurtech"] })).toBe("role-only");
+  });
+
+  it("labels that match nothing at all → scores NOTHING, never a consolation slice", () => {
+    // The first cut paid for the newest 1000 roles of the whole catalog when a
+    // user's labels matched none of it, so the more precisely someone targeted,
+    // the more likely they were to buy a pile of roles they had ruled out. Only
+    // ~38% of live rows carry a sector, so a role plus sector pair misses often.
     const jobs = [job("eng", { title: "Backend Engineer", role_family: "engineering" })];
-    expect(ids(prefilterJobs(jobs, { roles: ["Product"], sectors: [] }))).toEqual(["eng"]);
+    expect(prefilterJobs(jobs, { roles: ["Product"], sectors: [] })).toEqual([]);
+    expect(prefilterJobs(jobs, { roles: [], sectors: ["Fintech"] })).toEqual([]);
+  });
+});
+
+describe("prefilterJobs — determinism at the cap boundary", () => {
+  // first_seen_at is a statement timestamp, so a whole scrape batch shares one
+  // value: the live catalog carries ~186 distinct times across ~8,000 rows, the
+  // largest tie group 462 rows. If the cut inside a tie group depended on input
+  // order, the worker (a DB read) and the client (the dataplane artifact) would
+  // select DIFFERENT slices, the client would wait on roles the worker never
+  // scores, and the progress bar would never reach zero.
+  const tied = (order: string[]) =>
+    order.map((id) => job(id, { first_seen_at: "2026-08-18T00:00:00Z" }));
+
+  it("orders ties the same way regardless of the order they arrive in", () => {
+    const a = prefilterJobs(tied(["c", "a", "b"]), { roles: ["Product"], sectors: [] });
+    const b = prefilterJobs(tied(["b", "c", "a"]), { roles: ["Product"], sectors: [] });
+    expect(ids(a)).toEqual(ids(b));
+  });
+
+  it("keeps the same rows on both sides of the cap when every row ties", () => {
+    const build = (order: number[]) =>
+      order.map((i) =>
+        job(`j${String(i).padStart(5, "0")}`, { first_seen_at: "2026-08-18T00:00:00Z" }),
+      );
+    const forward = Array.from({ length: PREFILTER_CAP + 50 }, (_, i) => i);
+    const a = prefilterJobs(build(forward), { roles: ["Product"], sectors: [] });
+    const b = prefilterJobs(build([...forward].reverse()), { roles: ["Product"], sectors: [] });
+    expect(a).toHaveLength(PREFILTER_CAP);
+    expect(ids(a)).toEqual(ids(b));
   });
 });

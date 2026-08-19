@@ -365,7 +365,14 @@ export default function RolesPanel({
                 {/* FitChip is the single score render; CSS hides it pre-CV
                     (.roles-theme:not(.scored) .card .fitchip). `reveal` counts
                     the numeral up when the score-reveal flips scored on. */}
-                <FitChip score={job.score} size="md" reveal={scored} />
+                <FitChip
+                  score={job.score}
+                  size="md"
+                  reveal={scored}
+                  pendingLabel={
+                    scoreStatusOf(job.score, eligibleIds.has(job.id)) === "scoring" ? "Scoring" : "Not scored"
+                  }
+                />
                 {scored && job.reason && <div className="why">{job.reason}</div>}
                 {scored && (
                   <div className="acts">
