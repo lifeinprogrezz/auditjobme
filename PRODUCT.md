@@ -6,7 +6,7 @@
 # Northgoing — The Public Product (Foundation)
 
 > **What this document is.** The introduction chapter for turning the personal
-> `career-ops` engine into a public web product on **Northgoing**. It is the
+> `career-ops` engine into a public web product on **northgoing.com**. It is the
 > skeleton, not the detailed design: it states what we're building, sketches how
 > the pieces fit, and breaks the work into **parts** — each of which gets its own
 > focused session later (most of them drivable from the phone). When you want to
@@ -29,12 +29,9 @@
 scrapes roles from dozens of sources every day, scores each one against a deep
 personal profile, and hands back a ranked, personalized shortlist. Today that
 power serves exactly one person. **Northgoing is that same engine, opened up for
-other people** — a suite of career-ops superpowers for job-seekers in Europe. It
-launched as a Product-Manager wedge; since issue #34 the engine is
-**all-vertical**, covering five role families (product · engineering · sales ·
-marketing · operations).
+other people** — a suite of career-ops superpowers for **Product Managers (PMs)**.
 
-The company audit (the thing Northgoing's landing page sells today —
+The company audit (the thing the landing page sold under the old auditjob.me brand —
 *"show them you already did the job"*) is **one feature inside the suite**, not the
 headline. The sourcing + scoring + personalized daily digest is the core, because
 that's the part that's genuinely hard to build and "way more powerful" than the
@@ -50,20 +47,14 @@ AI key — is the **DEFERRED power-user tier** (prototype parked at
 path is validated. Decided 2026-06-12 (brainstorm, strategic call #2) and locked
 in the v1 design spec.
 
-**Scope (deliberately bounded):**
-- **Role type:** five `role_family` verticals — product, engineering, sales,
-  marketing, operations (issue #34; vertical set decided 2026-07-26). The
-  product launched PM-only; the PM wedge proved the quality bar, then the gate
-  widened. **Design** and **Data/AI** (analyst/scientist seats) are deliberately
-  deferred: design because a CV-vs-JD rubric is portfolio-blind, Data/AI because
-  it is too small to earn its own fit block yet.
-- **Geography:** Europe-first — the engine's home turf, so quality is real.
-- **Not** "every role in the world." Each widening is a decided, evidence-backed
-  step, not a default.
+**Scope at launch (deliberately narrow):**
+- **Role type:** Product Manager roles only. It's the archetype the engine is
+  already tuned for, so quality is real on day one.
+- **Geography:** Europe-first — same reason, same fit.
+- **Not** "every role in the world." Widening comes after the PM/Europe wedge works.
 
 **Explicitly out of scope for now:** the landing page copy and the product name
-(both already exist, both fine), visual design polish, and the two deferred
-verticals above.
+(both already exist, both fine), visual design polish, and any role type beyond PM.
 
 ---
 
@@ -105,13 +96,13 @@ built and working:
 |---|------|---------------|------|
 | 1 | planning repo | `lifeinprogrezz/auditjobme-careerops-planning` | Planning / coordination + the phone/GitHub surface. **This file lives here.** `career-ops/` is nested inside. |
 | 2 | nested under #1 | `lifeinprogrezz/career-ops-rober` | The engine (Node CLI, pinned fork). |
-| 3 | standalone | `lifeinprogrezz/auditjobme` | The public web product (Vite + Supabase). |
+| 3 | standalone | `lifeinprogrezz/northgoing` | The public web product (Vite + Supabase). Renamed from `auditjobme` on 2026-08-19; the old slug still 301s. |
 
 ### The strategic reframe (worth saying out loud)
 Earlier planning had this backwards: it treated "integration" as `career-ops`
-*calling* Northgoing to mint a single audit URL during an evaluation. **The real
+*calling* the product to mint a single audit URL during an evaluation. **The real
 direction is the inverse and much bigger: Northgoing becomes the public face of
-career-ops.** This also supersedes the older framing of Northgoing as
+career-ops.** This also supersedes the older framing of the product as
 "positioning, not a venture" — it's now being shipped as a real multi-user product
 (the Stripe schema is already there).
 
@@ -152,7 +143,7 @@ part holds the line.
 
 ```
                           ┌─────────────────────────────────────────┐
-                          │  Northgoing SPA  (Vite + React, exists)   │
+                          │  Northgoing SPA   (Vite + React, exists)  │
                           │  sign-in · onboarding · dashboard/digest  │
                           │  fire-audit · tracker · account           │
                           └───────────────┬───────────────────────────┘
