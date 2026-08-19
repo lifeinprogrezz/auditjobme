@@ -1,10 +1,10 @@
 // Issue #75 — inbox → tracker auto-advance (Option A: forwarding address).
 // A Node serverless function (Vercel), SEPARATE from the Vite bundle. The inbound
-// email provider for track.auditjob.me (e.g. a Cloudflare Email Routing worker —
+// email provider for track.northgoing.com (e.g. a Cloudflare Email Routing worker —
 // external setup, see the PR body) POSTs each delivered message here as normalized
 // JSON, authenticated with INBOUND_EMAIL_SECRET. The pipeline is:
 //
-//   recipient `u-{token}@track.auditjob.me` → inbound_tokens → user
+//   recipient `u-{token}@track.northgoing.com` → inbound_tokens → user
 //   → Gmail forwarding-confirmation? store the code on the token row (Settings shows it)
 //   → classify (rejection | confirmation | interview) → fuzzy-match a tracked
 //     application → stale-guarded transition (src/lib/inbound.ts, pinned by its test)
@@ -15,7 +15,7 @@
 //
 // Payload contract (provider-agnostic; the forwarding worker maps into this):
 //   POST { to, from, subject?, text?, html?, messageId?, date? }
-//   to: string | string[] — recipient(s); one must be u-{token}@track.auditjob.me
+//   to: string | string[] — recipient(s); one must be u-{token}@track.northgoing.com
 //   from: string — the From header ("Acme Hiring" <no-reply@greenhouse.io>)
 //   date: string — the Date header (RFC 2822 or ISO); powers the stale-guard
 //

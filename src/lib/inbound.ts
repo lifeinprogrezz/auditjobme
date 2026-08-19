@@ -15,7 +15,7 @@ import type { Status } from "./tracker"; // type-only: erased at compile, so the
 
 /** The inbound domain users forward to. DNS + the inbound provider for this domain
  *  are external setup (see the PR body's needs-human checklist). */
-export const FORWARDING_DOMAIN = "track.auditjob.me";
+export const FORWARDING_DOMAIN = "track.northgoing.com";
 
 /** How stale a rejection email may be (versus "now") and still flip a card. */
 export const REJECTION_RECENCY_DAYS = 10;
@@ -27,7 +27,7 @@ export function forwardingAddress(token: string): string {
 /**
  * Pull the per-user token out of the recipient list. Accepts a single address, a
  * comma-separated header, or an array (providers differ); the address may carry a
- * display name. Case-insensitive; returns null when no `u-{token}@track.auditjob.me`
+ * display name. Case-insensitive; returns null when no `u-{token}@track.northgoing.com`
  * recipient is present (the endpoint then rejects the delivery).
  */
 export function extractForwardingToken(to: string | string[] | undefined | null): string | null {
