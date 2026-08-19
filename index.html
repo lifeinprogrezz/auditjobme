@@ -8,6 +8,18 @@
     <link rel="canonical" href="https://auditjob.me/" />
     <meta name="author" content="auditjob.me" />
 
+    <!-- Northgoing mark (#107). The SVG is the real icon in every current browser;
+         the .ico is the legacy fallback and the PNGs are for the platforms that
+         still refuse SVG. All of them are generated from public/favicon.svg by
+         scripts/generate-icons.mjs, so they can never disagree.
+         The NAME is deliberately still auditjob.me here: the rename lands with the
+         domain cutover (#106) in one commit, so the product never straddles two
+         identities. This block swaps the mark only. -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="auditjob.me" />
     <meta property="og:url" content="https://auditjob.me/" />
