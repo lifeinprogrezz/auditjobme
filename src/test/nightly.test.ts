@@ -9,6 +9,7 @@ import {
   classifyHistoryRead,
   nightlyBudgetExhausted,
   cronAuthResult,
+  nightlyRunVerdict,
   rankMatches,
   attachWarmCounts,
   buildEmailSubject,
@@ -427,5 +428,37 @@ describe("nightlyBudgetExhausted (F6 durable execution)", () => {
   it("honours a custom budget", () => {
     expect(nightlyBudgetExhausted(0, 29_999, 30_000)).toBe(false);
     expect(nightlyBudgetExhausted(0, 30_000, 30_000)).toBe(true);
+  });
+});
+
+// ── The run verdict ──────────────────────────────────────────────────────────
+// A nightly run that failed for EVERY user still answered `200 {ok:true}`, because
+// the per-user loop swallowed each error into a console.warn and the handler
+// returned success unconditionally. A cron that reports success when it did nothing
+// is worse than one that crashes: the crash is visible.
+//
+// The trap is that "0 matches" is genuinely fine some nights — nothing new arrived.
+// So the verdict cannot key on the match count. It keys on whether users FAILED.
+describe("nightlyRunVerdict (a total failure must not report success)", () => {
+  it("succeeds on a normal run", () => {
+    expect(nightlyRunVerdict({ processed: 5, failed: 0 }).ok).toBe(true);
+  });
+
+  it("succeeds on a genuinely quiet night — no users to process is not a failure", () => {
+    expect(nightlyRunVerdict({ processed: 0, failed: 0 }).ok).toBe(true);
+  });
+
+  it("FAILS when every processed user failed", () => {
+    const v = nightlyRunVerdict({ processed: 3, failed: 3 });
+    expect(v.ok).toBe(false);
+    expect(v.status).toBe(500);
+    expect(v.reason).toMatch(/every/i);
+  });
+
+  it("still succeeds on a partial failure, but reports the count so it is visible", () => {
+    const v = nightlyRunVerdict({ processed: 5, failed: 2 });
+    expect(v.ok).toBe(true);
+    expect(v.status).toBe(200);
+    expect(v.failed).toBe(2);
   });
 });

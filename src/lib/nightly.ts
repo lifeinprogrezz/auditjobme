@@ -350,3 +350,35 @@ export function buildEmailBody(
 
   return { text, html };
 }
+
+/**
+ * Decide whether a finished nightly run should report success.
+ *
+ * The handler used to answer `200 {ok:true}` unconditionally: the per-user loop
+ * catches every error into a `console.warn` and keeps going, so a run in which
+ * EVERY user failed looked exactly like a quiet night. The scheduled Action saw a
+ * 200 and went green, and two days of digests were lost with no signal at all.
+ *
+ * The distinction that matters is not "did we produce matches" — zero matches is a
+ * perfectly normal night when nothing new was scraped. It is "did the users we
+ * tried to process fail". Total failure is a real outage and must go red so the
+ * Action surfaces it; partial failure stays a success but carries the count, so it
+ * is visible in the response body instead of only in logs nobody reads.
+ */
+export function nightlyRunVerdict(run: { processed: number; failed: number }): {
+  ok: boolean;
+  status: 200 | 500;
+  failed: number;
+  reason?: string;
+} {
+  const { processed, failed } = run;
+  if (processed > 0 && failed >= processed) {
+    return {
+      ok: false,
+      status: 500,
+      failed,
+      reason: `every user failed (${failed}/${processed}) — treating as an outage, not a quiet night`,
+    };
+  }
+  return { ok: true, status: 200, failed };
+}
