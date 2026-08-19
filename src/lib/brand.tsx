@@ -19,10 +19,10 @@
 export const MARK_VIEWBOX = "0 0 64 64";
 
 /** North half: solid. The answered direction. */
-export const MARK_NORTH = "M32 4 L42 34 L32 28 L22 34 Z";
+export const MARK_NORTH = "M32 4 L47 34 L32 28 L17 34 Z";
 
 /** South half: outline. The direction still open. */
-export const MARK_SOUTH = "M32 60 L42 38.5 L32 44.5 L22 38.5 Z";
+export const MARK_SOUTH = "M32 60 L47 38.5 L32 44.5 L17 38.5 Z";
 
 /** Outline weight of the south half, in viewBox units. */
 export const MARK_SOUTH_STROKE = 3.4;
