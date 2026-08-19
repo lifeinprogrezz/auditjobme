@@ -176,7 +176,7 @@ async function runScoring(admin: SupabaseClient, apiKey: string, userId: string,
     const inTok = data?.usage?.input_tokens ?? 0;
     const outTok = data?.usage?.output_tokens ?? 0;
     const usedModel = String(body.model);
-    await admin.from('usage_events').insert({
+    const { error: meterError } = await admin.from('usage_events').insert({
       user_id: userId,
       kind: ALLOWED_KINDS.includes(kind as string) ? kind : 'score',
       model: usedModel,
@@ -185,6 +185,17 @@ async function runScoring(admin: SupabaseClient, apiKey: string, userId: string,
       cost_usd: priceUsd(usedModel, inTok, outTok),
       latency_ms: latencyMs,
     });
+    // supabase-js RETURNS errors rather than throwing them, so a rejected row lands
+    // HERE and never in the catch below. Leaving it unread is how 'answer' spend went
+    // uncounted for the whole life of the feature: billed by Anthropic, refused by the
+    // CHECK constraint, invisible to the cap that sums this table. The batch path below
+    // already checks its error; this one did not. Loud, because unmetered spend is the
+    // one failure the global cap cannot protect against.
+    if (meterError) {
+      console.error(
+        `METERING DROPPED — this call was billed but is NOT counted toward the global cap. kind=${kind} model=${usedModel}: ${meterError.message}`,
+      );
+    }
   } catch (e) {
     console.warn('usage metering insert failed:', e);
   }
