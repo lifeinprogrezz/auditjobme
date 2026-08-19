@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { BRAND_NAME, BRAND_WORDMARK } from "@/lib/brand";
+import { BRAND_NAME, BRAND_WORDMARK } from "@/lib/brandName";
 
 // Coming-soon placeholder (Rober 7-06). The interactive /roles map is the only live
 // surface of Northgoing for now; every onward flow (sign-in, CV upload, profile,

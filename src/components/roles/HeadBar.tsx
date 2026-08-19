@@ -5,7 +5,7 @@ import FilterChip, { type FilterOption } from "./FilterChip";
 import { FACET_SCROLL_STEP, overflowSides } from "@/lib/facetRow";
 import ThemeToggle from "@/components/ThemeToggle";
 import AccountMenu from "@/components/app/AccountMenu";
-import { BRAND_WORDMARK } from "@/lib/brand";
+import { BRAND_WORDMARK } from "@/lib/brandName";
 
 export type HeadBarProps = {
   scored: boolean;

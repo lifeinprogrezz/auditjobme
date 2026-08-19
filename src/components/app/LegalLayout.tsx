@@ -3,7 +3,7 @@
 // em-dashes in the copy the pages pass in.
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { BRAND_WORDMARK } from "@/lib/brand";
+import { BRAND_WORDMARK } from "@/lib/brandName";
 
 export default function LegalLayout({
   title,

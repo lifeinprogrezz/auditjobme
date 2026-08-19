@@ -14,7 +14,9 @@
 //
 // public/favicon.svg carries the SAME two paths and is pinned to these
 // constants by src/test/brand-mark.test.ts. Edit one, edit both, in one commit.
-import { BRAND_NAME as PRODUCT_NAME, BRAND_WORDMARK as PRODUCT_WORDMARK } from "./brandName";
+// Constants live in brandName.ts and are imported FROM there by consumers: this
+// file exports components only, which is what keeps fast refresh working.
+import { BRAND_WORDMARK } from "./brandName";
 
 /** Shared coordinate space for every rendering of the mark. */
 export const MARK_VIEWBOX = "0 0 64 64";
@@ -34,10 +36,7 @@ export const MARK_SOUTH_STROKE = 3.4;
 // the whole identity (mark, lockup, name) from one place.
 /** The product name. The domain cutover (#106) swaps hosts, never this string. */
 // eslint-disable-next-line react-refresh/only-export-components -- re-export of one shared constant, not a component
-export const BRAND_NAME = PRODUCT_NAME;
 
-/** The name as DRAWN in the logo (lowercase). See brandName.ts for when to use which. */
-export const BRAND_WORDMARK = PRODUCT_WORDMARK;
 
 type MarkProps = {
   /** Rendered size in pixels. Square by construction. */

@@ -26,7 +26,7 @@ import {
 import { coordsOf } from "@/lib/geo";
 import { useRolesData } from "@/hooks/useRolesData";
 import { useTheme } from "@/lib/theme";
-import { BRAND_NAME } from "@/lib/brand";
+import { BRAND_NAME } from "@/lib/brandName";
 
 // Curated priority pool for the default "Hot right now" showcase (Rober 7-06):
 // recognizable big-tech + hot young high-growth, cool-first. Each card must be a

@@ -10,7 +10,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
 import AccountMenu from "@/components/app/AccountMenu";
-import { BRAND_WORDMARK } from "@/lib/brand";
+import { BRAND_WORDMARK } from "@/lib/brandName";
 
 const NAV = [
   { to: "/today", label: "Today" },

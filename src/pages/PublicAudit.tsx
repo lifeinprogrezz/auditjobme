@@ -13,7 +13,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAuditMatch } from "@/lib/auditOwnerMatch";
-import { BRAND_NAME } from "@/lib/brand";
+import { BRAND_NAME } from "@/lib/brandName";
 
 /** Canonical public origin — this page is meant to be sent to the company, so the
  *  credit link always points at production. */

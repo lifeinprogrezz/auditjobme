@@ -1,5 +1,5 @@
 import { safeAccent } from "./utils.js";
-import { BRAND_NAME } from "@/lib/brand";
+import { BRAND_NAME } from "@/lib/brandName";
 
 /* ═══════════════════ PDF HTML GENERATOR ═══════════════════ */
 export function generatePDFHTML(data) {

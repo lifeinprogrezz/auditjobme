@@ -7,7 +7,7 @@ import { textOn, safeAccent, slugifyPersonName, getPublicAuditOwner, validateOut
 import { makeCSS } from "./audit/styles.js";
 import { generatePDFHTML, downloadPDF } from "./audit/pdfHtml.js";
 import { SONNET, HAIKU, callClaude, callClaudeWithRetry, validateSections, extractText, safeParse } from "./audit/api.js";
-import { BRAND_NAME } from "@/lib/brand";
+import { BRAND_NAME } from "@/lib/brandName";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 /** Canonical public origin. Shared audit links are for sending to other people, so

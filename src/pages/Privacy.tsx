@@ -1,7 +1,7 @@
 // Privacy policy (issue #42): real content on the token layer, product-accurate for
 // the job-search product (not just the audit tool). Warm voice, no em-dashes.
 import LegalLayout, { LegalSection } from "@/components/app/LegalLayout";
-import { BRAND_NAME } from "@/lib/brand";
+import { BRAND_NAME } from "@/lib/brandName";
 
 export default function Privacy() {
   return (
