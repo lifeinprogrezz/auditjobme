@@ -10,6 +10,7 @@ import { isInFlightStatus } from "@/lib/tracker";
 import { hashCv, readCvStash, clearCvStash, normalizeTargetRoles } from "@/lib/labels";
 import { normalizeTargetSectors } from "@/lib/sectors";
 import { prefilterJobs } from "@/lib/scorePrefilter";
+import { fetchAllPages } from "@/lib/pagedSelect";
 import { shouldPromptCv } from "@/lib/deviceSession";
 import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
@@ -264,12 +265,18 @@ export function useRolesData() {
   /** Pull the user's landed scores and merge them into the map (sorted). The
    *  server worker writes them continuously; this is the read side of the poll. */
   async function refreshScores(userId: string, runId: number) {
-    const { data } = await supabase
-      .from("scores")
-      .select("job_id, score, signals")
-      .eq("user_id", userId)
-      .eq("rubric_version", RUBRIC_VERSION);
-    if (!data || runRef.current !== runId) return;
+    // Paged: PostgREST caps an un-ranged select at 1000 rows, silently. Un-paged, a
+    // user with more scores than that saw most of their roles as unscored forever.
+    const data = await fetchAllPages<{ job_id: string; score: number | null; signals: unknown }>(
+      () =>
+        supabase
+          .from("scores")
+          .select("job_id, score, signals")
+          .eq("user_id", userId)
+          .eq("rubric_version", RUBRIC_VERSION),
+      { label: "scores:refresh" },
+    );
+    if (!data.length || runRef.current !== runId) return;
     const landed = new Map<string, LandedScore>(
       data.map((s) => {
         const sig = s.signals as ScoreSignals;
@@ -469,11 +476,18 @@ export function useRolesData() {
         setLoading(false);
         return;
       }
-      const { data: scoresData } = await supabase
-        .from("scores")
-        .select("job_id, score, signals")
-        .eq("user_id", user.id)
-        .eq("rubric_version", RUBRIC_VERSION);
+      // Paged for the same reason as the poll above: this is the fetch that decides
+      // which roles show a score at all, so truncation here is the whole map going
+      // blank-ish for anyone past 1000 scores.
+      const scoresData = await fetchAllPages<{ job_id: string; score: number | null; signals: unknown }>(
+        () =>
+          supabase
+            .from("scores")
+            .select("job_id, score, signals")
+            .eq("user_id", user.id)
+            .eq("rubric_version", RUBRIC_VERSION),
+        { label: "scores:initial" },
+      );
       const scoreByJob: Record<
         string,
         {

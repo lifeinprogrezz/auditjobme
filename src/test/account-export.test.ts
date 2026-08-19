@@ -74,12 +74,20 @@ describe("USER_DATA_TABLES covers the schema", () => {
 
 type Fake = ExportClient & { reads: { table: string; column: string; value?: string; values?: string[] }[] };
 
+/** PostgREST's implicit ceiling, modelled so the fake behaves like the real thing. */
+const FAKE_CAP = 1000;
+
 function fakeClient(rows: Record<string, ExportRow[]> = {}, failOn?: string): Fake {
   const reads: Fake["reads"] = [];
-  const result = (table: string) =>
-    failOn === table
-      ? Promise.resolve({ data: null, error: { message: "read failed" } })
-      : Promise.resolve({ data: rows[table] ?? [], error: null });
+  const fail = () => Promise.resolve({ data: null, error: { message: "read failed" } });
+  // The fake ENFORCES the 1000-row cap. That is the point: an un-ranged read gets the
+  // first page and no warning, exactly as PostgREST behaves, so an export that forgets
+  // to page fails here instead of passing and truncating in production.
+  const slice = (table: string, from = 0, to = FAKE_CAP - 1) => {
+    const all = rows[table] ?? [];
+    const end = Math.min(to + 1, from + FAKE_CAP);
+    return Promise.resolve({ data: all.slice(from, end), error: null });
+  };
   return {
     reads,
     from(table: string) {
@@ -88,11 +96,18 @@ function fakeClient(rows: Record<string, ExportRow[]> = {}, failOn?: string): Fa
           return {
             eq(column: string, value: string) {
               reads.push({ table, column, value });
-              return result(table);
+              const base = failOn === table ? fail() : slice(table);
+              return Object.assign(base, {
+                range: (from: number, to: number) => (failOn === table ? fail() : slice(table, from, to)),
+              });
             },
             in(column: string, values: string[]) {
               reads.push({ table, column, values });
-              return result(table);
+              if (failOn === table) return fail();
+              const all = rows[table] ?? [];
+              const set = new Set(values);
+              const matched = all.filter((r) => set.has(String((r as Record<string, unknown>).id)));
+              return Promise.resolve({ data: matched.slice(0, FAKE_CAP), error: null });
             },
           };
         },
@@ -181,5 +196,28 @@ describe("the downloaded file", () => {
     const text = accountExportText(payload);
     expect(text).toContain("\n  ");
     expect(JSON.parse(text).data.feedback).toEqual([{ id: "f", message: "hi" }]);
+  });
+});
+
+describe("buildAccountExport pages past the row cap (#audit)", () => {
+  // The bug this pins: the export looped every user table with an un-ranged select.
+  // PostgREST returns its first 1000 rows and reports nothing, so a data-subject
+  // access request answered with a file that LOOKED complete. Measured on production
+  // 2026-08-19, one user held 11,813 score rows, so the export was ~8% of their data.
+  it("returns every row when a table holds more than one page", async () => {
+    const many = Array.from({ length: 2500 }, (_, i) => ({ id: `s${i}`, job_id: `j${i}`, score: 4 }));
+    const client = fakeClient({ scores: many });
+    const out = await buildAccountExport(client, { userId: "u1", now: new Date("2026-08-19T00:00:00Z") });
+    expect(out.data.scores).toHaveLength(2500);
+  });
+
+  it("does not lose rows at the page boundary", async () => {
+    // Exactly one page plus one row: the case an off-by-one in the stop condition
+    // gets wrong, and the case a short-page check must handle.
+    const rows = Array.from({ length: 1001 }, (_, i) => ({ id: `s${i}`, job_id: `j${i}`, score: 3 }));
+    const client = fakeClient({ scores: rows });
+    const out = await buildAccountExport(client, { userId: "u1", now: new Date("2026-08-19T00:00:00Z") });
+    expect(out.data.scores).toHaveLength(1001);
+    expect(new Set(out.data.scores.map((r) => (r as Record<string, unknown>).id)).size).toBe(1001);
   });
 });

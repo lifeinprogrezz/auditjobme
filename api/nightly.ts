@@ -373,6 +373,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // night). Drives three decisions: today's batch state (B3 notified-split),
       // the created_at cutoff (B2), and the already-matched-URL exclusion (B2).
       let sel = await admin
+        // paging-ok: one user, one batch_date, capped at NIGHTLY_TOP_N (10) rows.
         .from("daily_matches")
         .select("job_url, rank, score, reason, fit_bullets, batch_date, created_at, notified_at, rubric_version")
         .eq("user_id", userId)
@@ -387,6 +388,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         // Cast: fallback rows genuinely lack rubric_version; downstream reads treat
         // it as optional (undefined = stale rubric), which is the intended degrade.
         sel = (await admin
+          // paging-ok: one user, one batch_date, capped at NIGHTLY_TOP_N (10) rows.
           .from("daily_matches")
           .select("job_url, rank, score, reason, fit_bullets, batch_date, created_at, notified_at")
           .eq("user_id", userId)

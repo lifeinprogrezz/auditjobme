@@ -179,6 +179,9 @@ export default function Apply() {
           supabase.from("applications").select("id").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
           supabase.from("scores").select("score").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
           supabase.from("saved_jobs").select("id").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
+          // paging-ok: scoped to ONE company_key, so this is the user's connections at
+          // a single employer. Reaching PostgREST's 1000-row cap would mean knowing a
+          // thousand people at one company.
           supabase
             .from("connections")
             .select("full_name, company, company_key, position, linkedin_url")
