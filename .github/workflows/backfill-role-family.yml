@@ -1,0 +1,37 @@
+name: Backfill role_family
+
+# Manual one-off runner for scripts/backfill-role-family.mjs (issue #34 residue).
+# The service-role key is Sensitive in Vercel (env pull returns ""), so the
+# backfill runs here, where the scrape secrets already live. Dry-run by default;
+# tick "apply" to write. Delete this workflow once the null pool stays at zero.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Write the classifications (default: dry-run, prints counts only)"
+        type: boolean
+        default: false
+      live_only:
+        description: "Restrict to is_live rows (default: all rows)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - name: Backfill jobs.role_family
+        run: node scripts/backfill-role-family.mjs ${{ inputs.apply && '--apply' || '' }} ${{ inputs.live_only && '--live-only' || '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
