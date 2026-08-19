@@ -3,6 +3,7 @@
 // em-dashes in the copy the pages pass in.
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { BRAND_WORDMARK } from "@/lib/brandName";
 
 export default function LegalLayout({
   title,
@@ -18,7 +19,7 @@ export default function LegalLayout({
       <header className="border-b border-border">
         <div className="mx-auto flex h-14 max-w-2xl items-center gap-3 px-4 sm:px-6">
           <Link to="/" className="font-display text-sm font-semibold tracking-tight">
-            auditjob.me
+            {BRAND_WORDMARK}
           </Link>
           <span className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">

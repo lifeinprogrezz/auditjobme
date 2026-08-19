@@ -1,5 +1,37 @@
 # Brand & copy rules
 
+## Name and mark (issue #107, decided 2026-08-19)
+
+**Northgoing.** From the north-going ship, Swedish *norrgående*. The product is a map,
+and a map is only useful once it gives you a direction, so the name is the direction
+rather than the feature. It replaces `auditjob.me`, which tied the brand to the audit,
+now one feature among several rather than the core.
+
+**The mark is a compass needle.** Solid north half, outlined south half, a hairline gap
+at the pivot. It is a measuring instrument, which is exactly what the score is: the
+product reads a situation and gives you a bearing. The two halves carry the second
+reading, that one direction is answered and the other is still open.
+
+- **Source of truth:** `src/lib/brand.tsx` holds the geometry, the wordmark lockup, and
+  the product name. `public/favicon.svg` carries the same two paths and is pinned to it
+  by `src/test/brand-mark.test.ts`. Change one, change both, in the same commit.
+- **Every binary is generated,** never hand-exported: `node scripts/generate-icons.mjs`
+  rebuilds the icon set and the social image from `public/favicon.svg`.
+- **The mark is monochrome by construction.** Both halves paint with `currentColor`, so
+  it is ink on the light stage and pale on the dark map with no theme branching. Never
+  give it a color: the score palette below already means fit, and a colored mark would
+  make the accent say two different things.
+- **Wordmark:** lowercase `northgoing`, Space Grotesk 600, letter-spacing `-0.03em`, set
+  beside the mark at roughly 0.86 of the mark's height. The lowercase is the LETTERING,
+  not the name: `BRAND_WORDMARK` is what the logo draws (map headbar, page headers, social
+  card, email masthead), and `BRAND_NAME` stays `Northgoing` everywhere the name is spoken
+  in prose, titles, legal copy and email bodies. Both live in `src/lib/brandName.ts`.
+  Pick by the ROLE the text plays, never by the file you happen to be editing: lowercase
+  in a sentence reads as a typo and breaks the moment the name starts one.
+- **Grounds:** tab icons are the ink mark on transparency. App icons and the social card
+  put the pale mark on the ink ground, because iOS, Android, and Open Graph readers all
+  composite transparency onto a ground you do not control.
+
 ## Visual (matches the live product — rewritten 2026-07-11, Track D S3)
 
 The brand is a **monochrome ink-glass system** — the look of the live /roles map.

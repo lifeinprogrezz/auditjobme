@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Northgoing">
+  <!--
+    Northgoing mark, direction A "Needle" (issue #107).
+    Geometry is pinned to src/lib/brand.tsx by src/test/brand-mark.test.ts —
+    edit both in the same commit or the header and the favicon drift apart.
+
+    color-scheme + currentColor let ONE file serve both themes: browsers that
+    honor it paint the mark ink on a light tab strip and pale on a dark one.
+  -->
+  <style>
+    svg { color: #0b1f26; }
+    @media (prefers-color-scheme: dark) { svg { color: #eaf2f3; } }
+  </style>
+  <path d="M32 4 L47 34 L32 28 L17 34 Z" fill="currentColor"/>
+  <path d="M32 60 L47 38.5 L32 44.5 L17 38.5 Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round"/>
+</svg>

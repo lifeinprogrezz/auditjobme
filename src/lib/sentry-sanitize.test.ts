@@ -18,7 +18,7 @@ const LEAKED_FRAGMENT =
   `&expires_at=1785093815&expires_in=3600&provider_token=${FAKE_GOOGLE_TOKEN}` +
   `&refresh_token=${OPAQUE_VALUE}&token_type=bearer`;
 
-const LEAKED_URL = `https://auditjob.me/${LEAKED_FRAGMENT}`;
+const LEAKED_URL = `https://northgoing.com/${LEAKED_FRAGMENT}`;
 /** What Sentry's Breadcrumbs integration stores: parseUrl(...).relative = path + query + fragment. */
 const LEAKED_RELATIVE = `/${LEAKED_FRAGMENT}`;
 
@@ -67,8 +67,8 @@ describe("sanitizeSentryEvent", () => {
     );
 
     expectNoCredentials(event);
-    expect(event?.request?.url).toBe("https://auditjob.me/");
-    expect(event?.request?.headers?.Referer).toBe("https://auditjob.me/");
+    expect(event?.request?.url).toBe("https://northgoing.com/");
+    expect(event?.request?.headers?.Referer).toBe("https://northgoing.com/");
     // Everything else on the request survives untouched.
     expect(event?.request?.headers?.["User-Agent"]).toBe("Mozilla/5.0 (X11; Linux x86_64)");
   });
@@ -101,18 +101,18 @@ describe("sanitizeSentryEvent", () => {
         message: `navigation failed for ${LEAKED_URL}`,
         extra: { attemptedUrl: LEAKED_URL, retries: 2 },
         contexts: {
-          app: { app_start_url: LEAKED_URL, app_name: "auditjob.me" },
+          app: { app_start_url: LEAKED_URL, app_name: "northgoing.com" },
         },
         tags: { entry_url: LEAKED_URL, route: "roles" },
       }),
     );
 
     expectNoCredentials(event);
-    expect(event?.transaction).toBe("https://auditjob.me/");
-    expect(event?.extra?.attemptedUrl).toBe("https://auditjob.me/");
+    expect(event?.transaction).toBe("https://northgoing.com/");
+    expect(event?.extra?.attemptedUrl).toBe("https://northgoing.com/");
     expect(event?.extra?.retries).toBe(2);
-    expect(event?.contexts?.app?.app_start_url).toBe("https://auditjob.me/");
-    expect(event?.contexts?.app?.app_name).toBe("auditjob.me");
+    expect(event?.contexts?.app?.app_start_url).toBe("https://northgoing.com/");
+    expect(event?.contexts?.app?.app_name).toBe("northgoing.com");
     expect(event?.tags?.route).toBe("roles");
   });
 
@@ -145,9 +145,9 @@ describe("sanitizeSentryEvent", () => {
       environment: "production",
       transaction: "/roles/:id",
       request: {
-        url: "https://auditjob.me/roles?utm_source=newsletter&q=product+manager",
+        url: "https://northgoing.com/roles?utm_source=newsletter&q=product+manager",
         headers: {
-          Referer: "https://auditjob.me/",
+          Referer: "https://northgoing.com/",
           "User-Agent": "Mozilla/5.0",
         },
       },
@@ -161,7 +161,7 @@ describe("sanitizeSentryEvent", () => {
           category: "xhr",
           data: {
             method: "GET",
-            url: "https://api.auditjob.me/roles",
+            url: "https://api.northgoing.com/roles",
             status_code: 200,
           },
         },
@@ -175,13 +175,13 @@ describe("sanitizeSentryEvent", () => {
             stacktrace: {
               frames: [
                 {
-                  filename: "https://auditjob.me/assets/index-a1b2c3.js",
+                  filename: "https://northgoing.com/assets/index-a1b2c3.js",
                   function: "RoleCard",
                   lineno: 42,
                   colno: 7,
                 },
                 {
-                  filename: "https://auditjob.me/assets/vendor-d4e5f6.js",
+                  filename: "https://northgoing.com/assets/vendor-d4e5f6.js",
                   function: "renderWithHooks",
                   lineno: 11,
                   colno: 3,
@@ -242,14 +242,14 @@ describe("sanitizeSentryBreadcrumb", () => {
       category: "xhr",
       data: {
         method: "GET",
-        url: "https://auditjob.me/auth/callback?code=8d3f-secret&state=xyz",
+        url: "https://northgoing.com/auth/callback?code=8d3f-secret&state=xyz",
         status_code: 500,
       },
     });
 
     expect(crumb?.data).toEqual({
       method: "GET",
-      url: "https://auditjob.me/auth/callback?state=xyz",
+      url: "https://northgoing.com/auth/callback?state=xyz",
       status_code: 500,
     });
   });
@@ -261,7 +261,7 @@ describe("sanitizeSentryBreadcrumb", () => {
       message: LEAKED_URL,
     });
     expectNoCredentials(crumb);
-    expect(crumb?.message).toBe("https://auditjob.me/");
+    expect(crumb?.message).toBe("https://northgoing.com/");
   });
 
   it("leaves a harmless breadcrumb byte-identical", () => {

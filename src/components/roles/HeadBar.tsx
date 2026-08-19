@@ -5,6 +5,7 @@ import FilterChip, { type FilterOption } from "./FilterChip";
 import { FACET_SCROLL_STEP, overflowSides } from "@/lib/facetRow";
 import ThemeToggle from "@/components/ThemeToggle";
 import AccountMenu from "@/components/app/AccountMenu";
+import { BRAND_WORDMARK } from "@/lib/brandName";
 
 export type HeadBarProps = {
   scored: boolean;
@@ -212,7 +213,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
 
   return (
     <header className="nav glass liquid">
-      <Link className="brand" to="/" onClick={onBrand}>auditjob.me</Link>
+      <Link className="brand" to="/" onClick={onBrand}>{BRAND_WORDMARK}</Link>
       <span className="sep" />
 
       <div className="cmd">

@@ -7,8 +7,12 @@ import { textOn, safeAccent, slugifyPersonName, getPublicAuditOwner, validateOut
 import { makeCSS } from "./audit/styles.js";
 import { generatePDFHTML, downloadPDF } from "./audit/pdfHtml.js";
 import { SONNET, HAIKU, callClaude, callClaudeWithRetry, validateSections, extractText, safeParse } from "./audit/api.js";
+import { BRAND_NAME } from "@/lib/brandName";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
+/** Canonical public origin. Shared audit links are for sending to other people, so
+ *  they always point at production, never at wherever the app is running. */
+const PUBLIC_ORIGIN = "https://northgoing.com";
 const STEPS = [
   { label: "Parsing your CV" },
   { label: "Researching the company" },
@@ -217,7 +221,7 @@ export default function App() {
 
         const resolvedOwnerSlug = getPublicAuditOwner(user, profile);
         setOwnerSlug(resolvedOwnerSlug);
-        setShareUrl(data.is_published && resolvedOwnerSlug ? `https://auditjob.me/a/${resolvedOwnerSlug}/${data.slug}` : null);
+        setShareUrl(data.is_published && resolvedOwnerSlug ? `${PUBLIC_ORIGIN}/a/${resolvedOwnerSlug}/${data.slug}` : null);
       } else {
         setShareUrl(null);
       }
@@ -326,7 +330,7 @@ export default function App() {
       return;
     }
     setIsPublished(true);
-    setShareUrl(ownerSlug && auditSlug ? `https://auditjob.me/a/${ownerSlug}/${auditSlug}` : null);
+    setShareUrl(ownerSlug && auditSlug ? `${PUBLIC_ORIGIN}/a/${ownerSlug}/${auditSlug}` : null);
   };
 
   // Timer for processing stage
@@ -686,7 +690,7 @@ ROLE: ${company.role || roleCtx.role_type || ""}
       {/* ─── NAV ─── */}
       <div className="nav">
         <span className="nav-title" style={{ cursor: stage === "results" ? "pointer" : "default" }} onClick={() => stage === "results" && scrollTo("hero")}>
-          {(stage === "results" || stage === "hub") ? `${data.company?.company || ""} ${data.roleCtx?.audit_label || "Product Audit"}` : "auditjob.me"}
+          {(stage === "results" || stage === "hub") ? `${data.company?.company || ""} ${data.roleCtx?.audit_label || "Product Audit"}` : BRAND_NAME}
         </span>
         {stage === "results" && (
           <div className="nav-links">
@@ -1237,8 +1241,8 @@ ROLE: ${company.role || roleCtx.role_type || ""}
             </a>
             <div style={{ marginTop: "12px", fontSize: ".5rem", fontWeight: 400, letterSpacing: ".08em", opacity: 0.5 }}>
               MADE WITH{" "}
-              <a href="https://auditjob.me" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
-                AUDITJOB.ME
+              <a href={PUBLIC_ORIGIN} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+                {BRAND_NAME.toUpperCase()}
               </a>
             </div>
           </div>

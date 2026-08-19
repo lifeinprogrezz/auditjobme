@@ -1,9 +1,9 @@
 ---
 name: glass-design
-description: Use when building or restyling ANY auditjob.me UI — the roles/map page, the post-CV surfaces (rail cards, score/fit chips, role detail, /today, /apply, /tracker), glass surfaces, the globe, design tokens (colors/type/spacing/radius/motion), score & status presentation, the CV-unlock flow, adopted UI libraries, or Logo.dev logos. Carries the locked design system (v2: content-surface system — when glass, when ink) + the hard-won technical learnings so they are never re-derived or regressed.
+description: Use when building or restyling ANY Northgoing UI — the roles/map page, the post-CV surfaces (rail cards, score/fit chips, role detail, /today, /apply, /tracker), glass surfaces, the globe, design tokens (colors/type/spacing/radius/motion), score & status presentation, the CV-unlock flow, adopted UI libraries, or Logo.dev logos. Carries the locked design system (v2: content-surface system — when glass, when ink) + the hard-won technical learnings so they are never re-derived or regressed.
 ---
 
-# auditjob.me — glass design system (v2)
+# Northgoing — glass design system (v2)
 
 Distilled 2026-06-26 from the 2026-06-23 UI/UX deep-research (was gitignored scratch:
 `.superpowers/brainstorm/.../notes/design-progress.md` + `design-tokens-research.md`, mockup
@@ -201,7 +201,8 @@ color whispers, glass floats.**
    global-collision blank screen, the layer-order flat sea, and the opacity-stuck panel.
 
 ## Logo.dev
-Publishable (client-safe) token lives in the auditjobme env / the design-progress notes — reference it
+Publishable (client-safe) token lives in the `auditjobme` env (the Vercel PROJECT name, which
+the Northgoing rebrand did not change) / the design-progress notes — reference it
 by location, don't hardcode it into committed source. Pattern:
 `https://img.logo.dev/{domain}?token={pk_...}&size=96&format=png&theme=dark&retina=true&fallback=404`
 → `onerror` → colored-initial fallback. `theme=dark` returns transparent light marks for most brands;

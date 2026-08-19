@@ -4,7 +4,7 @@
  *
  * Same root cause. Supabase signs users in with Google over the implicit flow,
  * which returns the whole session in the URL *fragment*:
- * `https://auditjob.me/#access_token=...&provider_token=...&refresh_token=...`.
+ * `https://northgoing.com/#access_token=...&provider_token=...&refresh_token=...`.
  * Two default @sentry/react browser integrations record that URL, so any error
  * captured during or shortly after the sign-in redirect shipped the user's access
  * token, Google provider token and refresh token to a second third-party service.

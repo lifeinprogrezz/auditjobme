@@ -4,6 +4,7 @@
 // below is pure too, and carries the .js extension Node ESM requires). Pinned by
 // src/test/nightly.test.ts. Rule + code move together.
 import { companyKey, warmMarkerLabel } from "./connections.js";
+import { BRAND_WORDMARK } from "./brandName.js";
 
 /** How many top new matches to score + surface per user per night (spec §5). */
 export const NIGHTLY_TOP_N = 10;
@@ -294,7 +295,7 @@ export function buildEmailBody(
   const plural = matches.length === 1 ? "" : "s";
 
   const text = [
-    `auditjob.me`,
+    BRAND_WORDMARK,
     "",
     `You have ${matches.length} new role${plural} matched to you today.`,
     "",
@@ -337,7 +338,7 @@ export function buildEmailBody(
 
   const html = [
     `<div style="font-family:${FONT};max-width:560px;color:${INK}">`,
-    `<div style="font-size:14px;font-weight:700;letter-spacing:.01em;color:${INK}">auditjob.me</div>`,
+    `<div style="font-size:14px;font-weight:700;letter-spacing:.01em;color:${INK}">${BRAND_WORDMARK}</div>`,
     `<p style="margin:14px 0 4px;font-size:15px">You have <strong>${matches.length}</strong> new role${plural} matched to you today.</p>`,
     rows,
     ...(more > 0

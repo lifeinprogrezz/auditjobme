@@ -1,18 +1,19 @@
 // Terms of service (issue #42): real content on the token layer, product-accurate for
 // the job-search product. Warm voice, no em-dashes.
 import LegalLayout, { LegalSection } from "@/components/app/LegalLayout";
+import { BRAND_NAME } from "@/lib/brandName";
 
 export default function Terms() {
   return (
     <LegalLayout title="Terms of Service" updated="12 July 2026">
       <p className="text-sm text-muted-foreground">
-        These terms cover your use of auditjob.me. Using the product means you agree to them. If you don't, please
+        These terms cover your use of {BRAND_NAME}. Using the product means you agree to them. If you don't, please
         don't use it.
       </p>
 
       <LegalSection heading="1. What the product does">
         <p>
-          auditjob.me is a free tool for Product Managers job-hunting in Europe. It shows a daily-scraped pool of live
+          {BRAND_NAME} is a free tool for Product Managers job-hunting in Europe. It shows a daily-scraped pool of live
           roles, scores each against your CV, and helps you prepare an application bundle: a tailored CV summary, a
           cover letter, and an optional company audit. It also tracks the roles you apply to.
         </p>

@@ -1,6 +1,6 @@
 # Architecture
 
-How auditjob.me is built, for a developer (human or agent) landing in this repo for the
+How Northgoing is built, for a developer (human or agent) landing in this repo for the
 first time. Written 2026-07-25 (issue #60). Companion docs: [`DATA_CONTRACT.md`](./DATA_CONTRACT.md)
 for the job-row schema, [`scoring-benchmarks.md`](./scoring-benchmarks.md) for scorer calibration.
 
@@ -202,9 +202,37 @@ Two stages, no preview environments:
 
 - **`localhost:8080`** — `npm run dev`. It talks to the *production* Supabase, so saving a
   role or marking one applied writes real rows.
-- **`main` → auditjob.me** — pushing to `main` deploys the frontend on Vercel, and any commit
+- **`main` → northgoing.com** — pushing to `main` deploys the frontend on Vercel, and any commit
   touching `supabase/functions/**` deploys the edge function through
-  `deploy-edge-functions.yml`. One push ships both.
+  `deploy-edge-functions.yml`. One push ships both. The old `auditjob.me` still resolves
+  and 308-redirects to `northgoing.com` (`vercel.json`), except under `/api`, which both
+  hosts continue to serve.
+
+### The origin contract (nothing in code enforces this)
+
+Sign-in is origin-bound and the binding lives in the Supabase dashboard, not this repo.
+`AuthProvider` and `CvUnlockModal` pass `redirectTo: window.location.origin`, and GoTrue
+does **not** error on an origin missing from its Redirect-URLs allowlist. It silently
+substitutes the Site URL, so the OAuth fragment lands on a different origin than the one
+the user started on. That is not a failed login, which would be obvious. It is a login
+that succeeds on the wrong host, where the pre-redirect CV stash written to
+`auditjobme.cvStash` cannot be read, so the user is asked to paste the CV they just pasted.
+
+Two rules follow, and they are the reason this section exists:
+
+1. **Exactly one origin serves users: `https://northgoing.com`.** Every other host that
+   resolves must 308 to it before any JavaScript runs, `www` included. `vercel.json` does
+   this for `www.northgoing.com`, `auditjob.me`, `www.auditjob.me` and the `*.vercel.app`
+   aliases. A newly attached domain is a new origin and needs a rule in the same commit.
+2. **The Supabase allowlist must contain that origin with a path wildcard**
+   (`https://northgoing.com/**`). The bare origin is not enough: auth returns to the path
+   the user was on, so `/today`, `/apply` and `/tracker` deep-returns need the wildcard.
+
+Verifying it needs no credentials, and the control is what makes the check real: request
+`/auth/v1/verify?token=bogus&type=signup&redirect_to=<url>` and read the `Location`. An
+allowlisted URL comes back verbatim; a rejected one comes back as the Site URL. Test a
+deliberately bogus domain alongside, or a permissive allowlist looks identical to a
+correct one.
 
 Branch preview deployments are disabled in `vercel.json` (`git.deploymentEnabled`). They
 caused two stale-build reviews and reviewed nothing.
@@ -242,3 +270,13 @@ offline gate — run it deliberately.
 
 The gate in `.github/workflows/ci.yml` is lint, typecheck, test, and build, all blocking,
 plus a secrets scan and the migration and row-level-security check.
+
+### Email: sending and receiving moved separately
+
+The nightly digest and the scores-ready mail send from `matches@northgoing.com`
+(verified in Resend 2026-08-19: DKIM plus SPF live on `send.northgoing.com`, region
+eu-west-1). Replies do not go there. `northgoing.com` has **no apex MX record**, so any
+address at the bare domain bounces, and the `List-Unsubscribe` mailto therefore still
+points at `hello@lifeinprogrezz.com`, which is a real Google-hosted mailbox. Moving it
+needs apex MX first, not just a verified sending domain. A bounced unsubscribe is worse
+than an off-brand one.

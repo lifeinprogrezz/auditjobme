@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { BRAND_WORDMARK } from "@/lib/brandName";
 import {
   jobSeenMs,
   selectNewJobsSince,
@@ -204,13 +205,13 @@ describe("buildEmailSubject", () => {
 
 describe("applyUrl (issue #72 slice 3)", () => {
   it("deep-links a role to its OWN /apply page, url-encoded", () => {
-    expect(applyUrl("https://auditjob.me/", "https://boards.co/j?id=1&x=2")).toBe(
-      "https://auditjob.me/apply?job=https%3A%2F%2Fboards.co%2Fj%3Fid%3D1%26x%3D2",
+    expect(applyUrl("https://northgoing.com/", "https://boards.co/j?id=1&x=2")).toBe(
+      "https://northgoing.com/apply?job=https%3A%2F%2Fboards.co%2Fj%3Fid%3D1%26x%3D2",
     );
   });
 
   it("tolerates an app url with or without a trailing slash", () => {
-    expect(applyUrl("https://auditjob.me", "https://x/1")).toBe(applyUrl("https://auditjob.me/", "https://x/1"));
+    expect(applyUrl("https://northgoing.com", "https://x/1")).toBe(applyUrl("https://northgoing.com/", "https://x/1"));
   });
 });
 
@@ -228,33 +229,38 @@ describe("buildEmailBody (issue #72 slice 3)", () => {
     }));
 
   it("gives every role its OWN /apply deep link, plus score, reason, company, location", () => {
-    const { text, html } = buildEmailBody(ranked(3), "https://auditjob.me/");
+    const { text, html } = buildEmailBody(ranked(3), "https://northgoing.com/");
     expect(text).toContain("You have 3 new roles matched to you today.");
     expect(text).toContain("Co0");
     expect(text).toContain("Role0");
     expect(text).toContain("5.0 out of 5 · Barcelona");
     expect(text).toContain("Reason0");
-    for (let i = 0; i < 3; i++) expect(text).toContain(applyUrl("https://auditjob.me/", `https://x/${i}`));
-    expect(html).toContain(`href="${applyUrl("https://auditjob.me/", "https://x/0")}"`);
+    for (let i = 0; i < 3; i++) expect(text).toContain(applyUrl("https://northgoing.com/", `https://x/${i}`));
+    expect(html).toContain(`href="${applyUrl("https://northgoing.com/", "https://x/0")}"`);
     expect(html).toContain("5.0 out of 5 · Barcelona");
     expect(html).toContain("Reason0");
   });
 
   it("keeps the brand header and the see-them-all link", () => {
-    const { text, html } = buildEmailBody(ranked(2), "https://auditjob.me/");
-    expect(text.startsWith("auditjob.me")).toBe(true);
-    expect(html).toContain("auditjob.me</div>");
-    expect(text).toContain("See them all: https://auditjob.me/");
-    expect(html).toContain('href="https://auditjob.me/"');
+    const { text, html } = buildEmailBody(ranked(2), "https://northgoing.com/");
+    // The masthead is the LOGO, so it carries the lowercase wordmark, not the
+    // proper noun. Asserting the constant rather than the literal keeps this
+    // honest if the lettering ever changes again, while still proving the email
+    // does not fall back to the prose form.
+    expect(text.startsWith(BRAND_WORDMARK)).toBe(true);
+    expect(html).toContain(`${BRAND_WORDMARK}</div>`);
+    expect(BRAND_WORDMARK).toBe("northgoing");
+    expect(text).toContain("See them all: https://northgoing.com/");
+    expect(html).toContain('href="https://northgoing.com/"');
   });
 
   it("omits the location silently when we don't hold one (never guesses)", () => {
-    const { text } = buildEmailBody(ranked(2), "https://auditjob.me/");
+    const { text } = buildEmailBody(ranked(2), "https://northgoing.com/");
     expect(text).toContain("4.0 out of 5\n"); // Co1 has no location: score line only
   });
 
   it("stays a NOTIFICATION: no images, no campaign chrome, no em-dashes", () => {
-    const { text, html } = buildEmailBody(ranked(3), "https://auditjob.me/");
+    const { text, html } = buildEmailBody(ranked(3), "https://northgoing.com/");
     expect(html).not.toContain("<img");
     expect(html).not.toContain("unsubscribe");
     expect(text).not.toContain("\u2014");
@@ -262,7 +268,7 @@ describe("buildEmailBody (issue #72 slice 3)", () => {
   });
 
   it("summarizes the overflow beyond the preview count", () => {
-    const { text, html } = buildEmailBody(ranked(8), "https://auditjob.me/", 5);
+    const { text, html } = buildEmailBody(ranked(8), "https://northgoing.com/", 5);
     expect(text).toContain("...and 3 more.");
     expect(html).toContain("...and 3 more.");
     // only the first 5 are itemized
@@ -283,7 +289,7 @@ describe("buildEmailBody (issue #72 slice 3)", () => {
         rank: 1,
       },
     ];
-    const { html } = buildEmailBody(rows, "https://auditjob.me/");
+    const { html } = buildEmailBody(rows, "https://northgoing.com/");
     expect(html).toContain("A &amp; B &lt;Inc&gt;");
     expect(html).toContain("PM &quot;lead&quot;");
     expect(html).toContain("5 &gt; 4 &amp; rising");
@@ -334,7 +340,7 @@ describe("attachWarmCounts (issue #108 warm marker)", () => {
       [match("Spotify", 1), match("Klarna", 2)],
       ["spotify", "spotify"],
     );
-    const { text, html } = buildEmailBody(withWarm, "https://auditjob.me/");
+    const { text, html } = buildEmailBody(withWarm, "https://northgoing.com/");
     expect(text).toContain("You know 2 people here");
     expect(html).toContain("You know 2 people here");
     // exactly one row carries it
@@ -344,14 +350,14 @@ describe("attachWarmCounts (issue #108 warm marker)", () => {
 
   it("email body without warm counts carries no marker (byte-level no-op)", () => {
     const plain = [match("Spotify", 1)];
-    const { text, html } = buildEmailBody(plain, "https://auditjob.me/");
+    const { text, html } = buildEmailBody(plain, "https://northgoing.com/");
     expect(text).not.toContain("You know");
     expect(html).not.toContain("You know");
   });
 
   it("singular copy for one person", () => {
     const withWarm = attachWarmCounts([match("Acme", 1)], ["acme"]);
-    const { text } = buildEmailBody(withWarm, "https://auditjob.me/");
+    const { text } = buildEmailBody(withWarm, "https://northgoing.com/");
     expect(text).toContain("You know 1 person here");
   });
 });

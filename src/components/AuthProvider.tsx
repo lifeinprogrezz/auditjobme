@@ -57,7 +57,7 @@ const MOCK_USER = {
   id: "00000000-0000-0000-0000-000000000000",
   aud: "authenticated",
   role: "authenticated",
-  email: "e2e-dev@auditjob.me",
+  email: "e2e-dev@northgoing.com",
   app_metadata: {},
   user_metadata: { display_name: "E2E Dev" },
   created_at: new Date(0).toISOString(),

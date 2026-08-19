@@ -168,6 +168,10 @@ export function pickScoringSlice<T extends Pick<RoleJob, "title" | "sector">>(
 }
 
 // ── localStorage stash (survives the OAuth full-page redirect) ──────────────
+// The key keeps its pre-rebrand prefix ON PURPOSE (#106). It names a slot in
+// browsers we do not control, so renaming it orphans the stash of everyone who is
+// mid sign-up, and they lose the CV they just pasted. Moving it needs a
+// read-old/write-new migration, never a find-and-replace.
 export const CV_STASH_KEY = "auditjobme.cvStash";
 export type CvStash = {
   cv_text: string;

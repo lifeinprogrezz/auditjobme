@@ -1,4 +1,4 @@
-# Should auditjob.me expose an MCP server?
+# Should Northgoing expose an MCP server?
 
 Decide-once evaluation, 2026-07-25, closing part 2 of issue #60.
 **Recommendation: PARK** — with one cheap precursor worth doing now.
@@ -7,7 +7,7 @@ re-litigated in conversation.
 
 ## The question
 
-Expose auditjob.me's capabilities over the Model Context Protocol so agents and external
+Expose Northgoing's capabilities over the Model Context Protocol so agents and external
 tools can consume the product programmatically — role and company queries, per-user scored
 matches, and generation (tailored CV, cover letter, form answers, company audit).
 

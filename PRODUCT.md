@@ -3,10 +3,10 @@
      planning repo. Can drift; refresh with ./sync-mirrors.sh from the planning repo
      (last sync = this file's git history). -->
 
-# auditjob.me — The Public Product (Foundation)
+# Northgoing — The Public Product (Foundation)
 
 > **What this document is.** The introduction chapter for turning the personal
-> `career-ops` engine into a public web product on **auditjob.me**. It is the
+> `career-ops` engine into a public web product on **Northgoing**. It is the
 > skeleton, not the detailed design: it states what we're building, sketches how
 > the pieces fit, and breaks the work into **parts** — each of which gets its own
 > focused session later (most of them drivable from the phone). When you want to
@@ -28,13 +28,13 @@
 **Thesis.** `career-ops` already does something most job-seekers never get: it
 scrapes roles from dozens of sources every day, scores each one against a deep
 personal profile, and hands back a ranked, personalized shortlist. Today that
-power serves exactly one person. **auditjob.me is that same engine, opened up for
+power serves exactly one person. **Northgoing is that same engine, opened up for
 other people** — a suite of career-ops superpowers for job-seekers in Europe. It
 launched as a Product-Manager wedge; since issue #34 the engine is
 **all-vertical**, covering five role families (product · engineering · sales ·
 marketing · operations).
 
-The company audit (the thing auditjob.me's landing page sells today —
+The company audit (the thing Northgoing's landing page sells today —
 *"show them you already did the job"*) is **one feature inside the suite**, not the
 headline. The sourcing + scoring + personalized daily digest is the core, because
 that's the part that's genuinely hard to build and "way more powerful" than the
@@ -88,7 +88,7 @@ A Node command-line system, file-based, single-user today. What it does:
   `data/applications.md`. **Multi-tenancy = move those into a database, one row-set
   per user, and parameterize the prompt.** The hard engine doesn't change much.
 
-### The shell — auditjob.me (the product)
+### The shell — Northgoing (the product)
 A Vite + React single-page app (TypeScript), styled with Tailwind + shadcn/ui,
 backed by Supabase (Postgres + Google sign-in). What's already
 built and working:
@@ -109,9 +109,9 @@ built and working:
 
 ### The strategic reframe (worth saying out loud)
 Earlier planning had this backwards: it treated "integration" as `career-ops`
-*calling* auditjob.me to mint a single audit URL during an evaluation. **The real
-direction is the inverse and much bigger: auditjob.me becomes the public face of
-career-ops.** This also supersedes the older framing of auditjob.me as
+*calling* Northgoing to mint a single audit URL during an evaluation. **The real
+direction is the inverse and much bigger: Northgoing becomes the public face of
+career-ops.** This also supersedes the older framing of Northgoing as
 "positioning, not a venture" — it's now being shipped as a real multi-user product
 (the Stripe schema is already there).
 
@@ -152,7 +152,7 @@ part holds the line.
 
 ```
                           ┌─────────────────────────────────────────┐
-                          │  auditjob.me SPA  (Vite + React, exists)  │
+                          │  Northgoing SPA  (Vite + React, exists)   │
                           │  sign-in · onboarding · dashboard/digest  │
                           │  fire-audit · tracker · account           │
                           └───────────────┬───────────────────────────┘
@@ -184,7 +184,7 @@ part holds the line.
 ```
 
 **Components**
-1. **auditjob.me SPA** *(exists)* — the entire front end: sign-in, onboarding,
+1. **Northgoing SPA** *(exists)* — the entire front end: sign-in, onboarding,
    the dashboard where the daily digest lives, the fire-an-audit action, the
    application tracker, account/settings.
 2. **Supabase** *(exists)* — system of record. Row-Level Security (RLS) enforces

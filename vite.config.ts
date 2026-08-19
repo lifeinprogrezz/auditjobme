@@ -20,7 +20,7 @@ import { isDataplane } from "./src/lib/dataplane";
 // dataplane.json. On ANY failure the build still succeeds with a baseline sitemap +
 // llms.txt (never break the deploy over a discovery-surface artifact).
 function geoPrerenderPlugin(env: Record<string, string>): Plugin {
-  const origin = env.GEO_SITE_ORIGIN || "https://auditjob.me";
+  const origin = env.GEO_SITE_ORIGIN || "https://northgoing.com";
   const localFile = env.GEO_DATAPLANE_FILE || process.env.GEO_DATAPLANE_FILE;
   const supabaseUrl = env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 

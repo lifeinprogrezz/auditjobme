@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["fra1"],
+  "regions": [
+    "fra1"
+  ],
   "git": {
     "deploymentEnabled": {
       "**": false,
@@ -8,19 +10,66 @@
     }
   },
   "functions": {
-    "api/nightly.ts": { "maxDuration": 60 },
-    "api/score-backlog.ts": { "maxDuration": 60 },
-    "api/inbound-email.ts": { "maxDuration": 30 }
+    "api/nightly.ts": {
+      "maxDuration": 60
+    },
+    "api/score-backlog.ts": {
+      "maxDuration": 60
+    },
+    "api/inbound-email.ts": {
+      "maxDuration": 30
+    }
   },
   "redirects": [
     {
       "source": "/((?!api/).*)",
-      "has": [{ "type": "host", "value": "(?<sub>.+)\\.vercel\\.app" }],
-      "destination": "https://auditjob.me/$1",
-      "permanent": false
+      "has": [
+        {
+          "type": "host",
+          "value": "www\\.northgoing\\.com"
+        }
+      ],
+      "destination": "https://northgoing.com/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "auditjob\\.me"
+        }
+      ],
+      "destination": "https://northgoing.com/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www\\.auditjob\\.me"
+        }
+      ],
+      "destination": "https://northgoing.com/$1",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?<sub>.+)\\.vercel\\.app"
+        }
+      ],
+      "destination": "https://northgoing.com/$1",
+      "permanent": true
     }
   ],
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }

@@ -1,4 +1,4 @@
-# auditjob.me
+# Northgoing
 
 A live map of European tech roles, scored against your CV.
 
@@ -11,7 +11,8 @@ The catalog opens with product roles — a wedge, not a ceiling. The schema and 
 already carry a `role_family` dimension so further disciplines slot in without reshaping
 the engine.
 
-Live at **[auditjob.me](https://auditjob.me)**.
+Live at **[northgoing.com](https://northgoing.com)**. The old address, `auditjob.me`,
+redirects here permanently.
 
 ## Stack
 
