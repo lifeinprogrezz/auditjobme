@@ -4,7 +4,7 @@
 // .scored / .detail-open / .panel-hidden state classes — this component only
 // renders panel content and never touches body/root classes.
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import {
   EMPTY_FILTERS,
   FRESHNESS_WINDOWS,

@@ -10,7 +10,7 @@
 // pool, one row per company) → More matches.
 import { useMemo, useState } from "react";
 import { useRevealOnScroll } from "@/hooks/useRevealOnScroll";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import AppShell from "@/components/app/AppShell";
 import PaperLogo from "@/components/app/PaperLogo";
 import { Button } from "@/components/ui/button";

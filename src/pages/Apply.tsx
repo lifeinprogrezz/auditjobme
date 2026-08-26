@@ -13,7 +13,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router";
 import { toast } from "@/components/ui/sonner";
 import AppShell from "@/components/app/AppShell";
 import PaperLogo from "@/components/app/PaperLogo";

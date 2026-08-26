@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router";
 import "@/styles/roles.css";
 import GlobeMap from "@/components/roles/GlobeMap";
 import RolesPanel from "@/components/roles/RolesPanel";

@@ -8,7 +8,7 @@
 //   glass — the map headbar (.av / .avmenu classes from roles.css, glass tokens)
 //   paper — AppShell pages (Tailwind on the ink-paper tokens)
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useAuth } from "@/components/AuthProvider";
 
 const ITEMS: { label: string; to: string }[] = [

@@ -8,7 +8,7 @@
 // Rule + code move together: this test moves with HeadBar.tsx / FilterChip.tsx.
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import HeadBar from "@/components/roles/HeadBar";
 import { EMPTY_FILTERS } from "@/lib/roles";
 
@@ -25,7 +25,7 @@ const sponsorOptions = [
 function renderBar(props: Partial<React.ComponentProps<typeof HeadBar>> = {}) {
   const onFilters = vi.fn();
   const utils = render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter>
       <HeadBar
         scored={false}
         signedIn={false}

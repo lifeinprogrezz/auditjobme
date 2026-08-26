@@ -7,7 +7,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { render, screen, cleanup } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import AppShell from "@/components/app/AppShell";
 
 const signOut = vi.fn(async () => {});
@@ -17,7 +17,7 @@ vi.mock("@/components/AuthProvider", () => ({
 
 function renderShell(route = "/today", title?: string) {
   return render(
-    <MemoryRouter initialEntries={[route]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[route]}>
       <AppShell title={title}>
         <p>body</p>
       </AppShell>
@@ -79,7 +79,7 @@ describe("legal pages are reachable (#audit)", () => {
   // "the page exists at a URL" is not the same as having provided the information.
   it("every product page links to Privacy and Terms", () => {
     render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <AppShell title="Test">content</AppShell>
       </MemoryRouter>,
     );
