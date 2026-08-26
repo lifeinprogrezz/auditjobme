@@ -13,6 +13,13 @@ if (!("ResizeObserver" in window)) {
   Object.defineProperty(globalThis, "ResizeObserver", { writable: true, value: ResizeObserverStub });
 }
 
+// jsdom ships no scrollTo on Element; RolesPanel's detail view calls it on
+// mount to reset scroll position when the open role changes (issue #158's
+// signin test is the first to actually render a detail, not just cards).
+if (!("scrollTo" in Element.prototype)) {
+  Object.defineProperty(Element.prototype, "scrollTo", { writable: true, value: () => {} });
+}
+
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({

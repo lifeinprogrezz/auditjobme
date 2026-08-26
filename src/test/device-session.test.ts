@@ -1,7 +1,9 @@
 // Pins the returning-user device memory (sign-in shortcut, Rober 7-13): the
-// "this device has held a session before" flag that gates the CV modal's quiet
-// sign-in line, and the pure post-OAuth gate that keeps a CV mandatory for every
-// signed-in user regardless of which door they entered through.
+// "this device has held a session before" flag (stamped by AuthProvider on
+// every session; no longer gates the CV modal's sign-in line — issue #158 / A1
+// dropped that gate so a brand-new visitor sees it too) and the pure post-OAuth
+// gate that keeps a CV mandatory for every signed-in user regardless of which
+// door they entered through.
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   SESSION_SEEN_KEY,

@@ -69,6 +69,10 @@ export type RolesPanelProps = {
   onToggleHidden: () => void;
   /** Opens the CV-unlock modal (Phase A front door). */
   onAddCv: () => void;
+  /** Google OAuth sign-in (issue #158) — beside "Add your CV" in the logged-out
+   *  detail, same handler the header's own "Sign in" button uses. Optional so
+   *  existing render-only tests that never care about the click still pass. */
+  onSignIn?: () => void;
   /** The live headbar filter state (mirrored as removable chips in the panel). */
   filters: RolesFilters;
   onFilters: (f: RolesFilters) => void;
@@ -144,6 +148,7 @@ export default function RolesPanel({
   onToggleSaved,
   onToggleHidden,
   onAddCv,
+  onSignIn,
   filters,
   onFilters,
   onToggleMine,
@@ -689,9 +694,22 @@ export default function RolesPanel({
             Prepare application
           </button>
         ) : (
-          <button className="btn dcta" onClick={onAddCv}>
-            Add your CV to see your fit
-          </button>
+          // Logged out: "Add your CV" stays the primary action, with a real
+          // "Sign in" beside it (issue #158 / A1) — so a returning-but-
+          // unrecognized visitor signs back in instead of re-uploading a CV,
+          // which would re-score the whole catalog. Same pairing as the header
+          // (HeadBar.tsx's .navcv + .signin); signed-in-but-no-CV-yet never
+          // shows it, since signing in again isn't the fix for that.
+          <div className="dcta-row">
+            <button className="btn dcta" onClick={onAddCv}>
+              Add your CV to see your fit
+            </button>
+            {!signedIn && onSignIn && (
+              <button type="button" className="signin" onClick={onSignIn}>
+                Sign in
+              </button>
+            )}
+          </div>
         )}
         {signedIn && (
           // Save and Not-interested share ONE secondary row: the same .dsave token,

@@ -1,11 +1,12 @@
-// Pins the CV modal's returning-user shortcut (Rober 7-13): a quiet footer line
-// under the drop zone, visible ONLY to an anonymous visitor on a device that has
-// held a session before, that fires Google OAuth directly (no CV, no stash).
-// New visitors keep the pure CV-first modal; signed-in users never see it.
+// Pins the CV modal's returning-user shortcut (Rober 7-13, widened issue #158
+// / A1): a quiet footer line under the drop zone that fires Google OAuth
+// directly (no CV, no stash). Used to show only on a device that had held a
+// session before (hasSeenSession) — that hid it from every brand-new visitor,
+// which is most of them, and a first-time run on stranger-run feedback caught
+// it. Now shown to any signed-out visitor; signed-in users never see it.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import CvUnlockModal from "@/components/roles/CvUnlockModal";
-import { markSessionSeen } from "@/lib/deviceSession";
 
 const signInWithOAuth = vi.fn(async (..._a: unknown[]) => ({ error: null }));
 vi.mock("@/integrations/supabase/client", () => ({
@@ -32,25 +33,17 @@ describe("CvUnlockModal returning-user sign-in line", () => {
     cleanup();
   });
 
-  it("brand-new device → no sign-in line (pure CV modal)", () => {
-    renderModal();
-    expect(screen.queryByText(/already have a profile/i)).toBeNull();
-  });
-
-  it("device that held a session, anonymous → shows the line", () => {
-    markSessionSeen();
+  it("brand-new device, anonymous → still shows the line (issue #158 / A1)", () => {
     renderModal();
     expect(screen.getByText(/already have a profile/i)).toBeTruthy();
   });
 
   it("signed in → never shows the line", () => {
-    markSessionSeen();
     renderModal({ signedIn: true });
     expect(screen.queryByText(/already have a profile/i)).toBeNull();
   });
 
   it("click → fires Google OAuth directly, no CV required", () => {
-    markSessionSeen();
     renderModal();
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
     expect(signInWithOAuth).toHaveBeenCalledTimes(1);
