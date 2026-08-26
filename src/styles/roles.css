@@ -405,10 +405,15 @@
 .roles-theme .panel-toggle svg { transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1); }
 .roles-theme.panel-hidden .panel-toggle { right: 14px; }
 .roles-theme.panel-hidden .panel-toggle svg { transform: rotate(180deg); }
-/* One header row: title left + the quiet scoring progress right (Rober 7-16). The
-   scored gate moved from .ptitle to the row. */
+/* One header block: heading line (title + facet chip), then the quiet scoring
+   progress on its own full-width line beneath (Rober 7-16, column layout
+   #166). The scored gate moved from .ptitle to the block. */
 .roles-theme .phead { display: none; flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 14px; }
 .roles-theme.scored .phead { display: flex; }
+/* Heading line (issue #154): title + the "Your matches" chip, kept off the
+   .sprog line below so the fixed-size .fchip never shrinks the full-width
+   progress track. */
+.roles-theme .phead-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .roles-theme .ptitle { font-family: var(--font-d); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.035em; color: #fff; margin: 0; }
 /* Scoring progress (#149): the old .pprog whisper was a bare "N to go" with no
    phase and no end. Same typography, now with a thin bar carrying a real

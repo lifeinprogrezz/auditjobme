@@ -274,16 +274,21 @@ export default function RolesPanel({
 
   const renderCards = () => (
     <>
-      {/* One compact header row: title left, "Your matches" toggle + the scoring
-          progress as a quiet mono whisper right — no separate banner bar (Rober
-          7-16). The whisper is now a thin bar with a phase and a real count
+      {/* Compact header block: heading line (title + "Your matches" toggle),
+          then the scoring progress as a quiet mono whisper on its own
+          full-width line beneath (#166) — no separate banner bar (Rober
+          7-16). The whisper is a thin bar with a phase and a real count
           (#149); it hides itself. */}
       <div className="phead">
-        {/* "Your matches" always, once signed in with a CV — "Best fit" is
-            retired (issue #154); the default-view/narrowed split only still
-            matters for the anon "Hot right now" showcase. */}
-        <h1 className="ptitle">{railHeading(scored, Boolean(defaultView))}</h1>
-        <div className="phead-r" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {/* Heading line: title + the "Your matches" toggle. Kept off the
+            progress line so a header-row chip never fights the full-width
+            .sprog track for space — see .phead/.phead-top/.sprog in
+            roles.css. */}
+        <div className="phead-top">
+          {/* "Your matches" always, once signed in with a CV — "Best fit" is
+              retired (issue #154); the default-view/narrowed split only still
+              matters for the anon "Hot right now" showcase. */}
+          <h1 className="ptitle">{railHeading(scored, Boolean(defaultView))}</h1>
           {/* Disabled for a logged-out/no-CV visitor, but NEVER while active (fix
               round 1, blocker 2) — a stale active state must stay dismissable. */}
           <MineChip
@@ -291,15 +296,15 @@ export default function RolesPanel({
             disabled={(!signedIn || !scored) && !filters.mine}
             onToggle={onToggleMine}
           />
-          <ScoringProgress
-            variant="rail"
-            hasCv={signedIn && scored}
-            ready={!loading}
-            total={eligibleCount}
-            scored={eligibleCount - remaining}
-            batchPending={batchPending}
-          />
         </div>
+        <ScoringProgress
+          variant="rail"
+          hasCv={signedIn && scored}
+          ready={!loading}
+          total={eligibleCount}
+          scored={eligibleCount - remaining}
+          batchPending={batchPending}
+        />
       </div>
       {activeChips.length > 0 && (
         <div className="selhdr">
