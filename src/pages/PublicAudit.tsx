@@ -10,7 +10,7 @@
 // re-themed light per the artifact standard instead of the internal tool's dark
 // working UI.
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAuditMatch } from "@/lib/auditOwnerMatch";
 import { BRAND_NAME } from "@/lib/brandName";

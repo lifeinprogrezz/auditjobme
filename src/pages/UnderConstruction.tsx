@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { BRAND_NAME, BRAND_WORDMARK } from "@/lib/brandName";
 
 // Coming-soon placeholder (Rober 7-06). The interactive /roles map is the only live

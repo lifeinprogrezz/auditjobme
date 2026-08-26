@@ -9,7 +9,7 @@
 // "move updates exactly one row's position" acceptance, and keep the board
 // keyboard-accessible). Keeps the existing Supabase write-back.
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";

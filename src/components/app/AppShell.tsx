@@ -6,7 +6,7 @@
 // (`.nav-thumb`, shared with the map's segmented control), never a `bg-secondary`
 // pill. Ink-glass token layer only.
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
 import AccountMenu from "@/components/app/AccountMenu";

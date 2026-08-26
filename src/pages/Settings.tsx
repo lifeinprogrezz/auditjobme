@@ -2,7 +2,7 @@
 // promoted out of the map's ProfileModal popup so adding/removing preference
 // surfaces has a proper home). The page is a thin wire: AppShell chrome + the
 // shared useRolesData path feeding the pure SettingsPanel (pinned by its test).
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import AppShell from "@/components/app/AppShell";
 import ForwardingSection from "@/components/app/ForwardingSection";
 import ReferralSection from "@/components/app/ReferralSection";

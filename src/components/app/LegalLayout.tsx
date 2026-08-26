@@ -2,7 +2,7 @@
 // layer, no auth, no sign-out (these are readable signed-out). Warm voice, no
 // em-dashes in the copy the pages pass in.
 import { type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { BRAND_WORDMARK } from "@/lib/brandName";
 
 export default function LegalLayout({

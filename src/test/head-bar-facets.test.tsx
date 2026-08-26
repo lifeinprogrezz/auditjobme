@@ -8,7 +8,7 @@
 // Rule + code move together: this test moves with HeadBar.tsx / FilterChip.tsx.
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import HeadBar from "@/components/roles/HeadBar";
 import { EMPTY_FILTERS } from "@/lib/roles";
 
