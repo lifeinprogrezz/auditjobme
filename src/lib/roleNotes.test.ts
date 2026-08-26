@@ -40,28 +40,32 @@ describe("buildNotesDeleteMatch / buildNotesInsertRow — the delete+insert writ
     expect(buildNotesDeleteMatch("u1", "j1")).toEqual({ user_id: "u1", job_id: "j1", kind: NOTES_KIND });
   });
 
-  it("insert row stamps a fresh updated_at, so a later notes save always outranks an earlier generation row", () => {
-    const row = buildNotesInsertRow("u1", "j1", "call it back Tuesday", () => "2026-08-26T12:00:00.000Z");
+  it("insert row carries no updated_at — the DB default stamps it, same clock as saveArtifact's insert", () => {
+    const row = buildNotesInsertRow("u1", "j1", "call it back Tuesday");
     expect(row).toEqual({
       user_id: "u1",
       job_id: "j1",
       kind: NOTES_KIND,
       content: {},
       context: "call it back Tuesday",
-      updated_at: "2026-08-26T12:00:00.000Z",
     });
+    expect(row).not.toHaveProperty("updated_at");
+  });
+
+  it("latestRoleContext picks the newer row regardless of which kind wrote it — the D4 round trip", () => {
     // The exact "typed and lost" scenario D4 exists to fix: save note A, then
-    // generate a CV (carries A, newer at the time) — the notes row's OWN save
-    // used to never bump its updated_at, so a later edit could still lose to
-    // the older generation row. With a fresh stamp on every insert, it can't.
+    // generate a CV (carries A). Both inserts get their `updated_at` from the
+    // SAME clock (the DB default) here, so whichever was actually written
+    // last — simulated directly as timestamps, since buildNotesInsertRow no
+    // longer produces one — wins, with no client/DB clock skew possible.
     const rows = [
       { context: "an old note from generating the CV", updated_at: "2026-08-20T10:00:00.000Z" },
-      row,
+      { context: "call it back Tuesday", updated_at: "2026-08-26T12:00:00.000Z" },
     ];
     expect(latestRoleContext(rows)).toBe("call it back Tuesday");
   });
 
   it("blank context saves as null, same as the old upsert payload did", () => {
-    expect(buildNotesInsertRow("u1", "j1", "   ", () => "2026-08-26T12:00:00.000Z").context).toBeNull();
+    expect(buildNotesInsertRow("u1", "j1", "   ").context).toBeNull();
   });
 });

@@ -39,8 +39,12 @@ export function latestRoleContext(rows: ArtifactContextRow[]): string {
 // delete+insert also fixes the READ side: `artifacts.updated_at` has a default
 // but no trigger, so a plain upsert never bumped it and a stale notes row could
 // outlast a newer cv/letter/answers row in `latestRoleContext` above. An insert
-// gets a fresh `updated_at` — stamped explicitly here (not left to the DB
-// default) so the round trip is provable without a live database.
+// gets a fresh `updated_at` — left to the DB's `now()` default, same as
+// `saveArtifact`'s cv/letter/answers insert, NOT stamped from the client clock.
+// A notes row and a saveArtifact row must share one clock: two different
+// clocks (client vs DB) can be minutes apart, and whichever row happens to
+// land on the "later" clock wins `latestRoleContext` regardless of which was
+// actually typed last — the exact "typed and lost" scenario D4 exists to fix.
 
 export type NotesWriteRow = {
   user_id: string;
@@ -48,7 +52,6 @@ export type NotesWriteRow = {
   kind: string;
   content: Record<string, never>;
   context: string | null;
-  updated_at: string;
 };
 
 // content is always `{}` for a notes row — the note itself lives in `context`
@@ -61,13 +64,8 @@ export function buildNotesDeleteMatch(userId: string, jobId: string): { user_id:
   return { user_id: userId, job_id: jobId, kind: NOTES_KIND };
 }
 
-/** The row to insert right after the delete above. `now` is injectable so the
- *  round trip is testable without faking the system clock. */
-export function buildNotesInsertRow(
-  userId: string,
-  jobId: string,
-  context: string,
-  now: () => string = () => new Date().toISOString(),
-): NotesWriteRow {
-  return { user_id: userId, job_id: jobId, kind: NOTES_KIND, content: {}, context: context.trim() || null, updated_at: now() };
+/** The row to insert right after the delete above. No `updated_at` here — the
+ *  DB default stamps it, same clock every other artifact kind's insert uses. */
+export function buildNotesInsertRow(userId: string, jobId: string, context: string): NotesWriteRow {
+  return { user_id: userId, job_id: jobId, kind: NOTES_KIND, content: {}, context: context.trim() || null };
 }
