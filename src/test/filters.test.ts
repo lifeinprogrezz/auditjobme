@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { sizeBand, sizeBandOrder, filterJobs, freshnessCutoffMs, requiredLanguages, roleFamily, roleSeenMs, workplaceOf, EMPTY_FILTERS, FRESHNESS_WINDOWS, type RoleJob } from "@/lib/roles";
+import { describe, it, expect, beforeEach } from "vitest";
+import { sizeBand, sizeBandOrder, filterJobs, freshnessCutoffMs, requiredLanguages, roleFamily, roleSeenMs, workplaceOf, EMPTY_FILTERS, FRESHNESS_WINDOWS, readStoredMine, writeStoredMine, shouldDefaultMineOn, settleMineDefault, shouldForceMineOff, railHeading, type RoleJob } from "@/lib/roles";
 
 const base: RoleJob = {
   id: "1",
@@ -268,5 +268,180 @@ describe("filterJobs — UK sponsor discovery facet", () => {
     const got = filterJobs(jobs, { ...EMPTY_FILTERS, sponsors: ["licensed", "unmatched"] }, NOW).map((j) => j.id);
     expect(got).toEqual(["lic", "un"]);
     expect(got).not.toContain("unchecked");
+  });
+});
+
+// ── Issue #154: the "Your matches" facet ──────────────────────────────────────
+describe("filterJobs — Your matches (mine) facet", () => {
+  const jobs = [
+    mk({ id: "scored-eligible", score: 4.2 }),
+    mk({ id: "pending-eligible" }), // unscored, still in the eligible slice
+    mk({ id: "outside-slice" }), // never in eligibleIds
+  ];
+  const eligibleIds = new Set(["scored-eligible", "pending-eligible"]);
+
+  it("off (default) → the whole catalog, regardless of eligibility", () => {
+    expect(filterJobs(jobs, EMPTY_FILTERS, Date.now(), eligibleIds)).toHaveLength(3);
+  });
+  it("on → only the eligible slice, scored or still pending within it", () => {
+    const got = filterJobs(jobs, { ...EMPTY_FILTERS, mine: true }, Date.now(), eligibleIds).map((j) => j.id);
+    expect(got).toEqual(["scored-eligible", "pending-eligible"]);
+    expect(got).not.toContain("outside-slice");
+  });
+  it("no eligibleIds supplied → fail-safe closed (mine on, no known slice, shows nothing)", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, mine: true })).toHaveLength(0);
+  });
+  it("ANDs with the other facets (mine + city)", () => {
+    const mix = [
+      mk({ id: "a", city: "Berlin" }),
+      mk({ id: "b", city: "Paris" }),
+    ];
+    const ids = new Set(["a", "b"]);
+    expect(
+      filterJobs(mix, { ...EMPTY_FILTERS, mine: true, cities: ["Berlin"] }, Date.now(), ids).map((j) => j.id),
+    ).toEqual(["a"]);
+  });
+  it("fixtures without a mine key still filter (optional field)", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS }, Date.now(), eligibleIds)).toHaveLength(3);
+  });
+});
+
+describe("shouldDefaultMineOn (issue #154 default-on rule)", () => {
+  const base = { signedIn: true, hasCv: true, hasScore: true, stored: null as boolean | null };
+
+  it("defaults ON once a signed-in user with a CV has at least one landed score", () => {
+    expect(shouldDefaultMineOn(base)).toBe(true);
+  });
+  it("stays OFF while no score has landed yet, even signed in with a CV", () => {
+    expect(shouldDefaultMineOn({ ...base, hasScore: false })).toBe(false);
+  });
+  it("stays OFF for a logged-out visitor", () => {
+    expect(shouldDefaultMineOn({ ...base, signedIn: false })).toBe(false);
+  });
+  it("stays OFF for a signed-in visitor with no CV on file", () => {
+    expect(shouldDefaultMineOn({ ...base, hasCv: false })).toBe(false);
+  });
+  it("a stored explicit choice wins for a signed-in, scored user, either way", () => {
+    expect(shouldDefaultMineOn({ ...base, hasScore: false, stored: true })).toBe(true);
+    expect(shouldDefaultMineOn({ ...base, stored: false })).toBe(false);
+  });
+  // Fix round 1, blocker 2: the logged-out/no-CV rule overrides ANY stored value —
+  // a stored "1" from an earlier scored session must not survive a same-browser
+  // sign-out (SPA, no reload) or follow the browser into an anonymous visit.
+  it("ignores a stored choice for a logged-out visitor", () => {
+    expect(shouldDefaultMineOn({ ...base, signedIn: false, stored: true })).toBe(false);
+  });
+  it("ignores a stored choice for a signed-in visitor with no CV", () => {
+    expect(shouldDefaultMineOn({ ...base, hasCv: false, stored: true })).toBe(false);
+  });
+});
+
+describe("settleMineDefault (issue #154 fix round 1, blocker 1: don't settle before auth/profile land)", () => {
+  const ready = {
+    authLoading: false,
+    profileChecked: true,
+    signedIn: true,
+    hasCv: true,
+    hasScore: true,
+    stored: null as boolean | null,
+  };
+
+  it("waits while auth is still loading, even with nothing stored", () => {
+    expect(settleMineDefault({ ...ready, authLoading: true })).toBe("wait");
+  });
+  it("waits on the exact first-paint shape that shipped the bug: loading=true so signedIn reads false", () => {
+    expect(
+      settleMineDefault({
+        authLoading: true,
+        profileChecked: false,
+        signedIn: false,
+        hasCv: false,
+        hasScore: false,
+        stored: null,
+      }),
+    ).toBe("wait");
+  });
+  it("waits for a signed-in visitor's profile fetch before trusting hasCv", () => {
+    expect(settleMineDefault({ ...ready, profileChecked: false })).toBe("wait");
+  });
+  it("does not wait on profileChecked for a logged-out visitor (it never flips true for one)", () => {
+    expect(
+      settleMineDefault({ ...ready, signedIn: false, hasCv: false, hasScore: false, profileChecked: false }),
+    ).toBe(false);
+  });
+  it("waits for the first landed score when nothing is stored", () => {
+    expect(settleMineDefault({ ...ready, hasScore: false })).toBe("wait");
+  });
+  it("settles ON once auth, profile, and the first score have all landed", () => {
+    expect(settleMineDefault(ready)).toBe(true);
+  });
+  it("an explicit stored choice settles immediately once auth/profile are ready, without waiting on hasScore", () => {
+    expect(settleMineDefault({ ...ready, hasScore: false, stored: true })).toBe(true);
+    expect(settleMineDefault({ ...ready, stored: false })).toBe(false);
+  });
+
+  // Fix round 2, blocker 1: a signed-in visitor's CV submission (post-sign-in
+  // modal) can land AFTER this hook first evaluates — hasCv starts false, not
+  // just hasScore. Waiting on hasCv too (still only when nothing is stored)
+  // stops the old immediate, permanent "false" from shouldDefaultMineOn's
+  // `!hasCv` branch, which the one-shot settle effect then never revisited
+  // even after hasCv and hasScore both turned true in the same SPA session.
+  it("waits for the CV itself, not just its score, when nothing is stored", () => {
+    expect(settleMineDefault({ ...ready, hasCv: false, hasScore: false })).toBe("wait");
+  });
+  it("still settles ON once both the CV and its first score have landed", () => {
+    expect(settleMineDefault({ ...ready, hasCv: true, hasScore: true })).toBe(true);
+  });
+  it("an explicit stored choice still settles immediately even before the CV lands (no wait)", () => {
+    expect(settleMineDefault({ ...ready, hasCv: false, hasScore: false, stored: true })).toBe(false);
+  });
+});
+
+describe("shouldForceMineOff (issue #154 fix round 1, blocker 2: sign-out transition)", () => {
+  it("forces mine off when signed out mid-session with mine still active", () => {
+    expect(shouldForceMineOff({ signedIn: false, hasCv: false, mine: true })).toBe(true);
+  });
+  it("forces mine off when the CV drops while still signed in", () => {
+    expect(shouldForceMineOff({ signedIn: true, hasCv: false, mine: true })).toBe(true);
+  });
+  it("does nothing once mine is already off", () => {
+    expect(shouldForceMineOff({ signedIn: false, hasCv: false, mine: false })).toBe(false);
+  });
+  it("does nothing for a steady signed-in, scored session", () => {
+    expect(shouldForceMineOff({ signedIn: true, hasCv: true, mine: true })).toBe(false);
+  });
+});
+
+describe("readStoredMine / writeStoredMine (issue #154 per-browser persistence)", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("returns null when nothing has been stored yet", () => {
+    expect(readStoredMine()).toBeNull();
+  });
+  it("round-trips an explicit true/false choice", () => {
+    writeStoredMine(true);
+    expect(readStoredMine()).toBe(true);
+    writeStoredMine(false);
+    expect(readStoredMine()).toBe(false);
+  });
+});
+
+describe("railHeading (issue #154 — 'Best fit' retired)", () => {
+  it("reads 'Your matches' for a scored user on the default landing", () => {
+    expect(railHeading(true, true)).toBe("Your matches");
+  });
+  it("reads 'Your matches' once anything has narrowed the view, scored or not", () => {
+    expect(railHeading(true, false)).toBe("Your matches");
+    expect(railHeading(false, false)).toBe("Your matches");
+  });
+  it("reads 'Hot right now' only for the anon/no-CV default landing", () => {
+    expect(railHeading(false, true)).toBe("Hot right now");
+  });
+  it("never returns 'Best fit'", () => {
+    for (const scored of [true, false]) {
+      for (const defaultView of [true, false]) {
+        expect(railHeading(scored, defaultView)).not.toBe("Best fit");
+      }
+    }
   });
 });

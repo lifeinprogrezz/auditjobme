@@ -44,6 +44,7 @@ function renderBar(props: Partial<React.ComponentProps<typeof HeadBar>> = {}) {
         onAddCv={vi.fn()}
         onSignIn={vi.fn()}
         onBrand={vi.fn()}
+        onToggleMine={vi.fn()}
         {...props}
       />
     </MemoryRouter>,
@@ -95,5 +96,62 @@ describe("HeadBar facet row", () => {
     expect(document.querySelector(".fdrop-portal")).not.toBeNull();
     fireEvent.click(document.body);
     expect(document.querySelector(".fdrop-portal")).toBeNull();
+  });
+});
+
+// ── Issue #154: the "Your matches" chip ────────────────────────────────────
+describe("HeadBar — Your matches chip", () => {
+  afterEach(cleanup);
+
+  it("renders disabled (greyed, inert) for a logged-out visitor", () => {
+    renderBar({ signedIn: false, scored: false });
+    const btn = screen.getByRole("button", { name: "Your matches" });
+    expect(btn).toBeDisabled();
+    expect(btn.className).toContain("disabled");
+  });
+
+  it("renders disabled for a signed-in visitor with no CV on file", () => {
+    renderBar({ signedIn: true, scored: false });
+    expect(screen.getByRole("button", { name: "Your matches" })).toBeDisabled();
+  });
+
+  it("is enabled and reports the toggle up for a scored user", () => {
+    const onToggleMine = vi.fn();
+    renderBar({ signedIn: true, scored: true, onToggleMine });
+    const btn = screen.getByRole("button", { name: "Your matches" });
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+    expect(onToggleMine).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the active state + dismiss × once the facet is on", () => {
+    renderBar({ signedIn: true, scored: true, filters: { ...EMPTY_FILTERS, mine: true } });
+    const btn = screen.getByRole("button", { name: /Your matches/ });
+    expect(btn.className).toContain("active");
+    expect(btn).toHaveTextContent("×");
+  });
+
+  // Issue #154 fix round 1, blocker 2: "Your matches" is scope, not a narrowing
+  // filter (mirrors RolesMap's isDefaultView, which never counts filters.mine) —
+  // so a scored user's RESTING DEFAULT state (mine on, nothing else set) must not
+  // show "Clear all" as permanently active.
+  it("'Clear all' stays inert when Your matches is the ONLY active thing", () => {
+    renderBar({ signedIn: true, scored: true, filters: { ...EMPTY_FILTERS, mine: true } });
+    openRow();
+    const clearAll = screen.getByRole("button", { name: "Clear all filters" });
+    expect(clearAll.className).toContain("disabled");
+    expect(clearAll).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("'Clear all' still activates on a real filter even while Your matches is on", () => {
+    renderBar({
+      signedIn: true,
+      scored: true,
+      filters: { ...EMPTY_FILTERS, mine: true, cities: ["Berlin"] },
+    });
+    openRow();
+    const clearAll = screen.getByRole("button", { name: "Clear all filters" });
+    expect(clearAll.className).not.toContain("disabled");
+    expect(clearAll).toHaveAttribute("aria-disabled", "false");
   });
 });

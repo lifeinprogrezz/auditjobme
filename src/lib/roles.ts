@@ -107,6 +107,14 @@ export function fitLabel(score: number): string {
   return b === "great" ? "Strong fit" : b === "mid" ? "Fair fit" : "Weak fit";
 }
 
+/** The rail heading (issue #154, retiring "Best fit"): "Your matches" always
+ *  once signed in with a CV (`scored`), and also once anything has narrowed the
+ *  view away from the default landing — the anon/no-CV "Hot right now" showcase
+ *  is the only other state. */
+export function railHeading(scored: boolean, defaultView: boolean): string {
+  return scored || !defaultView ? "Your matches" : "Hot right now";
+}
+
 /** Geo / work-authorization verdict for a role (issue #42, finishing the RolesPanel
  *  partial). SAFETY PROPERTY: never show a WRONG verdict — only surface a positive or
  *  barrier when the JD states it unambiguously; when nothing is stated, fall through to
@@ -216,6 +224,14 @@ export type RolesFilters = {
   // a company we never checked (null) hides while a selection is active, because a
   // silent register match is not evidence of a licence. Issue #73 slice 5.
   sponsors?: string[];
+  // "Your matches" (issue #154): narrows the view to the user's scored/pending
+  // slice — a role passes when its id is in the eligibleIds set filterJobs is
+  // given (the same paid-scoring prefilter useRolesData draws eligibleJobs from,
+  // whether a score has landed yet or the role is still pending within it). Off
+  // shows the whole catalog. Optional so fixtures typecheck; EMPTY_FILTERS keeps
+  // it false — the ON default is an app-level decision (see shouldDefaultMineOn),
+  // not baked into the empty state.
+  mine?: boolean;
 };
 
 export const EMPTY_FILTERS: RolesFilters = {
@@ -229,7 +245,104 @@ export const EMPTY_FILTERS: RolesFilters = {
   workplaces: [],
   freshness: [],
   sponsors: [],
+  mine: false,
 };
+
+// ── "Your matches" persisted preference (issue #154) ──────────────────────────
+// The default-computation itself (shouldDefaultMineOn) is pure/testable; the two
+// storage functions are thin, try/catch-guarded localStorage access, same shape
+// as markSessionSeen/hasSeenSession in lib/deviceSession.ts.
+const MINE_STORAGE_KEY = "northgoing.roles.mine";
+
+/** The user's last explicit "Your matches" choice, or null when nothing is
+ *  stored yet (a fresh browser, or storage unavailable). */
+export function readStoredMine(): boolean | null {
+  try {
+    const v = localStorage.getItem(MINE_STORAGE_KEY);
+    return v === "1" ? true : v === "0" ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Remember the effective "Your matches" state (an explicit toggle, or the
+ *  default this session settled on) so a later page load in this browser opens
+ *  the same way. Storage-safe: private-mode / quota failures are ignored. */
+export function writeStoredMine(v: boolean): void {
+  try {
+    localStorage.setItem(MINE_STORAGE_KEY, v ? "1" : "0");
+  } catch {
+    /* ignore — localStorage unavailable */
+  }
+}
+
+/** Pure default-on rule (issue #154 acceptance, corrected fix round 1 blocker 2):
+ *  the logged-out/no-CV visitor has no slice to show, so that rule OVERRIDES any
+ *  stored value first — a stored "1" from an earlier scored session must not
+ *  survive a same-browser sign-out (SPA, no reload) or follow the browser into an
+ *  anonymous visit. Only once signed in with a CV does a stored explicit choice
+ *  win; absent one, "Your matches" turns on the moment this signed-in, scored
+ *  user has at least one landed score. Mirrors the shape of shouldPromptCv in
+ *  lib/deviceSession.ts. */
+export function shouldDefaultMineOn(s: {
+  signedIn: boolean;
+  hasCv: boolean;
+  hasScore: boolean;
+  stored: boolean | null;
+}): boolean {
+  if (!s.signedIn || !s.hasCv) return false;
+  if (s.stored != null) return s.stored;
+  return s.hasScore;
+}
+
+/** The default-SETTLE decision (issue #154 fix round 1, blocker 1): "wait" until
+ *  auth has actually resolved and — for a signed-in visitor — the profile fetch
+ *  has landed too, so the very first render (Supabase session still null,
+ *  useAuth().loading===true, RolesMap ungated at "/") never reads signedIn=false
+ *  and permanently persists "off". A logged-out visitor has no profile row to
+ *  wait on (profileChecked never flips true for one — see useRolesData), so the
+ *  profileChecked gate applies only when signedIn. Once both have settled, keep
+ *  the existing wait-for-first-score behavior when nothing is stored. Pure/
+ *  testable; RolesMap's one settle effect calls this instead of
+ *  shouldDefaultMineOn directly.
+ *
+ *  Fix round 2, blocker 1: the wait-for-hasScore branch used to require
+ *  `hasCv` already true before it would hold off settling — so a signed-in
+ *  visitor who reaches this hook BEFORE their CV submission lands (the normal
+ *  shape post-sign-in, per shouldPromptCv in lib/deviceSession.ts: CV modal
+ *  opens, hasCv is false at that first settle-eligible render) got an
+ *  immediate, permanent "false" from shouldDefaultMineOn's `!hasCv` branch —
+ *  the one-shot settle effect then never revisits it, even after hasCv AND
+ *  hasScore both flip true in the same SPA session with no reload. Waiting on
+ *  `!hasCv` here too (still only when nothing is stored — an explicit choice
+ *  should never be held hostage to a CV that may never arrive) closes that
+ *  gap: for a genuinely CV-less signed-in visitor the wait never resolves,
+ *  which is harmless (mine simply stays at its initial `false`, the correct
+ *  value either way). */
+export function settleMineDefault(s: {
+  authLoading: boolean;
+  profileChecked: boolean;
+  signedIn: boolean;
+  hasCv: boolean;
+  hasScore: boolean;
+  stored: boolean | null;
+}): "wait" | boolean {
+  if (s.authLoading) return "wait";
+  if (s.signedIn && !s.profileChecked) return "wait";
+  if (s.stored == null && s.signedIn && (!s.hasCv || !s.hasScore)) return "wait";
+  return shouldDefaultMineOn(s);
+}
+
+/** True when a currently-active "Your matches" needs to be forced back off
+ *  (issue #154 fix round 1, blocker 2): the settle effect above is one-shot, so
+ *  once it has already run it never revisits mine=true after a mid-session
+ *  sign-out (SPA, no reload — signedIn drops with no page reload to re-settle)
+ *  or a CV clearing. RolesMap runs THIS on every signedIn/hasCv change instead,
+ *  so a stale "Your matches" never keeps the view narrowed to the anonymous
+ *  fallback slice (scorePrefilter's FALLBACK_CAP) with no visible way out. */
+export function shouldForceMineOff(s: { signedIn: boolean; hasCv: boolean; mine: boolean }): boolean {
+  return s.mine && (!s.signedIn || !s.hasCv);
+}
 
 /** Fixed option order + display labels for the Freshness facet (issue #73 slice 3).
  *  Deliberately a FILTER only: we measured freshness against 10,921 rows of the
@@ -316,10 +429,24 @@ export function workplaceOf(job: RoleJob): string | null {
   return job.workplace ?? job.extraction?.remote_policy ?? (job.remote ? "remote" : null);
 }
 
-export function filterJobs(jobs: RoleJob[], f: RolesFilters, nowMs: number = Date.now()): RoleJob[] {
+const EMPTY_SET: ReadonlySet<string> = new Set();
+
+export function filterJobs(
+  jobs: RoleJob[],
+  f: RolesFilters,
+  nowMs: number = Date.now(),
+  // "Your matches" (issue #154): the paid-scoring slice, from useRolesData's
+  // eligibleIds. Undefined (no slice known) behaves like an empty one — the
+  // honest fail-safe every other discovery facet already uses.
+  eligibleIds?: ReadonlySet<string>,
+): RoleJob[] {
   const q = f.query.trim().toLowerCase();
   const freshCutoff = freshnessCutoffMs(f.freshness, nowMs);
   return jobs.filter((j) => {
+    // "Your matches" — keep only roles in the user's eligible slice, scored or
+    // still pending within it; a role outside the slice hides, same discovery
+    // semantics as sponsors/workplaces/languages below.
+    if (f.mine && !(eligibleIds ?? EMPTY_SET).has(j.id)) return false;
     // Freshness = a DISCOVERY filter: a role whose seen-time we don't hold (both
     // first_seen_at and posted_at missing) can't be proven fresh, so it hides while
     // a window is selected rather than being fabricated into it.

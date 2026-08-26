@@ -9,6 +9,7 @@ import {
   EMPTY_FILTERS,
   FRESHNESS_WINDOWS,
   LEVELS,
+  ROLE_FAMILY_OTHER,
   UK_SPONSOR_STATUSES,
   WORKPLACES,
   fitLabel,
@@ -17,10 +18,12 @@ import {
   geoVerdict,
   hueFor,
   postedAgo,
+  railHeading,
   websiteUrl,
   type RoleJob,
   type RolesFilters,
 } from "@/lib/roles";
+import { ROLE_FAMILY_OPTIONS } from "@/lib/labels";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { hasReadableJd, pendingLabelOf, scoreStatusOf } from "@/lib/scorePrefilter";
 import { ScoringProgress } from "@/components/roles/ScoringProgress";
@@ -28,6 +31,7 @@ import { useTheme } from "@/lib/theme";
 import { track } from "@/lib/analytics";
 import ScoreBreakdown from "./ScoreBreakdown";
 import FitChip from "./FitChip";
+import MineChip from "./MineChip";
 
 // The pool is unbounded (1000+ live rows); each card mounts a Logo.dev <img>,
 // so cap the DOM and point the user at search/filters for the tail.
@@ -68,6 +72,9 @@ export type RolesPanelProps = {
   /** The live headbar filter state (mirrored as removable chips in the panel). */
   filters: RolesFilters;
   onFilters: (f: RolesFilters) => void;
+  /** Toggle the "Your matches" facet (issue #154) — routed through the page so
+   *  the effective state also lands in localStorage (lib/roles.ts writeStoredMine). */
+  onToggleMine: () => void;
   /** Map selection: company and/or city, each independently removable via a chip. */
   selCo?: string | null;
   selCity?: string | null;
@@ -139,6 +146,7 @@ export default function RolesPanel({
   onAddCv,
   filters,
   onFilters,
+  onToggleMine,
   selCo,
   selCity,
   onClearCo,
@@ -169,6 +177,12 @@ export default function RolesPanel({
   // removable. They read/write the SAME filter state the headbar uses, so the two
   // can never drift out of sync (Rober 7-06).
   const levelLabel = (v: string) => LEVELS.find((l) => l.value === v)?.label ?? v;
+  // Role vertical labels come from the ONE role vocabulary (issue #70) — the same
+  // Title-Case display names the headbar's Role facet uses — plus "Other" for the
+  // unlabelled-family bucket (roleFamily's fallback), so a chip never falls back
+  // to the raw lowercase stored value ("product", not "Product").
+  const roleFamilyLabel = (v: string) =>
+    ROLE_FAMILY_OPTIONS.find((o) => o.value === v)?.label ?? (v === ROLE_FAMILY_OTHER ? "Other" : v);
   const remove = (key: "levels" | "cities" | "sectors" | "sizes", v: string) =>
     onFilters({ ...filters, [key]: (filters[key] as string[]).filter((x) => x !== v) });
   const activeChips: { key: string; label: string; bold?: boolean; onX?: () => void }[] = [
@@ -177,6 +191,14 @@ export default function RolesPanel({
     ...(filters.query
       ? [{ key: "q", label: `“${filters.query}”`, onX: () => onFilters({ ...filters, query: "" }) }]
       : []),
+    // Role + Language (issue #154 fix round 1, blocker 3): every other headbar
+    // facet already renders a chip under "Your matches" — these two were missing,
+    // so the spec's own "Your matches — Product ×" example never rendered.
+    ...(filters.roles ?? []).map((v) => ({
+      key: `ro-${v}`,
+      label: roleFamilyLabel(v),
+      onX: () => onFilters({ ...filters, roles: (filters.roles ?? []).filter((x) => x !== v) }),
+    })),
     ...filters.levels.map((v) => ({ key: `lv-${v}`, label: levelLabel(v), onX: () => remove("levels", v) })),
     ...filters.cities.map((v) => ({ key: `ci-${v}`, label: v, onX: () => remove("cities", v) })),
     ...filters.sectors.map((v) => ({ key: `se-${v}`, label: v, onX: () => remove("sectors", v) })),
@@ -196,9 +218,18 @@ export default function RolesPanel({
       label: UK_SPONSOR_STATUSES.find((st) => st.value === v)?.label ?? v,
       onX: () => onFilters({ ...filters, sponsors: (filters.sponsors ?? []).filter((x) => x !== v) }),
     })),
+    ...(filters.languages ?? []).map((v) => ({
+      key: `la-${v}`,
+      label: v,
+      onX: () => onFilters({ ...filters, languages: (filters.languages ?? []).filter((x) => x !== v) }),
+    })),
   ];
   const clearAllFilters = () => {
-    onFilters(EMPTY_FILTERS);
+    // "Your matches" is scope, not a narrowing filter (RolesMap's isDefaultView
+    // never counts it) — a "Clear all" here must not silently turn it off
+    // (issue #154 fix round 1, blocker 2), same fix as RolesMap's onResetView /
+    // onClearAll / onBrand.
+    onFilters({ ...EMPTY_FILTERS, mine: filters.mine });
     onClearCo?.();
     onClearCity?.();
   };
@@ -243,11 +274,29 @@ export default function RolesPanel({
 
   const renderCards = () => (
     <>
-      {/* One compact header row: title left, the scoring progress as a quiet mono
-          whisper right — no separate banner bar (Rober 7-16). The whisper is now a
-          thin bar with a phase and a real count (#149); it hides itself. */}
+      {/* Compact header block: heading line (title + "Your matches" toggle),
+          then the scoring progress as a quiet mono whisper on its own
+          full-width line beneath (#166) — no separate banner bar (Rober
+          7-16). The whisper is a thin bar with a phase and a real count
+          (#149); it hides itself. */}
       <div className="phead">
-        <h1 className="ptitle">{defaultView ? (scored ? "Best fit" : "Hot right now") : "Your matches"}</h1>
+        {/* Heading line: title + the "Your matches" toggle. Kept off the
+            progress line so a header-row chip never fights the full-width
+            .sprog track for space — see .phead/.phead-top/.sprog in
+            roles.css. */}
+        <div className="phead-top">
+          {/* "Your matches" always, once signed in with a CV — "Best fit" is
+              retired (issue #154); the default-view/narrowed split only still
+              matters for the anon "Hot right now" showcase. */}
+          <h1 className="ptitle">{railHeading(scored, Boolean(defaultView))}</h1>
+          {/* Disabled for a logged-out/no-CV visitor, but NEVER while active (fix
+              round 1, blocker 2) — a stale active state must stay dismissable. */}
+          <MineChip
+            active={Boolean(filters.mine)}
+            disabled={(!signedIn || !scored) && !filters.mine}
+            onToggle={onToggleMine}
+          />
+        </div>
         <ScoringProgress
           variant="rail"
           hasCv={signedIn && scored}
