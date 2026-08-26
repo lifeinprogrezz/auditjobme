@@ -11,8 +11,10 @@
 // cached rows and re-validates in the background instead of blanking the page. Keys are
 // scoped by user id, so one person's rows can never be read under another's key.
 //
-// Rule + code move together: the keys and the stale windows are pinned by
-// src/test/roles-data-cache.test.tsx.
+// A FAILED read must throw, never resolve empty — see `assertOk` below.
+//
+// Rule + code move together: the keys, the stale windows and the throw-on-error rule
+// are pinned by src/test/roles-data-cache.test.tsx.
 
 import { supabase } from "@/integrations/supabase/client";
 import { fetchDataplane, type DataplaneCompany, type DataplaneOffice } from "@/lib/dataplane";
@@ -81,6 +83,29 @@ export type PublicPool = {
 
 const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page past it.
 
+/**
+ * Every function in this file is a TanStack `queryFn`, and a queryFn has exactly two
+ * honest outcomes: the complete data, or a throw.
+ *
+ * Resolving with an empty result on a PostgREST or network error is the third, dishonest
+ * one, and it is destructive here because these queries re-validate on their own: on tab
+ * focus, on mount past the stale window, and on reconnect. A person wakes the laptop,
+ * focus fires before the wifi is back, one read fails — and if that failure resolves
+ * empty, TanStack records a SUCCESSFUL refetch and overwrites the last good rows. The
+ * profile nulls, so `hasCv` flips false and the CV modal opens for a user who HAS a CV
+ * and Settings offers to save empty targets over the stored ones; applications and saved
+ * empty, so applied roles resurface in the queue; scores blank, so the map goes back to
+ * "Scoring…". Throwing keeps the cached rows exactly as they were, marks the query
+ * `isError`, and retries.
+ *
+ * A legitimately MISSING row is not an error and must not throw: `maybeSingle()` returns
+ * `{ data: null, error: null }` for a user with no profile yet, and an empty `select`
+ * returns `{ data: [], error: null }`. Only `error` means the read failed.
+ */
+function assertOk(label: string, error: { message: string } | null | undefined): void {
+  if (error) throw new Error(`[rolesQueries] ${label} read failed: ${error.message}`);
+}
+
 /** Columns the map needs off a job row, live-query fallback and by-id reads alike. */
 const JOB_COLUMNS =
   "id, company, title, url, location, remote, source, seniority, posted_at, first_seen_at, company_id, extraction, role_family, workplace";
@@ -131,9 +156,10 @@ export async function fetchPublicPool(): Promise<PublicPool> {
       .select(`${JOB_COLUMNS}, has_jd`)
       .eq("is_live", true)
       .range(from, from + PAGE - 1);
-    if (error || !data) break;
-    jobs = jobs.concat(data as unknown as JobsRow[]);
-    if (data.length < PAGE) break;
+    assertOk("jobs:fallback", error);
+    const rows = (data ?? []) as unknown as JobsRow[];
+    jobs = jobs.concat(rows);
+    if (rows.length < PAGE) break;
   }
   // Paged: 598 companies today, but the catalogue grows and PostgREST would silently
   // return the first 1000. A company missing from this list loses its logo, sector,
@@ -145,9 +171,12 @@ export async function fetchPublicPool(): Promise<PublicPool> {
         .select(
           "slug, logo_domain, lat, lng, website, sector, stage, headcount_bucket, hq_city, hq_country, linkedin_url, description, founded_year, uk_sponsor_status",
         ),
-    { label: "companies:dataplane" },
+    { label: "companies:dataplane", strict: true },
   );
-  const { data: offs } = await supabase.from("company_offices").select("company_slug, lat, lng");
+  const { data: offs, error: offErr } = await supabase
+    .from("company_offices")
+    .select("company_slug, lat, lng");
+  assertOk("company_offices", offErr);
   return { jobs, companies, offices: (offs ?? []) as DataplaneOffice[] };
 }
 
@@ -164,15 +193,16 @@ export async function fetchScores(userId: string): Promise<ScoreRow[]> {
         .select("job_id, score, signals")
         .eq("user_id", userId)
         .eq("rubric_version", RUBRIC_VERSION),
-    { label: "scores:read" },
+    { label: "scores:read", strict: true },
   );
 }
 
 export async function fetchApplications(userId: string): Promise<ApplicationsData> {
-  const { data: appsData } = await supabase
+  const { data: appsData, error } = await supabase
     .from("applications")
     .select("job_id, status")
     .eq("user_id", userId);
+  assertOk("applications", error);
   const applications: ApplicationRow[] = (appsData ?? []).map((a) => ({
     job_id: a.job_id,
     status: a.status ?? null,
@@ -182,20 +212,26 @@ export async function fetchApplications(userId: string): Promise<ApplicationsDat
   // Resolve those applications to their companies from their OWN rows, not from the
   // live pool: an application whose posting has since closed must still collapse its
   // company while the conversation is open.
-  const { data: jobRows } = await supabase
+  const { data: jobRows, error: jobsErr } = await supabase
     .from("jobs")
     .select("id, company, company_id")
     .in("id", ids);
+  assertOk("applications:jobs", jobsErr);
   return { applications, jobRows: (jobRows ?? []) as AppliedJobRow[] };
 }
 
 /** Shared shape for saved_jobs / dismissed_jobs: own-row ids, then those roles' job
  *  rows WITHOUT the is_live filter so an expired role keeps its display data. */
 async function fetchRoleSet(userId: string, table: "saved_jobs" | "dismissed_jobs"): Promise<RoleSetData> {
-  const { data } = await supabase.from(table).select("job_id").eq("user_id", userId);
+  const { data, error } = await supabase.from(table).select("job_id").eq("user_id", userId);
+  assertOk(table, error);
   const ids = (data ?? []).map((r) => r.job_id);
   if (ids.length === 0) return { ids, rows: [] };
-  const { data: rows } = await supabase.from("jobs").select(JOB_COLUMNS).in("id", ids);
+  const { data: rows, error: jobsErr } = await supabase
+    .from("jobs")
+    .select(JOB_COLUMNS)
+    .in("id", ids);
+  assertOk(`${table}:jobs`, jobsErr);
   return { ids, rows: (rows ?? []) as unknown as JobsRow[] };
 }
 
@@ -204,9 +240,13 @@ export const fetchDismissed = (userId: string) => fetchRoleSet(userId, "dismisse
 
 /**
  * Warm contacts (issue #41): the user's whole connections upload, paged past
- * PostgREST's row cap (a LinkedIn export routinely runs to a few thousand rows). Read
- * defensively — an error (the migration not applied yet) just means no markers
- * anywhere, never a crash.
+ * PostgREST's row cap (a LinkedIn export routinely runs to a few thousand rows).
+ *
+ * A failed page throws (see `assertOk`). It used to swallow the error and return the
+ * rows collected so far, which cached a truncated upload as a successful read and left
+ * the map missing warm markers the person had uploaded. The caller still degrades to no
+ * markers while the query is in error — `connectionsQ.data ?? []` — it just no longer
+ * writes that emptiness over the good rows.
  */
 export async function fetchConnections(userId: string): Promise<ConnectionRow[]> {
   let rows: ConnectionRow[] = [];
@@ -216,23 +256,33 @@ export async function fetchConnections(userId: string): Promise<ConnectionRow[]>
       .select("full_name, company, company_key, position, linkedin_url, created_at")
       .eq("user_id", userId)
       .range(from, from + PAGE - 1);
-    if (error || !data) break;
-    rows = rows.concat(data as ConnectionRow[]);
-    if (data.length < PAGE) break;
+    assertOk("connections", error);
+    const page = (data ?? []) as ConnectionRow[];
+    rows = rows.concat(page);
+    if (page.length < PAGE) break;
   }
   return rows;
 }
 
-/** The profile row, or null when the user has none yet. Never undefined: a query
- *  function that returns undefined is an error in TanStack Query. */
+/**
+ * The profile row, or null when the user has none yet. Never undefined: a query
+ * function that returns undefined is an error in TanStack Query.
+ *
+ * The null is reserved for the one thing it can honestly mean — NO ROW. `maybeSingle()`
+ * reports that as `{ data: null, error: null }`, so `error` is the only signal that the
+ * read itself failed, and a failed read throws. This is the load-bearing case: a null
+ * profile flips `hasCv` false, which opens the CV modal on /roles for someone who has a
+ * CV and makes Settings render "No CV on file" with empty chips over stored targets.
+ */
 export async function fetchProfile(userId: string): Promise<ProfileRow | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select(
       "target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, cv_text, target_roles, target_sectors, updated_at",
     )
     .eq("id", userId)
     .maybeSingle();
+  assertOk("profiles", error);
   return (data as ProfileRow | null) ?? null;
 }
 

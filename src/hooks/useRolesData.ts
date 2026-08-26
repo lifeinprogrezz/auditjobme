@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
@@ -354,7 +354,18 @@ export function useRolesData() {
     () => enrichAll(poolJobs ?? [], dims, officesBySlug),
     [poolJobs, dims, officesBySlug],
   );
-  const landed = useMemo(() => landedScoreMap(scoresQ.data ?? NO_SCORES), [scoresQ.data]);
+  // ── Issue #54, the non-urgent half. THE DEFERRAL LIVES HERE, and it has to: a
+  // `startTransition` around the cache write does nothing, because `useQuery` subscribes
+  // through `useSyncExternalStore` (store-change re-renders are scheduled on SyncLane
+  // whatever transition the write sat in) and TanStack's notifyManager batches the
+  // notification into a `setTimeout(0)` that has left the transition's scope by the time
+  // it runs. `useDeferredValue` is the version React honours: every rebuild downstream of
+  // `landed` — the jobs sort, the Today queue, the map facets and markers — re-renders at
+  // transition priority, so a click during a scoring drain interrupts it instead of
+  // waiting behind it. Pinned by src/test/score-deferral.test.ts; do not inline
+  // `scoresQ.data` back into the memo.
+  const deferredScores = useDeferredValue(scoresQ.data);
+  const landed = useMemo(() => landedScoreMap(deferredScores ?? NO_SCORES), [deferredScores]);
   // #130 lives inside applyLandedScores: a score held by a role with no description
   // is not applied, so the role renders as unscored and cannot rank on a stale row.
   const jobs = useMemo(() => {
@@ -446,18 +457,19 @@ export function useRolesData() {
   // ── Score-arrival coalescer (issue #54). Each poll pushes its landed-score snapshot
   // here instead of committing directly; the buffer merges snapshots that bunch up
   // (initial-load handoff + a manual "check now" + a poll can fire in the same tick)
-  // into ONE commit, and startTransition marks that commit non-urgent so the heavy
-  // derived-list rebuild (Today queue + map facets/markers) yields to clicks instead
-  // of stalling the main thread. Each poll's map is a full snapshot, so the merged
-  // union IS the freshest complete set and can replace the cached rows outright.
+  // into ONE commit, so a drain costs one derived rebuild per flush instead of one per
+  // reply. Each poll's map is a full snapshot, so the merged union IS the freshest
+  // complete set and can replace the cached rows outright.
+  //
+  // This half is the COALESCING only. Making the resulting rebuild non-urgent is the
+  // `useDeferredValue` above — wrapping this write in `startTransition` looked like it
+  // did the job and did not, for the reasons written there.
   const commitScoresRef = useRef<(rows: ScoreRow[]) => void>(() => {});
   useEffect(() => {
     commitScoresRef.current = (rows) => {
       const uid = currentUserRef.current;
       if (!uid) return;
-      startTransition(() => {
-        queryClient.setQueryData(rolesKeys.scores(uid), rows);
-      });
+      queryClient.setQueryData(rolesKeys.scores(uid), rows);
     };
   }, [queryClient]);
   const scoreBufferRef = useRef<ScoreBuffer<ScoreRow> | null>(null);

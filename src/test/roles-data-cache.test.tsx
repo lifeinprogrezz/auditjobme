@@ -64,15 +64,23 @@ const rowsByTable: Record<string, Record<string, unknown>[]> = {
   ],
 };
 
+/** Arm ONE table to fail its NEXT read, then heal. That is the shape of the failure
+ *  that matters: a laptop waking up fires the focus refetch before the wifi is back. */
+const failOnce: Record<string, string | undefined> = {};
+
 function builderFor(table: string) {
-  const rows = rowsByTable[table] ?? [];
-  const result = { data: rows, error: null };
+  const failure = failOnce[table];
+  delete failOnce[table];
+  const rows = failure ? [] : (rowsByTable[table] ?? []);
+  // Exactly what PostgREST hands back on a failed read: no data, an error.
+  const error = failure ? { message: failure } : null;
+  const result = { data: failure ? null : rows, error };
   const builder: Record<string, unknown> = {
     eq: () => builder,
     in: () => builder,
     limit: () => Promise.resolve(result),
     range: () => Promise.resolve(result),
-    maybeSingle: () => Promise.resolve({ data: rows[0] ?? null, error: null }),
+    maybeSingle: () => Promise.resolve({ data: failure ? null : (rows[0] ?? null), error }),
     update: () => builder,
     upsert: () => Promise.resolve({ error: null }),
     insert: () => Promise.resolve({ error: null }),
@@ -104,6 +112,7 @@ vi.mock("@/lib/cvParse", () => ({
 
 // Imported after the mocks so the hook picks them up.
 const { useRolesData } = await import("@/hooks/useRolesData");
+const { rolesKeys } = await import("@/lib/rolesQueries");
 
 const ARTIFACT = {
   version: 1,
@@ -178,6 +187,7 @@ describe("useRolesData caches its reads (issue #152)", () => {
   beforeEach(() => {
     localStorage.clear();
     for (const k of Object.keys(reads)) delete reads[k];
+    for (const k of Object.keys(failOnce)) delete failOnce[k];
     fetchDataplane.mockReset().mockResolvedValue(ARTIFACT);
     currentUser = { id: "user-1" };
   });
@@ -232,6 +242,38 @@ describe("useRolesData caches its reads (issue #152)", () => {
     expect(second.result.current.cvText).toBe("a stored curriculum vitae");
     await settle();
     expect(counts()).toEqual(before);
+  });
+
+  // The cost of caching these reads is that they now re-validate on their own — on tab
+  // focus, on a mount past the 60-second stale window, on reconnect. A queryFn that
+  // resolves EMPTY on a failed read turns each of those into a data-loss event: TanStack
+  // records a successful refetch and the failure's leftovers replace the last good rows.
+  // For the profile that is the 7-25 P1 the `profileChecked` gate exists to prevent — a
+  // null profile means no CV, so the CV modal opens for someone who HAS a CV and Settings
+  // offers to save empty targets over the stored ones. The old hook kept the previous
+  // profile on a failed read (`if (prof) setProfile`), so anything less is a regression.
+  it("a failed profile refetch keeps the cached profile, not an empty one", async () => {
+    const client = makeClient();
+    const { result } = renderHook(() => useRolesData(), { wrapper: wrapperFor(client) });
+    await waitFor(() => expect(result.current.profileChecked).toBe(true));
+    await settle();
+    expect(result.current.cvText).toBe("a stored curriculum vitae");
+    expect(result.current.needsCv).toBe(false);
+
+    // Tab focus with the wifi still down.
+    failOnce.profiles = "boom";
+    await act(async () => {
+      await client.refetchQueries({ queryKey: rolesKeys.profile("user-1") });
+    });
+    await settle();
+
+    // What the person sees, first — the assertions that must go red on a regression.
+    expect(result.current.cvText).toBe("a stored curriculum vitae");
+    expect(result.current.needsCv).toBe(false);
+    expect(result.current.profileChecked).toBe(true);
+    // And the mechanism: the read was recorded as a FAILURE, so TanStack will retry it,
+    // rather than as a successful fetch of nothing.
+    expect(client.getQueryState(rolesKeys.profile("user-1"))?.errorUpdateCount).toBe(1);
   });
 
   it("signed out, nothing personal is read and the profile gate stays shut", async () => {
