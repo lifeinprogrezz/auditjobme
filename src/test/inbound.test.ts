@@ -25,6 +25,7 @@ import {
   secretAuthResult,
   senderDomain,
   type TrackedApp,
+  googleLinkHosts,
 } from "@/lib/inbound";
 
 const D = (iso: string) => new Date(iso);
@@ -621,5 +622,31 @@ describe("forwardingStatus (the Settings live status line, 4 states)", () => {
         gmail_confirmed_at: "2026-08-27T10:00:00Z",
       }),
     ).toBe("received");
+  });
+});
+
+describe("Gmail confirmation link on the mail-settings host (2026-08-26 live mails)", () => {
+  // Two real verification mails on 2026-08-26 carried ONLY the mail-settings.google.com
+  // host and were logged "no code or link found". Both Google hosts must match; the
+  // uf- cancel link must still never match on either.
+  it("extracts a mail-settings.google.com vf- link", () => {
+    const body = "Please confirm: https://mail-settings.google.com/mail/vf-ABC123def_-xyz and to cancel https://mail-settings.google.com/mail/uf-ABC123def_-xyz";
+    expect(extractGmailConfirmationLink(body)).toBe("https://mail-settings.google.com/mail/vf-ABC123def_-xyz");
+  });
+  it("never extracts a uf- cancel link on either host", () => {
+    expect(extractGmailConfirmationLink("https://mail-settings.google.com/mail/uf-ABC")).toBeNull();
+    expect(extractGmailConfirmationLink("https://mail.google.com/mail/uf-ABC")).toBeNull();
+  });
+  it("isConfirmUrl accepts vf- on both Google hosts and refuses lookalikes", () => {
+    expect(isConfirmUrl("https://mail-settings.google.com/mail/vf-ABC")).toBe(true);
+    expect(isConfirmUrl("https://mail.google.com/mail/vf-ABC")).toBe(true);
+    expect(isConfirmUrl("https://mail-settings.google.com/mail/uf-ABC")).toBe(false);
+    expect(isConfirmUrl("https://mail-settings.google.com.evil.io/mail/vf-ABC")).toBe(false);
+  });
+  it("googleLinkHosts reports hosts only, never paths or tokens", () => {
+    expect(googleLinkHosts("x https://mail-settings.google.com/mail/vf-SECRET y https://accounts.google.com/o/z")).toEqual([
+      "accounts.google.com",
+      "mail-settings.google.com",
+    ]);
   });
 });

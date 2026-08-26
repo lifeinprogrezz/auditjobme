@@ -24,10 +24,43 @@ const Y_TOLERANCE = 2.5;
  * the old space join, so a word the engine split across two runs reads exactly as it
  * did before; only the line breaks are new.
  */
-export function linesFromItems(items: PdfTextItem[]): string[] {
+/** Horizontal position of an item (transform index 4), or 0 when unknown. */
+const xOf = (item: PdfTextItem): number =>
+  typeof item?.transform?.[4] === "number" ? item.transform[4] : 0;
+const yOf = (item: PdfTextItem): number | null =>
+  typeof item?.transform?.[5] === "number" ? item.transform[5] : null;
+
+/**
+ * Put items in READING order: top to bottom, then left to right. pdf.js hands
+ * items back in content-stream order, which is the order the producer wrote
+ * them, not the order a reader sees them. Chromium (the owner's own CV engine)
+ * writes every block heading first and every bullet list afterwards, so a
+ * stream-ordered CV read as "three companies, then all their bullets" and the
+ * parser hung every bullet on the last company (2026-08-26). Items without a
+ * position keep their relative stream order at the end. Stable sort.
+ */
+export function readingOrder(items: PdfTextItem[]): PdfTextItem[] {
+  const indexed = items.map((item, i) => ({ item, i, y: yOf(item), x: xOf(item) }));
+  indexed.sort((a, b) => {
+    if (a.y === null && b.y === null) return a.i - b.i;
+    if (a.y === null) return 1;
+    if (b.y === null) return -1;
+    const dy = b.y - a.y; // PDF y grows upward: larger y = higher on the page
+    if (Math.abs(dy) > Y_TOLERANCE) return dy;
+    if (a.x !== b.x) return a.x - b.x;
+    return a.i - b.i;
+  });
+  return indexed.map((e) => e.item);
+}
+
+export function linesFromItems(rawItems: PdfTextItem[]): string[] {
+  const items = readingOrder(rawItems);
   const lines: string[] = [];
   let current: string[] = [];
   let currentY: number | null = null;
+  // The engine's own end-of-line flag still splits two runs that share a baseline
+  // (two columns of a skills table); sorting keeps such runs adjacent because
+  // they share y and the sort is stable on x, so the flag stays meaningful.
   let breakBefore = false;
 
   const flush = () => {
