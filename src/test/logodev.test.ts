@@ -86,11 +86,22 @@ describe("guessedDomain — the LAST-resort favicon guess (issue #153 item B1)",
 });
 
 describe("guessedFaviconUrl", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it("builds a single DuckDuckGo favicon URL from the guessed domain", () => {
     expect(guessedFaviconUrl("Acme")).toBe("https://icons.duckduckgo.com/ip3/acme.com.ico");
   });
 
   it("returns null when there is nothing to guess from", () => {
     expect(guessedFaviconUrl("")).toBeNull();
+  });
+
+  // PR #164 live-verify round 1: a wrong guess 404s and Chromium logs that
+  // failed <img> load to console regardless of the caller's onError handler —
+  // the browser's own resource-load log, unsuppressable from app JS. Dev-only
+  // keeps the request (and its console entry) out of the production bundle.
+  it("returns null outside dev — the guess never ships to production (console-silent)", () => {
+    vi.stubEnv("DEV", false);
+    expect(guessedFaviconUrl("Acme")).toBeNull();
   });
 });
