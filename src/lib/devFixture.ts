@@ -40,7 +40,7 @@ export const DEV_FIXTURE_CV_TEXT = `DEV FIXTURE CV - synthetic, used only by the
 Ada Fixture
 Product Manager - Berlin, Germany
 ada@example.invalid | +49 30 000000
-linkedin.com/in/ada-fixture
+linkedin.com/in/ada-fixture | github.com/ada-fixture | ada-fixture.example
 
 SUMMARY
 Product Manager, Europe. Ten years building consumer products end to end.
@@ -92,7 +92,7 @@ export const DEV_FIXTURE_CV_STRUCTURED: CvStructured = {
     email: "ada@example.invalid",
     phone: "+49 30 000000",
     location: "Berlin, Germany",
-    links: ["linkedin.com/in/ada-fixture"],
+    links: ["linkedin.com/in/ada-fixture", "github.com/ada-fixture", "ada-fixture.example"],
   },
   summary: "Product Manager, Europe. Ten years building consumer products end to end.",
   experience: [

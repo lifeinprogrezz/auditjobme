@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { boldRuns, buildCvDoc, buildCoverDoc, buildStructuredCvDoc, contactLine, jobMetaLine, pdfFilename } from "./pdf";
+import {
+  CV_FONT,
+  boldRuns,
+  buildCvDoc,
+  buildCoverDoc,
+  buildStructuredCvDoc,
+  contactLines,
+  jobMetaLine,
+  linkHref,
+  linkLabel,
+  pdfFilename,
+} from "./pdf";
 import { stripLeadingSummary } from "./cvHtml";
 import { validateCvStructured, type CvStructured } from "./cvStructured";
 
@@ -148,35 +159,117 @@ describe("pdf doc builders", () => {
 });
 
 describe("structured CV doc (#150)", () => {
-  it("renders the personal engine's layout: letterhead, contact line, then the four sections in order", () => {
+  it("renders the personal engine's layout: name, contact block, then the four sections in order", () => {
     const doc = buildStructuredCvDoc({ name: "ignored", summary: "Tailored for this role.", cv: STRUCTURED });
+    const content = doc.content as ContentItem[];
     const texts = textsOf(doc);
     expect(texts[0]).toBe("Jane Doe");
-    expect(texts[1]).toBe("Barcelona, Spain  \u00b7  jane@example.com");
-    const headers = texts.filter((t): t is string => typeof t === "string" && /^[A-Z][A-Z ]+$/.test(t));
+    expect(Array.isArray(content[1].stack)).toBe(true);
+    const headers = texts.filter((t): t is string => typeof t === "string" && /^[A-Z][A-Z &]+$/.test(t));
     expect(headers).toEqual([
       "PROFESSIONAL SUMMARY",
       "PROFESSIONAL EXPERIENCE",
       "EDUCATION",
-      "SKILLS AND ADDITIONAL INFORMATION",
+      "SKILLS & ADDITIONAL INFORMATION",
     ]);
     expect(doc.pageSize).toBe("A4");
   });
 
+  it("uses the personal engine's typography: Helvetica 11pt black on a 1.42 line height", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "Tailored.", cv: STRUCTURED });
+    expect(doc.defaultStyle).toEqual({ font: CV_FONT, fontSize: 11, lineHeight: 1.42, color: "#000" });
+    expect(CV_FONT).toBe("Helvetica");
+    const content = doc.content as ContentItem[];
+    // h1: full name, 20pt bold, 10px below (0.75pt per CSS px).
+    expect(content[0]).toEqual({ text: "Jane Doe", fontSize: 20, bold: true, margin: [0, 0, 0, 7.5] });
+    // h2: 13pt bold uppercase, 20px above and 9px below — NO colour tint, NO letter-spacing.
+    const headers = content.filter((c) => typeof c.text === "string" && /^[A-Z][A-Z &]+$/.test(c.text));
+    expect(headers.length).toBe(4);
+    for (const h of headers) {
+      expect(h.fontSize).toBe(13);
+      expect(h.bold).toBe(true);
+      expect(h.margin).toEqual([0, 15, 0, 6.75]);
+      expect(h).not.toHaveProperty("color");
+      expect(h).not.toHaveProperty("characterSpacing");
+    }
+  });
+
+  it("prints the contact block one labelled item per line, links coloured, underlined and clickable", () => {
+    const cv = validateCvStructured(
+      {
+        contact: {
+          name: "Jane Doe",
+          email: "jane@example.com",
+          phone: "+34 600 000 000",
+          location: "Berlin, Germany",
+          links: ["https://www.linkedin.com/in/jane", "github.com/jane", "jane.dev"],
+        },
+        experience: [{ company: "Acme", role: "PM", start: "", end: "", bullets: ["Shipped it"] }],
+      },
+      "Jane Doe Acme PM Shipped it",
+    ).cv;
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv });
+    const block = (doc.content as ContentItem[])[1] as { stack: ContentItem[] };
+    const lines = block.stack.map((item) => item.text as ContentItem[]);
+    // The engine's order: Location · Mobile · Email · Portfolio · GitHub · LinkedIn.
+    expect(lines.map((runs) => runs[0].text)).toEqual([
+      "Location: ",
+      "Mobile: ",
+      "Email: ",
+      "Portfolio: ",
+      "GitHub: ",
+      "LinkedIn: ",
+    ]);
+    for (const runs of lines) expect(runs[0].bold).toBe(true);
+    for (const item of block.stack) expect(item.fontSize).toBe(11);
+    expect(lines[0][1]).toEqual({ text: "Berlin, Germany" });
+    expect(lines[2][1]).toEqual({ text: "jane@example.com", link: "mailto:jane@example.com", color: "#1155cc", decoration: "underline" });
+    expect(lines[3][1]).toEqual({ text: "jane.dev", link: "https://jane.dev", color: "#1155cc", decoration: "underline" });
+    expect(lines[5][1]).toEqual({
+      text: "https://www.linkedin.com/in/jane",
+      link: "https://www.linkedin.com/in/jane",
+      color: "#1155cc",
+      decoration: "underline",
+    });
+  });
+
   it("prints each job as one unbreakable block: company, role, dates with location, then real bullets", () => {
     const doc = buildStructuredCvDoc({ name: "", summary: "s", cv: STRUCTURED });
-    const block = (doc.content as ContentItem[]).find((c) => Array.isArray(c.stack)) as {
+    const block = (doc.content as ContentItem[]).find((c) => c.unbreakable === true) as {
       stack: ContentItem[];
       unbreakable?: boolean;
     };
     expect(block.unbreakable).toBe(true);
-    expect(block.stack[0].text).toBe("Acme Corp");
-    expect(block.stack[1].text).toBe("Product Manager");
-    expect(block.stack[2].text).toBe("09/2021 - Present | Barcelona, Spain");
-    // A real list, not a paragraph of run-together text.
-    expect(block.stack[3].ul).toEqual([
+    expect(block.stack[0]).toEqual({ text: "Acme Corp", fontSize: 11, bold: true });
+    expect(block.stack[1]).toEqual({ text: "Product Manager", fontSize: 11, bold: true });
+    // The meta line is 11pt regular, black (no colour), with the engine's 5px below.
+    expect(block.stack[2]).toEqual({ text: "09/2021 - Present | Barcelona, Spain", fontSize: 11, margin: [0, 0, 0, 3.75] });
+    // A real list, not a paragraph of run-together text, 3px between items.
+    const bullets = block.stack[3].ul as ContentItem[];
+    expect(bullets.map((b) => b.text)).toEqual([
       "Grew activation 40% by shipping an onboarding redesign",
       "Led a team of 5 engineers",
+    ]);
+    for (const b of bullets) expect(b.margin).toEqual([0, 0, 0, 2.25]);
+  });
+
+  it("spaces blocks like the engine's h3 (13px above), collapsed against the section header for the first", () => {
+    const twoJobs = validateCvStructured(
+      {
+        contact: { name: "Jane Doe", links: [] },
+        experience: [
+          { company: "Acme", role: "PM", start: "", end: "", bullets: ["Shipped it"] },
+          { company: "Beta", role: "PM", start: "", end: "", bullets: ["Shipped that"] },
+        ],
+      },
+      "Jane Doe Acme PM Shipped it Beta PM Shipped that",
+    ).cv;
+    const blocks = (buildStructuredCvDoc({ name: "", summary: "", cv: twoJobs }).content as ContentItem[]).filter((c) =>
+      Array.isArray(c.stack),
+    );
+    expect(blocks.map((b) => b.margin)).toEqual([
+      [0, 3, 0, 0],
+      [0, 9.75, 0, 0],
     ]);
   });
 
@@ -228,8 +321,8 @@ describe("structured CV doc (#150)", () => {
       "Jane Doe Acme PM did a **thing**",
     ).cv;
     const doc = buildStructuredCvDoc({ name: "", summary: "", cv: withMarkers });
-    const block = (doc.content as ContentItem[]).find((c) => Array.isArray(c.stack)) as { stack: ContentItem[] };
-    expect(block.stack.at(-1)?.ul).toEqual(["did a **thing**"]);
+    const block = (doc.content as ContentItem[]).find((c) => c.unbreakable === true) as { stack: ContentItem[] };
+    expect((block.stack.at(-1)?.ul as ContentItem[]).map((b) => b.text)).toEqual(["did a **thing**"]);
   });
 
   it("skips a section the CV has nothing for, instead of printing an empty heading", () => {
@@ -242,7 +335,7 @@ describe("structured CV doc (#150)", () => {
     ).cv;
     const texts = textsOf(buildStructuredCvDoc({ name: "", summary: "", cv: workOnly }));
     expect(texts).not.toContain("EDUCATION");
-    expect(texts).not.toContain("SKILLS AND ADDITIONAL INFORMATION");
+    expect(texts).not.toContain("SKILLS & ADDITIONAL INFORMATION");
     expect(texts).not.toContain("PROFESSIONAL SUMMARY");
   });
 
@@ -251,10 +344,23 @@ describe("structured CV doc (#150)", () => {
     expect(jobMetaLine({ start: "2021", end: "" })).toBe("2021");
     expect(jobMetaLine({ location: "Berlin" })).toBe("Berlin");
     expect(jobMetaLine({})).toBe("");
-    expect(contactLine({ name: "Jane", links: [] })).toBe("");
-    expect(contactLine({ name: "Jane", email: "j@x.com", links: ["github.com/j"] })).toBe(
-      "j@x.com  \u00b7  github.com/j",
-    );
+    expect(contactLines({ name: "Jane", links: [] })).toEqual([]);
+    expect(contactLines({ name: "Jane", email: "j@x.com", links: ["github.com/j"] })).toEqual([
+      { label: "Email", text: "j@x.com", link: "mailto:j@x.com" },
+      { label: "GitHub", text: "github.com/j", link: "https://github.com/j" },
+    ]);
+  });
+
+  it("labels links by host — LinkedIn, GitHub, anything else Portfolio — and makes each clickable", () => {
+    expect(linkLabel("https://www.linkedin.com/in/jane")).toBe("LinkedIn");
+    expect(linkLabel("linkedin.com/in/jane")).toBe("LinkedIn");
+    expect(linkLabel("github.com/jane")).toBe("GitHub");
+    expect(linkLabel("https://jane.github.io")).toBe("Portfolio");
+    expect(linkLabel("lifeinprogrezz.com")).toBe("Portfolio");
+    expect(linkLabel("not a url at all")).toBe("Portfolio");
+    expect(linkHref("github.com/jane")).toBe("https://github.com/jane");
+    expect(linkHref("http://jane.dev/")).toBe("http://jane.dev/");
+    expect(linkHref(" mailto:j@x.com ")).toBe("mailto:j@x.com");
   });
 });
 
