@@ -1,20 +1,20 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "@/components/ui/sonner";
-import { RUBRIC_VERSION, type ScoreableProfile } from "@/lib/score";
+import type { ScoreableProfile } from "@/lib/score";
 import type { ScoreSubscore, ScoreEvidence } from "@/lib/scorePrompt";
-import { applyLandedScores, byScore, type RoleJob, type RoleExtraction } from "@/lib/roles";
+import { applyLandedScores, byScore, type RoleJob } from "@/lib/roles";
 import { inFlightCompanyKeys } from "@/lib/product";
 import { isInFlightStatus } from "@/lib/tracker";
 import { hashCv, readCvStash, clearCvStash, normalizeTargetRoles } from "@/lib/labels";
 import { normalizeTargetSectors } from "@/lib/sectors";
-import { hasReadableJd, prefilterJobs } from "@/lib/scorePrefilter";
-import { fetchAllPages } from "@/lib/pagedSelect";
+import { prefilterJobs } from "@/lib/scorePrefilter";
 import { shouldPromptCv } from "@/lib/deviceSession";
 import { cityOf, coordsOf } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
-import { fetchDataplane, type DataplaneCompany, type DataplaneOffice } from "@/lib/dataplane";
+import type { DataplaneCompany, DataplaneOffice } from "@/lib/dataplane";
 import { DEV_FIXTURE, DEV_FIXTURE_PROFILE, devFixtureScores } from "@/lib/devFixture";
 import { createScoreBuffer, type ScoreBuffer } from "@/lib/scoreCoalescer";
 import { buildWarmIndex, type ParsedConnection, type WarmContact } from "@/lib/connections";
@@ -25,29 +25,23 @@ import {
   CV_STRUCTURED_CLEAR,
   isMissingCvStructuredColumn,
 } from "@/lib/cvParse";
-
-type JobsRow = {
-  id: string;
-  company: string;
-  title: string;
-  url: string;
-  location: string | null;
-  remote: boolean;
-  source: string | null;
-  seniority: string | null;
-  posted_at: string | null;
-  /** jobs.first_seen_at — the Freshness facet's primary key (issue #73 slice 3);
-   *  NOT NULL in the DB, optional here only for a pre-#73 dataplane artifact. */
-  first_seen_at?: string | null;
-  company_id: string | null;
-  extraction: RoleExtraction | null;
-  role_family: string | null;
-  workplace: string | null;
-  /** jobs.has_jd (#130): optional only for an artifact built before the column. */
-  has_jd?: boolean | null;
-};
-
-const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page past it.
+import {
+  applicationsQuery,
+  connectionsQuery,
+  dismissedQuery,
+  fetchScores,
+  profileQuery,
+  publicPoolQuery,
+  rolesKeys,
+  savedQuery,
+  scoresQuery,
+  type ApplicationsData,
+  type ConnectionRow,
+  type JobsRow,
+  type ProfileRow,
+  type RoleSetData,
+  type ScoreRow,
+} from "@/lib/rolesQueries";
 
 /** The profile-view slice (issue #43): the labels a returning user picked plus
  *  when their CV was last written. Kept separate from ScoreableProfile, which
@@ -77,6 +71,31 @@ type LandedScore = {
   subscores: ScoreSubscore[] | null;
   evidence: ScoreEvidence[] | null;
 };
+
+// Stable empties. Every derived list below is memoized on its query's data, so a
+// fresh `[]` per render would rebuild the whole map on every render.
+const NO_SCORES: ScoreRow[] = [];
+const NO_CONNECTIONS: ConnectionRow[] = [];
+const NO_APPLICATIONS: ApplicationsData = { applications: [], jobRows: [] };
+const NO_ROLE_SET: RoleSetData = { ids: [], rows: [] };
+
+/** scores rows → the map applyLandedScores merges. A row with a null score is left
+ *  out: it is not a number anyone can rank on, and the role stays honestly unscored. */
+function landedScoreMap(rows: ScoreRow[]): Map<string, LandedScore> {
+  const out = new Map<string, LandedScore>();
+  for (const s of rows) {
+    if (s.score == null) continue;
+    const sig = s.signals as ScoreSignals;
+    out.set(s.job_id, {
+      score: Number(s.score),
+      reason: sig?.reason ?? null,
+      fitBullets: sig?.fit_bullets ?? null,
+      subscores: sig?.subscores ?? null,
+      evidence: sig?.evidence ?? null,
+    });
+  }
+  return out;
+}
 
 /**
  * City + map-position + logo-domain enrichment. Same-city jobs get a stable
@@ -207,6 +226,9 @@ function enrichAll(
       ...r,
       score: null,
       reason: null,
+      fitBullets: null,
+      subscores: null,
+      evidence: null,
       city,
       lngLat: posFor(city, r),
       // companies.logo_domain (engine-verified website) wins; name-guess is the
@@ -227,109 +249,237 @@ function enrichAll(
   });
 }
 
+/** A RoleJob narrowed back to the stored columns, for the optimistic push into a
+ *  cached saved/dismissed set (the enrichment is re-derived from these). */
+function toJobsRow(job: RoleJob): JobsRow {
+  return {
+    id: job.id,
+    company: job.company,
+    title: job.title,
+    url: job.url,
+    location: job.location,
+    remote: job.remote,
+    source: job.source,
+    seniority: job.seniority,
+    posted_at: job.posted_at,
+    first_seen_at: job.first_seen_at ?? null,
+    company_id: job.company_id ?? null,
+    extraction: job.extraction ?? null,
+    role_family: job.role_family ?? null,
+    workplace: job.workplace ?? null,
+    has_jd: job.has_jd ?? null,
+  };
+}
+
 // The server-side backlog worker (api/score-backlog.ts, issue #33) is the only
 // scorer now; the page POLLS landed scores at this cadence while any visible
 // role is unscored, so the map fills in live without the page doing the paying.
 const SCORE_POLL_MS = 20_000;
 
 /**
- * Data plane for the /roles page. The initial fetch omits jd_text (heavy) and
- * pages past PostgREST's 1000-row cap. Scoring is SERVER-SIDE (the backlog
- * worker, issue #33): this hook only reads `scores`, polling while unscored
- * roles remain so results land in front of the user — leaving the page never
- * stops a pass.
+ * Data plane for the /roles page. The reads live in the TanStack Query cache
+ * (issue #152, `src/lib/rolesQueries.ts`), keyed by USER ID: a route change or a
+ * tab focus reuses them instead of blanking the page, and a new user object with
+ * the same id — which supabase-js hands out on every token refresh — changes
+ * nothing. Scoring is SERVER-SIDE (the backlog worker, issue #33): this hook only
+ * reads `scores`, polling while unscored roles remain so results land in front of
+ * the user — leaving the page never stops a pass.
  */
 export function useRolesData() {
   const { user } = useAuth();
-  const [jobs, setJobs] = useState<RoleJob[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<ScoreableProfile | null>(null);
-  const [profileMeta, setProfileMeta] = useState<ProfileMeta | null>(null);
-  // True once THIS session's profile row has been fetched AND any pre-redirect
-  // CV stash handed off — the earliest moment `needsCv` can be trusted without
-  // flashing the CV modal at a user whose CV is still in flight.
-  const [profileChecked, setProfileChecked] = useState(false);
-  const [applied, setApplied] = useState<Set<string>>(new Set());
-  // The application ROWS (job_id + status), not just the ids: the in-flight company
-  // collapse (issue #73 slice 2) needs the status to tell a live conversation from a
-  // closed one — a rejected company must resurface on a new role.
-  const [applications, setApplications] = useState<{ job_id: string; status: string | null }[]>([]);
-  // The applied roles' OWN job rows, fetched by id WITHOUT the is_live filter (same
-  // idiom as savedJobsRaw/dismissedJobsRaw). The in-flight company collapse must be
-  // LIVENESS-INDEPENDENT — career-ops' appliedCos is — and postings routinely close
-  // mid-conversation: resolving applications against the live pool alone would let a
-  // company's other roles resurface the moment the applied posting flipped is_live
-  // false. Identity columns only; nothing here is rendered.
-  const [appliedJobsRaw, setAppliedJobsRaw] = useState<
-    { id: string; company: string; company_id: string | null }[]
-  >([]);
-  const [saved, setSaved] = useState<Set<string>>(new Set());
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  // Dismissed roles fetched WITHOUT the is_live filter, so the /settings undo list
-  // still has display data once a posting expires (same reason as savedJobsRaw).
-  const [dismissedJobsRaw, setDismissedJobsRaw] = useState<RoleJob[]>([]);
-  // Saved roles fetched WITHOUT the is_live filter, so an expired-but-saved role still
-  // has display data for the Today Saved section (Rober 7-15 review).
-  const [savedJobsRaw, setSavedJobsRaw] = useState<RoleJob[]>([]);
-  // Warm contacts (issue #41): the user's own LinkedIn connections upload, read
-  // whole so the Today cards can mark "You know N people here". Information only —
-  // NEVER fed into scoring (deliberate divergence from the personal engine).
-  const [connections, setConnections] = useState<WarmContact[]>([]);
-  const [connectionsUpdatedAt, setConnectionsUpdatedAt] = useState<string | null>(null);
+  // The id, never the object: supabase-js (autoRefreshToken + persistSession)
+  // emits a NEW session, and so a new User object, on tab focus. Keyed on the
+  // object, every read below re-ran on every focus (issue #152 items E6/F1).
+  const userId = user?.id ?? null;
+  const signedIn = Boolean(userId);
+  const queryClient = useQueryClient();
+
+  const poolQ = useQuery(publicPoolQuery());
+  const scoresQ = useQuery({ ...scoresQuery(userId), enabled: signedIn });
+  const applicationsQ = useQuery({ ...applicationsQuery(userId), enabled: signedIn });
+  const savedQ = useQuery({ ...savedQuery(userId), enabled: signedIn });
+  const dismissedQ = useQuery({ ...dismissedQuery(userId), enabled: signedIn });
+  const connectionsQ = useQuery({ ...connectionsQuery(userId), enabled: signedIn });
+  const profileQ = useQuery({ ...profileQuery(userId), enabled: signedIn });
+
   // Work sitting in an open Anthropic batch (#96), read from the user's own
   // score_batches rows. Drives the progress bar's "Collecting the rest" phase
   // (#149) — the one state the score count alone cannot tell you about.
   const [batchPending, setBatchPending] = useState(false);
-  // Per-run cancellation: each effect run gets its own id; async loops compare
-  // against the current id (a shared boolean would be re-armed by the next run,
-  // resurrecting a cancelled loop and leaking user A's scores into user B's view).
-  const runRef = useRef(0);
+  // The pre-redirect CV stash is being written to the profile right now. Held
+  // separately from the reads so `profileChecked` stays false across the write.
+  const [handoffBusy, setHandoffBusy] = useState(false);
+  const handoffDoneFor = useRef<string | null>(null);
+  // Whose data this render belongs to. Async loops compare against it so a reply
+  // that arrives after a user change is dropped instead of landing in the new
+  // user's view.
+  const currentUserRef = useRef<string | null>(userId);
+  useEffect(() => {
+    currentUserRef.current = userId;
+  }, [userId]);
 
-  // Score-arrival coalescer (issue #54). Each poll pushes its landed-score snapshot
+  // ── Companies dimension (~600 rows): real logo domains beat the name-guess,
+  // street office coords beat the sunflower scatter. Failure degrades to guess +
+  // centroid, never blocks.
+  const companies = poolQ.data?.companies;
+  const offices = poolQ.data?.offices;
+  const poolJobs = poolQ.data?.jobs;
+  const dims = useMemo(() => {
+    const m = new Map<string, CompanyDim>();
+    (companies ?? []).forEach((c: DataplaneCompany) =>
+      m.set(c.slug, {
+        logo_domain: c.logo_domain, lat: c.lat, lng: c.lng,
+        website: c.website, sector: c.sector, stage: c.stage,
+        headcount_bucket: c.headcount_bucket, hq_city: c.hq_city, hq_country: c.hq_country,
+        linkedin_url: c.linkedin_url, description: c.description, founded_year: c.founded_year,
+        uk_sponsor_status: c.uk_sponsor_status,
+      }),
+    );
+    return m;
+  }, [companies]);
+  // Per-city offices: a company hiring in several cities gets each pin on the
+  // right office (distance-matched). Empty until seeded — degrades to the single
+  // companies coord, never blocks.
+  const officesBySlug = useMemo(() => {
+    const m = new Map<string, [number, number][]>();
+    (offices ?? []).forEach((o: DataplaneOffice) => {
+      const arr = m.get(o.company_slug) ?? [];
+      arr.push([o.lng, o.lat]);
+      m.set(o.company_slug, arr);
+    });
+    return m;
+  }, [offices]);
+
+  const enriched = useMemo(
+    () => enrichAll(poolJobs ?? [], dims, officesBySlug),
+    [poolJobs, dims, officesBySlug],
+  );
+  const landed = useMemo(() => landedScoreMap(scoresQ.data ?? NO_SCORES), [scoresQ.data]);
+  // #130 lives inside applyLandedScores: a score held by a role with no description
+  // is not applied, so the role renders as unscored and cannot rank on a stale row.
+  const jobs = useMemo(() => {
+    const merged = applyLandedScores(enriched, landed, false);
+    // Dev-only (VITE_E2E_BYPASS_AUTH under vite dev): the mock user has no JWT, so
+    // the scores read returns nothing and every authed surface renders empty. Fill
+    // the gaps with obviously-labelled synthetic scores so an automated walk can
+    // reach the queue, the dismiss control and the "+N more" affordance. Folded out
+    // of production builds — see lib/devFixture.ts.
+    const withFixture = DEV_FIXTURE ? devFixtureScores(merged) : merged;
+    return withFixture.sort(byScore);
+  }, [enriched, landed]);
+
+  const applicationsData = applicationsQ.data ?? NO_APPLICATIONS;
+  const applications = applicationsData.applications;
+  // The applied roles' OWN job rows, fetched by id WITHOUT the is_live filter. The
+  // in-flight company collapse must be LIVENESS-INDEPENDENT — career-ops' appliedCos
+  // is — and postings routinely close mid-conversation.
+  const appliedJobsRaw = applicationsData.jobRows;
+  const applied = useMemo(() => new Set(applications.map((a) => a.job_id)), [applications]);
+
+  const savedData = savedQ.data ?? NO_ROLE_SET;
+  const saved = useMemo(() => new Set(savedData.ids), [savedData]);
+  const savedJobsRaw = useMemo(
+    () => enrichAll(savedData.rows, dims, officesBySlug),
+    [savedData, dims, officesBySlug],
+  );
+  const dismissedData = dismissedQ.data ?? NO_ROLE_SET;
+  const dismissed = useMemo(() => new Set(dismissedData.ids), [dismissedData]);
+  const dismissedJobsRaw = useMemo(
+    () => enrichAll(dismissedData.rows, dims, officesBySlug),
+    [dismissedData, dims, officesBySlug],
+  );
+
+  // Warm contacts (issue #41): the user's own LinkedIn connections upload, read
+  // whole so the Today cards can mark "You know N people here". Information only —
+  // NEVER fed into scoring (deliberate divergence from the personal engine).
+  const connectionRows = connectionsQ.data ?? NO_CONNECTIONS;
+  const connections = useMemo<WarmContact[]>(
+    () =>
+      connectionRows.map((r) => ({
+        fullName: r.full_name,
+        company: r.company,
+        companyKey: r.company_key,
+        position: r.position,
+        linkedinUrl: r.linkedin_url,
+      })),
+    [connectionRows],
+  );
+  const connectionsUpdatedAt = useMemo(
+    () =>
+      connectionRows.reduce<string | null>(
+        (acc, r) => (acc == null || r.created_at > acc ? r.created_at : acc),
+        null,
+      ),
+    [connectionRows],
+  );
+
+  const profileRow = profileQ.data ?? null;
+  const profile = useMemo<ScoreableProfile | null>(() => {
+    if (profileRow) return profileRow as ScoreableProfile;
+    // Same dev-only gate as the fixture scores: `scored` is Boolean(profile.cv_text),
+    // and the mock user has no profile row, so without this /today never leaves its
+    // "add your CV" empty state and the walk sees nothing.
+    return DEV_FIXTURE ? DEV_FIXTURE_PROFILE : null;
+  }, [profileRow]);
+  const profileMeta = useMemo<ProfileMeta | null>(() => {
+    if (profileRow) {
+      // Vocabulary shim (issue #70). The migration rewrites the stored rows, but a
+      // profile written between deploy and migration — or by a browser tab still
+      // running the previous bundle — can still hold a retired archetype or sector
+      // variant. Translating on read means such a value narrows the view instead of
+      // matching nothing and rendering permanent "Not scored".
+      return {
+        targetRoles: normalizeTargetRoles(profileRow.target_roles),
+        targetSectors: normalizeTargetSectors(profileRow.target_sectors),
+        cvUpdatedAt: profileRow.updated_at ?? null,
+      };
+    }
+    // A jobs.role_family value, not a display string: "Product Manager" was in none
+    // of the three old vocabularies and matched nothing (issue #70).
+    return DEV_FIXTURE ? { targetRoles: ["product"], targetSectors: [], cvUpdatedAt: null } : null;
+  }, [profileRow]);
+
+  // Same gate the map used to apply after its first setJobs: the catalogue and this
+  // user's scores. Everything else fills in behind it.
+  const loading = poolQ.isPending || (signedIn && scoresQ.isPending);
+
+  // ── Score-arrival coalescer (issue #54). Each poll pushes its landed-score snapshot
   // here instead of committing directly; the buffer merges snapshots that bunch up
   // (initial-load handoff + a manual "check now" + a poll can fire in the same tick)
   // into ONE commit, and startTransition marks that commit non-urgent so the heavy
   // derived-list rebuild (Today queue + map facets/markers) yields to clicks instead
-  // of stalling the main thread. Cancelled on the run boundary below so a batch
-  // buffered for user A never lands in user B's freshly-loaded view.
-  const scoreBufferRef = useRef<ScoreBuffer<LandedScore> | null>(null);
+  // of stalling the main thread. Each poll's map is a full snapshot, so the merged
+  // union IS the freshest complete set and can replace the cached rows outright.
+  const commitScoresRef = useRef<(rows: ScoreRow[]) => void>(() => {});
+  useEffect(() => {
+    commitScoresRef.current = (rows) => {
+      const uid = currentUserRef.current;
+      if (!uid) return;
+      startTransition(() => {
+        queryClient.setQueryData(rolesKeys.scores(uid), rows);
+      });
+    };
+  }, [queryClient]);
+  const scoreBufferRef = useRef<ScoreBuffer<ScoreRow> | null>(null);
   if (scoreBufferRef.current === null) {
-    scoreBufferRef.current = createScoreBuffer<LandedScore>((merged) =>
-      startTransition(() => setJobs((prev) => applyLandedScores(prev, merged, true))),
+    scoreBufferRef.current = createScoreBuffer<ScoreRow>((merged) =>
+      commitScoresRef.current([...merged.values()]),
     );
   }
+  // Drop any batch buffered for the previous user so it can never flush into the
+  // next one's view (the cache keys already scope by id; this closes the window
+  // between the fetch returning and the flush landing).
+  useEffect(() => {
+    const buffer = scoreBufferRef.current;
+    return () => buffer?.cancel();
+  }, [userId]);
 
-  /** Pull the user's landed scores and merge them into the map (sorted). The
-   *  server worker writes them continuously; this is the read side of the poll. */
-  async function refreshScores(userId: string, runId: number) {
-    // Paged: PostgREST caps an un-ranged select at 1000 rows, silently. Un-paged, a
-    // user with more scores than that saw most of their roles as unscored forever.
-    const data = await fetchAllPages<{ job_id: string; score: number | null; signals: unknown }>(
-      () =>
-        supabase
-          .from("scores")
-          .select("job_id, score, signals")
-          .eq("user_id", userId)
-          .eq("rubric_version", RUBRIC_VERSION),
-      { label: "scores:refresh" },
-    );
-    if (!data.length || runRef.current !== runId) return;
-    const landed = new Map<string, LandedScore>(
-      data.map((s) => {
-        const sig = s.signals as ScoreSignals;
-        return [
-          s.job_id as string,
-          {
-            score: Number(s.score),
-            reason: sig?.reason ?? null,
-            fitBullets: sig?.fit_bullets ?? [],
-            subscores: sig?.subscores ?? null,
-            evidence: sig?.evidence ?? null,
-          },
-        ] as const;
-      }),
-    );
-    if (landed.size > 0) scoreBufferRef.current?.push(landed);
+  /** Pull the user's landed scores and merge them into the map. The server worker
+   *  writes them continuously; this is the read side of the poll. */
+  async function refreshScores(uid: string) {
+    const data = await fetchScores(uid);
+    if (!data.length || currentUserRef.current !== uid) return;
+    scoreBufferRef.current?.push(new Map(data.map((row) => [row.job_id, row] as const)));
   }
 
   /** Does this user still have work sitting in an Anthropic batch (#96)? One
@@ -339,14 +489,14 @@ export function useRolesData() {
    *  on the provider, which gives no latency guarantee. Any error (the table is
    *  applied by hand, so it can legitimately be absent) reads as "no batch", and
    *  the bar falls back to the scoring phase. */
-  async function refreshBatchPending(userId: string, runId: number) {
+  async function refreshBatchPending(uid: string) {
     const { data, error } = await supabase
       .from("score_batches")
       .select("id")
-      .eq("user_id", userId)
+      .eq("user_id", uid)
       .eq("status", "submitted")
       .limit(1);
-    if (runRef.current !== runId) return;
+    if (currentUserRef.current !== uid) return;
     setBatchPending(!error && (data ?? []).length > 0);
   }
 
@@ -387,9 +537,8 @@ export function useRolesData() {
    * toast and no reveal. Returns true on success.
    */
   async function applyCv(
-    userId: string,
+    uid: string,
     payload: { cv_text: string; cv_hash: string; target_roles: string[]; target_sectors: string[] },
-    jobsSnapshot: RoleJob[],
   ): Promise<boolean> {
     const cvText = payload.cv_text.trim();
     if (!cvText) return false;
@@ -398,7 +547,7 @@ export function useRolesData() {
     const { data: hd, error: he } = await supabase
       .from("profiles")
       .select("cv_text, cv_hash")
-      .eq("id", userId)
+      .eq("id", uid)
       .maybeSingle();
     const storedHash = he ? null : ((hd?.cv_hash as string | null) ?? null);
     const storedCvText = he ? null : ((hd?.cv_text as string | null) ?? null);
@@ -425,13 +574,13 @@ export function useRolesData() {
     // tailored CV from here on whenever the re-parse below does not land. An
     // unchanged CV keeps its structure, so re-submitting the same file is free.
     const patch = changed ? { ...base, ...CV_STRUCTURED_CLEAR } : base;
-    let { error: upErr } = await supabase.from("profiles").update(patch).eq("id", userId);
+    let { error: upErr } = await supabase.from("profiles").update(patch).eq("id", uid);
     if (upErr && isMissingCvStructuredColumn(upErr.message)) {
       // Before the #150 migration lands those two columns are unknown. Saving the CV
       // matters more than clearing them, and readCvStructuredState refuses a
       // structure older than cv_changed_at anyway, so the stale render stays
       // impossible either way.
-      ({ error: upErr } = await supabase.from("profiles").update(base).eq("id", userId));
+      ({ error: upErr } = await supabase.from("profiles").update(base).eq("id", uid));
     }
     if (upErr) {
       // Expected before the Phase-A migration is applied (unknown columns); the
@@ -450,7 +599,7 @@ export function useRolesData() {
       //
       // Stamping the change time is what lets the worker wait for editing to
       // stop: eight saves in one sitting become one refresh.
-      await supabase.from("profiles").update({ cv_changed_at: new Date().toISOString() }).eq("id", userId);
+      await supabase.from("profiles").update({ cv_changed_at: new Date().toISOString() }).eq("id", uid);
       // scores_ready_notified_at is deliberately NOT reset. That email says "we
       // finished scoring your roles", which is true once, on the first pass. A
       // refresh happens behind a user who is already here, and with scores kept
@@ -467,13 +616,13 @@ export function useRolesData() {
     // It fires AFTER the cv_changed_at stamp above, never before: the parse writes
     // cv_structured_at, and a stamp that lands first would read back as older than
     // the CV and be thrown away as stale on the next load.
-    void (changed ? parseAndSaveCv(userId, cvText) : ensureCvStructured(userId, cvText));
+    void (changed ? parseAndSaveCv(uid, cvText) : ensureCvStructured(uid, cvText));
 
     // Fresh scoreable profile — OLD columns only, so this read is pre-migration safe.
     const { data: fresh } = await supabase
       .from("profiles")
       .select("target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, cv_text")
-      .eq("id", userId)
+      .eq("id", uid)
       .maybeSingle();
     const prof = (fresh ?? {
       target_seniority: null,
@@ -486,18 +635,28 @@ export function useRolesData() {
     }) as ScoreableProfile;
 
     if (changed) {
-      setJobs(
-        jobsSnapshot.map((j) => ({ ...j, score: null, reason: null, fitBullets: null, subscores: null, evidence: null })),
-      );
+      // Same local blanking as before: the map drops back to unscored until the
+      // worker's refreshed numbers land through the poll.
+      queryClient.setQueryData(rolesKeys.scores(uid), NO_SCORES);
     }
     // Flip `scored` false→true → the CSS reveal + FitChip count-up fire
     // in-session. This flip is what reveals the map, so success resolves HERE.
     // Scores arrive from the SERVER worker (issue #33) — the poll effect
     // surfaces them as they land; the panel's "Scoring… N to go" bar tracks it.
-    setProfile(prof);
-    // Profile view (issue #43): reflect the write we just made, no re-fetch
-    // needed — we already know exactly what landed.
-    setProfileMeta({ targetRoles: payload.target_roles, targetSectors: payload.target_sectors, cvUpdatedAt: nowIso });
+    // Profile view (issue #43): reflect the write we just made, no re-fetch needed
+    // — we already know exactly what landed.
+    queryClient.setQueryData<ProfileRow | null>(rolesKeys.profile(uid), {
+      target_seniority: prof.target_seniority,
+      target_cities: prof.target_cities,
+      open_to_remote: prof.open_to_remote,
+      citizenship: prof.citizenship,
+      eu_work_authorized: prof.eu_work_authorized,
+      languages: prof.languages,
+      cv_text: cvText,
+      target_roles: payload.target_roles,
+      target_sectors: payload.target_sectors,
+      updated_at: nowIso,
+    });
     // #149: the CV is stored, so the worker has something to score. Ask for the
     // drain now rather than waiting on the schedule. Never awaited: the reveal
     // above is what this function promises.
@@ -505,314 +664,51 @@ export function useRolesData() {
     return true;
   }
 
+  // ── Post-OAuth CV handoff (Phase A): a CV stashed before the sign-in redirect is
+  // written to the profile now, then revealed. Only when the profile has no CV yet
+  // (never clobber an existing one). Scoring itself is the server worker's job.
+  const profileFetched = profileQ.isFetched;
+  const stashPending = Boolean(readCvStash());
+  const stashOutstanding =
+    signedIn && !DEV_FIXTURE && stashPending && profileFetched && !profileRow?.cv_text?.trim();
   useEffect(() => {
-    const runId = ++runRef.current;
-    setProfileChecked(false);
-    async function load() {
-      // F3 (issue #37): the three public reads below are served by ONE static
-      // artifact, rebuilt daily after the scrape — zero DB reads per anonymous
-      // visitor. The live queries stay as FALLBACK for a missing/unreachable
-      // artifact (deploy-order safe; the map never breaks on the dataplane).
-      const plane = await fetchDataplane(import.meta.env.VITE_SUPABASE_URL as string);
-      // Jobs are public postings (anon SELECT on is_live rows, migration
-      // 20260705121000) — fetch them signed-in or not. Everything personalized
-      // below stays behind the user check.
-      let rows: JobsRow[] = [];
-      let cosRows: DataplaneCompany[] = [];
-      let offRows: DataplaneOffice[] = [];
-      if (plane) {
-        rows = plane.jobs as unknown as JobsRow[];
-        cosRows = plane.companies;
-        offRows = plane.offices;
-      } else {
-        for (let from = 0; ; from += PAGE) {
-          const { data, error } = await supabase
-            .from("jobs")
-            .select("id, company, title, url, location, remote, source, seniority, posted_at, first_seen_at, company_id, extraction, role_family, workplace, has_jd")
-            .eq("is_live", true)
-            .range(from, from + PAGE - 1);
-          if (error || !data) break;
-          rows = rows.concat(data as JobsRow[]);
-          if (data.length < PAGE) break;
-        }
-        // Paged: 598 companies today, but the catalogue grows and PostgREST would
-        // silently return the first 1000. A company missing from this list loses its
-        // logo, sector, headcount and map position — quietly, on an arbitrary subset.
-        const cos = await fetchAllPages<DataplaneCompany>(
-          () =>
-            supabase
-              .from("companies")
-              .select(
-                "slug, logo_domain, lat, lng, website, sector, stage, headcount_bucket, hq_city, hq_country, linkedin_url, description, founded_year, uk_sponsor_status",
-              ),
-          { label: "companies:dataplane" },
-        );
-        cosRows = cos;
-        const { data: offs } = await supabase.from("company_offices").select("company_slug, lat, lng");
-        offRows = (offs ?? []) as DataplaneOffice[];
-      }
-      // Companies dimension (~600 rows): real logo domains beat the name-guess,
-      // street office coords beat the sunflower scatter. Failure degrades to
-      // guess + centroid, never blocks.
-      const dims = new Map<string, CompanyDim>();
-      cosRows.forEach((c) =>
-        dims.set(c.slug, {
-          logo_domain: c.logo_domain, lat: c.lat, lng: c.lng,
-          website: c.website, sector: c.sector, stage: c.stage,
-          headcount_bucket: c.headcount_bucket, hq_city: c.hq_city, hq_country: c.hq_country,
-          linkedin_url: c.linkedin_url, description: c.description, founded_year: c.founded_year,
-          uk_sponsor_status: c.uk_sponsor_status,
-        }),
-      );
-      // Per-city offices: a company hiring in several cities gets each pin on the
-      // right office (distance-matched). Empty until seeded — degrades to the
-      // single companies coord, never blocks.
-      const officesBySlug = new Map<string, [number, number][]>();
-      offRows.forEach((o) => {
-        const arr = officesBySlug.get(o.company_slug) ?? [];
-        arr.push([o.lng, o.lat]);
-        officesBySlug.set(o.company_slug, arr);
-      });
-      if (!user) {
-        if (runRef.current !== runId) return;
-        // Anonymous browse (or sign-out: clears the previous session's state).
-        setJobs(enrichAll(rows, dims, officesBySlug).sort(byScore));
-        setProfile(null);
-        setProfileMeta(null);
-        setApplied(new Set());
-        setApplications([]);
-        setAppliedJobsRaw([]);
-        setSaved(new Set());
-        setSavedJobsRaw([]);
-        setDismissed(new Set());
-        setDismissedJobsRaw([]);
-        setConnections([]);
-        setConnectionsUpdatedAt(null);
-        setBatchPending(false);
-        setLoading(false);
-        return;
-      }
-      // Paged for the same reason as the poll above: this is the fetch that decides
-      // which roles show a score at all, so truncation here is the whole map going
-      // blank-ish for anyone past 1000 scores.
-      const scoresData = await fetchAllPages<{ job_id: string; score: number | null; signals: unknown }>(
-        () =>
-          supabase
-            .from("scores")
-            .select("job_id, score, signals")
-            .eq("user_id", user.id)
-            .eq("rubric_version", RUBRIC_VERSION),
-        { label: "scores:initial" },
-      );
-      const scoreByJob: Record<
-        string,
-        {
-          score: number | null;
-          reason: string | null;
-          fitBullets: string[] | null;
-          subscores: ScoreSubscore[] | null;
-          evidence: ScoreEvidence[] | null;
-        }
-      > = {};
-      (scoresData ?? []).forEach((s) => {
-        const sig = s.signals as ScoreSignals;
-        scoreByJob[s.job_id] = {
-          score: s.score,
-          reason: sig?.reason ?? null,
-          fitBullets: sig?.fit_bullets ?? null,
-          subscores: sig?.subscores ?? null,
-          evidence: sig?.evidence ?? null,
-        };
-      });
-      const scoredRows = enrichAll(rows, dims, officesBySlug).map((j) => {
-        // #130: a score held by a role with no description is not applied, so
-        // the role renders as unscored and cannot rank on a stale row.
-        const hit = hasReadableJd(j) ? scoreByJob[j.id] : undefined;
-        return {
-          ...j,
-          score: hit?.score ?? null,
-          reason: hit?.reason ?? null,
-          fitBullets: hit?.fitBullets ?? null,
-          subscores: hit?.subscores ?? null,
-          evidence: hit?.evidence ?? null,
-        };
-      });
-      // Dev-only (VITE_E2E_BYPASS_AUTH under vite dev): the mock user has no JWT, so
-      // the query above returns nothing and every authed surface renders empty. Fill
-      // the gaps with obviously-labelled synthetic scores so an automated walk can
-      // reach the queue, the dismiss control and the "+N more" affordance. Folded out
-      // of production builds — see lib/devFixture.ts.
-      const merged = DEV_FIXTURE ? devFixtureScores(scoredRows) : scoredRows;
-      merged.sort(byScore);
-      if (runRef.current !== runId) return;
-      setJobs(merged);
-      setLoading(false);
+    if (!userId || !stashOutstanding || handoffDoneFor.current === userId) return;
+    handoffDoneFor.current = userId;
+    const stash = readCvStash();
+    if (!stash) return;
+    clearCvStash();
+    setHandoffBusy(true);
+    void applyCv(userId, {
+      cv_text: stash.cv_text,
+      cv_hash: stash.cv_hash,
+      // Same shim as the profile read above, and it matters MORE here: the stash is
+      // written by the bundle the user had before the OAuth redirect and read by the
+      // one they have after, so a sign-up started before this deploy would otherwise
+      // write a retired archetype into a brand-new profile row (issue #70).
+      target_roles: normalizeTargetRoles(stash.target_roles),
+      target_sectors: normalizeTargetSectors(stash.target_sectors),
+    }).finally(() => setHandoffBusy(false));
+    // applyCv is re-created every render; the ref guard above is what makes this
+    // run exactly once per signed-in user.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, stashOutstanding]);
 
-      const { data: appsData } = await supabase
-        .from("applications")
-        .select("job_id, status")
-        .eq("user_id", user.id);
-      if (runRef.current !== runId) return;
-      setApplied(new Set((appsData ?? []).map((a) => a.job_id)));
-      setApplications((appsData ?? []).map((a) => ({ job_id: a.job_id, status: a.status ?? null })));
-
-      // Resolve those applications to their companies from their OWN rows, not from
-      // the live pool (see appliedJobsRaw): an application whose posting has since
-      // closed must still collapse its company while the conversation is open.
-      const appliedIds = (appsData ?? []).map((a) => a.job_id);
-      if (appliedIds.length > 0) {
-        const { data: appliedRows } = await supabase
-          .from("jobs")
-          .select("id, company, company_id")
-          .in("id", appliedIds);
-        if (runRef.current !== runId) return;
-        setAppliedJobsRaw((appliedRows ?? []) as { id: string; company: string; company_id: string | null }[]);
-      } else {
-        setAppliedJobsRaw([]);
-      }
-
-      // Dismissed roles (issue #73 slice 4) — same own-row table shape as saved_jobs.
-      const { data: dismissedData } = await supabase
-        .from("dismissed_jobs")
-        .select("job_id")
-        .eq("user_id", user.id);
-      if (runRef.current !== runId) return;
-      const dismissedIds = (dismissedData ?? []).map((d) => d.job_id);
-      setDismissed(new Set(dismissedIds));
-      if (dismissedIds.length > 0) {
-        const { data: dismissedRows } = await supabase
-          .from("jobs")
-          .select("id, company, title, url, location, remote, source, seniority, posted_at, first_seen_at, company_id, extraction, role_family, workplace")
-          .in("id", dismissedIds);
-        if (runRef.current !== runId) return;
-        setDismissedJobsRaw(enrichAll((dismissedRows ?? []) as JobsRow[], dims, officesBySlug));
-      } else {
-        setDismissedJobsRaw([]);
-      }
-
-      const { data: savedData } = await supabase.from("saved_jobs").select("job_id").eq("user_id", user.id);
-      if (runRef.current !== runId) return;
-      const savedIds = (savedData ?? []).map((s) => s.job_id);
-      setSaved(new Set(savedIds));
-      // Fetch the saved roles' rows WITHOUT the is_live filter so a role saved for
-      // later still shows in the Saved section once the posting expires (the whole
-      // point of "save for later"). Same company enrichment; scores aren't needed here.
-      if (savedIds.length > 0) {
-        const { data: savedRows } = await supabase
-          .from("jobs")
-          .select("id, company, title, url, location, remote, source, seniority, posted_at, first_seen_at, company_id, extraction, role_family, workplace")
-          .in("id", savedIds);
-        if (runRef.current !== runId) return;
-        setSavedJobsRaw(enrichAll((savedRows ?? []) as JobsRow[], dims, officesBySlug));
-      } else {
-        setSavedJobsRaw([]);
-      }
-
-      // Warm contacts (issue #41): the user's whole connections upload, paged past
-      // PostgREST's row cap (a LinkedIn export routinely runs to a few thousand
-      // rows). Read defensively — an error (e.g. the migration not applied yet)
-      // just means no markers anywhere, never a crash.
-      {
-        let connRows: {
-          full_name: string;
-          company: string;
-          company_key: string;
-          position: string | null;
-          linkedin_url: string | null;
-          created_at: string;
-        }[] = [];
-        for (let from = 0; ; from += PAGE) {
-          const { data, error } = await supabase
-            .from("connections")
-            .select("full_name, company, company_key, position, linkedin_url, created_at")
-            .eq("user_id", user.id)
-            .range(from, from + PAGE - 1);
-          if (error || !data) break;
-          connRows = connRows.concat(data);
-          if (data.length < PAGE) break;
-        }
-        if (runRef.current !== runId) return;
-        setConnections(
-          connRows.map((r) => ({
-            fullName: r.full_name,
-            company: r.company,
-            companyKey: r.company_key,
-            position: r.position,
-            linkedinUrl: r.linkedin_url,
-          })),
-        );
-        setConnectionsUpdatedAt(
-          connRows.reduce<string | null>((acc, r) => (acc == null || r.created_at > acc ? r.created_at : acc), null),
-        );
-      }
-
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select(
-          "target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, cv_text, target_roles, target_sectors, updated_at",
-        )
-        .eq("id", user.id)
-        .maybeSingle();
-      if (runRef.current !== runId) return;
-      if (prof) {
-        setProfile(prof as ScoreableProfile);
-        // Vocabulary shim (issue #70). The migration rewrites the stored rows, but
-        // a profile written between deploy and migration — or by a browser tab
-        // still running the previous bundle — can still hold a retired archetype
-        // or sector variant. Translating on read means such a value narrows the
-        // view instead of matching nothing and rendering permanent "Not scored".
-        setProfileMeta({
-          targetRoles: normalizeTargetRoles(prof.target_roles),
-          targetSectors: normalizeTargetSectors(prof.target_sectors),
-          cvUpdatedAt: prof.updated_at ?? null,
-        });
-      } else if (DEV_FIXTURE) {
-        // Same dev-only gate: `scored` is Boolean(profile.cv_text), and the mock
-        // user has no profile row, so without this /today never leaves its
-        // "add your CV" empty state and the walk sees nothing.
-        setProfile(DEV_FIXTURE_PROFILE);
-        // A jobs.role_family value, not a display string: "Product Manager" was in
-        // none of the three old vocabularies and matched nothing (issue #70).
-        setProfileMeta({ targetRoles: ["product"], targetSectors: [], cvUpdatedAt: null });
-      }
-      if (!DEV_FIXTURE && !prof?.cv_text?.trim()) {
-        // Post-OAuth handoff (Phase A): a CV stashed before the sign-in redirect
-        // is written to the profile now, then revealed. Only when the profile
-        // has no CV yet (never clobber an existing one). Scoring itself is the
-        // server worker's job; the poll effect below surfaces its results.
-        const stash = readCvStash();
-        if (stash && runRef.current === runId) {
-          clearCvStash();
-          await applyCv(
-            user.id,
-            {
-              cv_text: stash.cv_text,
-              cv_hash: stash.cv_hash,
-              // Same shim as the profile read above, and it matters MORE here: the
-              // stash is written by the bundle the user had before the OAuth
-              // redirect and read by the one they have after, so a sign-up started
-              // before this deploy would otherwise write a retired archetype into
-              // a brand-new profile row (issue #70).
-              target_roles: normalizeTargetRoles(stash.target_roles),
-              target_sectors: normalizeTargetSectors(stash.target_sectors),
-            },
-            merged,
-          );
-        }
-      }
-      // Profile + stash handoff settled — `needsCv` may now be trusted.
-      if (runRef.current === runId) setProfileChecked(true);
-    }
-    load();
-    return () => {
-      // Cancels this run's loops on unmount AND on dep change; the next run's
-      // own increment keeps every runId unique.
-      runRef.current++;
-      // Drop any score batch buffered for this run so it can't flush into the
-      // next user's freshly-loaded view (the same leak the runRef guard prevents).
-      scoreBufferRef.current?.cancel();
-    };
-  }, [user]);
+  /** True once every own-row read has landed AND any pre-redirect CV stash has been
+   *  handed off — the earliest moment `needsCv` and the routed /settings page can be
+   *  trusted. It covers the whole set, not just the profile, because Settings renders
+   *  the dismissed list and the connections count off the same gate. `isFetched` (not
+   *  `isFetchedAfterMount`) is the load-bearing choice: a cached read satisfies it on
+   *  the FIRST render of a revisit, which is what removes the loading gate (#152). */
+  const profileChecked =
+    signedIn &&
+    profileFetched &&
+    scoresQ.isFetched &&
+    applicationsQ.isFetched &&
+    savedQ.isFetched &&
+    dismissedQ.isFetched &&
+    connectionsQ.isFetched &&
+    !stashOutstanding &&
+    !handoffBusy;
 
   // ── Score poll (issue #33): while the signed-in user has a CV and any ELIGIBLE
   // role is still unscored, pull landed scores every SCORE_POLL_MS so the server
@@ -832,43 +728,36 @@ export function useRolesData() {
   const eligibleIds = useMemo(() => new Set(eligibleJobs.map((j) => j.id)), [eligibleJobs]);
   const hasCv = Boolean(profile?.cv_text?.trim());
   useEffect(() => {
-    if (!user || !hasCv || !hasUnscored || loading) return;
-    const runId = runRef.current;
+    if (!userId || !hasCv || !hasUnscored || loading) return;
     // #149: the batch state is read once up front so the progress bar has the
     // right phase without waiting a poll cycle, then on the same cadence.
-    void refreshBatchPending(user.id, runId);
+    void refreshBatchPending(userId);
     const t = setInterval(() => {
-      void refreshScores(user.id, runId);
-      void refreshBatchPending(user.id, runId);
+      void refreshScores(userId);
+      void refreshBatchPending(userId);
     }, SCORE_POLL_MS);
     return () => clearInterval(t);
-  }, [user, hasCv, hasUnscored, loading]);
+  }, [userId, hasCv, hasUnscored, loading]);
 
   const markApplied = async (job: RoleJob) => {
-    if (!user) return;
-    setApplied((prev) => new Set(prev).add(job.id));
+    if (!userId) return;
+    const key = rolesKeys.applications(userId);
+    const prev = queryClient.getQueryData<ApplicationsData>(key) ?? NO_APPLICATIONS;
     // Mirror the row into `applications` too (default status 'applied'), so the
-    // company's other roles collapse out of the queue in the same tick.
-    setApplications((prev) => [...prev.filter((a) => a.job_id !== job.id), { job_id: job.id, status: "applied" }]);
-    // Carry the job's identity alongside, so applying a role that is NOT in the live
-    // pool (an expired role applied from the Saved section) still resolves to its
-    // company for the collapse — the same reason the load path fetches these rows.
-    setAppliedJobsRaw((prev) =>
-      prev.some((j) => j.id === job.id)
-        ? prev
-        : [...prev, { id: job.id, company: job.company, company_id: job.company_id ?? null }],
-    );
+    // company's other roles collapse out of the queue in the same tick. Carry the
+    // job's identity alongside, so applying a role that is NOT in the live pool (an
+    // expired role applied from the Saved section) still resolves to its company.
+    queryClient.setQueryData<ApplicationsData>(key, {
+      applications: [...prev.applications.filter((a) => a.job_id !== job.id), { job_id: job.id, status: "applied" }],
+      jobRows: prev.jobRows.some((j) => j.id === job.id)
+        ? prev.jobRows
+        : [...prev.jobRows, { id: job.id, company: job.company, company_id: job.company_id ?? null }],
+    });
     const { error } = await supabase
       .from("applications")
-      .upsert({ user_id: user.id, job_id: job.id }, { onConflict: "user_id,job_id" });
+      .upsert({ user_id: userId, job_id: job.id }, { onConflict: "user_id,job_id" });
     if (error) {
-      setApplied((prev) => {
-        const next = new Set(prev);
-        next.delete(job.id);
-        return next;
-      });
-      setApplications((prev) => prev.filter((a) => a.job_id !== job.id));
-      setAppliedJobsRaw((prev) => prev.filter((j) => j.id !== job.id));
+      queryClient.setQueryData<ApplicationsData>(key, prev);
       toast.error("Couldn't mark as applied. Please try again.");
       return;
     }
@@ -878,74 +767,76 @@ export function useRolesData() {
     // Applied ⇒ leaves Saved (Rober 7-16): the role lives on the applications board
     // now; keeping the bookmark too is clutter. Best-effort — never blocks the apply.
     if (saved.has(job.id)) {
-      setSaved((prev) => {
-        const next = new Set(prev);
-        next.delete(job.id);
-        return next;
+      const savedKey = rolesKeys.saved(userId);
+      const prevSaved = queryClient.getQueryData<RoleSetData>(savedKey) ?? NO_ROLE_SET;
+      queryClient.setQueryData<RoleSetData>(savedKey, {
+        ids: prevSaved.ids.filter((id) => id !== job.id),
+        rows: prevSaved.rows,
       });
-      await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", job.id);
+      await supabase.from("saved_jobs").delete().eq("user_id", userId).eq("job_id", job.id);
     }
+  };
+
+  /** Optimistic add/remove against a cached own-role set (saved_jobs /
+   *  dismissed_jobs), rolled back on failure. One shape for both toggles. */
+  const toggleRoleSet = async (
+    key: readonly unknown[],
+    table: "saved_jobs" | "dismissed_jobs",
+    uid: string,
+    job: RoleJob,
+    present: boolean,
+    failure: string,
+  ): Promise<boolean> => {
+    const prev = queryClient.getQueryData<RoleSetData>(key) ?? NO_ROLE_SET;
+    queryClient.setQueryData<RoleSetData>(key, {
+      ids: present ? prev.ids.filter((id) => id !== job.id) : [...prev.ids, job.id],
+      // Keep the undo/Saved list populated for a role acted on straight from the queue.
+      rows: present || prev.rows.some((r) => r.id === job.id) ? prev.rows : [...prev.rows, toJobsRow(job)],
+    });
+    // Dev-only walk (VITE_E2E_BYPASS_AUTH): the mock user's write is refused by RLS,
+    // which would roll the row straight back and make the control look broken. Keep
+    // the state local instead — nothing is persisted, exactly as the gate intends.
+    if (DEV_FIXTURE && table === "dismissed_jobs") return true;
+    const { error } = present
+      ? await supabase.from(table).delete().eq("user_id", uid).eq("job_id", job.id)
+      : await supabase.from(table).upsert({ user_id: uid, job_id: job.id }, { onConflict: "user_id,job_id" });
+    if (error) {
+      queryClient.setQueryData<RoleSetData>(key, prev);
+      toast.error(failure);
+      return false;
+    }
+    return true;
   };
 
   // Save / unsave a role for later (Rober 7-15). Optimistic toggle against the
   // saved_jobs table; rolls back + toasts on failure, same idiom as markApplied.
   const toggleSaved = async (job: RoleJob) => {
-    if (!user) return;
+    if (!userId) return;
     const wasSaved = saved.has(job.id);
-    setSaved((prev) => {
-      const next = new Set(prev);
-      if (wasSaved) next.delete(job.id);
-      else next.add(job.id);
-      return next;
-    });
-    const { error } = wasSaved
-      ? await supabase.from("saved_jobs").delete().eq("user_id", user.id).eq("job_id", job.id)
-      : await supabase.from("saved_jobs").upsert({ user_id: user.id, job_id: job.id }, { onConflict: "user_id,job_id" });
-    if (error) {
-      setSaved((prev) => {
-        const next = new Set(prev);
-        if (wasSaved) next.add(job.id);
-        else next.delete(job.id);
-        return next;
-      });
-      toast.error(wasSaved ? "Couldn't remove from saved. Please try again." : "Couldn't save. Please try again.");
-    }
+    await toggleRoleSet(
+      rolesKeys.saved(userId),
+      "saved_jobs",
+      userId,
+      job,
+      wasSaved,
+      wasSaved ? "Couldn't remove from saved. Please try again." : "Couldn't save. Please try again.",
+    );
   };
 
   // Dismiss / restore a role (issue #73 slice 4). "Not interested" is the missing
   // half of the queue: without it the same rejected match keeps nagging from the top
   // forever. Optimistic toggle against dismissed_jobs, same idiom as toggleSaved.
   const toggleDismissed = async (job: RoleJob) => {
-    if (!user) return;
+    if (!userId) return;
     const wasDismissed = dismissed.has(job.id);
-    setDismissed((prev) => {
-      const next = new Set(prev);
-      if (wasDismissed) next.delete(job.id);
-      else next.add(job.id);
-      return next;
-    });
-    // Keep the undo list populated for a role dismissed straight from the queue.
-    if (!wasDismissed) setDismissedJobsRaw((prev) => (prev.some((j) => j.id === job.id) ? prev : [...prev, job]));
-    // Dev-only walk (VITE_E2E_BYPASS_AUTH): the mock user's insert is refused by RLS,
-    // which would roll the row straight back and make the control look broken. Keep
-    // the state local instead — nothing is persisted, exactly as the gate intends.
-    if (DEV_FIXTURE) return;
-    const { error } = wasDismissed
-      ? await supabase.from("dismissed_jobs").delete().eq("user_id", user.id).eq("job_id", job.id)
-      : await supabase
-          .from("dismissed_jobs")
-          .upsert({ user_id: user.id, job_id: job.id }, { onConflict: "user_id,job_id" });
-    if (error) {
-      setDismissed((prev) => {
-        const next = new Set(prev);
-        if (wasDismissed) next.add(job.id);
-        else next.delete(job.id);
-        return next;
-      });
-      toast.error(
-        wasDismissed ? "Couldn't restore this role. Please try again." : "Couldn't hide this role. Please try again.",
-      );
-    }
+    await toggleRoleSet(
+      rolesKeys.dismissed(userId),
+      "dismissed_jobs",
+      userId,
+      job,
+      wasDismissed,
+      wasDismissed ? "Couldn't restore this role. Please try again." : "Couldn't hide this role. Please try again.",
+    );
   };
 
   // Persist edited target labels to the profile (Settings, Rober 7-15). Roles/sectors
@@ -953,17 +844,18 @@ export function useRolesData() {
   // the scoring prefilter (#114): a widened selection surfaces new unscored eligible
   // rows here, and the worker picks them up as fresh backlog on its next tick.
   const saveTargets = async (roles: string[], sectors: string[]): Promise<boolean> => {
-    if (!user) return false;
+    if (!userId) return false;
     const { error } = await supabase
       .from("profiles")
       .update({ target_roles: roles, target_sectors: sectors })
-      .eq("id", user.id);
+      .eq("id", userId);
     if (error) {
       toast.error("Couldn't save your settings. Please try again.");
       return false;
     }
-    setProfile((p) => (p ? { ...p, target_roles: roles, target_sectors: sectors } : p));
-    setProfileMeta((m) => (m ? { ...m, targetRoles: roles, targetSectors: sectors } : m));
+    queryClient.setQueryData<ProfileRow | null>(rolesKeys.profile(userId), (prev) =>
+      prev ? { ...prev, target_roles: roles, target_sectors: sectors } : prev,
+    );
     // #149: new targets widen or move the paid slice, so there is fresh backlog
     // the moment this write lands. Same fire-and-forget as the CV path.
     void kickScoringWorker();
@@ -979,8 +871,8 @@ export function useRolesData() {
    * rewrites, so a partial state never survives a retry).
    */
   const saveConnections = async (rows: ParsedConnection[]): Promise<boolean> => {
-    if (!user || rows.length === 0) return false;
-    const { error: delErr } = await supabase.from("connections").delete().eq("user_id", user.id);
+    if (!userId || rows.length === 0) return false;
+    const { error: delErr } = await supabase.from("connections").delete().eq("user_id", userId);
     if (delErr) {
       toast.error("Couldn't save your connections. Please try again.");
       return false;
@@ -989,7 +881,7 @@ export function useRolesData() {
     for (let i = 0; i < rows.length; i += CHUNK) {
       const { error } = await supabase.from("connections").insert(
         rows.slice(i, i + CHUNK).map((r) => ({
-          user_id: user.id,
+          user_id: userId,
           full_name: r.fullName,
           company: r.company,
           company_key: r.companyKey,
@@ -1003,16 +895,18 @@ export function useRolesData() {
         return false;
       }
     }
-    setConnections(
+    const nowIso = new Date().toISOString();
+    queryClient.setQueryData<ConnectionRow[]>(
+      rolesKeys.connections(userId),
       rows.map((r) => ({
-        fullName: r.fullName,
+        full_name: r.fullName,
         company: r.company,
-        companyKey: r.companyKey,
+        company_key: r.companyKey,
         position: r.position,
-        linkedinUrl: r.linkedinUrl,
+        linkedin_url: r.linkedinUrl,
+        created_at: nowIso,
       })),
     );
-    setConnectionsUpdatedAt(new Date().toISOString());
     // Counts only — never names, companies or the file itself (issue #89 rule).
     track("connections_uploaded", { connection_count: rows.length });
     return true;
@@ -1021,14 +915,13 @@ export function useRolesData() {
   /** Remove the whole connections upload (issue #41): every row goes, and every
    *  warm marker disappears with it. */
   const removeConnections = async (): Promise<boolean> => {
-    if (!user) return false;
-    const { error } = await supabase.from("connections").delete().eq("user_id", user.id);
+    if (!userId) return false;
+    const { error } = await supabase.from("connections").delete().eq("user_id", userId);
     if (error) {
       toast.error("Couldn't remove your connections. Please try again.");
       return false;
     }
-    setConnections([]);
-    setConnectionsUpdatedAt(null);
+    queryClient.setQueryData<ConnectionRow[]>(rolesKeys.connections(userId), NO_CONNECTIONS);
     track("connections_removed");
     return true;
   };
@@ -1036,32 +929,28 @@ export function useRolesData() {
   /** Manual "check now" — an immediate scores pull, ahead of the next poll tick.
    *  Kept for the RolesPanel prop surface; scoring itself is server-side. */
   const scoreMore = () => {
-    if (!user || !profile?.cv_text?.trim()) return;
-    void refreshScores(user.id, runRef.current);
+    if (!userId || !profile?.cv_text?.trim()) return;
+    void refreshScores(userId);
   };
 
   /**
    * Signed-in CV submit (from the CV-unlock modal): write the CV + labels to the
    * profile and reveal + score in-session. The anon path stashes instead and the
-   * load effect hands off after sign-in. Returns true on success.
+   * handoff effect above picks it up after sign-in. Returns true on success.
    */
   const submitCv = async (
     text: string,
     labels: { roles: string[]; sectors: string[] },
   ): Promise<boolean> => {
-    if (!user) return false;
+    if (!userId) return false;
     const cvText = text.trim();
     if (!cvText) return false;
-    return applyCv(
-      user.id,
-      {
-        cv_text: cvText,
-        cv_hash: hashCv(cvText),
-        target_roles: labels.roles,
-        target_sectors: labels.sectors,
-      },
-      jobs,
-    );
+    return applyCv(userId, {
+      cv_text: cvText,
+      cv_hash: hashCv(cvText),
+      target_roles: labels.roles,
+      target_sectors: labels.sectors,
+    });
   };
 
   // Saved roles for the Today section: live saved roles (enriched, score-carrying) plus
@@ -1106,7 +995,7 @@ export function useRolesData() {
     loading,
     // "Scoring" now means the SERVER pass hasn't drained this user's backlog yet
     // (the worker runs regardless; this drives the panel's progress bar).
-    scoring: Boolean(user) && hasCv && hasUnscored && !loading,
+    scoring: signedIn && hasCv && hasUnscored && !loading,
     remaining: eligibleJobs.filter((j) => j.score == null).length,
     /** Size of the paid slice (#114). The denominator of the progress bar (#149):
      *  "N to go" alone never said what it was counting down from. */
@@ -1140,8 +1029,8 @@ export function useRolesData() {
     scoreMore,
     submitCv,
     /** Post-CV state: the score reveal keys on a CV being present. */
-    scored: Boolean(profile?.cv_text?.trim()),
-    signedIn: Boolean(user),
+    scored: hasCv,
+    signedIn,
     /** Stored CV text (profile view, issue #43) — null until a signed-in user has one. */
     cvText: profile?.cv_text ?? null,
     /** Picked labels + last-write date (profile view, issue #43). */
@@ -1155,10 +1044,10 @@ export function useRolesData() {
      *  they entered through, the map shell opens the CV modal — CV mandatory as
      *  an invariant, not a door policy. */
     needsCv: shouldPromptCv({
-      signedIn: Boolean(user),
+      signedIn,
       profileChecked,
       hasCv,
-      stashPending: Boolean(readCvStash()),
+      stashPending,
     }),
   };
 }

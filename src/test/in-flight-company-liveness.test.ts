@@ -15,6 +15,9 @@ import { join } from "node:path";
 // a real posting dies during a real conversation. So pin the call site itself.
 describe("useRolesData feeds inFlightCompanyKeys a liveness-independent pool", () => {
   const src = readFileSync(join(process.cwd(), "src/hooks/useRolesData.ts"), "utf8");
+  // The reads themselves moved into the cached query layer (issue #152); the rule
+  // they carry did not, so the guard follows the fetches.
+  const queries = readFileSync(join(process.cwd(), "src/lib/rolesQueries.ts"), "utf8");
 
   it("passes the applied roles' own rows, not just the live jobs pool", () => {
     const call = /inFlightCompanyKeys\(([\s\S]*?)\)\s*,/.exec(src);
@@ -27,12 +30,12 @@ describe("useRolesData feeds inFlightCompanyKeys a liveness-independent pool", (
   });
 
   it("keeps the is_live filter on the live-pool fetch ONLY", () => {
-    const filters = src.match(/\.eq\("is_live", true\)/g) ?? [];
+    const filters = (src + queries).match(/\.eq\("is_live", true\)/g) ?? [];
     expect(
       filters.length,
-      "exactly one is_live filter belongs in this hook (the paged live-pool fetch). " +
-        "The by-id fetches — applied / saved / dismissed — must stay unfiltered so an " +
-        "expired posting still resolves (RLS 20260726094000 grants the read).",
+      "exactly one is_live filter belongs in the /roles reads (the paged live-pool " +
+        "fetch). The by-id fetches — applied / saved / dismissed — must stay unfiltered " +
+        "so an expired posting still resolves (RLS 20260726094000 grants the read).",
     ).toBe(1);
   });
 });
