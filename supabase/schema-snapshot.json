@@ -1216,6 +1216,15 @@
   {
    "default": null,
    "generated": null,
+   "name": "gmail_confirmed_at",
+   "nullable": true,
+   "table": "inbound_tokens",
+   "type": "timestamp with time zone",
+   "udt": "timestamptz"
+  },
+  {
+   "default": null,
+   "generated": null,
    "name": "token",
    "nullable": false,
    "table": "inbound_tokens",

@@ -30,6 +30,8 @@ import {
   extractForwardingToken,
   extractGmailConfirmationCode,
   extractGmailConfirmationLink,
+  isConfirmUrl,
+  isGmailConfirmSuccess,
   isGmailForwardingConfirmation,
   matchApplication,
   secretAuthResult,
@@ -88,6 +90,29 @@ async function fetchResendContent(
   } catch (e) {
     console.warn("[inbound] Resend content fetch failed:", e);
     return null;
+  }
+}
+
+/**
+ * Issue #157 / LOCKED decision 7 (2026-08-26): follow the Gmail confirm link
+ * server-side, so Settings can show "Confirmed" without the user clicking the
+ * manual button. Callers MUST pass a url that already passed isConfirmUrl (see
+ * the call site below) — this function makes the fetch, nothing else, and never
+ * logs the url itself (only short, url-free messages). Best-effort: a timeout,
+ * a network error, or a response that reads like Gmail rejected the link all
+ * resolve false, never throw, so the manual button always stays a working
+ * fallback. fetchImpl is injectable for tests, same shape as the liveness sweep
+ * (scripts/liveness-lib.mjs checkUrl).
+ */
+export async function confirmGmailForwarding(url: string, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+  try {
+    // jsdom's AbortSignal (vitest environment) has no .timeout — degrade to no signal there.
+    const signal = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(10_000) : undefined;
+    const res = await fetchImpl(url, { method: "GET", redirect: "follow", signal });
+    const text = await res.text();
+    return isGmailConfirmSuccess(res.status, text);
+  } catch {
+    return false;
   }
 }
 
@@ -275,9 +300,31 @@ async function handler(req: Req, res: Res): Promise<void> {
         })
         .eq("user_id", userId);
     }
-    const detail = link ? "link stored" : code ? "code stored" : "no code or link found";
+
+    // Auto-confirm: follow ONLY a url that passes isConfirmUrl (the extracted
+    // /mail/vf-... link, never /mail/uf-...) and stamp gmail_confirmed_at on
+    // success. Degrades gracefully in either direction: a fetch failure leaves
+    // the column unset (the manual button in Settings stays the fallback), and
+    // an environment where the migration hasn't landed yet (unknown-column error
+    // on the update) is caught below rather than thrown.
+    let confirmed = false;
+    if (link && isConfirmUrl(link)) {
+      confirmed = await confirmGmailForwarding(link);
+      if (confirmed) {
+        const { error: confirmErr } = await admin
+          .from("inbound_tokens")
+          .update({ gmail_confirmed_at: new Date().toISOString() })
+          .eq("user_id", userId);
+        if (confirmErr) {
+          confirmed = false;
+          console.warn("[inbound-email] gmail_confirmed_at stamp failed:", confirmErr.message);
+        }
+      }
+    }
+
+    const detail = link ? (confirmed ? "link stored; auto-confirmed" : "link stored") : code ? "code stored" : "no code or link found";
     await log({ classification: "gmail_confirmation", action: "gmail_confirmation", detail });
-    res.status(200).json({ ok: true, action: "gmail_confirmation", stored: Boolean(code || link) });
+    res.status(200).json({ ok: true, action: "gmail_confirmation", stored: Boolean(code || link), confirmed });
     return;
   }
 

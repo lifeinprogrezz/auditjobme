@@ -133,6 +133,65 @@ export function extractGmailConfirmationLink(body: string | undefined | null): s
   return m ? m[0] : null;
 }
 
+/**
+ * Issue #157 / LOCKED decision 7: api/inbound-email.ts follows the confirm link
+ * server-side instead of waiting for a click. extractGmailConfirmationLink above
+ * already matches only /mail/vf-..., but the auto-follow is the one action this
+ * endpoint ever takes on a user's behalf, so the URL is checked again, right
+ * before the fetch, against the exact host and path rather than trusting the
+ * regex match transitively. Anything that is not that shape — the /mail/uf-
+ * cancel link one letter away, a lookalike host, a non-https scheme — is false.
+ */
+export function isConfirmUrl(url: string | undefined | null): boolean {
+  if (!url) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  return parsed.protocol === "https:" && parsed.hostname === "mail.google.com" && parsed.pathname.startsWith("/mail/vf-");
+}
+
+/**
+ * Reads the response the confirm link gave back. Gmail returns 200 for both a
+ * link it accepted and one it didn't (already used, expired) — the difference is
+ * in the page text, so a plain HTTP-ok check would report success on a link that
+ * silently did nothing. False on any non-200 too, so a network hiccup or an
+ * anti-bot block never gets recorded as a confirmation.
+ */
+export function isGmailConfirmSuccess(status: number, bodyText: string): boolean {
+  if (status !== 200) return false;
+  return !/error|invalid|expired/i.test(bodyText);
+}
+
+/** The Settings live status line ("Address created · Confirmation received ·
+ *  Confirmed") reads exactly these four states, in order. */
+export type ForwardingStatus = "none" | "created" | "received" | "confirmed";
+
+/**
+ * Derives the status line's state from the token row alone, so it is testable
+ * without a component and identical to whatever ForwardingSection renders.
+ * "received" covers either shape the confirmation mail leaves behind (the
+ * modern link or the legacy numeric code); "confirmed" is set only once the
+ * server actually followed the link (gmail_confirmed_at, issue #157).
+ */
+export function forwardingStatus(
+  row:
+    | {
+        gmail_confirmation_url?: string | null;
+        gmail_confirmation_code?: string | null;
+        gmail_confirmed_at?: string | null;
+      }
+    | null
+    | undefined,
+): ForwardingStatus {
+  if (!row) return "none";
+  if (row.gmail_confirmed_at) return "confirmed";
+  if (row.gmail_confirmation_url || row.gmail_confirmation_code) return "received";
+  return "created";
+}
+
 // ---------------------------------------------------------------------------
 // Classifier
 // ---------------------------------------------------------------------------

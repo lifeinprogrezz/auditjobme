@@ -3,17 +3,25 @@
 // one guided Gmail filter that makes their tracker move itself. Reads the own token
 // row through row-level security; creation goes through the server-side
 // get_or_create_forwarding_token() function, so a client can never choose a token.
-// The Gmail forwarding-verification code Google mails TO the address is parsed by
-// the inbound endpoint onto the token row, and surfaces here.
+// The Gmail forwarding-verification link Google mails TO the address is parsed by
+// the inbound endpoint onto the token row, which also follows it server-side
+// (issue #157 / LOCKED decision 7) — this section just reflects the result back as
+// a live status line, polling its own row every 10s until it reads confirmed.
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { ATS_SENDER_DOMAINS, forwardingAddress } from "@/lib/inbound";
+import { ATS_SENDER_DOMAINS, forwardingAddress, forwardingStatus, type ForwardingStatus } from "@/lib/inbound";
 
 // inbound_tokens is not in the generated types until the migration is applied to the
 // project and src/integrations/supabase/types.ts is regenerated (same note as
 // delete_own_account in Settings.tsx).
-type TokenRow = { token: string; gmail_confirmation_code: string | null; gmail_confirmation_url: string | null };
+type TokenRow = {
+  token: string;
+  gmail_confirmation_code: string | null;
+  gmail_confirmation_url: string | null;
+  gmail_confirmation_at: string | null;
+  gmail_confirmed_at: string | null;
+};
 type InboundClient = {
   from: (table: string) => {
     select: (cols: string) => { limit: (n: number) => Promise<{ data: TokenRow[] | null; error: unknown }> };
@@ -21,6 +29,19 @@ type InboundClient = {
   rpc: (fn: string) => Promise<{ data: unknown; error: { message: string } | null }>;
 };
 const db = supabase as unknown as InboundClient;
+
+const POLL_MS = 10_000;
+// Auto-confirm is a single server-side fetch and normally lands within seconds;
+// 60s is generous slack before Settings offers the manual fallback, so a slow
+// Gmail response doesn't flash the button and then take it away again.
+const MANUAL_FALLBACK_DELAY_MS = 60_000;
+
+const STATUS_STEPS: { key: ForwardingStatus; label: string }[] = [
+  { key: "created", label: "Address created" },
+  { key: "received", label: "Confirmation received" },
+  { key: "confirmed", label: "Confirmed" },
+];
+const STATUS_ORDER: ForwardingStatus[] = ["none", "created", "received", "confirmed"];
 
 /** The one Gmail filter, as a copyable From: query over every sender we parse. */
 const GMAIL_FILTER_QUERY = [...new Set(ATS_SENDER_DOMAINS.map(([suffix]) => suffix))].join(" OR ");
@@ -50,7 +71,10 @@ export default function ForwardingSection() {
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
-    const { data } = await db.from("inbound_tokens").select("token, gmail_confirmation_code, gmail_confirmation_url").limit(1);
+    const { data } = await db
+      .from("inbound_tokens")
+      .select("token, gmail_confirmation_code, gmail_confirmation_url, gmail_confirmation_at, gmail_confirmed_at")
+      .limit(1);
     setRow(data?.[0] ?? null);
     setChecked(true);
   }, []);
@@ -58,6 +82,22 @@ export default function ForwardingSection() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const status = forwardingStatus(row);
+
+  // Auto-confirm runs server-side (issue #157); this poll is what picks the
+  // result up without the user coming back to click Refresh themselves. Stops
+  // as soon as the row reads confirmed.
+  useEffect(() => {
+    if (!row || status === "confirmed") return;
+    const id = window.setInterval(() => void load(), POLL_MS);
+    return () => window.clearInterval(id);
+  }, [row, status, load]);
+
+  const showManualFallback =
+    status === "received" &&
+    row?.gmail_confirmation_at != null &&
+    Date.now() - new Date(row.gmail_confirmation_at).getTime() > MANUAL_FALLBACK_DELAY_MS;
 
   const handleCreate = async () => {
     setCreating(true);
@@ -76,9 +116,8 @@ export default function ForwardingSection() {
     <section className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-page">
       <h2 className="font-display text-section text-foreground">Email auto-tracking</h2>
       <p className="mt-3 text-body text-muted-foreground text-pretty">
-        Job applications generate email: a confirmation when you apply, an interview invite when it goes well, a
-        rejection when it doesn't. Forward those to your personal tracking address and your board moves itself. One
-        Gmail filter, set up once. We only ever see the mail you choose to forward, never your inbox.
+        Forward the emails your applications generate here, just the ones you choose, and your board updates on its
+        own.
       </p>
 
       {!checked ? (
@@ -105,35 +144,36 @@ export default function ForwardingSection() {
             <CopyButton text={forwardingAddress(row.token)} label="Copy address" />
           </div>
 
+          <p className="mt-2 text-caption text-muted-foreground" role="status">
+            {STATUS_STEPS.map((step, i) => (
+              <span
+                key={step.key}
+                className={STATUS_ORDER.indexOf(status) >= STATUS_ORDER.indexOf(step.key) ? "font-medium text-foreground" : ""}
+              >
+                {i > 0 && " · "}
+                {step.label}
+              </span>
+            ))}
+          </p>
+
+          {showManualFallback &&
+            (row.gmail_confirmation_url ? (
+              <a
+                className="mt-3 inline-flex items-center rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background"
+                href={row.gmail_confirmation_url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Confirm forwarding in Gmail
+              </a>
+            ) : row.gmail_confirmation_code ? (
+              <p className="mt-3 text-caption text-foreground">
+                Your code: <code>{row.gmail_confirmation_code}</code>
+              </p>
+            ) : null)}
+
           <ol className="mt-4 list-decimal space-y-2 pl-5 text-body text-muted-foreground">
-            <li>
-              In Gmail, open Settings, then "Forwarding and POP/IMAP", and add the address above as a forwarding
-              address. Gmail then emails a confirmation to that address, which means to us, not to you.
-            </li>
-            <li>
-              {/* Gmail sends a LINK, not a code (measured 2026-08-19 against real mail).
-                  The code branch stays for the older "(#123456789)" subject some
-                  accounts still receive. */}
-              Confirm it here: refresh below and the button appears.
-              {row.gmail_confirmation_url ? (
-                <a
-                  className="ml-2 inline-flex items-center rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background"
-                  href={row.gmail_confirmation_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Confirm forwarding in Gmail
-                </a>
-              ) : row.gmail_confirmation_code ? (
-                <span className="ml-1 font-medium text-foreground">
-                  Your code: <code>{row.gmail_confirmation_code}</code>
-                </span>
-              ) : (
-                <Button variant="ghost" size="sm" className="ml-2" onClick={() => void load()}>
-                  Refresh
-                </Button>
-              )}
-            </li>
+            <li>Add this address as a forwarding address in Gmail, under Settings, then "Forwarding and POP/IMAP".</li>
             <li>
               Create one filter: in the Gmail search bar, open filter options, paste the sender list below into the
               "From" field, choose "Create filter", and tick "Forward it" to your tracking address.
@@ -148,9 +188,8 @@ export default function ForwardingSection() {
           </div>
 
           <p className="mt-3 text-caption text-muted-foreground text-pretty">
-            That list covers the common applicant tracking systems (Greenhouse, Lever, Ashby and friends). Mail from
-            them moves your card: a confirmation stamps it confirmed, an interview invite moves it to Interview, a
-            rejection closes it. An old rejection never overwrites a later interview.
+            This covers the applicant tracking systems we recognize, and moves your card to confirmed, interview, or
+            rejected on its own.
           </p>
         </>
       )}

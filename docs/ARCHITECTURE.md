@@ -338,3 +338,25 @@ address at the bare domain bounces, and the `List-Unsubscribe` mailto therefore 
 points at `hello@lifeinprogrezz.com`, which is a real Google-hosted mailbox. Moving it
 needs apex MX first, not just a verified sending domain. A bounced unsubscribe is worse
 than an off-brand one.
+
+**Receiving** is a separate pipeline, per user. `inbound_tokens` gives each user a
+personal `u-{token}@northgoing.com`; one guided Gmail filter forwards their applicant-
+tracking-system mail there, and `api/inbound-email.ts` (service role, authenticated by
+Svix for Resend or a shared bearer secret for anything else) classifies what arrives
+and advances the matching `applications` row through the same `status_events` trigger
+a manual kanban move uses. The pure logic — token parsing, the ATS sender map, the
+classifier, the stale-guarded transition — lives in `src/lib/inbound.ts`, pinned by
+`src/test/inbound.test.ts`.
+
+Gmail's own forwarding setup needs a confirmation, and that confirmation mail lands at
+the forwarding address itself rather than in the user's inbox. The endpoint stores the
+link it extracts on the token row, then follows it server-side (issue #157 / LOCKED
+decision 7) and stamps `inbound_tokens.gmail_confirmed_at` on success, so Settings
+shows "Confirmed" without the user clicking anything. The same mail carries a cancel
+link one letter away (`/mail/uf-...`, next to the confirm link's `/mail/vf-...`);
+`isConfirmUrl` checks the host and path again right before that one fetch, so the
+endpoint can never follow it. Any failure — a timeout, a non-200, a body that reads
+like Gmail rejected the link — leaves the column null, and the manual "Confirm
+forwarding in Gmail" button in `ForwardingSection.tsx` stays the fallback, which is
+also what happens in an environment where the migration hasn't landed yet (the update
+is caught, not thrown).

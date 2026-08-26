@@ -524,6 +524,7 @@ export type Database = {
           gmail_confirmation_at: string | null
           gmail_confirmation_code: string | null
           gmail_confirmation_url: string | null
+          gmail_confirmed_at: string | null
           token: string
           user_id: string
         }
@@ -532,6 +533,7 @@ export type Database = {
           gmail_confirmation_at?: string | null
           gmail_confirmation_code?: string | null
           gmail_confirmation_url?: string | null
+          gmail_confirmed_at?: string | null
           token: string
           user_id: string
         }
@@ -540,6 +542,7 @@ export type Database = {
           gmail_confirmation_at?: string | null
           gmail_confirmation_code?: string | null
           gmail_confirmation_url?: string | null
+          gmail_confirmed_at?: string | null
           token?: string
           user_id?: string
         }
