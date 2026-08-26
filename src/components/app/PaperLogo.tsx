@@ -9,7 +9,7 @@
 // switch, because `stage` never rewound to give the NEW theme variant a shot —
 // the `useEffect` below rewinds it so the newly-themed logo is retried first.
 import { useEffect, useState } from "react";
-import { logoUrl, faviconUrls } from "@/lib/logodev";
+import { logoUrl, faviconUrls, guessedFaviconUrl } from "@/lib/logodev";
 import { useTheme } from "@/lib/theme";
 
 /** Rendered box sizes (px). Radius stays 10 (§2.4 tile radius) at every size. */
@@ -25,9 +25,12 @@ export default function PaperLogo({
   size?: PaperLogoSize;
 }) {
   const { theme } = useTheme();
+  // No domain on file at all (issue #153 item B1): one last-resort guess from
+  // the company name before the coloured initial, instead of going straight
+  // to it. A wrong guess just 404s via onError, same as any other stage.
   const chain = domain
     ? [logoUrl(domain, theme === "dark" ? "dark" : "light"), ...faviconUrls(domain)].filter(Boolean)
-    : [];
+    : [guessedFaviconUrl(company)].filter(Boolean);
   const [stage, setStage] = useState(0);
   // Rewind the fallback chain on a theme flip so the new theme's logo is retried.
   useEffect(() => setStage(0), [theme]);

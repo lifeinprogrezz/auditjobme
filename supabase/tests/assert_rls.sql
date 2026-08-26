@@ -27,11 +27,15 @@ declare
   --     anon/authenticated grants, because RLS without a policy blocks reads but
   --     not writes made through a table-level grant, and that default includes
   --     DELETE and TRUNCATE.
+  --   geocode_cache               -- internal geocoder cache (issue #153); the
+  --     client reads company_offices, the result this cache feeds, never the
+  --     cache itself.
   deny_all_allowlist text[] := array[
     'whitelisted_emails',
     'headcount_bucket_backup_20260726',
     'companies_sector_backup_20260819',
-    'profiles_targets_backup_20260819'
+    'profiles_targets_backup_20260819',
+    'geocode_cache'
   ];
 begin
   select string_agg(c.relname, ', ' order by c.relname)

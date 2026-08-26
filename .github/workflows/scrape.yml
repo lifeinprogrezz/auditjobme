@@ -94,15 +94,42 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # Issue #153 item B1: a `companies` row for every distinct company on live
+      # jobs that lacks one (~40% of them — no row means no logo, no coordinates,
+      # no sector). Runs BEFORE the logo backfill so the rows it creates are
+      # eligible for a logo domain in the SAME run.
+      - name: Create company records for job-derived companies
+        continue-on-error: true # additive; a hiccup must never fail the core scrape
+        run: node scripts/company-records.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       # Issue #68 item 4: derive companies.logo_domain from the company's own
       # careers/website URL for null-logo companies with a live role. Hosted-ATS
-      # URLs never produce a domain (a wrong domain renders a wrong logo).
+      # URLs never produce a domain (a wrong domain renders a wrong logo). Issue
+      # #153 item B1 extended this: a company with NEITHER a careers_url NOR a
+      # website (the job-derived rows just above) falls to its own apply-URL host.
       - name: Backfill missing company logo domains (careers/website URL derivation)
         continue-on-error: true # cosmetic; must never fail the core scrape
         run: node scripts/logo-backfill.mjs --apply
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # Issue #153 item B2: real street coordinates per company x city, via
+      # Nominatim (Mapbox instead when MAPBOX_TOKEN/MAPBOX_ACCESS_TOKEN is set —
+      # neither exists in this repo's secrets today, checked read-only for the
+      # issue). Cached forever in geocode_cache (migration 20260827110000);
+      # degrades gracefully (skips caching only) if that migration is not applied
+      # yet. Companies without a resolved office keep the client's centroid disc.
+      - name: Geocode company offices
+        continue-on-error: true # third-party rate limit; a hiccup must never fail the core scrape
+        run: node scripts/geocode-companies.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Optional: prefer Mapbox over Nominatim when a key exists (either name).
+          MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
       # F3 (issue #37): publish the static dataplane LAST, after every write to the
       # pool — the /roles map and the GEO feeds fetch these artifacts instead of
       # querying the DB per visitor. Deliberately NOT continue-on-error: a red run

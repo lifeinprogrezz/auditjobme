@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { domainFor, logoUrl } from "@/lib/logodev";
+import { domainFor, logoUrl, guessedDomain, guessedFaviconUrl } from "@/lib/logodev";
 
 describe("domainFor", () => {
   it("derives the domain from big-tech scraper sources", () => {
@@ -65,5 +65,32 @@ describe("logoUrl", () => {
   it("returns null when the token is empty or missing", () => {
     vi.stubEnv("VITE_LOGODEV_TOKEN", "");
     expect(logoUrl("personio.com")).toBeNull();
+  });
+});
+
+describe("guessedDomain — the LAST-resort favicon guess (issue #153 item B1)", () => {
+  it("slugifies the company name plus .com", () => {
+    expect(guessedDomain("Acme")).toBe("acme.com");
+    expect(guessedDomain("Some Random Startup")).toBe("somerandomstartup.com");
+  });
+
+  it("folds diacritics and strips punctuation", () => {
+    expect(guessedDomain("Café Ai")).toBe("cafeai.com");
+    expect(guessedDomain("1Password")).toBe("1password.com");
+  });
+
+  it("returns an empty string for a name with no alphanumeric content", () => {
+    expect(guessedDomain("")).toBe("");
+    expect(guessedDomain("---")).toBe("");
+  });
+});
+
+describe("guessedFaviconUrl", () => {
+  it("builds a single DuckDuckGo favicon URL from the guessed domain", () => {
+    expect(guessedFaviconUrl("Acme")).toBe("https://icons.duckduckgo.com/ip3/acme.com.ico");
+  });
+
+  it("returns null when there is nothing to guess from", () => {
+    expect(guessedFaviconUrl("")).toBeNull();
   });
 });

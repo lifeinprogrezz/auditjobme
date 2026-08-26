@@ -62,6 +62,11 @@
   },
   {
    "kind": "r",
+   "name": "geocode_cache",
+   "rls": true
+  },
+  {
+   "kind": "r",
    "name": "headcount_bucket_backup_20260726",
    "rls": true
   },
@@ -1059,6 +1064,51 @@
    "table": "feedback",
    "type": "uuid",
    "udt": "uuid"
+  },
+  {
+   "default": "now()",
+   "generated": null,
+   "name": "fetched_at",
+   "nullable": false,
+   "table": "geocode_cache",
+   "type": "timestamp with time zone",
+   "udt": "timestamptz"
+  },
+  {
+   "default": null,
+   "generated": null,
+   "name": "lat",
+   "nullable": true,
+   "table": "geocode_cache",
+   "type": "double precision",
+   "udt": "float8"
+  },
+  {
+   "default": null,
+   "generated": null,
+   "name": "lng",
+   "nullable": true,
+   "table": "geocode_cache",
+   "type": "double precision",
+   "udt": "float8"
+  },
+  {
+   "default": null,
+   "generated": null,
+   "name": "precision",
+   "nullable": true,
+   "table": "geocode_cache",
+   "type": "text",
+   "udt": "text"
+  },
+  {
+   "default": null,
+   "generated": null,
+   "name": "query",
+   "nullable": false,
+   "table": "geocode_cache",
+   "type": "text",
+   "udt": "text"
   },
   {
    "default": "now()",
@@ -2363,6 +2413,11 @@
    "table": "feedback"
   },
   {
+   "def": "PRIMARY KEY (query)",
+   "name": "geocode_cache_pkey",
+   "table": "geocode_cache"
+  },
+  {
    "def": "PRIMARY KEY (slug)",
    "name": "headcount_bucket_backup_20260726_pkey",
    "table": "headcount_bucket_backup_20260726"
@@ -2743,6 +2798,11 @@
    "def": "CREATE INDEX feedback_user_idx ON public.feedback USING btree (user_id)",
    "name": "feedback_user_idx",
    "table": "feedback"
+  },
+  {
+   "def": "CREATE UNIQUE INDEX geocode_cache_pkey ON public.geocode_cache USING btree (query)",
+   "name": "geocode_cache_pkey",
+   "table": "geocode_cache"
   },
   {
    "def": "CREATE UNIQUE INDEX headcount_bucket_backup_20260726_pkey ON public.headcount_bucket_backup_20260726 USING btree (slug)",

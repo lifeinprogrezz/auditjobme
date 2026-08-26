@@ -7,6 +7,14 @@
  * (teamtailor/greenhouse/...) never produce a domain: a wrong domain renders a
  * WRONG logo, so null stays null rather than guessing.
  *
+ * Issue #153 item B1: a company with NEITHER a careers_url NOR a website (the
+ * job-derived rows scripts/company-records.mjs creates have neither) falls
+ * through to a second source — the apply URL of its own live job(s). The same
+ * domainFromUrl() already excludes every hosted-ATS/platform host (Greenhouse,
+ * Lever, LinkedIn, Notion...), so a resolved domain is the company's own site,
+ * never a wrong-company guess; when it resolves, it fills BOTH website and
+ * logo_domain in one write.
+ *
  * SAFETY: dry-run is the DEFAULT — reports what it would set, writes nothing.
  * Pass --apply to write (the nightly workflow does; manual runs must opt in).
  *
@@ -15,7 +23,7 @@
  *   node scripts/logo-backfill.mjs --apply    # write derived logo domains
  */
 import { createClient } from "@supabase/supabase-js";
-import { deriveLogoDomain } from "./logo-lib.mjs";
+import { resolveLogoDomain } from "./logo-lib.mjs";
 
 const APPLY = process.argv.includes("--apply");
 const url = process.env.SUPABASE_URL;
@@ -27,11 +35,14 @@ if (!url || !key) {
 const supabase = createClient(url, key);
 
 // Companies with at least one live role (paged; the pool is a few thousand rows).
+// Also collect a few apply URLs per company — the item B1 fallback source below.
 const liveCompanyIds = new Set();
+const urlsByCompany = new Map();
+const URLS_PER_COMPANY = 5; // bounded: the first few live roles are enough to try
 for (let from = 0; ; from += 1000) {
   const { data, error } = await supabase
     .from("jobs")
-    .select("company_id")
+    .select("company_id, url")
     .eq("is_live", true)
     .not("company_id", "is", null)
     .range(from, from + 999);
@@ -39,7 +50,12 @@ for (let from = 0; ; from += 1000) {
     console.error("logo-backfill: jobs select failed:", error.message);
     process.exit(1);
   }
-  for (const r of data || []) liveCompanyIds.add(r.company_id);
+  for (const r of data || []) {
+    liveCompanyIds.add(r.company_id);
+    const arr = urlsByCompany.get(r.company_id) ?? [];
+    if (arr.length < URLS_PER_COMPANY) arr.push(r.url);
+    urlsByCompany.set(r.company_id, arr);
+  }
   if (!data || data.length < 1000) break;
 }
 
@@ -54,15 +70,21 @@ if (error) {
 
 const candidates = (companies || []).filter((c) => liveCompanyIds.has(c.slug));
 const fills = [];
+let viaApplyUrl = 0;
 for (const c of candidates) {
-  const domain = deriveLogoDomain({ careersUrl: c.careers_url, website: c.website });
-  if (domain) fills.push({ slug: c.slug, name: c.name, domain });
+  const { domain, derivedWebsite } = resolveLogoDomain({
+    careersUrl: c.careers_url,
+    website: c.website,
+    applyUrls: urlsByCompany.get(c.slug) ?? [],
+  });
+  if (derivedWebsite) viaApplyUrl++;
+  if (domain) fills.push({ slug: c.slug, name: c.name, domain, website: derivedWebsite });
 }
 
 console.error(
-  `logo-backfill: ${candidates.length} null-logo company(ies) with a live role; ${fills.length} derivable${APPLY ? "" : " (DRY RUN — pass --apply to write)"}`,
+  `logo-backfill: ${candidates.length} null-logo company(ies) with a live role; ${fills.length} derivable (${viaApplyUrl} via apply-URL host)${APPLY ? "" : " (DRY RUN — pass --apply to write)"}`,
 );
-for (const f of fills) console.error(`  ${f.name} (${f.slug}) -> ${f.domain}`);
+for (const f of fills) console.error(`  ${f.name} (${f.slug}) -> ${f.domain}${f.website ? " [+website]" : ""}`);
 
 if (!APPLY) {
   console.error("logo-backfill: DRY RUN — no writes.");
@@ -71,7 +93,9 @@ if (!APPLY) {
 
 let written = 0;
 for (const f of fills) {
-  const { error: e } = await supabase.from("companies").update({ logo_domain: f.domain }).eq("slug", f.slug);
+  const update = { logo_domain: f.domain };
+  if (f.website) update.website = f.website;
+  const { error: e } = await supabase.from("companies").update(update).eq("slug", f.slug);
   if (e) console.error(`logo-backfill: update failed for ${f.slug}: ${e.message}`);
   else written++;
 }

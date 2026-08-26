@@ -71,3 +71,26 @@ export function domainFromUrl(url) {
 export function deriveLogoDomain({ careersUrl, website } = {}) {
   return domainFromUrl(careersUrl) || domainFromUrl(website) || null;
 }
+
+/**
+ * Full fallback order for a company with no logo domain yet (issue #153 item
+ * B1): careers_url/website first (deriveLogoDomain, unchanged), then — ONLY
+ * for a company with NEITHER on file at all, e.g. a job-derived row created by
+ * scripts/company-records.mjs with nothing but a name — the first of its own
+ * live-job apply URLs whose host is not a hosted-ATS/platform host.
+ * domainFromUrl() already excludes every such host, so a resolved fallback
+ * domain is the company's own site, never a wrong-company guess. When it
+ * resolves, the SAME domain doubles as the company's website (nothing else
+ * has ever named one), returned separately so a caller can persist both
+ * columns without touching an existing website that just didn't resolve.
+ */
+export function resolveLogoDomain({ careersUrl, website, applyUrls } = {}) {
+  const direct = deriveLogoDomain({ careersUrl, website });
+  if (direct) return { domain: direct, derivedWebsite: null };
+  if (website) return { domain: null, derivedWebsite: null }; // has a website; it just didn't resolve — don't guess elsewhere
+  for (const url of applyUrls || []) {
+    const domain = domainFromUrl(url);
+    if (domain) return { domain, derivedWebsite: `https://${domain}` };
+  }
+  return { domain: null, derivedWebsite: null };
+}

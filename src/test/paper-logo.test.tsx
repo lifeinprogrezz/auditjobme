@@ -14,6 +14,7 @@ import { setTheme } from "@/lib/theme";
 vi.mock("@/lib/logodev", () => ({
   logoUrl: (domain: string, theme: "dark" | "light") => `https://logo.test/${domain}?theme=${theme}`,
   faviconUrls: (domain: string) => [`https://fav.test/1/${domain}`, `https://fav.test/2/${domain}`],
+  guessedFaviconUrl: (company: string) => (company ? `https://guess.test/${company}` : null),
 }));
 
 describe("PaperLogo — theme-aware page logo (§5.5) + reset-on-theme (nit 5a)", () => {
@@ -39,13 +40,25 @@ describe("PaperLogo — theme-aware page logo (§5.5) + reset-on-theme (nit 5a)"
     expect(img.getAttribute("src")).toBe("https://logo.test/acme.com?theme=dark");
   });
 
-  it("falls back to a coloured initial when there is no domain", () => {
+  it("tries one guessed-domain favicon before the coloured initial when there is no domain", () => {
+    // Issue #153 item B1: no domain on file -> ONE last-resort attempt, not
+    // straight to the initial.
     const { container } = render(<PaperLogo domain={null} company="Zeta" size={24} />);
+    const img = container.querySelector("img") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("https://guess.test/Zeta");
+    // The guess 404s -> falls through to the initial, same as any other stage.
+    fireEvent.error(img);
     expect(container.querySelector("img")).toBeNull();
     const span = container.querySelector("span") as HTMLElement;
     expect(span.textContent).toBe("Z");
     // Tile size maps to the 24px box; radius stays on the {…,10,…} scale.
     expect(span.className).toContain("h-6");
     expect(span.className).toContain("rounded-[10px]");
+  });
+
+  it("falls straight to the initial when even the guess has nothing to work with", () => {
+    const { container } = render(<PaperLogo domain={null} company="" size={24} />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("span")).not.toBeNull();
   });
 });

@@ -163,3 +163,32 @@ export function faviconUrls(domain: string): string[] {
     `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
   ];
 }
+
+/**
+ * Issue #153 item B1: the LAST resort, for a company with no domain known at
+ * all (no companies.logo_domain, no KNOWN_DOMAINS match) — a plain slug of the
+ * company name plus ".com". Not domainFor(): domainFor() is a certain-mappings
+ * lookup and must never guess (pinned by domainFor's own tests); this is
+ * deliberately the opposite — a guess, used ONLY as a single favicon attempt
+ * behind onError, never stored anywhere and never used for a "visit website"
+ * link. A wrong guess just 404s (or DuckDuckGo's default icon 404s) and falls
+ * through to the coloured initial, same as today.
+ */
+export function guessedDomain(company: string): string {
+  const slug = company
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+  return slug ? `${slug}.com` : "";
+}
+
+/** DuckDuckGo favicon for the guessed domain — ONE attempt, nothing chained
+ *  after it (no logo.dev, no icon.horse): those would spend a paid token or a
+ *  network round trip on a name that might not even be a real domain. Null for
+ *  a company name with no alphanumeric content at all (nothing to guess). */
+export function guessedFaviconUrl(company: string): string | null {
+  const domain = guessedDomain(company);
+  return domain ? `https://icons.duckduckgo.com/ip3/${domain}.ico` : null;
+}
