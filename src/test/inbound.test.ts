@@ -482,6 +482,27 @@ describe("extractGmailConfirmationLink (the real Gmail flow)", () => {
     expect(link).toContain("/mail/vf-");
   });
 
+  it("returns null on a body carrying ONLY the cancel link, so the handler never fetches it", () => {
+    // Not derived from REAL_BODY (which has both links) — an isolated fixture with
+    // just the uf- cancel link, matching a mail where the confirm link is absent or
+    // was already stripped. If the regex ever loosened to "any /mail/*- link",
+    // extraction alone would hand back the cancel URL. Issue #157 acceptance item 1:
+    // pins the extraction, not just the isConfirmUrl guard downstream — the handler
+    // (api/inbound-email.ts) only calls confirmGmailForwarding when `link` is
+    // truthy, so a null here means it skips the auto-confirm fetch entirely.
+    const UF_ONLY_BODY = [
+      "quinterostudio3@gmail.com has requested to automatically forward mail",
+      "to your email",
+      "address u-cd4b7288dfac41c389c34b0fe78193ce@northgoing.com.",
+      "",
+      "If you do not approve of this request, no further action is required.",
+      "click this link to cancel this",
+      "verification:",
+      "https://mail.google.com/mail/uf-%5BANGjdJ8lD5qR5FyuGLKUzxmx1odsM_wMxybG6L9Wa7I%5D-8JA0s_VWEX",
+    ].join("\n");
+    expect(extractGmailConfirmationLink(UF_ONLY_BODY)).toBeNull();
+  });
+
   it("finds the link in html mail too, where it arrives inside an anchor", () => {
     const html = '<p>confirm: <a href="https://mail.google.com/mail/vf-%5BABC%5D-XYZ">Confirm</a></p>';
     expect(extractGmailConfirmationLink(html)).toBe("https://mail.google.com/mail/vf-%5BABC%5D-XYZ");
