@@ -1,0 +1,33 @@
+name: Spend alert
+
+# Daily trigger for the spend alert (api/spend-alert.ts, issue #137). Runs once
+# at 10:00 UTC, after the morning scoring drain window (nightly.yml ends 09:50),
+# so "yesterday" is a closed UTC day. The endpoint reads usage_events, compares
+# yesterday against the trailing-7-day median and the top user against the
+# median user, and emails the owner through Resend only when a threshold trips.
+# Signal only: no enforcement, no per-user cap.
+#
+# Requires repo secret CRON_SECRET = the same value as the Vercel env var
+# CRON_SECRET (shared with api/nightly.ts and api/score-backlog.ts).
+
+on:
+  schedule:
+    - cron: "0 10 * * *" # 10:00 UTC daily
+  workflow_dispatch: {} # manual trigger from the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spend-alert
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke the spend alert
+        run: |
+          curl -fsS --max-time 60 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://northgoing.com/api/spend-alert
