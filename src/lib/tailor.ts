@@ -1,15 +1,17 @@
-// src/lib/tailor.ts — the ONLY LLM surface for the apply bundle's CV + cover letter.
+// src/lib/tailor.ts — the ONLY LLM surface for the apply bundle's CV + cover letter
+// + drafted answers. The LLM writes ONLY (1) the tailored Professional Summary,
+// (2) the cover letter, and (3) drafted answers to application-form questions. The
+// CV BODY is never touched by an LLM — it is rendered verbatim from the user's
+// cv_text in cvHtml.ts / cvStructured.ts. That is the trust rule.
 //
-// Generalized port of career-ops lib/tailor-cv.mjs: the LLM writes ONLY (1) the tailored
-// Professional Summary and (2) the cover letter. The CV BODY is never touched by an LLM —
-// it is rendered verbatim from the user's cv_text in cvHtml.ts. That is the trust rule.
-//
-// Both calls go through the anthropic-proxy edge function (our key, Haiku), authenticated
-// with the user's session token. The proxy enforces the spend caps and meters usage
-// server-side — the client just passes `kind` for attribution.
-import { supabase } from "@/integrations/supabase/client";
+// The transport (callProxy, HAIKU) lives in proxy.ts so it can be mocked in tests
+// without a real network call or Supabase session; re-exported here for the
+// existing call sites (cvParse.ts, Apply.tsx) that import them from "./tailor".
+import { callProxy, HAIKU, type ProxyMessage } from "./proxy";
+import { normalizeForAts } from "./cvStructured";
 
-export const HAIKU = "claude-haiku-4-5-20251001";
+export { callProxy, HAIKU };
+export type { ProxyMessage };
 
 export type TailorInput = {
   role: string;
@@ -24,41 +26,17 @@ export type TailorInput = {
 
 export type CoverJson = { greeting: string; p1: string; p2: string; p3: string; sign: string };
 
-type ProxyMessage = { role: "user" | "assistant"; content: string };
-
-/** The one door to the proxy for every apply-bundle call (the CV parse in cvParse.ts
- *  goes through it too, so the caps and the usage ledger stay in one place). */
-export async function callProxy(messages: ProxyMessage[], maxTokens: number, kind: "cv" | "letter" | "answer"): Promise<string> {
-  const url = import.meta.env.VITE_SUPABASE_URL as string;
-  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
-  const { data: sessionData } = await supabase.auth.getSession();
-  const accessToken = sessionData?.session?.access_token;
-  if (!accessToken) throw new Error("Not authenticated");
-  const res = await fetch(`${url}/functions/v1/anthropic-proxy`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-      apikey: key,
-      "x-region": "eu-central-1", // residency pin: edge fns run caller-near by default (S1)
-    },
-    body: JSON.stringify({ messages, model: HAIKU, max_tokens: maxTokens, kind }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `anthropic-proxy ${res.status}`);
-  }
-  const data = await res.json();
-  return ((data?.content as { type: string; text: string }[]) || [])
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
-}
-
 /** Belt-and-suspenders no-em-dash guardrail on LLM output (the prompt also forbids them). */
 export function noEmDash(s: string): string {
   return (s || "").replace(/\s*—\s*/g, ", ").replace(/—/g, ", ");
+}
+
+/** Cover-letter output guardrail (issue #151 / D2): the brand no-em-dash rule,
+ *  then the same applicant-tracking-system normalisation the structured CV uses
+ *  (smart quotes, en-dashes, ellipsis, zero-width chars) — so a pasted cover
+ *  letter is as ATS-safe as the CV it travels with. */
+function atsClean(s: string): string {
+  return normalizeForAts(noEmDash(s || "")).trim();
 }
 
 // ── Pure prompt builders (unit-tested) ───────────────────────────────────────
@@ -105,30 +83,57 @@ ${cvText.slice(0, 6000)}
 Professional Summary:`;
 }
 
-export function buildCoverPrompt({ role, company, jdText, cvText, context }: TailorInput, candidateName: string): string {
+/** The cover letter prompt (issue #151 / D2: ported verbatim from the personal
+ *  engine's buildCoverBody — career-ops lib/tailor-cv.mjs — plus the two
+ *  guardrails that engine keeps in its summary prompt but had never carried
+ *  into its cover prompt: the number re-attribution guard, and never stating
+ *  relocation, a visa, or a dated availability beyond what the CV or the
+ *  candidate's own note actually says. `retryWordCount`, when set, appends the
+ *  one length-retry hint (tailorCover below fires it at most once). */
+export function buildCoverPrompt(
+  { role, company, jdText, cvText, context }: TailorInput,
+  candidateName: string,
+  retryWordCount?: number,
+  flagUnbackedAvailability?: boolean,
+): string {
   const contextBlock = buildContextBlock(context);
+  const retryBlock = retryWordCount
+    ? `\nYour previous draft was ${retryWordCount} words across the three body paragraphs. Rewrite it to land strictly between 120 and 180 words total across p1, p2 and p3 combined, keeping every fact exactly as it was.\n`
+    : "";
+  // issue #151 fix round 1, blocker 4: rule 3 below was prompt-only — nothing
+  // ever checked the output against it. coverStatesUnbackedFacts catches a miss
+  // and this retry block names it explicitly so the one retry the letter gets
+  // (tailorCover) can actually fix it, not just re-roll blind.
+  const unbackedBlock = flagUnbackedAvailability
+    ? `\nYour previous draft stated relocation, a visa, sponsorship, or a dated availability that does not appear verbatim in the CV or in what the candidate told us. Rewrite it to remove that statement entirely, unless it appears verbatim in the CV or candidate context below.\n`
+    : "";
   return `You are writing a cover letter for a job application. Produce a warm, honest cover letter body.
 
 STRICT RULES:
 1. Every metric/claim MUST come from the CV below. Do NOT invent numbers or responsibilities.
-2. Write entirely in English. Warm, honest register (greeting like "Hi,").
-3. NO em-dashes. Use commas or short sentences instead.
-4. Total body length: 120-180 words across exactly 3 paragraphs.
-5. Be honest about any gap vs the JD (1 sentence max).
-6. First person. The sign-off line ends with the candidate's name: ${candidateName || "the candidate"}.
-7. Return ONLY valid JSON with keys: greeting, p1, p2, p3, sign. No extra keys. greeting and sign are single lines; p1/p2/p3 are paragraph strings.
+2. Do NOT re-label or re-attribute any number. Keep every number's exact meaning and wording from the CV.
+3. Never state relocation, a visa, or a dated availability. Only mention any of these if it appears verbatim in the CV or in what the candidate told us below — otherwise leave it out entirely.
+4. Write entirely in English. Warm, honest register (greeting like "Hi,").
+5. NO em-dashes. Use commas or short sentences instead.
+6. Total body length: 120-180 words across exactly 3 paragraphs.
+7. Be honest about any gap vs the JD (1 sentence max).
+8. First person. The sign-off line ends with the candidate's name: ${candidateName || "the candidate"}.
+9. Return ONLY valid JSON with keys: greeting, p1, p2, p3, sign. No extra keys. greeting and sign are single lines; p1/p2/p3 are paragraph strings.
 
 ROLE: ${role} at ${company}
 JD EXCERPT: ${(jdText || "").slice(0, 800)}
-${contextBlock}
+${contextBlock}${retryBlock}${unbackedBlock}
 CV TEXT (key facts):
 ${cvText.slice(0, 4500)}
 
 Return JSON now:`;
 }
 
-/** Application-form question cap per role — bounds the sponsored-compute surface. */
-export const MAX_ANSWERS = 8;
+/** Application-form question cap per role — bounds the sponsored-compute surface.
+ *  Raised 8 -> 12 (issue #151): the common pack below spends 4 of these in one
+ *  click, and the manual "paste one question" flow (Step 4) keeps its full 8
+ *  after it, rather than losing half its room to the new feature. */
+export const MAX_ANSWERS = 12;
 
 export function buildAnswerPrompt({ role, company, jdText, cvText, context }: TailorInput, question: string): string {
   const jd = (jdText || "").slice(0, 2000);
@@ -160,6 +165,137 @@ ${cvText.slice(0, 6000)}
 Answer:`;
 }
 
+/** The four questions almost every application asks (career-ops apply-sheet.mjs
+ *  COMMON_FIELDS, the narrative half) — issue #151 / D4, the one-click "Answer
+ *  the usual four". `key` is the JSON contract with the model; `label` is what
+ *  the UI shows above each drafted answer. */
+export const COMMON_PACK_QUESTIONS: { key: keyof CommonPackJson; label: string }[] = [
+  { key: "whyCompany", label: "Why do you want to work at this company, and why this role?" },
+  { key: "whyFit", label: "Why are you a strong fit for this role?" },
+  { key: "productShipped", label: "Tell us about a product you've shipped that you're proud of." },
+  { key: "measureSuccess", label: "How do you measure product success?" },
+];
+
+export type CommonPackJson = {
+  whyCompany: string;
+  whyFit: string;
+  productShipped: string;
+  measureSuccess: string;
+};
+
+export function buildCommonPackPrompt({ role, company, jdText, cvText, context }: TailorInput): string {
+  const jd = (jdText || "").slice(0, 2000);
+  const contextBlock = buildContextBlock(context);
+  const questionsBlock = COMMON_PACK_QUESTIONS.map((q, i) => `${i + 1}. ${q.label}`).join("\n");
+  return `You are answering four of the questions almost every job-application form asks, in the candidate's own voice, in ONE pass.
+
+QUESTIONS:
+${questionsBlock}
+
+HARD RULES — do not break (this protects the candidate's credibility):
+- Use ONLY facts, responsibilities, and numbers that literally appear in the CV below. Do NOT invent projects, duties, tools, or numbers the CV does not state.
+- Do NOT re-label or re-attribute any number. Keep every number's exact meaning and wording from the CV.
+- Write in the FIRST PERSON. Warm, direct, like the candidate talking. Use contractions.
+- NO em-dashes at all (use commas or short sentences). Write in English.
+- Each answer: 120-180 words.
+- No buzzwords, no boilerplate that could describe any candidate.
+
+ROLE: ${role} at ${company}
+
+JOB DESCRIPTION (context for what they care about):
+${jd || "(No JD text — answer from the role title and company plus the CV.)"}
+${contextBlock}
+CANDIDATE CV (canonical facts; the only permitted source of claims):
+${cvText.slice(0, 6000)}
+
+Return ONLY valid JSON with exactly these keys, one answer per question in order, no extra keys, no markdown fence, no preamble: whyCompany, whyFit, productShipped, measureSuccess.
+
+Return JSON now:`;
+}
+
+// ── Cover letter length gate (issue #151 / D2) ───────────────────────────────
+
+export const COVER_MIN_WORDS = 120;
+export const COVER_MAX_WORDS = 180;
+
+/** Plain whitespace word count — the same measure the engine's own rule uses
+ *  ("120-180 words"), not a token count. */
+export function wordCount(text: string): number {
+  return (text || "").trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** Word count across the three body paragraphs — greeting and sign-off don't count. */
+export function coverBodyWordCount({ p1, p2, p3 }: Pick<CoverJson, "p1" | "p2" | "p3">): number {
+  return wordCount(p1) + wordCount(p2) + wordCount(p3);
+}
+
+export function isCoverLengthOk(cover: Pick<CoverJson, "p1" | "p2" | "p3">): boolean {
+  const n = coverBodyWordCount(cover);
+  return n >= COVER_MIN_WORDS && n <= COVER_MAX_WORDS;
+}
+
+// ── Relocation / availability guard (issue #151 fix round 1, blocker 4) ─────
+//
+// buildCoverPrompt's rule 3 tells the model never to state relocation, a visa,
+// or a dated availability unless it appears verbatim in the CV or the
+// candidate's own note — but nothing ever checked the output against it.
+// This is the code-side check: it never blocks generation itself, it only
+// tells tailorCover's existing single retry slot when to fire.
+const AVAILABILITY_RE = /relocat\w*|\bvisa\b|\bsponsorship\b|available from|start(?:ing)? on/i;
+
+/** True when the cover letter's body states relocation/visa/sponsorship/dated
+ *  availability language that is NOT backed by the CV or the candidate's own
+ *  context — i.e. the model invented it. */
+export function coverStatesUnbackedFacts(
+  cover: Pick<CoverJson, "p1" | "p2" | "p3">,
+  cvText: string,
+  context?: string | null,
+): boolean {
+  const body = `${cover.p1} ${cover.p2} ${cover.p3}`;
+  if (!AVAILABILITY_RE.test(body)) return false;
+  const backing = `${cvText || ""} ${context || ""}`;
+  return !AVAILABILITY_RE.test(backing);
+}
+
+// ── JSON parsing + validation (pure, unit-tested) ────────────────────────────
+
+function firstJsonObject(raw: string): Record<string, unknown> {
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("Model did not return JSON");
+  return JSON.parse(match[0]) as Record<string, unknown>;
+}
+
+/** Parses + validates the cover letter JSON: all five fields present and
+ *  non-blank (issue #151 — the old check let p2/p3 through empty), then
+ *  ATS-cleans every field. */
+export function parseCoverJson(raw: string): CoverJson {
+  const parsed = firstJsonObject(raw);
+  const fields = ["greeting", "p1", "p2", "p3", "sign"] as const;
+  for (const key of fields) {
+    const value = parsed[key];
+    if (typeof value !== "string" || !value.trim()) throw new Error(`Cover letter JSON missing field: ${key}`);
+  }
+  return {
+    greeting: atsClean(parsed.greeting as string),
+    p1: atsClean(parsed.p1 as string),
+    p2: atsClean(parsed.p2 as string),
+    p3: atsClean(parsed.p3 as string),
+    sign: atsClean(parsed.sign as string),
+  };
+}
+
+/** Parses + validates the common-pack JSON: all four answers present. */
+export function parseCommonPackJson(raw: string): CommonPackJson {
+  const parsed = firstJsonObject(raw);
+  const out = {} as CommonPackJson;
+  for (const { key } of COMMON_PACK_QUESTIONS) {
+    const value = parsed[key];
+    if (typeof value !== "string" || !value.trim()) throw new Error(`Common pack JSON missing field: ${key}`);
+    out[key] = noEmDash(value);
+  }
+  return out;
+}
+
 // ── LLM calls ─────────────────────────────────────────────────────────────────
 
 export async function tailorSummary(input: TailorInput): Promise<string> {
@@ -172,17 +308,24 @@ export async function answerQuestion(input: TailorInput, question: string): Prom
   return noEmDash(text);
 }
 
+/** One retry when the draft lands outside 120-180 words (issue #151 / D2) OR
+ *  states an unbacked relocation/visa/availability claim (issue #151 fix round
+ *  1, blocker 4), then accepts whatever comes back — never loops. Both checks
+ *  share the same single retry slot, so this still ever calls the model at
+ *  most twice. The prompt itself already asks for both; the retry only fires
+ *  when the model missed one. */
 export async function tailorCover(input: TailorInput, candidateName: string): Promise<CoverJson> {
-  const raw = await callProxy([{ role: "user", content: buildCoverPrompt(input, candidateName) }], 800, "letter");
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("Cover letter did not return JSON");
-  const parsed = JSON.parse(match[0]) as CoverJson;
-  if (!parsed.greeting || !parsed.p1 || !parsed.sign) throw new Error("Cover letter JSON missing fields");
-  return {
-    greeting: noEmDash(parsed.greeting),
-    p1: noEmDash(parsed.p1),
-    p2: noEmDash(parsed.p2),
-    p3: noEmDash(parsed.p3),
-    sign: noEmDash(parsed.sign),
-  };
+  const first = parseCoverJson(await callProxy([{ role: "user", content: buildCoverPrompt(input, candidateName) }], 800, "letter"));
+  const lengthOk = isCoverLengthOk(first);
+  const unbacked = coverStatesUnbackedFacts(first, input.cvText, input.context);
+  if (lengthOk && !unbacked) return first;
+  const retryPrompt = buildCoverPrompt(input, candidateName, lengthOk ? undefined : coverBodyWordCount(first), unbacked);
+  return parseCoverJson(await callProxy([{ role: "user", content: retryPrompt }], 800, "letter"));
+}
+
+/** The four common-pack answers in ONE call (issue #151 / D4) — counts as 4
+ *  toward MAX_ANSWERS, same as four calls to answerQuestion would. */
+export async function answerCommonPack(input: TailorInput): Promise<CommonPackJson> {
+  const raw = await callProxy([{ role: "user", content: buildCommonPackPrompt(input) }], 1600, "answer");
+  return parseCommonPackJson(raw);
 }

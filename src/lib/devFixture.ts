@@ -16,6 +16,7 @@ import { AUTH_BYPASSED } from "@/components/AuthProvider";
 import type { DailyMatchRow } from "@/lib/product";
 import type { ScoreableProfile } from "@/lib/score";
 import type { CvStructured } from "@/lib/cvStructured";
+import type { CommonPackJson } from "@/lib/tailor";
 import { hasReadableJd } from "@/lib/scorePrefilter";
 
 /** Single gate, borrowed from AuthProvider so the two can never drift. */
@@ -144,6 +145,24 @@ export const DEV_FIXTURE_CV_STRUCTURED: CvStructured = {
  */
 export const DEV_FIXTURE_TAILORED_SUMMARY =
   "Dev fixture summary, not a real tailored line. Product Manager in Europe who led a checkout rebuild that lifted completed orders by 18 percent and shipped a mobile onboarding flow used by 40,000 people a month.";
+
+/**
+ * Stands in for the "Answer the usual four" common-pack call on an apply page
+ * (issue #151 / D4). Same reason as the tailored summary above: the proxy needs a
+ * session, the mock user has none, so the real call answers "Not authenticated"
+ * and the common-pack render can't be walked at all. Every claim below is a fact
+ * DEV_FIXTURE_CV_TEXT already states, same grounding the real prompt is held to.
+ */
+export const DEV_FIXTURE_COMMON_PACK: CommonPackJson = {
+  whyCompany:
+    "Dev fixture answer, not a real draft. I'd want to work here to keep building products end to end, the way I did leading the checkout rebuild and the onboarding flow described in my CV.",
+  whyFit:
+    "Dev fixture answer, not a real draft. I've spent ten years as a Product Manager in Europe, most recently leading a checkout rebuild that lifted completed orders by 18 percent.",
+  productShipped:
+    "Dev fixture answer, not a real draft. I shipped a mobile onboarding flow used by 40,000 people a month and set the activation metric the team planned against.",
+  measureSuccess:
+    "Dev fixture answer, not a real draft. I look at the metric a change was meant to move, like the 18 percent lift in completed orders from the checkout rebuild I led.",
+};
 
 /**
  * A synthetic invite token, in the real token's shape (REF_TOKEN_RE: 32 hex chars).

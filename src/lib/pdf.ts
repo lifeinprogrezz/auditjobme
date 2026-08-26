@@ -38,9 +38,9 @@ export function boldRuns(text: string): TextRun[] {
 // pdfmake document definitions are plain objects — kept pure and exported for tests.
 type DocDef = Record<string, unknown>;
 
-// Letterhead + section-header treatment shared by the cover letter and the
-// unparsed-text CV fallback: one matched document pair for a profile that is not
-// parsed yet. Presentation only — no color blocks, no rules, one typeface family.
+// Letterhead + section-header treatment for the unparsed-text CV fallback (the
+// cover letter now shares the structured CV's own letterhead below — issue #151).
+// Presentation only — no color blocks, no rules, one typeface family.
 const PAGE_MARGINS = [54, 50, 54, 50] as number[];
 const NAME_STYLE = { fontSize: 20, bold: true, margin: [0, 0, 0, 6] as number[] };
 // Section headers get a touch of tracked-caps spacing — a recruiter-CV convention that
@@ -52,7 +52,6 @@ const SECTION_HEADER = {
   characterSpacing: 0.6,
   margin: [0, 18, 0, 6] as number[],
 };
-const META_STYLE = { fontSize: 10, color: "#4a5a4a", margin: [0, 0, 0, 16] as number[] };
 
 // ─── Structured CV typography: the personal engine's stylesheet, unit for unit ──────
 // Source: career-ops lib/tailor-cv.mjs SHARED_CV_CSS (Arial/Helvetica, 11pt body on a
@@ -98,6 +97,28 @@ export function jobMetaLine(job: { start?: string; end?: string; location?: stri
   const dates = [ats(job.start ?? ""), ats(job.end ?? "")].filter(Boolean).join(" - ");
   return [dates, ats(job.location ?? "")].filter(Boolean).join(" | ");
 }
+
+// ─── Cover letter dateline (issue #151 / D2) ─────────────────────────────────
+const MONTHS_EN = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/** "26 August 2026" — the engine's English date format (career-ops tailor-cv.mjs
+ *  formatDateEN), spelled out for a letter rather than a numeric date. */
+export function formatDateEN(date: Date): string {
+  return `${date.getDate()} ${MONTHS_EN[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/** "Barcelona, 26 August 2026" — the engine's letter dateline, city from the
+ *  contact location (the part before the first comma). Falls back to the bare
+ *  date when there is no location on file, rather than inventing one. */
+export function coverDateLine(location: string | undefined | null, date: Date): string {
+  const city = ats(location ?? "").split(",")[0].trim();
+  const formatted = formatDateEN(date);
+  return city ? `${city}, ${formatted}` : formatted;
+}
+const COVER_DATE_STYLE = { fontSize: 11, margin: [0, px(14), 0, px(18)] as number[] };
 
 /** One line of the contact block: "Label: text", the text a link when `link` is set. */
 export type ContactLine = { label: string; text: string; link?: string };
@@ -255,21 +276,39 @@ export function buildCvDoc({
   };
 }
 
-export function buildCoverDoc({ name, company, cover }: { name: string; company: string; cover: CoverJson }): DocDef {
-  return {
-    pageSize: "A4",
-    pageMargins: PAGE_MARGINS,
-    defaultStyle: { fontSize: 11, lineHeight: 1.45, color: "#1a1a1a" },
-    content: [
-      ...(name ? [{ text: name, ...NAME_STYLE }] : []),
-      { text: `Cover letter${company ? ` - ${company}` : ""}`, ...META_STYLE },
-      // Salutation, then the three body paragraphs, each its own block for even leading.
-      { text: cover.greeting, margin: [0, 0, 0, 10] as number[] },
-      ...[cover.p1, cover.p2, cover.p3].map((p) => ({ text: p, margin: [0, 0, 0, 10] as number[] })),
-      // Sign-off block: visually separated from the body, not just another paragraph.
-      { text: cover.sign, margin: [0, 8, 0, 0] as number[] },
-    ],
-  };
+/**
+ * The cover letter: the SAME letterhead as the structured CV (issue #151 / D2) —
+ * name in CV_NAME_STYLE, the contactLines block when there is a parsed contact —
+ * then a dateline in the contact's city, then the salutation, the three body
+ * paragraphs, and the sign-off. `contact` is optional: a profile that has not
+ * been parsed yet (buildCvDoc's text fallback) still gets a name and a dateline,
+ * just no contact block.
+ */
+export function buildCoverDoc({
+  name,
+  cover,
+  contact,
+  date = new Date(),
+}: {
+  name: string;
+  /** Kept for the download filename (pdfFilename) — no longer printed as a body caption. */
+  company?: string;
+  cover: CoverJson;
+  contact?: CvStructured["contact"] | null;
+  date?: Date;
+}): DocDef {
+  const headline = ats(contact?.name || name);
+  const contactBlock = contact ? contactLines(contact) : [];
+  const content: DocDef[] = [];
+  if (headline) content.push({ text: headline, ...CV_NAME_STYLE });
+  if (contactBlock.length > 0) content.push({ stack: contactBlock.map(contactItem) });
+  content.push({ text: coverDateLine(contact?.location, date), ...COVER_DATE_STYLE });
+  // Salutation, then the three body paragraphs, each its own block for even leading.
+  content.push({ text: cover.greeting, margin: [0, 0, 0, 10] as number[] });
+  content.push(...[cover.p1, cover.p2, cover.p3].map((p) => ({ text: p, margin: [0, 0, 0, 10] as number[] })));
+  // Sign-off block: visually separated from the body, not just another paragraph.
+  content.push({ text: cover.sign, margin: [0, 8, 0, 0] as number[] });
+  return { pageSize: "A4", pageMargins: PAGE_MARGINS, defaultStyle: CV_DEFAULT_STYLE, content };
 }
 
 /** Safe download filename: strips path/reserved characters, keeps it readable. */
@@ -290,8 +329,9 @@ async function download(def: DocDef, filename: string): Promise<void> {
     import("pdfmake/build/vfs_fonts"),
     import("pdfmake/build/standard-fonts/Helvetica"),
   ]);
-  // Roboto (embedded) for the cover letter and the text fallback; Helvetica — a PDF
-  // standard font, metrics only, no font file — for the structured CV (CV_FONT).
+  // Roboto (embedded) for the unparsed-text CV fallback; Helvetica — a PDF standard
+  // font, metrics only, no font file — for the structured CV AND the cover letter,
+  // which now shares its letterhead (CV_FONT, issue #151).
   pdfMake.addVirtualFileSystem(vfsFonts);
   pdfMake.addFontContainer(helvetica);
   const doc = pdfMake.createPdf(def as never) as unknown as DownloadableDoc;
@@ -308,6 +348,12 @@ export async function downloadCvPdf(input: {
   await download(buildCvDoc(input), pdfFilename(input.name, "CV", input.company));
 }
 
-export async function downloadCoverPdf(input: { name: string; company: string; cover: CoverJson }): Promise<void> {
+export async function downloadCoverPdf(input: {
+  name: string;
+  company: string;
+  cover: CoverJson;
+  contact?: CvStructured["contact"] | null;
+  date?: Date;
+}): Promise<void> {
   await download(buildCoverDoc(input), pdfFilename(input.name, "Cover letter", input.company));
 }

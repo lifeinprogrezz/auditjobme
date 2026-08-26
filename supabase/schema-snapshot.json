@@ -2290,7 +2290,7 @@
    "table": "artifacts"
   },
   {
-   "def": "CHECK ((kind = ANY (ARRAY['cv'::text, 'letter'::text, 'audit'::text])))",
+   "def": "CHECK ((kind = ANY (ARRAY['cv'::text, 'letter'::text, 'audit'::text, 'answers'::text, 'notes'::text])))",
    "name": "artifacts_kind_check",
    "table": "artifacts"
   },
