@@ -259,7 +259,13 @@ export default function RolesPanel({
             matters for the anon "Hot right now" showcase. */}
         <h1 className="ptitle">{railHeading(scored, Boolean(defaultView))}</h1>
         <div className="phead-r" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <MineChip active={Boolean(filters.mine)} disabled={!signedIn || !scored} onToggle={onToggleMine} />
+          {/* Disabled for a logged-out/no-CV visitor, but NEVER while active (fix
+              round 1, blocker 2) — a stale active state must stay dismissable. */}
+          <MineChip
+            active={Boolean(filters.mine)}
+            disabled={(!signedIn || !scored) && !filters.mine}
+            onToggle={onToggleMine}
+          />
           <ScoringProgress
             variant="rail"
             hasCv={signedIn && scored}

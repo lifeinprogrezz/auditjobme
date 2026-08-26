@@ -280,8 +280,15 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
         >
         {/* "Your matches" leads (issue #154) — the catalog-scope toggle, ahead of
             every narrowing facet. Disabled (greyed, inert) for a logged-out or
-            no-CV visitor, same voice as Role/Level below with nothing to pick. */}
-        <MineChip active={Boolean(filters.mine)} disabled={!signedIn || !scored} onToggle={onToggleMine} />
+            no-CV visitor, same voice as Role/Level below with nothing to pick —
+            but NEVER while active (fix round 1, blocker 2): a stale active state
+            (e.g. mid sign-out, before the force-off effect lands) must stay
+            dismissable, not stuck showing a chip the user cannot click. */}
+        <MineChip
+          active={Boolean(filters.mine)}
+          disabled={(!signedIn || !scored) && !filters.mine}
+          onToggle={onToggleMine}
+        />
         {/* Chip order: what → where → company (spec 2026-07-10). Role leads. Its
             options carry a separate value and label (issue #70): the value is the
             stored jobs.role_family the filter compares against, the label is the

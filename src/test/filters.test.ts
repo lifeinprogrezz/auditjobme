@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { sizeBand, sizeBandOrder, filterJobs, freshnessCutoffMs, requiredLanguages, roleFamily, roleSeenMs, workplaceOf, EMPTY_FILTERS, FRESHNESS_WINDOWS, readStoredMine, writeStoredMine, shouldDefaultMineOn, railHeading, type RoleJob } from "@/lib/roles";
+import { sizeBand, sizeBandOrder, filterJobs, freshnessCutoffMs, requiredLanguages, roleFamily, roleSeenMs, workplaceOf, EMPTY_FILTERS, FRESHNESS_WINDOWS, readStoredMine, writeStoredMine, shouldDefaultMineOn, settleMineDefault, shouldForceMineOff, railHeading, type RoleJob } from "@/lib/roles";
 
 const base: RoleJob = {
   id: "1",
@@ -321,9 +321,78 @@ describe("shouldDefaultMineOn (issue #154 default-on rule)", () => {
   it("stays OFF for a signed-in visitor with no CV on file", () => {
     expect(shouldDefaultMineOn({ ...base, hasCv: false })).toBe(false);
   });
-  it("an explicit stored choice always wins over the computed default, either way", () => {
+  it("a stored explicit choice wins for a signed-in, scored user, either way", () => {
     expect(shouldDefaultMineOn({ ...base, hasScore: false, stored: true })).toBe(true);
     expect(shouldDefaultMineOn({ ...base, stored: false })).toBe(false);
+  });
+  // Fix round 1, blocker 2: the logged-out/no-CV rule overrides ANY stored value —
+  // a stored "1" from an earlier scored session must not survive a same-browser
+  // sign-out (SPA, no reload) or follow the browser into an anonymous visit.
+  it("ignores a stored choice for a logged-out visitor", () => {
+    expect(shouldDefaultMineOn({ ...base, signedIn: false, stored: true })).toBe(false);
+  });
+  it("ignores a stored choice for a signed-in visitor with no CV", () => {
+    expect(shouldDefaultMineOn({ ...base, hasCv: false, stored: true })).toBe(false);
+  });
+});
+
+describe("settleMineDefault (issue #154 fix round 1, blocker 1: don't settle before auth/profile land)", () => {
+  const ready = {
+    authLoading: false,
+    profileChecked: true,
+    signedIn: true,
+    hasCv: true,
+    hasScore: true,
+    stored: null as boolean | null,
+  };
+
+  it("waits while auth is still loading, even with nothing stored", () => {
+    expect(settleMineDefault({ ...ready, authLoading: true })).toBe("wait");
+  });
+  it("waits on the exact first-paint shape that shipped the bug: loading=true so signedIn reads false", () => {
+    expect(
+      settleMineDefault({
+        authLoading: true,
+        profileChecked: false,
+        signedIn: false,
+        hasCv: false,
+        hasScore: false,
+        stored: null,
+      }),
+    ).toBe("wait");
+  });
+  it("waits for a signed-in visitor's profile fetch before trusting hasCv", () => {
+    expect(settleMineDefault({ ...ready, profileChecked: false })).toBe("wait");
+  });
+  it("does not wait on profileChecked for a logged-out visitor (it never flips true for one)", () => {
+    expect(
+      settleMineDefault({ ...ready, signedIn: false, hasCv: false, hasScore: false, profileChecked: false }),
+    ).toBe(false);
+  });
+  it("waits for the first landed score when nothing is stored", () => {
+    expect(settleMineDefault({ ...ready, hasScore: false })).toBe("wait");
+  });
+  it("settles ON once auth, profile, and the first score have all landed", () => {
+    expect(settleMineDefault(ready)).toBe(true);
+  });
+  it("an explicit stored choice settles immediately once auth/profile are ready, without waiting on hasScore", () => {
+    expect(settleMineDefault({ ...ready, hasScore: false, stored: true })).toBe(true);
+    expect(settleMineDefault({ ...ready, stored: false })).toBe(false);
+  });
+});
+
+describe("shouldForceMineOff (issue #154 fix round 1, blocker 2: sign-out transition)", () => {
+  it("forces mine off when signed out mid-session with mine still active", () => {
+    expect(shouldForceMineOff({ signedIn: false, hasCv: false, mine: true })).toBe(true);
+  });
+  it("forces mine off when the CV drops while still signed in", () => {
+    expect(shouldForceMineOff({ signedIn: true, hasCv: false, mine: true })).toBe(true);
+  });
+  it("does nothing once mine is already off", () => {
+    expect(shouldForceMineOff({ signedIn: false, hasCv: false, mine: false })).toBe(false);
+  });
+  it("does nothing for a steady signed-in, scored session", () => {
+    expect(shouldForceMineOff({ signedIn: true, hasCv: true, mine: true })).toBe(false);
   });
 });
 

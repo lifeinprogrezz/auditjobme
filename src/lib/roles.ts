@@ -276,18 +276,58 @@ export function writeStoredMine(v: boolean): void {
   }
 }
 
-/** Pure default-on rule (issue #154 acceptance): a stored explicit choice always
- *  wins; absent one, "Your matches" turns on the moment a signed-in user with a
- *  CV has at least one landed score, and stays off for a logged-out or no-CV
- *  visitor. Mirrors the shape of shouldPromptCv in lib/deviceSession.ts. */
+/** Pure default-on rule (issue #154 acceptance, corrected fix round 1 blocker 2):
+ *  the logged-out/no-CV visitor has no slice to show, so that rule OVERRIDES any
+ *  stored value first — a stored "1" from an earlier scored session must not
+ *  survive a same-browser sign-out (SPA, no reload) or follow the browser into an
+ *  anonymous visit. Only once signed in with a CV does a stored explicit choice
+ *  win; absent one, "Your matches" turns on the moment this signed-in, scored
+ *  user has at least one landed score. Mirrors the shape of shouldPromptCv in
+ *  lib/deviceSession.ts. */
 export function shouldDefaultMineOn(s: {
   signedIn: boolean;
   hasCv: boolean;
   hasScore: boolean;
   stored: boolean | null;
 }): boolean {
+  if (!s.signedIn || !s.hasCv) return false;
   if (s.stored != null) return s.stored;
-  return s.signedIn && s.hasCv && s.hasScore;
+  return s.hasScore;
+}
+
+/** The default-SETTLE decision (issue #154 fix round 1, blocker 1): "wait" until
+ *  auth has actually resolved and — for a signed-in visitor — the profile fetch
+ *  has landed too, so the very first render (Supabase session still null,
+ *  useAuth().loading===true, RolesMap ungated at "/") never reads signedIn=false
+ *  and permanently persists "off". A logged-out visitor has no profile row to
+ *  wait on (profileChecked never flips true for one — see useRolesData), so the
+ *  profileChecked gate applies only when signedIn. Once both have settled, keep
+ *  the existing wait-for-first-score behavior when nothing is stored. Pure/
+ *  testable; RolesMap's one settle effect calls this instead of
+ *  shouldDefaultMineOn directly. */
+export function settleMineDefault(s: {
+  authLoading: boolean;
+  profileChecked: boolean;
+  signedIn: boolean;
+  hasCv: boolean;
+  hasScore: boolean;
+  stored: boolean | null;
+}): "wait" | boolean {
+  if (s.authLoading) return "wait";
+  if (s.signedIn && !s.profileChecked) return "wait";
+  if (s.stored == null && s.signedIn && s.hasCv && !s.hasScore) return "wait";
+  return shouldDefaultMineOn(s);
+}
+
+/** True when a currently-active "Your matches" needs to be forced back off
+ *  (issue #154 fix round 1, blocker 2): the settle effect above is one-shot, so
+ *  once it has already run it never revisits mine=true after a mid-session
+ *  sign-out (SPA, no reload — signedIn drops with no page reload to re-settle)
+ *  or a CV clearing. RolesMap runs THIS on every signedIn/hasCv change instead,
+ *  so a stale "Your matches" never keeps the view narrowed to the anonymous
+ *  fallback slice (scorePrefilter's FALLBACK_CAP) with no visible way out. */
+export function shouldForceMineOff(s: { signedIn: boolean; hasCv: boolean; mine: boolean }): boolean {
+  return s.mine && (!s.signedIn || !s.hasCv);
 }
 
 /** Fixed option order + display labels for the Freshness facet (issue #73 slice 3).

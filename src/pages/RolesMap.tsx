@@ -23,7 +23,8 @@ import {
   sizeBandOrder,
   readStoredMine,
   writeStoredMine,
-  shouldDefaultMineOn,
+  settleMineDefault,
+  shouldForceMineOff,
   type RoleJob,
   type RolesFilters,
 } from "@/lib/roles";
@@ -67,8 +68,9 @@ export default function RolesMap() {
     scored,
     signedIn,
     needsCv,
+    profileChecked,
   } = useRolesData();
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, loading: authLoading } = useAuth();
   // CV-unlock modal (Phase A front door). Opened from the "Add your CV" affordances,
   // and from the Settings page's Replace-CV deep link (?cv=1) — one shared instance.
   const [cvModalOpen, setCvModalOpen] = useState(false);
@@ -109,19 +111,40 @@ export default function RolesMap() {
     writeStoredMine(next);
     setFilters((f) => ({ ...f, mine: next }));
   }, []);
-  // Settle the default exactly once per page load: a stored explicit choice wins
-  // immediately either way; with none stored, wait for this user's first landed
-  // score (shouldDefaultMineOn) — the ON default has no meaning before then, so
-  // the effect keeps re-checking as eligibleCount/remaining move.
+  // Settle the default exactly once per page load — but NOT before auth (and, for
+  // a signed-in visitor, the profile fetch) have actually resolved (issue #154 fix
+  // round 1, blocker 1): at first render useAuth().loading is still true and
+  // signedIn/scored both read false, so settling then would write a PERMANENT
+  // "off" to storage and no user would ever see the default-on behavior.
+  // settleMineDefault (lib/roles.ts) is the pure "wait" | boolean decision; once it
+  // stops waiting, this effect fires exactly once (a stored explicit choice wins
+  // immediately either way; with none stored, it keeps waiting for this user's
+  // first landed score, re-checking as eligibleCount/remaining move).
   const mineDefaultSettled = useRef(false);
   useEffect(() => {
     if (mineDefaultSettled.current) return;
     const stored = readStoredMine();
     const hasScore = eligibleCount > remaining;
-    if (stored == null && signedIn && scored && !hasScore) return;
+    const decision = settleMineDefault({
+      authLoading,
+      profileChecked,
+      signedIn,
+      hasCv: scored,
+      hasScore,
+      stored,
+    });
+    if (decision === "wait") return;
     mineDefaultSettled.current = true;
-    setMine(shouldDefaultMineOn({ signedIn, hasCv: scored, hasScore, stored }));
-  }, [signedIn, scored, eligibleCount, remaining, setMine]);
+    setMine(decision);
+  }, [authLoading, profileChecked, signedIn, scored, eligibleCount, remaining, setMine]);
+  // The settle effect above is one-shot, so it never revisits an already-settled
+  // "Your matches" — a mid-session sign-out (SPA, no reload) or a CV clearing
+  // must force it back off itself (issue #154 fix round 1, blocker 2), or the view
+  // stays narrowed to the anonymous fallback slice (scorePrefilter's
+  // FALLBACK_CAP) with the badge reading "N of 8,155" and no visible way out.
+  useEffect(() => {
+    if (shouldForceMineOff({ signedIn, hasCv: scored, mine: Boolean(filters.mine) })) setMine(false);
+  }, [signedIn, scored, filters.mine, setMine]);
   const [detailJob, setDetailJob] = useState<RoleJob | null>(null);
   // A panel-card click flies the map to the role's city (see openDetail); the
   // nonce forces a re-fly even when the same city is reopened.
