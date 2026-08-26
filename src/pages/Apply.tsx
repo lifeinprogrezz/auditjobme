@@ -30,6 +30,7 @@ import {
   HAIKU,
   MAX_ANSWERS,
   type CoverJson,
+  type CommonPackJson,
 } from "@/lib/tailor";
 import { downloadCvPdf, downloadCoverPdf } from "@/lib/pdf";
 import { ensureCvStructured } from "@/lib/cvParse";
@@ -40,6 +41,7 @@ import {
   DEV_FIXTURE_CV_TEXT,
   DEV_FIXTURE_CV_STRUCTURED,
   DEV_FIXTURE_TAILORED_SUMMARY,
+  DEV_FIXTURE_COMMON_PACK,
 } from "@/lib/devFixture";
 import { domainFor } from "@/lib/logodev";
 import { cityOf } from "@/lib/geo";
@@ -309,8 +311,17 @@ export default function Apply() {
     // (user_id, job_id, kind) unique index is PARTIAL, so an upsert's
     // onConflict can never find an arbiter and 42P10s every time. See
     // roleNotes.ts for the full rationale — same fix saveArtifact already uses.
-    await supabase.from("artifacts").delete().match(buildNotesDeleteMatch(user.id, job.id));
-    const { error } = await supabase.from("artifacts").insert(buildNotesInsertRow(user.id, job.id, roleContext));
+    //
+    // Dev-only: the mock user carries no JWT, so both calls 401 under the same
+    // gate every sibling save on this page already skips (e.g. the tailored-
+    // summary save above). The Saved state is what's under test here, so report
+    // it without the round-trip; there is no fixture-side store, so this can't
+    // stand in for the reload-survives check — only a signed-in walk covers that.
+    let error: { message: string } | null = null;
+    if (!DEV_FIXTURE) {
+      await supabase.from("artifacts").delete().match(buildNotesDeleteMatch(user.id, job.id));
+      ({ error } = await supabase.from("artifacts").insert(buildNotesInsertRow(user.id, job.id, roleContext)));
+    }
     setNotesSaving(false);
     if (error) {
       toast.error("Couldn't save your note. Please try again.");
@@ -445,13 +456,23 @@ export default function Apply() {
     setError("");
     setErrStep(null);
     try {
-      const pack = await answerCommonPack({
-        role: job.title,
-        company: job.company,
-        jdText: job.jd_text,
-        cvText,
-        context: roleContext.trim() || undefined,
-      });
+      // Dev-only: same gate as the tailored-summary call above — the proxy
+      // needs a session the mock user doesn't have, so the real call answers
+      // "Not authenticated" and this render can never be walked otherwise.
+      // Written as an if, not a ternary, for the same reason as above: a
+      // ternary kept the fixture object in the shipped chunk.
+      let pack: CommonPackJson;
+      if (DEV_FIXTURE) {
+        pack = DEV_FIXTURE_COMMON_PACK;
+      } else {
+        pack = await answerCommonPack({
+          role: job.title,
+          company: job.company,
+          jdText: job.jd_text,
+          cvText,
+          context: roleContext.trim() || undefined,
+        });
+      }
       const next = [...qas, ...COMMON_PACK_QUESTIONS.map(({ key, label }) => ({ q: label, a: pack[key] }))];
       setQas(next);
       track("common_pack_drafted", { answer_count: next.length });
