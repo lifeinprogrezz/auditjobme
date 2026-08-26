@@ -33,6 +33,7 @@ Three surfaces, all behind sign-in except the map:
  scrape.yml      05:00 UTC  →   api/nightly.ts        →   Postgres  (jobs, companies,
  nightly.yml     */10 6-9   →   api/score-backlog.ts  →              profiles, scores,
  score-backlog   */10 all day                                        daily_matches, …)
+ spend-alert     10:00 UTC  →   api/spend-alert.ts    →              usage_events (read)
  deploy-edge-fns on push    →   the React SPA         →   anthropic-proxy (edge function)
                                                       →   Storage (dataplane artifacts)
 ```
@@ -138,6 +139,21 @@ surface a future cap will read. That is a settled decision, not an oversight (is
 missing `x-region` entry once passed preflight and silently blocked every POST, killing CV
 generation in browsers.
 
+### The spend alert — signal, not a cap
+
+`api/spend-alert.ts` runs once a day (`.github/workflows/spend-alert.yml`, 10:00 UTC, after
+the morning drain window). It calls the `spend_alert_snapshot()` RPC, which sums
+`usage_events` in the database: yesterday's total, month to date, the seven zero-filled
+daily totals before yesterday, and yesterday's per-user totals. `src/lib/spendAlert.ts`
+decides: alert when yesterday is more than **3x the trailing-7-day median**, or when one
+user is more than **10x the median user's day** (a $1 floor keeps a fresh deployment from
+paging over cents). On alert it emails `OWNER_ALERT_EMAIL` (default
+`hello@lifeinprogrezz.com`) through Resend from the nightly's sender; on no alert it returns
+the numbers as JSON, and it logs them either way. Its job is to make a cost step function
+(a `RUBRIC_VERSION` bump, a catalogue expansion) visible within hours instead of at the
+invoice. It enforces nothing; the no-cap decision above still stands. Change the thresholds
+only alongside `spendAlert.test.ts`.
+
 ## The front end
 
 Vite plus React plus TypeScript, single-page, no framework router beyond `react-router`.
@@ -189,7 +205,8 @@ Client (`VITE_`-prefixed, baked into the bundle, all public by design):
 
 Server (Vercel environment and GitHub secrets, never in the bundle):
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`,
-`CRON_SECRET`, `SCRAPE_PROXY_URL`.
+`CRON_SECRET`, `SCRAPE_PROXY_URL`, `OWNER_ALERT_EMAIL` (optional; the spend alert's
+recipient, defaults to `hello@lifeinprogrezz.com`).
 
 `SUPABASE_SERVICE_ROLE_KEY` must be the legacy `eyJ…` service-role JWT. Note that the
 dashboard's service-role token and the one an edge function receives are *different but both

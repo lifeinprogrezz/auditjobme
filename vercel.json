@@ -18,6 +18,9 @@
     },
     "api/inbound-email.ts": {
       "maxDuration": 30
+    },
+    "api/spend-alert.ts": {
+      "maxDuration": 30
     }
   },
   "redirects": [
