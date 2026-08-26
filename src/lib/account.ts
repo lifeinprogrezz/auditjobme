@@ -38,6 +38,11 @@ export const USER_DATA_TABLES: readonly UserDataTable[] = [
   { table: "scores", column: "user_id", label: "your match score for every role" },
   { table: "daily_matches", column: "user_id", label: "your nightly match lists" },
   {
+    table: "daily_top_sets",
+    column: "user_id",
+    label: "today's frozen top-ten set on your Today page",
+  },
+  {
     table: "artifacts",
     column: "user_id",
     label: "every tailored CV, cover letter and set of answers we generated for you",
