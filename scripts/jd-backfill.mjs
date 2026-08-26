@@ -3,343 +3,182 @@
  * scripts/jd-backfill.mjs — LLM-FREE JD backfill for the shared `jobs` pool.
  *
  * Many rows arrive from LIST endpoints that carry no description (SmartRecruiters /
- * Workable / Workday list APIs, the consider.com + Getro VC boards, startupmap,
- * Meta/Microsoft big-tech list feeds). Those rows land with jd_text = null and get
- * scored on title alone. This script fills jd_text by routing each row's apply `url`
- * to the correct ATS *detail* API — the per-role endpoint the list call omitted.
+ * Workable / Workday list APIs, the Getro VC boards, startupmap, scaling-europe,
+ * Meta/Microsoft big-tech list feeds). Since issue #130 a row with no readable
+ * jd_text is never scored, so every blank row here is a role the product cannot
+ * rank until this script fills it (issue #143). It routes each row's apply `url`
+ * to the correct ATS *detail* endpoint — the per-role call the list omitted.
  *
- * It is deterministic and LLM-free (no ANTHROPIC_API_KEY, no model call). Idempotent
- * by construction: it only selects rows where jd_text IS NULL, so a filled row is
- * never touched again. Writes are per-row and column-scoped (jd_text + jd_source_detail
- * only) — never an upsert, never clobbering other columns.
+ * Deterministic and LLM-free (no ANTHROPIC_API_KEY, no model call). Idempotent by
+ * construction: it selects only rows whose jd_text is null or empty, so a filled row
+ * is never touched again. Writes are per-row and column-scoped (jd_text +
+ * jd_source_detail only) — never an upsert, never clobbering other columns.
+ * Fail-soft per row: a dead endpoint leaves that row blank and is counted as failed.
+ *
+ * Bounded: BACKFILL_LIMIT rows per run (300), NEWEST first — a role scraped this
+ * morning gets its JD today and scores on the next backlog tick; the older tail
+ * catches up over the following daily runs.
+ *
+ * Board sources (startupmap, scaling-europe, vc:*) store a board link that
+ * redirects to the employer's ATS. For those rows ONLY, the URL is followed once
+ * (redirects, no body read) and the final host is routed like any other row. An
+ * unknown final host is reported as unsupported — never scraped as generic HTML.
  *
  * Env (same contract as scrape.mjs): SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY to
  * WRITE. Without them it runs in dry mode and logs only (it needs the service role to
  * even SELECT the pool, so no-creds = nothing to do).
  *
  * CLI:  node scripts/jd-backfill.mjs [--dry] [--limit N]
- *   --dry      fetch every detail API + log a per-route breakdown, but write nothing.
- *   --limit N  cap how many jd_text-null rows to attempt (newest first).
+ *   --dry      fetch every detail endpoint + log the breakdown, but write nothing.
+ *   --limit N  override the per-run cap (default BACKFILL_LIMIT).
  *
- * ATS routes (host-regex dispatch; each fetcher returns a stripped JD string ≤8000
- * chars or null, and NEVER throws — a dead route just leaves jd_text null):
- *   greenhouse · lever · ashby · smartrecruiters · workable · recruitee · personio
- *   · join / teamtailor / workday (best-effort JSON-LD JobPosting.description).
- * Unknown host → null (the role still shows, scored on its title).
+ * Pure logic (routing, id parsing, extraction, tallies) lives in jd-backfill-lib.mjs,
+ * pinned by jd-backfill-lib.test.mjs. This file owns fetch + Supabase only.
  */
 import { createClient } from "@supabase/supabase-js";
-import { stripHtml } from "./job-filters.mjs";
+import {
+  BACKFILL_LIMIT,
+  ashbyRef,
+  atsKindOf,
+  extractAshby,
+  extractGreenhouse,
+  extractJsonLd,
+  extractLever,
+  extractPersonio,
+  extractRecruitee,
+  extractSmartRecruiters,
+  extractWorkable,
+  greenhouseRef,
+  isReadableJd,
+  leverRef,
+  newTally,
+  personioRef,
+  recruiteeRef,
+  shouldFollow,
+  smartRecruitersRef,
+  summaryLine,
+} from "./jd-backfill-lib.mjs";
 
 const fetchOpts = (extra = {}) => ({ signal: AbortSignal.timeout(20000), ...extra }); // fresh signal per call
 const UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-const JD_CAP = 8000;
+const JSON_HEADERS = { "User-Agent": UA, Accept: "application/json" };
+const HTML_HEADERS = { "User-Agent": UA, Accept: "text/html" };
 
-// Trim + cap a stripped JD; empty → null so callers never persist "".
-const cap = (s) => {
-  const t = (s || "").slice(0, JD_CAP);
-  return t || null;
+async function getJson(url) {
+  const res = await fetch(url, fetchOpts({ headers: JSON_HEADERS }));
+  return res.ok ? res.json() : null;
+}
+
+async function getText(url, accept = HTML_HEADERS) {
+  const res = await fetch(url, fetchOpts({ redirect: "follow", headers: accept }));
+  return res.ok ? res.text() : null;
+}
+
+// ── Per-ATS detail fetchers: fetch + the lib's extractor. Each returns a stripped
+// JD string ≤ JD_CAP or null. Errors propagate to the caller, which counts them. ──
+const FETCHERS = {
+  greenhouse: async (url) => {
+    const ref = greenhouseRef(url);
+    if (!ref) return null;
+    return extractGreenhouse(
+      await getJson(`https://boards-api.greenhouse.io/v1/boards/${ref.token}/jobs/${ref.id}?content=true`),
+    );
+  },
+  lever: async (url) => {
+    const ref = leverRef(url);
+    if (!ref) return null;
+    return extractLever(await getJson(`https://api.lever.co/v0/postings/${ref.token}/${ref.id}?mode=json`));
+  },
+  ashby: async (url) => {
+    const ref = ashbyRef(url);
+    if (!ref) return null;
+    return extractAshby(await getJson(`https://api.ashbyhq.com/posting-api/job-board/${ref.token}`), ref.id);
+  },
+  smartrecruiters: async (url) => {
+    const ref = smartRecruitersRef(url);
+    if (!ref) return null;
+    return extractSmartRecruiters(
+      await getJson(`https://api.smartrecruiters.com/v1/companies/${ref.company}/postings/${ref.id}`),
+    );
+  },
+  workable: async (url) => extractWorkable(await getText(url)),
+  recruitee: async (url) => {
+    const ref = recruiteeRef(url);
+    if (!ref) return null;
+    return extractRecruitee(await getJson(`https://${ref.company}.recruitee.com/api/offers/`), ref.slug);
+  },
+  personio: async (url) => {
+    const ref = personioRef(url);
+    if (!ref) return null;
+    return extractPersonio(
+      await getText(`${ref.origin}/xml`, { "User-Agent": UA, Accept: "application/xml, text/xml" }),
+      ref.id,
+    );
+  },
+  join: async (url) => extractJsonLd(await getText(url)),
+  teamtailor: async (url) => extractJsonLd(await getText(url)),
+  workday: async (url) => extractJsonLd(await getText(url)),
 };
 
-const hostOf = (url) => {
+/** Follow a board link's redirects once and return the final URL (body discarded).
+ *  Null on any failure. Used ONLY for shouldFollow sources. */
+async function resolveFinalUrl(url) {
   try {
-    return new URL(url).hostname;
-  } catch {
-    return "";
-  }
-};
-
-// Pull a JobPosting.description out of a page's JSON-LD blocks (join / teamtailor /
-// workday fallback). Handles a bare object, an array, and an @graph wrapper.
-function jsonLdDescription(html) {
-  const blocks = [
-    ...(html || "").matchAll(
-      /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
-    ),
-  ];
-  for (const b of blocks) {
-    let parsed;
+    const res = await fetch(url, fetchOpts({ redirect: "follow", headers: HTML_HEADERS }));
     try {
-      parsed = JSON.parse(b[1].trim());
+      await res.body?.cancel();
     } catch {
-      continue;
+      /* body already consumed or absent */
     }
-    const nodes = [];
-    const push = (x) => {
-      if (x && typeof x === "object") nodes.push(x);
-    };
-    if (Array.isArray(parsed)) parsed.forEach(push);
-    else {
-      push(parsed);
-      if (Array.isArray(parsed["@graph"])) parsed["@graph"].forEach(push);
-    }
-    for (const n of nodes) {
-      const t = n["@type"];
-      const isJob = t === "JobPosting" || (Array.isArray(t) && t.includes("JobPosting"));
-      if (isJob && n.description) return n.description;
-    }
-  }
-  return null;
-}
-
-// ── Per-ATS detail fetchers (each: browser UA, fetchOpts() timeout, try/catch →
-// stripped JD string ≤8000 chars or null; NEVER throw). ───────────────────────
-
-// greenhouse: boards|job-boards.greenhouse.io/{token}/jobs/{id}
-//   → GET boards-api.greenhouse.io/v1/boards/{token}/jobs/{id}?content=true → content
-async function fetchGreenhouse(url) {
-  try {
-    let token = null;
-    let id = null;
-    const m = url.match(/greenhouse\.io\/([^/?#]+)\/jobs\/(\d+)/);
-    if (m) {
-      token = m[1];
-      id = m[2];
-    } else {
-      // Embedded board variant: /embed/job_app?for={token}&token={id}
-      const u = new URL(url);
-      token = u.searchParams.get("for");
-      id = u.searchParams.get("token");
-    }
-    if (!token || !id) return null;
-    const res = await fetch(
-      `https://boards-api.greenhouse.io/v1/boards/${token}/jobs/${id}?content=true`,
-      fetchOpts({ headers: { "User-Agent": UA, Accept: "application/json" } }),
-    );
-    if (!res.ok) return null;
-    const json = await res.json();
-    return cap(stripHtml(json.content));
+    return res.url || null;
   } catch {
     return null;
   }
 }
 
-// lever: jobs.lever.co/{token}/{id}
-//   → GET api.lever.co/v0/postings/{token}/{id}?mode=json → descriptionPlain | description
-async function fetchLever(url) {
-  try {
-    const m = url.match(/lever\.co\/([^/?#]+)\/([^/?#]+)/);
-    if (!m) return null;
-    const [, token, id] = m;
-    const res = await fetch(
-      `https://api.lever.co/v0/postings/${token}/${id}?mode=json`,
-      fetchOpts({ headers: { "User-Agent": UA, Accept: "application/json" } }),
-    );
-    if (!res.ok) return null;
-    const j = await res.json();
-    return cap(j.descriptionPlain || stripHtml(j.description));
-  } catch {
-    return null;
-  }
-}
-
-// ashby: jobs.ashbyhq.com/{token}/{id}
-//   → GET api.ashbyhq.com/posting-api/job-board/{token} → find posting whose id matches
-async function fetchAshby(url) {
-  try {
-    const m = url.match(/ashbyhq\.com\/([^/?#]+)\/([^/?#]+)/);
-    if (!m) return null;
-    const [, token, id] = m;
-    const res = await fetch(
-      `https://api.ashbyhq.com/posting-api/job-board/${token}`,
-      fetchOpts({ headers: { "User-Agent": UA, Accept: "application/json" } }),
-    );
-    if (!res.ok) return null;
-    const json = await res.json();
-    const posting = (json.jobs || []).find(
-      (p) => p.id === id || (p.jobUrl && p.jobUrl.includes(id)) || (p.applyUrl && p.applyUrl.includes(id)),
-    );
-    if (!posting) return null;
-    return cap(stripHtml(posting.descriptionHtml || posting.descriptionPlain));
-  } catch {
-    return null;
-  }
-}
-
-// smartrecruiters: jobs|careers.smartrecruiters.com/{company}/{id}[-slug]
-//   → GET api.smartrecruiters.com/v1/companies/{company}/postings/{id}
-//   → concat every jobAd.sections.*.text (jobDescription/qualifications/additionalInformation)
-async function fetchSmartRecruiters(url) {
-  try {
-    const u = new URL(url);
-    const segs = u.pathname.split("/").filter(Boolean);
-    if (segs.length < 2) return null;
-    const company = segs[0];
-    const seg = segs[1];
-    const uuid = seg.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-    const id = uuid ? uuid[0] : (seg.match(/^\d+/) || [])[0];
-    if (!id) return null;
-    const res = await fetch(
-      `https://api.smartrecruiters.com/v1/companies/${company}/postings/${id}`,
-      fetchOpts({ headers: { "User-Agent": UA, Accept: "application/json" } }),
-    );
-    if (!res.ok) return null;
-    const json = await res.json();
-    const sections = (json.jobAd || {}).sections || {};
-    const parts = [];
-    for (const k of Object.keys(sections)) {
-      const t = sections[k] && sections[k].text;
-      if (t) parts.push(t);
-    }
-    return cap(stripHtml(parts.join("\n")));
-  } catch {
-    return null;
-  }
-}
-
-// workable: apply.workable.com/{account}/j/{shortcode} OR the account-less
-// apply.workable.com/j/{shortcode} (which 302-redirects to the canonical form).
-// Workable's public detail/list APIs are gated (404 on every account), and the
-// apply page is a client-rendered SPA — the full JD is fetched by JS and is NOT
-// in the initial HTML. The one reliable JD signal is the og:description meta: a
-// real summary paragraph of the role. Partial (not the full JD) but far better
-// than title-only, and it needs no account parsing so it also covers the /j/…
-// account-less URLs. Prefer a JSON-LD JobPosting.description if one is present.
-async function fetchWorkable(url) {
-  try {
-    const res = await fetch(
-      url,
-      fetchOpts({ redirect: "follow", headers: { "User-Agent": UA, Accept: "text/html" } }),
-    );
-    if (!res.ok) return null;
-    const html = await res.text();
-    const ld = jsonLdDescription(html);
-    if (ld) return cap(stripHtml(ld));
-    const og = (html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)/i) || [])[1];
-    if (!og) return null;
-    const decoded = og
-      .replace(/&amp;/g, "&")
-      .replace(/&#39;/g, "'")
-      .replace(/&quot;/g, '"')
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">");
-    return cap(stripHtml(decoded));
-  } catch {
-    return null;
-  }
-}
-
-// recruitee: {company}.recruitee.com/o/{slug}
-//   → GET https://{company}.recruitee.com/api/offers/ → match by slug → description
-async function fetchRecruitee(url) {
-  try {
-    const u = new URL(url);
-    const company = u.hostname.split(".")[0];
-    const m = u.pathname.match(/\/o\/([^/?#]+)/);
-    if (!company || !m) return null;
-    const slug = m[1];
-    const res = await fetch(
-      `https://${company}.recruitee.com/api/offers/`,
-      fetchOpts({ headers: { "User-Agent": UA, Accept: "application/json" } }),
-    );
-    if (!res.ok) return null;
-    const json = await res.json();
-    const offer = (json.offers || []).find((o) => o.slug === slug || slug.startsWith(o.slug));
-    if (!offer) return null;
-    return cap(stripHtml(offer.description));
-  } catch {
-    return null;
-  }
-}
-
-// personio: {company}.jobs.personio.{de|com}/job/{id}
-//   → GET https://{company}.jobs.personio.{tld}/xml → find <position> whose <id> matches
-//   → stripHtml its <jobDescriptions>. Fail-open: any parse trouble → null.
-async function fetchPersonio(url) {
-  try {
-    const u = new URL(url);
-    const m = u.pathname.match(/\/job\/(\d+)/);
-    if (!m) return null;
-    const id = m[1];
-    const res = await fetch(
-      `${u.origin}/xml`,
-      fetchOpts({ headers: { "User-Agent": UA, Accept: "application/xml, text/xml" } }),
-    );
-    if (!res.ok) return null;
-    const xml = await res.text();
-    for (const p of xml.matchAll(/<position>([\s\S]*?)<\/position>/gi)) {
-      const block = p[1];
-      const idm = block.match(/<id>\s*(\d+)\s*<\/id>/i);
-      if (idm && idm[1] === id) {
-        const dm = block.match(/<jobDescriptions>([\s\S]*?)<\/jobDescriptions>/i);
-        if (!dm) return null;
-        const inner = dm[1].replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "");
-        return cap(stripHtml(inner));
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// join / teamtailor / workday: best-effort JSON-LD JobPosting.description from the page.
-function makeJsonLd(kind) {
-  return async function fetchJsonLd(url) {
-    try {
-      const res = await fetch(
-        url,
-        fetchOpts({ headers: { "User-Agent": UA, Accept: "text/html" } }),
-      );
-      if (!res.ok) return null;
-      const desc = jsonLdDescription(await res.text());
-      return desc ? cap(stripHtml(desc)) : null;
-    } catch {
-      return null;
-    }
-  };
-}
-
-// ── Host-regex dispatch ───────────────────────────────────────────────────────
-// detectAts(url, source) → { kind, fetch } | null. `source` is a secondary hint;
-// the apply URL's host is authoritative (JD-less rows carry ATS-direct apply URLs).
-function detectAts(url, source) {
-  const host = hostOf(url);
-  if (!host) return null;
-  if (/(^|\.)greenhouse\.io$/.test(host)) return { kind: "greenhouse", fetch: () => fetchGreenhouse(url) };
-  if (/(^|\.)lever\.co$/.test(host)) return { kind: "lever", fetch: () => fetchLever(url) };
-  if (/(^|\.)ashbyhq\.com$/.test(host)) return { kind: "ashby", fetch: () => fetchAshby(url) };
-  if (/(^|\.)smartrecruiters\.com$/.test(host)) return { kind: "smartrecruiters", fetch: () => fetchSmartRecruiters(url) };
-  if (/(^|\.)workable\.com$/.test(host)) return { kind: "workable", fetch: () => fetchWorkable(url) };
-  if (/(^|\.)recruitee\.com$/.test(host)) return { kind: "recruitee", fetch: () => fetchRecruitee(url) };
-  if (/(^|\.)personio\.(de|com)$/.test(host)) return { kind: "personio", fetch: () => fetchPersonio(url) };
-  if (/(^|\.)join\.com$/.test(host)) return { kind: "join", fetch: makeJsonLd("join").bind(null, url) };
-  if (/(^|\.)teamtailor\.com$/.test(host)) return { kind: "teamtailor", fetch: makeJsonLd("teamtailor").bind(null, url) };
-  if (/\.(myworkdayjobs|myworkdaysite)\.com$/.test(host)) return { kind: "workday", fetch: makeJsonLd("workday").bind(null, url) };
-  return null;
+/** Decide the route for one row: { kind, url, followed } or null (unsupported). */
+async function routeRow(row) {
+  const direct = atsKindOf(row.url);
+  if (direct) return { kind: direct, url: row.url, followed: false };
+  if (!shouldFollow(row.source)) return null;
+  const finalUrl = await resolveFinalUrl(row.url);
+  const kind = finalUrl ? atsKindOf(finalUrl) : null;
+  return kind ? { kind, url: finalUrl, followed: true } : null;
 }
 
 // ── Orchestration ─────────────────────────────────────────────────────────────
 async function main() {
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const dryFlag = process.argv.includes("--dry");
+  const dry = process.argv.includes("--dry");
   const limIdx = process.argv.indexOf("--limit");
-  const LIMIT = limIdx >= 0 ? Number(process.argv[limIdx + 1]) : null;
+  const parsed = limIdx >= 0 ? Number(process.argv[limIdx + 1]) : NaN;
+  const LIMIT = Number.isFinite(parsed) && parsed > 0 ? parsed : BACKFILL_LIMIT;
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
     console.error("[dry-run] no SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY set; cannot query the pool, nothing to backfill.");
     return;
   }
-  const dry = dryFlag;
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  // Rows that arrived without a JD body. Idempotent by construction — filled rows
-  // (jd_text NOT NULL) are never selected, so re-runs only touch the remaining gap.
-  let query = supabase
+  // Live rows with no readable body (null OR empty). Idempotent: a filled row is
+  // never selected again. Newest first, capped — see the header for why.
+  const { data: rows, error } = await supabase
     .from("jobs")
     .select("id, url, source, company")
-    .is("jd_text", null)
+    .or("jd_text.is.null,jd_text.eq.")
     .eq("is_live", true)
-    .order("first_seen_at", { ascending: false });
-  if (LIMIT && Number.isFinite(LIMIT)) query = query.limit(LIMIT);
-  const { data: rows, error } = await query;
+    .order("first_seen_at", { ascending: false })
+    .limit(LIMIT);
   if (error) {
     console.error("jd-backfill: select failed —", error.message);
     process.exit(1);
   }
   const targets = rows || [];
-  console.error(`jd-backfill: ${targets.length} jd_text-null live row(s)${LIMIT ? ` (limit ${LIMIT})` : ""} · dry=${dry}`);
+  const tally = newTally();
+  tally.selected = targets.length;
+  console.error(`jd-backfill: ${targets.length} blank live row(s) selected (cap ${LIMIT}, newest first) · dry=${dry}`);
 
   // Per-route + per-source tallies so we can see which ATS paths actually work.
   const byKind = {};
@@ -350,27 +189,33 @@ async function main() {
   };
 
   const successes = [];
-  let attempted = 0;
-  let unknown = 0;
-
   const FETCH_CONCURRENCY = 6;
   let idx = 0;
   async function fetchWorker() {
     while (idx < targets.length) {
       const row = targets[idx++];
-      const det = detectAts(row.url, row.source);
-      if (!det) {
-        unknown++;
+      const route = await routeRow(row);
+      if (!route) {
+        tally.unsupported++;
         continue;
       }
-      attempted++;
-      bump(byKind, det.kind, "attempted");
+      if (route.followed) tally.followed++;
+      tally.attempted++;
+      bump(byKind, route.kind, "attempted");
       bump(bySource, row.source || "unknown", "attempted");
-      const jd = await det.fetch();
-      if (jd) {
-        successes.push({ url: row.url, jd_text: jd, jd_source_detail: det.kind });
-        bump(byKind, det.kind, "filled");
+      let jd = null;
+      try {
+        jd = await FETCHERS[route.kind](route.url);
+      } catch {
+        jd = null; // fail-soft: this row stays blank, counted below
+      }
+      if (isReadableJd(jd)) {
+        successes.push({ id: row.id, jd_text: jd, jd_source_detail: route.kind });
+        tally.filled++;
+        bump(byKind, route.kind, "filled");
         bump(bySource, row.source || "unknown", "filled");
+      } else {
+        tally.failed++;
       }
     }
   }
@@ -386,19 +231,15 @@ async function main() {
         const { error: uerr } = await supabase
           .from("jobs")
           .update({ jd_text: s.jd_text, jd_source_detail: s.jd_source_detail })
-          .eq("url", s.url);
-        if (uerr) console.error(`  update failed for ${s.url}: ${uerr.message}`);
+          .eq("id", s.id);
+        if (uerr) console.error(`  update failed for ${s.id}: ${uerr.message}`);
         else wrote++;
       }
     }
     await Promise.all(Array.from({ length: FETCH_CONCURRENCY }, writeWorker));
   }
 
-  // Final summary — attempted, filled, and a per-source/per-kind breakdown.
-  console.error(
-    `jd-backfill: attempted ${attempted} · filled ${successes.length} · unknown-host ${unknown}` +
-      (dry ? " · [dry-run] no writes" : ` · wrote ${wrote}`),
-  );
+  console.error(summaryLine(tally, { dry, wrote }));
   const fmt = (obj) =>
     Object.keys(obj)
       .sort()
