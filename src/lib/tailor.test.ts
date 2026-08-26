@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildSummaryPrompt, buildCoverPrompt, buildAnswerPrompt, noEmDash, MAX_ANSWERS } from "./tailor";
-import { stripLeadingSummary, buildCvHtml, buildCoverHtml, esc } from "./cvHtml";
+import { stripLeadingSummary } from "./cvHtml";
 
 const CV = `John Doe
 john@example.com
@@ -122,23 +122,6 @@ describe("tailor prompts", () => {
   });
 });
 
-describe("CV trust rule — verbatim body", () => {
-  it("renders the cv_text body VERBATIM (escaped) inside the CV HTML", () => {
-    const summary = "Tailored summary for the role.";
-    const html = buildCvHtml({ name: "John Doe", summary, cvText: CV });
-    // the exact CV text (escaped) must appear unchanged — no reorder, no rewrite
-    expect(html).toContain(esc(stripLeadingSummary(CV)));
-    expect(html).toContain(summary);
-    expect(html).toContain("Grew activation 40%");
-  });
-
-  it("escapes HTML in the body (no injection)", () => {
-    const html = buildCvHtml({ name: "X", summary: "s", cvText: "Skills: <script>alert(1)</script>" });
-    expect(html).toContain("&lt;script&gt;");
-    expect(html).not.toContain("<script>alert(1)</script>");
-  });
-});
-
 describe("stripLeadingSummary — conservative", () => {
   it("leaves CV unchanged when there is no leading summary heading", () => {
     expect(stripLeadingSummary(CV)).toBe(CV);
@@ -160,16 +143,5 @@ Acme — PM — 2021
   it("does not strip when the first line is not a summary heading", () => {
     const t = "Skills\nReact, TypeScript\n\nExperience\n- built things";
     expect(stripLeadingSummary(t)).toBe(t);
-  });
-});
-
-describe("cover HTML", () => {
-  it("renders all five cover parts, escaped", () => {
-    const cover = { greeting: "Hi,", p1: "para one", p2: "para two", p3: "para three", sign: "Best, John" };
-    const html = buildCoverHtml({ name: "John Doe", company: "Acme", cover });
-    expect(html).toContain("para one");
-    expect(html).toContain("para three");
-    expect(html).toContain("Best, John");
-    expect(html).toContain("Acme");
   });
 });

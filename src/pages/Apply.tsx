@@ -7,8 +7,9 @@
 //
 // It keeps the two steps the audit flagged: (1) CV EDIT-BEFORE-DOWNLOAD — the
 // tailored summary lands in an editable box before it prints, so the one
-// LLM-written line is reviewed, never blind; the CV BODY stays verbatim from
-// cv_text (the trust rule, in cvHtml.ts). (2) PREFILL-NEVER-SUBMIT confirm card —
+// LLM-written line is reviewed, never blind; the CV BODY stays the user's own words,
+// rendered from their parsed profile (the trust rule, in pdf.ts + cvStructured.ts).
+// (2) PREFILL-NEVER-SUBMIT confirm card —
 // we hand you the fields to paste and open the real posting; we never submit.
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { tailorSummary, tailorCover, answerQuestion, HAIKU, MAX_ANSWERS, type CoverJson } from "@/lib/tailor";
 import { downloadCvPdf, downloadCoverPdf } from "@/lib/pdf";
+import { ensureCvStructured } from "@/lib/cvParse";
+import type { CvStructured } from "@/lib/cvStructured";
 import { domainFor } from "@/lib/logodev";
 import { cityOf } from "@/lib/geo";
 import { auditHref } from "@/lib/auditLink";
@@ -117,6 +120,9 @@ export default function Apply() {
 
   const [job, setJob] = useState<Job | null>(null);
   const [cvText, setCvText] = useState<string | null>(null);
+  // The parsed CV (issue #150). Null keeps the tailored PDF on the plain-text render,
+  // so this page works exactly as before while a profile is unparsed.
+  const [cvStructured, setCvStructured] = useState<CvStructured | null>(null);
   const [name, setName] = useState("");
   const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -153,6 +159,7 @@ export default function Apply() {
     setQas([]);
     setRoleContext("");
     setWarmContacts([]);
+    setCvStructured(null);
     async function load() {
       if (!user) {
         setLoading(false);
@@ -203,6 +210,13 @@ export default function Apply() {
           );
       }
       if (active) setLoading(false);
+      // Lazy migration (issue #150): a CV uploaded before the structured parse
+      // shipped is parsed once, here, and stored. It runs after the page is
+      // usable and never blocks it: a failure just leaves the old render.
+      if (profile?.cv_text?.trim()) {
+        const cv = await ensureCvStructured(user.id, profile.cv_text);
+        if (active && cv) setCvStructured(cv);
+      }
     }
     load();
     return () => {
@@ -244,7 +258,7 @@ export default function Apply() {
   async function generateAndDownloadCv() {
     if (!job || !cvText) return;
     if (summary != null) {
-      await downloadCvPdf({ name, summary, cvText, company: job.company });
+      await downloadCvPdf({ name, summary, cvText, company: job.company, structured: cvStructured });
       return;
     }
     setBusy("cv");
@@ -260,7 +274,7 @@ export default function Apply() {
       });
       setSummary(s);
       track("cv_tailored");
-      await downloadCvPdf({ name, summary: s, cvText, company: job.company });
+      await downloadCvPdf({ name, summary: s, cvText, company: job.company, structured: cvStructured });
       const saved = await saveArtifact("cv", { summary: s });
       if (!saved) {
         toast.error("Your CV downloaded, but we couldn't save a copy to your bundle.");

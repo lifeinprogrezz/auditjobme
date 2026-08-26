@@ -26,7 +26,9 @@ export type CoverJson = { greeting: string; p1: string; p2: string; p3: string; 
 
 type ProxyMessage = { role: "user" | "assistant"; content: string };
 
-async function callProxy(messages: ProxyMessage[], maxTokens: number, kind: "cv" | "letter" | "answer"): Promise<string> {
+/** The one door to the proxy for every apply-bundle call (the CV parse in cvParse.ts
+ *  goes through it too, so the caps and the usage ledger stay in one place). */
+export async function callProxy(messages: ProxyMessage[], maxTokens: number, kind: "cv" | "letter" | "answer"): Promise<string> {
   const url = import.meta.env.VITE_SUPABASE_URL as string;
   const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
   const { data: sessionData } = await supabase.auth.getSession();

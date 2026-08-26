@@ -19,6 +19,7 @@ import { DEV_FIXTURE, DEV_FIXTURE_PROFILE, devFixtureScores } from "@/lib/devFix
 import { createScoreBuffer, type ScoreBuffer } from "@/lib/scoreCoalescer";
 import { buildWarmIndex, type ParsedConnection, type WarmContact } from "@/lib/connections";
 import { track } from "@/lib/analytics";
+import { parseAndSaveCv, ensureCvStructured } from "@/lib/cvParse";
 
 type JobsRow = {
   id: string;
@@ -398,6 +399,13 @@ export function useRolesData() {
       toast.error("Couldn't save your CV. Please try again.");
       return false;
     }
+
+    // Structured CV parse (issue #150): ONE language model call per CV, so every
+    // tailored CV after this renders with real sections, bullets and dates instead
+    // of one paragraph. Deliberately NOT awaited — the reveal below is what the
+    // person is waiting for, and a parse failure only means the tailored CV keeps
+    // the old plain-text render. A CV that did not change is not re-parsed.
+    void (changed ? parseAndSaveCv(userId, cvText) : ensureCvStructured(userId, cvText));
 
     if (changed) {
       // Scores are NOT deleted (#123). Deleting them re-bought the user's whole
