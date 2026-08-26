@@ -151,6 +151,75 @@ describe("useYourMatchesDefault — force-off on sign-out/CV-clear never persist
   });
 });
 
+describe("useYourMatchesDefault — settle waits for hasCv, not just hasScore (fix round 2, blocker 1)", () => {
+  afterEach(() => {
+    cleanup();
+    clearStorage();
+  });
+
+  it("the exact repro: signed-in visitor whose CV lands before its first score, nothing stored", () => {
+    // Reproduces the blocker verbatim: settleMineDefault used to settle "false"
+    // the instant it saw signedIn && !hasCv (the normal shape right after
+    // sign-in, before the CV modal's submission lands — see shouldPromptCv in
+    // lib/deviceSession.ts), and the one-shot effect never revisited it once
+    // hasCv and then hasScore turned true in the same SPA session.
+    const base: YourMatchesSignals = {
+      authLoading: false,
+      profileChecked: true,
+      signedIn: true,
+      hasCv: false,
+      hasScore: false,
+      stored: null,
+      mine: false,
+    };
+    const { result, rerender } = renderHook((signals: YourMatchesSignals) => useHarness(signals), {
+      initialProps: base,
+    });
+    expect(result.current.mine).toBe(false);
+
+    act(() => rerender({ ...base, hasCv: true, mine: result.current.mine }));
+    expect(result.current.mine).toBe(false); // still waiting on the first score
+
+    act(() => rerender({ ...base, hasCv: true, hasScore: true, mine: result.current.mine }));
+    expect(result.current.mine).toBe(true); // was stuck at false before the fix
+  });
+
+  it("re-applies a stored explicit choice after hasCv drops then rises again, same session", () => {
+    // The stored-choice sibling of the repro above: a returning user's stored
+    // "1" also used to get swallowed, because settleMineDefault skips the wait
+    // branch entirely once something is stored, so the settle-once effect could
+    // still lock onto the "false" it read from a render where hasCv was
+    // momentarily down (a mid-session CV clear, or a not-yet-loaded profile
+    // row) and never re-evaluate once hasCv came back.
+    writeStoredMine(true);
+    const settled: YourMatchesSignals = {
+      authLoading: false,
+      profileChecked: true,
+      signedIn: true,
+      hasCv: true,
+      hasScore: true,
+      stored: true,
+      mine: true,
+    };
+    const { result, rerender } = renderHook((signals: YourMatchesSignals) => useHarness(signals), {
+      initialProps: settled,
+    });
+    expect(result.current.mine).toBe(true);
+
+    // CV clears mid-session — force-off fires (blocker 1+2, already covered above).
+    act(() => rerender({ ...settled, hasCv: false, hasScore: false, mine: result.current.mine }));
+    expect(result.current.mine).toBe(false);
+
+    // CV resubmitted in the SAME session, no reload: the settle-once effect
+    // must re-arm instead of staying locked to the false decision it reached
+    // while hasCv was down, so the stored "1" takes hold again immediately —
+    // hasCv true is enough once something is stored; no need to wait on
+    // hasScore a second time.
+    act(() => rerender({ ...settled, hasCv: true, hasScore: false, mine: result.current.mine }));
+    expect(result.current.mine).toBe(true);
+  });
+});
+
 describe("useYourMatchesDefault — an explicit toggle (not this hook) is the only writer", () => {
   afterEach(() => {
     cleanup();

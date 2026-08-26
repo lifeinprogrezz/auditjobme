@@ -304,7 +304,21 @@ export function shouldDefaultMineOn(s: {
  *  profileChecked gate applies only when signedIn. Once both have settled, keep
  *  the existing wait-for-first-score behavior when nothing is stored. Pure/
  *  testable; RolesMap's one settle effect calls this instead of
- *  shouldDefaultMineOn directly. */
+ *  shouldDefaultMineOn directly.
+ *
+ *  Fix round 2, blocker 1: the wait-for-hasScore branch used to require
+ *  `hasCv` already true before it would hold off settling — so a signed-in
+ *  visitor who reaches this hook BEFORE their CV submission lands (the normal
+ *  shape post-sign-in, per shouldPromptCv in lib/deviceSession.ts: CV modal
+ *  opens, hasCv is false at that first settle-eligible render) got an
+ *  immediate, permanent "false" from shouldDefaultMineOn's `!hasCv` branch —
+ *  the one-shot settle effect then never revisits it, even after hasCv AND
+ *  hasScore both flip true in the same SPA session with no reload. Waiting on
+ *  `!hasCv` here too (still only when nothing is stored — an explicit choice
+ *  should never be held hostage to a CV that may never arrive) closes that
+ *  gap: for a genuinely CV-less signed-in visitor the wait never resolves,
+ *  which is harmless (mine simply stays at its initial `false`, the correct
+ *  value either way). */
 export function settleMineDefault(s: {
   authLoading: boolean;
   profileChecked: boolean;
@@ -315,7 +329,7 @@ export function settleMineDefault(s: {
 }): "wait" | boolean {
   if (s.authLoading) return "wait";
   if (s.signedIn && !s.profileChecked) return "wait";
-  if (s.stored == null && s.signedIn && s.hasCv && !s.hasScore) return "wait";
+  if (s.stored == null && s.signedIn && (!s.hasCv || !s.hasScore)) return "wait";
   return shouldDefaultMineOn(s);
 }
 

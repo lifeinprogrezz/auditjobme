@@ -379,6 +379,22 @@ describe("settleMineDefault (issue #154 fix round 1, blocker 1: don't settle bef
     expect(settleMineDefault({ ...ready, hasScore: false, stored: true })).toBe(true);
     expect(settleMineDefault({ ...ready, stored: false })).toBe(false);
   });
+
+  // Fix round 2, blocker 1: a signed-in visitor's CV submission (post-sign-in
+  // modal) can land AFTER this hook first evaluates — hasCv starts false, not
+  // just hasScore. Waiting on hasCv too (still only when nothing is stored)
+  // stops the old immediate, permanent "false" from shouldDefaultMineOn's
+  // `!hasCv` branch, which the one-shot settle effect then never revisited
+  // even after hasCv and hasScore both turned true in the same SPA session.
+  it("waits for the CV itself, not just its score, when nothing is stored", () => {
+    expect(settleMineDefault({ ...ready, hasCv: false, hasScore: false })).toBe("wait");
+  });
+  it("still settles ON once both the CV and its first score have landed", () => {
+    expect(settleMineDefault({ ...ready, hasCv: true, hasScore: true })).toBe(true);
+  });
+  it("an explicit stored choice still settles immediately even before the CV lands (no wait)", () => {
+    expect(settleMineDefault({ ...ready, hasCv: false, hasScore: false, stored: true })).toBe(false);
+  });
 });
 
 describe("shouldForceMineOff (issue #154 fix round 1, blocker 2: sign-out transition)", () => {

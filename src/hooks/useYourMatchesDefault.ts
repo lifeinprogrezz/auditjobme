@@ -48,6 +48,23 @@ export function useYourMatchesDefault(signals: YourMatchesSignals, setMine: (nex
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signals.authLoading, signals.profileChecked, signals.signedIn, signals.hasCv, signals.hasScore, signals.stored]);
 
+  // Fix round 2, blocker 1 (second half): a decision reached while `hasCv` is
+  // false is never a REAL settle — shouldDefaultMineOn returns false for
+  // `!hasCv` immediately, without waiting, so the effect above can still lock
+  // `settled.current` on a render where hasCv is false (a stored explicit
+  // choice skips the wait branch in settleMineDefault; see lib/roles.ts). Left
+  // alone, that lock survives a later hasCv rise in the same SPA session (a
+  // CV submission with no reload, or a mid-session clear-then-resubmit) and
+  // the one-shot settle effect never revisits it — swallowing a stored "1"
+  // exactly like blocker 1's core repro, just via the stored-choice branch
+  // instead of the wait-for-hasScore branch. Declared AFTER the settle effect
+  // so it runs later in the same commit and un-locks whatever that effect just
+  // set: while hasCv is false, `settled` can never end a render as `true`,
+  // so the settle effect always re-evaluates fresh once hasCv actually rises.
+  useEffect(() => {
+    if (!signals.hasCv) settled.current = false;
+  }, [signals.hasCv]);
+
   useEffect(() => {
     if (shouldForceMineOff({ signedIn: signals.signedIn, hasCv: signals.hasCv, mine: signals.mine }))
       setMine(false);
