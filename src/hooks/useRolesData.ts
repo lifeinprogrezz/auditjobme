@@ -19,7 +19,12 @@ import { DEV_FIXTURE, DEV_FIXTURE_PROFILE, devFixtureScores } from "@/lib/devFix
 import { createScoreBuffer, type ScoreBuffer } from "@/lib/scoreCoalescer";
 import { buildWarmIndex, type ParsedConnection, type WarmContact } from "@/lib/connections";
 import { track } from "@/lib/analytics";
-import { parseAndSaveCv, ensureCvStructured } from "@/lib/cvParse";
+import {
+  parseAndSaveCv,
+  ensureCvStructured,
+  CV_STRUCTURED_CLEAR,
+  isMissingCvStructuredColumn,
+} from "@/lib/cvParse";
 
 type JobsRow = {
   id: string;
@@ -382,30 +387,33 @@ export function useRolesData() {
     // sets it) — stamp it explicitly so the profile view's "uploaded" date reflects
     // THIS write, not the user's original sign-up time.
     const nowIso = new Date().toISOString();
-    const { error: upErr } = await supabase
-      .from("profiles")
-      .update({
-        cv_text: cvText,
-        cv_hash: payload.cv_hash,
-        target_roles: payload.target_roles,
-        target_sectors: payload.target_sectors,
-        onboarded_at: nowIso,
-        updated_at: nowIso,
-      })
-      .eq("id", userId);
+    const base = {
+      cv_text: cvText,
+      cv_hash: payload.cv_hash,
+      target_roles: payload.target_roles,
+      target_sectors: payload.target_sectors,
+      onboarded_at: nowIso,
+      updated_at: nowIso,
+    };
+    // A CHANGED CV retires the structured parse of the one it replaces, in the SAME
+    // write (#150). Left behind, it would print the previous CV's jobs under every
+    // tailored CV from here on whenever the re-parse below does not land. An
+    // unchanged CV keeps its structure, so re-submitting the same file is free.
+    const patch = changed ? { ...base, ...CV_STRUCTURED_CLEAR } : base;
+    let { error: upErr } = await supabase.from("profiles").update(patch).eq("id", userId);
+    if (upErr && isMissingCvStructuredColumn(upErr.message)) {
+      // Before the #150 migration lands those two columns are unknown. Saving the CV
+      // matters more than clearing them, and readCvStructuredState refuses a
+      // structure older than cv_changed_at anyway, so the stale render stays
+      // impossible either way.
+      ({ error: upErr } = await supabase.from("profiles").update(base).eq("id", userId));
+    }
     if (upErr) {
       // Expected before the Phase-A migration is applied (unknown columns); the
       // /roles page still works, only the CV-submit flow is blocked until then.
       toast.error("Couldn't save your CV. Please try again.");
       return false;
     }
-
-    // Structured CV parse (issue #150): ONE language model call per CV, so every
-    // tailored CV after this renders with real sections, bullets and dates instead
-    // of one paragraph. Deliberately NOT awaited — the reveal below is what the
-    // person is waiting for, and a parse failure only means the tailored CV keeps
-    // the old plain-text render. A CV that did not change is not re-parsed.
-    void (changed ? parseAndSaveCv(userId, cvText) : ensureCvStructured(userId, cvText));
 
     if (changed) {
       // Scores are NOT deleted (#123). Deleting them re-bought the user's whole
@@ -424,6 +432,17 @@ export function useRolesData() {
       // the completion check would read zero-pending immediately and fire a mail
       // claiming work that has not happened yet.
     }
+
+    // Structured CV parse (issue #150): ONE language model call per CV, so every
+    // tailored CV after this renders with real sections, bullets and dates instead
+    // of one paragraph. Deliberately NOT awaited — the reveal below is what the
+    // person is waiting for, and a parse failure only means the tailored CV keeps
+    // the old plain-text render. A CV that did not change is not re-parsed.
+    //
+    // It fires AFTER the cv_changed_at stamp above, never before: the parse writes
+    // cv_structured_at, and a stamp that lands first would read back as older than
+    // the CV and be thrown away as stale on the next load.
+    void (changed ? parseAndSaveCv(userId, cvText) : ensureCvStructured(userId, cvText));
 
     // Fresh scoreable profile — OLD columns only, so this read is pre-migration safe.
     const { data: fresh } = await supabase

@@ -7,6 +7,17 @@
 // rule 1). Users who uploaded before this shipped are parsed lazily on their next
 // visit to Settings or to an apply page, with no re-upload.
 //
+// TWO RULES THIS MODULE EXISTS TO KEEP:
+//
+// 1. NEVER RENDER A STRUCTURE THAT BELONGS TO AN OLDER CV. cv_structured_at is
+//    compared against cv_changed_at on every read; older loses. A new upload also
+//    clears both columns in the same write (CV_STRUCTURED_CLEAR). Without this, a
+//    re-parse that never lands prints the previous CV's jobs under every tailored CV.
+//
+// 2. DECIDE ONCE, NEVER RETRY ON EVERY VISIT. A parse that came back is recorded even
+//    when it produced nothing renderable, and a read that FAILED never triggers a
+//    parse at all. Both are paid calls on a page that loads on every visit.
+//
 // PRE-MIGRATION SAFE: cv_structured is read and written defensively. Until the
 // migration is applied, the column is unknown, the query returns an error rather than
 // throwing, and every caller falls back to the plain cv_text render.
@@ -14,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { callProxy } from "./tailor";
 import {
   buildCvParsePrompt,
+  isCvStructuredUsable,
   parseCvResponse,
   readCvStructured,
   CV_PARSE_MAX_TOKENS,
@@ -43,18 +55,80 @@ const db = supabase as unknown as ProfilesClient;
 /** One parse per user per session, even if two surfaces ask at the same moment. */
 const inFlight = new Set<string>();
 
-/** Read the stored structure. Null when absent, unparsed, or pre-migration. */
-export async function loadCvStructured(userId: string): Promise<CvStructured | null> {
-  const { data, error } = await db.from("profiles").select("cv_structured").eq("id", userId).maybeSingle();
-  if (error || !data) return null;
-  return readCvStructured(data.cv_structured);
+/**
+ * The columns a CV write must ALSO set when the CV actually changed: the stored
+ * structure describes the CV being replaced, so it is retired in the SAME write
+ * (src/hooks/useRolesData.ts applyCv). An unchanged CV keeps its structure, so
+ * re-submitting the same file never re-buys the parse.
+ */
+export const CV_STRUCTURED_CLEAR = { cv_structured: null, cv_structured_at: null } as const;
+
+/** True when a profiles write failed only because the #150 columns are not there yet. */
+export function isMissingCvStructuredColumn(message: string | null | undefined): boolean {
+  return /cv_structured/i.test(message || "");
 }
 
-/** Persist a structure (the parse's, or the owner's edit). False on failure. */
-export async function saveCvStructured(userId: string, cv: CvStructured): Promise<boolean> {
+function millis(value: unknown): number | null {
+  if (typeof value !== "string" || !value) return null;
+  const t = Date.parse(value);
+  return Number.isNaN(t) ? null : t;
+}
+
+/** What the profile row says about the structured CV — enough to decide once. */
+export type CvStructuredState = {
+  /** The stored structure, when it is CURRENT and renderable. Null otherwise. */
+  cv: CvStructured | null;
+  /**
+   * A parse already ran against the CURRENT cv_text — including one that produced
+   * nothing renderable. The caller must not buy another one.
+   */
+  attempted: boolean;
+  /** The read itself failed: pre-migration unknown column, offline, missing row. */
+  failed: boolean;
+};
+
+/**
+ * Read cv_structured with both guards.
+ *
+ * STALE — cv_structured_at older than cv_changed_at means the structure was parsed
+ * from a PREVIOUS CV. It is treated as absent, so a failed re-parse can never print
+ * the old CV's jobs under the new one.
+ *
+ * ATTEMPTED — a cv_structured_at that is current means the parse already ran, even
+ * when it left nothing renderable (a CV of pure prose, a response the validator
+ * emptied). Re-parsing on every Settings and Apply load would buy that call forever.
+ */
+export async function readCvStructuredState(userId: string): Promise<CvStructuredState> {
+  const { data, error } = await db
+    .from("profiles")
+    .select("cv_structured, cv_structured_at, cv_changed_at")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) return { cv: null, attempted: false, failed: true };
+  const parsedAt = millis(data.cv_structured_at);
+  const cvAt = millis(data.cv_changed_at);
+  // A legacy row has no cv_changed_at (the column shipped later); nothing to be
+  // older than, so a stamped parse counts as current.
+  const current = parsedAt != null && (cvAt == null || parsedAt >= cvAt);
+  return { cv: current ? readCvStructured(data.cv_structured) : null, attempted: current, failed: false };
+}
+
+/** The stored structure when it is current and renderable. Null otherwise. */
+export async function loadCvStructured(userId: string): Promise<CvStructured | null> {
+  return (await readCvStructuredState(userId)).cv;
+}
+
+/**
+ * Persist a structure (the parse's, or the owner's edit) and stamp the attempt.
+ *
+ * `null` is a legitimate value here: it records that a parse RAN and produced nothing
+ * renderable, so the next Settings or Apply load does not buy the same call again.
+ * False on failure.
+ */
+export async function saveCvStructured(userId: string, cv: CvStructured | null): Promise<boolean> {
   const { error } = await db
     .from("profiles")
-    .update({ cv_structured: cv as unknown, cv_structured_at: new Date().toISOString() })
+    .update({ cv_structured: (cv as unknown) ?? null, cv_structured_at: new Date().toISOString() })
     .eq("id", userId);
   if (error) {
     console.warn("could not save the structured CV", error.message);
@@ -88,15 +162,31 @@ export async function parseCvText(cvText: string): Promise<CvStructured | null> 
  * rather than blocking anything. Model calls are never retried here.
  */
 export async function parseAndSaveCv(userId: string, cvText: string): Promise<CvStructured | null> {
+  if (!cvText?.trim()) return null;
   if (inFlight.has(userId)) return null;
   inFlight.add(userId);
   try {
-    const cv = await parseCvText(cvText);
-    if (!cv) return null;
+    let cv: CvStructured | null = null;
+    try {
+      cv = await parseCvText(cvText);
+    } catch (err) {
+      // The CALL failed: proxy down, spend cap, no session. Nothing was decided, so
+      // the stamp is deliberately NOT written and the next load may try again. Only
+      // a call that CAME BACK records an attempt.
+      console.warn("structured CV parse failed", err);
+      return null;
+    }
+    // The call came back. Store what it produced, even when that is nothing: a CV the
+    // parser can make nothing of is a DECISION, not a reason to buy the same call on
+    // every later Settings and Apply load. A new upload clears the stamp, and "Read
+    // my CV again" in Settings is the deliberate retry.
     await saveCvStructured(userId, cv);
-    return cv;
+    // Hand back only what a caller could render. A thin parse is still STORED — that
+    // stamp is what stops the retry loop — but it shows as nothing, exactly as a
+    // reload would show it.
+    return cv && isCvStructuredUsable(cv) ? cv : null;
   } catch (err) {
-    console.warn("structured CV parse failed", err);
+    console.warn("could not store the structured CV", err);
     return null;
   } finally {
     inFlight.delete(userId);
@@ -107,11 +197,17 @@ export async function parseAndSaveCv(userId: string, cvText: string): Promise<Cv
  * Lazy migration for CVs uploaded before this shipped: return the stored structure
  * when there is one, otherwise parse the CV once and store it. Called on the
  * Settings and Apply loads, so an existing user gets the new render with no
- * re-upload, and pays for one parse rather than one per role.
+ * re-upload, and pays for one parse rather than one per role — and, because both
+ * "already tried" and "could not read" stop here, one parse rather than one per visit.
  */
 export async function ensureCvStructured(userId: string, cvText: string | null): Promise<CvStructured | null> {
-  const stored = await loadCvStructured(userId);
-  if (stored) return stored;
+  const state = await readCvStructuredState(userId);
+  if (state.cv) return state.cv;
+  // The read failed. Before the migration lands the column is unknown, so a parse
+  // could not be stored and EVERY visit would buy it again. Render from cv_text.
+  if (state.failed) return null;
+  // A parse already ran against this CV and left nothing renderable. Decide once.
+  if (state.attempted) return null;
   if (!cvText?.trim()) return null;
   return parseAndSaveCv(userId, cvText);
 }

@@ -20,4 +20,4 @@ alter table public.profiles
   add column if not exists cv_structured_at timestamptz;
 
 comment on column public.profiles.cv_structured_at is
-  'When cv_structured was last written, by the parse or by the owner editing it in Settings. Compared against the CV upload time to spot a structure that predates the current cv_text.';
+  'When a parse last RAN, or the owner last edited the structure in Settings. Two jobs (src/lib/cvParse.ts readCvStructuredState). (1) Older than cv_changed_at means the structure was parsed from a PREVIOUS cv_text: it is thrown away rather than printed, so a re-parse that never landed can never put the old CV''s jobs on the new one. (2) Set and current means the parse already ran, EVEN IF cv_structured is null or too thin to render: the parse is a paid call on a page that loads every visit, so it is decided once, not retried forever. A CV upload clears both columns together.';
