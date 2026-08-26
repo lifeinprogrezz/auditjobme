@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { type Level, type RolesFilters } from "@/lib/roles";
 import FilterChip, { type FilterOption } from "./FilterChip";
+import MineChip from "./MineChip";
 import { FACET_SCROLL_STEP, overflowSides } from "@/lib/facetRow";
 import ThemeToggle from "@/components/ThemeToggle";
 import AccountMenu from "@/components/app/AccountMenu";
@@ -29,13 +30,16 @@ export type HeadBarProps = {
   onAddCv: () => void;
   /** Returning-user sign-in — the logged-out header's secondary action (Google OAuth). */
   onSignIn: () => void;
+  /** Toggle the "Your matches" facet (issue #154) — routed through the page so
+   *  the effective state also lands in localStorage (lib/roles.ts writeStoredMine). */
+  onToggleMine: () => void;
   /** Brand click = home reset: clears selection/filters and re-frames Europe (Rober 7-16). */
   onBrand: () => void;
 };
 
 // Glass nav headbar (v43 mockup lines 237–269). State classes .scored /
 // .panel-hidden etc live on the page root (.roles-theme), not here.
-export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, freshnessOptions, sponsorOptions, onClearAll, onAddCv, onSignIn, onBrand }: HeadBarProps) {
+export default function HeadBar({ scored, signedIn, filters, onFilters, roleOptions, levelOptions, workplaceOptions, cityOptions, sectorOptions, sizeOptions, languageOptions, freshnessOptions, sponsorOptions, onClearAll, onAddCv, onSignIn, onBrand, onToggleMine }: HeadBarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [chipsShown, setChipsShown] = useState(false);
@@ -200,6 +204,7 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
 
   // Any filter active → show the headbar-wide Clear all (Rober 7-09).
   const anyActive =
+    Boolean(filters.mine) ||
     (filters.roles?.length ?? 0) > 0 ||
     filters.levels.length > 0 ||
     filters.cities.length > 0 ||
@@ -273,6 +278,10 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
           onPointerCancel={onRowPointerUp}
           onClickCapture={onRowClickCapture}
         >
+        {/* "Your matches" leads (issue #154) — the catalog-scope toggle, ahead of
+            every narrowing facet. Disabled (greyed, inert) for a logged-out or
+            no-CV visitor, same voice as Role/Level below with nothing to pick. */}
+        <MineChip active={Boolean(filters.mine)} disabled={!signedIn || !scored} onToggle={onToggleMine} />
         {/* Chip order: what → where → company (spec 2026-07-10). Role leads. Its
             options carry a separate value and label (issue #70): the value is the
             stored jobs.role_family the filter compares against, the label is the

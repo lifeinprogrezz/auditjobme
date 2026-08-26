@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import "@/styles/roles.css";
 import GlobeMap from "@/components/roles/GlobeMap";
@@ -21,6 +21,9 @@ import {
   WORKPLACES,
   sizeBand,
   sizeBandOrder,
+  readStoredMine,
+  writeStoredMine,
+  shouldDefaultMineOn,
   type RoleJob,
   type RolesFilters,
 } from "@/lib/roles";
@@ -98,6 +101,27 @@ export default function RolesMap() {
     if (needsCv && !AUTH_BYPASSED) setCvModalOpen(true);
   }, [needsCv]);
   const [filters, setFilters] = useState<RolesFilters>(EMPTY_FILTERS);
+  // "Your matches" (issue #154): every explicit flip — the header chip, the
+  // panel dismiss, and the default below — is routed through this one setter so
+  // it always lands in localStorage too (lib/roles.ts read/writeStoredMine), and
+  // the next page load in this browser opens the same way.
+  const setMine = useCallback((next: boolean) => {
+    writeStoredMine(next);
+    setFilters((f) => ({ ...f, mine: next }));
+  }, []);
+  // Settle the default exactly once per page load: a stored explicit choice wins
+  // immediately either way; with none stored, wait for this user's first landed
+  // score (shouldDefaultMineOn) — the ON default has no meaning before then, so
+  // the effect keeps re-checking as eligibleCount/remaining move.
+  const mineDefaultSettled = useRef(false);
+  useEffect(() => {
+    if (mineDefaultSettled.current) return;
+    const stored = readStoredMine();
+    const hasScore = eligibleCount > remaining;
+    if (stored == null && signedIn && scored && !hasScore) return;
+    mineDefaultSettled.current = true;
+    setMine(shouldDefaultMineOn({ signedIn, hasCv: scored, hasScore, stored }));
+  }, [signedIn, scored, eligibleCount, remaining, setMine]);
   const [detailJob, setDetailJob] = useState<RoleJob | null>(null);
   // A panel-card click flies the map to the role's city (see openDetail); the
   // nonce forces a re-fly even when the same city is reopened.
@@ -151,11 +175,22 @@ export default function RolesMap() {
   // scanned, not about your view.
   const pool = useMemo(() => (dismissed.size ? jobs.filter((j) => !dismissed.has(j.id)) : jobs), [jobs, dismissed]);
 
-  const visible = useMemo(() => filterJobs(pool, filters), [pool, filters]);
+  const visible = useMemo(
+    () => filterJobs(pool, filters, Date.now(), eligibleIds),
+    [pool, filters, eligibleIds],
+  );
 
   // Top-left badge is the TOTAL catalog size — always the full numbers, never the
-  // filtered view (Rober 7-06). The per-view count lives in the panel's filter bar.
+  // filtered view (Rober 7-06), UNLESS "Your matches" is on: then it reads "N of
+  // 8,155 roles" (issue #154) — the size of the eligible slice against the whole
+  // catalog, so the badge still answers "how big is my scope right now" rather
+  // than the ephemeral count of every OTHER active facet (that lives in the
+  // panel's filter bar, unchanged).
   const scopeRoles = jobs.length;
+  const mineScopeRoles = useMemo(
+    () => pool.filter((j) => eligibleIds.has(j.id)).length,
+    [pool, eligibleIds],
+  );
   const scopeCos = useMemo(
     () => new Set(jobs.map((j) => j.company_id ?? j.company)).size,
     [jobs],
@@ -177,7 +212,7 @@ export default function RolesMap() {
   // "Other" is appended only when unlabelled rows are actually present.
   const roleOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of filterJobs(pool, { ...filters, roles: [] }))
+    for (const j of filterJobs(pool, { ...filters, roles: [] }, Date.now(), eligibleIds))
       m.set(roleFamily(j), (m.get(roleFamily(j)) ?? 0) + 1);
     const known = ROLE_FAMILY_OPTIONS.filter((o) => (m.get(o.value) ?? 0) > 0).map((o) => ({
       value: o.value as string,
@@ -188,40 +223,40 @@ export default function RolesMap() {
     return other > 0
       ? [...known, { value: ROLE_FAMILY_OTHER, label: "Other", count: other }]
       : known;
-  }, [pool, filters]);
+  }, [pool, filters, eligibleIds]);
   const levelOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of filterJobs(pool, { ...filters, levels: [] }))
+    for (const j of filterJobs(pool, { ...filters, levels: [] }, Date.now(), eligibleIds))
       if (j.seniority) m.set(j.seniority, (m.get(j.seniority) ?? 0) + 1);
     // Keep the fixed ladder order (Junior→Executive), each with its faceted count.
     return LEVELS.map((l) => ({ value: l.value, label: l.label, count: m.get(l.value) ?? 0 }));
-  }, [pool, filters]);
+  }, [pool, filters, eligibleIds]);
   // Workplace facet — fixed Remote/Hybrid/On-site order (like the Level ladder),
   // counts over roles with a KNOWN mode (discovery semantics; unknown ≈60% excluded).
   const workplaceOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of filterJobs(pool, { ...filters, workplaces: [] })) {
+    for (const j of filterJobs(pool, { ...filters, workplaces: [] }, Date.now(), eligibleIds)) {
       const w = workplaceOf(j);
       if (w) m.set(w, (m.get(w) ?? 0) + 1);
     }
     return WORKPLACES.map((w) => ({ value: w.value, label: w.label, count: m.get(w.value) ?? 0 }));
-  }, [pool, filters]);
+  }, [pool, filters, eligibleIds]);
   const cityOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of filterJobs(pool, { ...filters, cities: [] }))
+    for (const j of filterJobs(pool, { ...filters, cities: [] }, Date.now(), eligibleIds))
       if (j.city) m.set(j.city, (m.get(j.city) ?? 0) + 1);
     return [...m.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([value, count]) => ({ value, label: value, count }));
-  }, [pool, filters]);
+  }, [pool, filters, eligibleIds]);
   const sectorOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of filterJobs(pool, { ...filters, sectors: [] }))
+    for (const j of filterJobs(pool, { ...filters, sectors: [] }, Date.now(), eligibleIds))
       if (j.sector) m.set(j.sector, (m.get(j.sector) ?? 0) + 1);
     return [...m.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([value, count]) => ({ value, label: value, count }));
-  }, [pool, filters]);
+  }, [pool, filters, eligibleIds]);
   // The CV-unlock modal's industry picker is a DIFFERENT list from the headbar
   // facet above (issue #70). The facet shows every live sector with a count beside
   // it, which is its own honesty mechanism. The target picker shows no count and
@@ -235,19 +270,19 @@ export default function RolesMap() {
   );
   const sizeOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of filterJobs(pool, { ...filters, sizes: [] })) {
+    for (const j of filterJobs(pool, { ...filters, sizes: [] }, Date.now(), eligibleIds)) {
       const b = sizeBand(j.headcount);
       if (b) m.set(b, (m.get(b) ?? 0) + 1);
     }
     return [...m.entries()]
       .sort((a, b) => sizeBandOrder(a[0]) - sizeBandOrder(b[0]))
       .map(([value, count]) => ({ value, label: value, count }));
-  }, [pool, filters]);
+  }, [pool, filters, eligibleIds]);
   // Non-English languages a role explicitly requires (English is implicit); cross-faceted
   // like the others — the counts reflect the city/sector/size/etc currently selected.
   const languageOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of filterJobs(pool, { ...filters, languages: [] }))
+    for (const j of filterJobs(pool, { ...filters, languages: [] }, Date.now(), eligibleIds))
       for (const l of j.extraction?.languages_required ?? []) {
         const s = typeof l === "string" ? l.trim() : "";
         if (s && s.toLowerCase() !== "english") m.set(s, (m.get(s) ?? 0) + 1);
@@ -255,7 +290,7 @@ export default function RolesMap() {
     return [...m.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([value, count]) => ({ value, label: value, count }));
-  }, [pool, filters]);
+  }, [pool, filters, eligibleIds]);
 
   // Freshness facet (issue #73 slice 3) — fixed 7/14/28-day ladder like the Level
   // ladder, counts over roles we can actually date (roleSeenMs). Filter only: we
@@ -263,21 +298,21 @@ export default function RolesMap() {
   // NOT predict match quality, so it never touches ranking.
   const freshnessOptions = useMemo(() => {
     const now = Date.now();
-    const base = filterJobs(pool, { ...filters, freshness: [] }, now);
+    const base = filterJobs(pool, { ...filters, freshness: [] }, now, eligibleIds);
     return FRESHNESS_WINDOWS.map((w) => ({
       value: w.value,
       label: w.label,
       count: base.filter((j) => roleSeenMs(j) >= now - w.days * 86_400_000).length,
     }));
-  }, [pool, filters]);
+  }, [pool, filters, eligibleIds]);
   // UK sponsor-licence facet (issue #73 slice 5): the Home Office register status is
   // already a company attribute and already a badge — this makes it filterable.
   const sponsorOptions = useMemo(() => {
     const m = new Map<string, number>();
-    for (const j of filterJobs(pool, { ...filters, sponsors: [] }))
+    for (const j of filterJobs(pool, { ...filters, sponsors: [] }, Date.now(), eligibleIds))
       if (j.ukSponsorStatus) m.set(j.ukSponsorStatus, (m.get(j.ukSponsorStatus) ?? 0) + 1);
     return UK_SPONSOR_STATUSES.map((st) => ({ value: st.value, label: st.label, count: m.get(st.value) ?? 0 }));
-  }, [pool, filters]);
+  }, [pool, filters, eligibleIds]);
 
   // Default landing (nothing searched / filtered / selected) shows a curated
   // "hot companies" showcase — one Product role from each (Rober 7-06). The reset
@@ -312,10 +347,12 @@ export default function RolesMap() {
       setEuropeFrame((n) => n + 1);
     }
   }, [isDefaultView, hasExplored, scored]);
-  // Scored users (signed in + CV on file) get their genuinely fit-ranked list as the
-  // DEFAULT rail ("Best fit"), not the curated showcase — the showcase is the
-  // anon/no-CV landing only (Rober 7-15). For anon, !scored is always true so this is
-  // unchanged; only scored users skip straight to the byScore ranking below.
+  // Scored users (signed in + CV on file) get their genuinely fit-ranked list as
+  // the default rail ("Your matches", issue #154 — narrowed further by the mine
+  // facet baked into `visible` when it defaults on), not the curated showcase —
+  // the showcase is the anon/no-CV landing only (Rober 7-15). For anon, !scored
+  // is always true so this is unchanged; only scored users skip straight to the
+  // byScore ranking below.
   const showShowcase = isDefaultView && !scored;
 
   const hotJobs = useMemo(() => {
@@ -506,6 +543,7 @@ export default function RolesMap() {
           }}
           onAddCv={() => setCvModalOpen(true)}
           onSignIn={signInWithGoogle}
+          onToggleMine={() => setMine(!filters.mine)}
           // Brand = home: same state reset as the map's reset control, plus a camera
           // re-frame to the Europe landing (europeFrame bump eases the globe back).
           onBrand={() => {
@@ -525,6 +563,7 @@ export default function RolesMap() {
           defaultView={isDefaultView}
           filters={filters}
           onFilters={setFilters}
+          onToggleMine={() => setMine(!filters.mine)}
           selCo={sel.co}
           selCity={sel.city}
           onClearCo={() => setSel((s) => ({ ...s, co: null }))}
@@ -550,7 +589,15 @@ export default function RolesMap() {
         />
         <div className="scope" aria-label="Catalog scope">
           <span className="scope-cell">
-            <b>{scopeRoles.toLocaleString()}</b> roles
+            {filters.mine ? (
+              <>
+                <b>{mineScopeRoles.toLocaleString()}</b> of {scopeRoles.toLocaleString()} roles
+              </>
+            ) : (
+              <>
+                <b>{scopeRoles.toLocaleString()}</b> roles
+              </>
+            )}
           </span>
           <span className="scope-sep" />
           <span className="scope-cell">

@@ -44,6 +44,7 @@ function renderBar(props: Partial<React.ComponentProps<typeof HeadBar>> = {}) {
         onAddCv={vi.fn()}
         onSignIn={vi.fn()}
         onBrand={vi.fn()}
+        onToggleMine={vi.fn()}
         {...props}
       />
     </MemoryRouter>,
@@ -95,5 +96,38 @@ describe("HeadBar facet row", () => {
     expect(document.querySelector(".fdrop-portal")).not.toBeNull();
     fireEvent.click(document.body);
     expect(document.querySelector(".fdrop-portal")).toBeNull();
+  });
+});
+
+// ── Issue #154: the "Your matches" chip ────────────────────────────────────
+describe("HeadBar — Your matches chip", () => {
+  afterEach(cleanup);
+
+  it("renders disabled (greyed, inert) for a logged-out visitor", () => {
+    renderBar({ signedIn: false, scored: false });
+    const btn = screen.getByRole("button", { name: "Your matches" });
+    expect(btn).toBeDisabled();
+    expect(btn.className).toContain("disabled");
+  });
+
+  it("renders disabled for a signed-in visitor with no CV on file", () => {
+    renderBar({ signedIn: true, scored: false });
+    expect(screen.getByRole("button", { name: "Your matches" })).toBeDisabled();
+  });
+
+  it("is enabled and reports the toggle up for a scored user", () => {
+    const onToggleMine = vi.fn();
+    renderBar({ signedIn: true, scored: true, onToggleMine });
+    const btn = screen.getByRole("button", { name: "Your matches" });
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+    expect(onToggleMine).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the active state + dismiss × once the facet is on", () => {
+    renderBar({ signedIn: true, scored: true, filters: { ...EMPTY_FILTERS, mine: true } });
+    const btn = screen.getByRole("button", { name: /Your matches/ });
+    expect(btn.className).toContain("active");
+    expect(btn).toHaveTextContent("×");
   });
 });

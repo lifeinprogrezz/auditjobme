@@ -17,6 +17,7 @@ import {
   geoVerdict,
   hueFor,
   postedAgo,
+  railHeading,
   websiteUrl,
   type RoleJob,
   type RolesFilters,
@@ -28,6 +29,7 @@ import { useTheme } from "@/lib/theme";
 import { track } from "@/lib/analytics";
 import ScoreBreakdown from "./ScoreBreakdown";
 import FitChip from "./FitChip";
+import MineChip from "./MineChip";
 
 // The pool is unbounded (1000+ live rows); each card mounts a Logo.dev <img>,
 // so cap the DOM and point the user at search/filters for the tail.
@@ -68,6 +70,9 @@ export type RolesPanelProps = {
   /** The live headbar filter state (mirrored as removable chips in the panel). */
   filters: RolesFilters;
   onFilters: (f: RolesFilters) => void;
+  /** Toggle the "Your matches" facet (issue #154) — routed through the page so
+   *  the effective state also lands in localStorage (lib/roles.ts writeStoredMine). */
+  onToggleMine: () => void;
   /** Map selection: company and/or city, each independently removable via a chip. */
   selCo?: string | null;
   selCity?: string | null;
@@ -139,6 +144,7 @@ export default function RolesPanel({
   onAddCv,
   filters,
   onFilters,
+  onToggleMine,
   selCo,
   selCity,
   onClearCo,
@@ -243,19 +249,26 @@ export default function RolesPanel({
 
   const renderCards = () => (
     <>
-      {/* One compact header row: title left, the scoring progress as a quiet mono
-          whisper right — no separate banner bar (Rober 7-16). The whisper is now a
-          thin bar with a phase and a real count (#149); it hides itself. */}
+      {/* One compact header row: title left, "Your matches" toggle + the scoring
+          progress as a quiet mono whisper right — no separate banner bar (Rober
+          7-16). The whisper is now a thin bar with a phase and a real count
+          (#149); it hides itself. */}
       <div className="phead">
-        <h1 className="ptitle">{defaultView ? (scored ? "Best fit" : "Hot right now") : "Your matches"}</h1>
-        <ScoringProgress
-          variant="rail"
-          hasCv={signedIn && scored}
-          ready={!loading}
-          total={eligibleCount}
-          scored={eligibleCount - remaining}
-          batchPending={batchPending}
-        />
+        {/* "Your matches" always, once signed in with a CV — "Best fit" is
+            retired (issue #154); the default-view/narrowed split only still
+            matters for the anon "Hot right now" showcase. */}
+        <h1 className="ptitle">{railHeading(scored, Boolean(defaultView))}</h1>
+        <div className="phead-r" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <MineChip active={Boolean(filters.mine)} disabled={!signedIn || !scored} onToggle={onToggleMine} />
+          <ScoringProgress
+            variant="rail"
+            hasCv={signedIn && scored}
+            ready={!loading}
+            total={eligibleCount}
+            scored={eligibleCount - remaining}
+            batchPending={batchPending}
+          />
+        </div>
       </div>
       {activeChips.length > 0 && (
         <div className="selhdr">

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { sizeBand, sizeBandOrder, filterJobs, freshnessCutoffMs, requiredLanguages, roleFamily, roleSeenMs, workplaceOf, EMPTY_FILTERS, FRESHNESS_WINDOWS, type RoleJob } from "@/lib/roles";
+import { describe, it, expect, beforeEach } from "vitest";
+import { sizeBand, sizeBandOrder, filterJobs, freshnessCutoffMs, requiredLanguages, roleFamily, roleSeenMs, workplaceOf, EMPTY_FILTERS, FRESHNESS_WINDOWS, readStoredMine, writeStoredMine, shouldDefaultMineOn, railHeading, type RoleJob } from "@/lib/roles";
 
 const base: RoleJob = {
   id: "1",
@@ -268,5 +268,95 @@ describe("filterJobs — UK sponsor discovery facet", () => {
     const got = filterJobs(jobs, { ...EMPTY_FILTERS, sponsors: ["licensed", "unmatched"] }, NOW).map((j) => j.id);
     expect(got).toEqual(["lic", "un"]);
     expect(got).not.toContain("unchecked");
+  });
+});
+
+// ── Issue #154: the "Your matches" facet ──────────────────────────────────────
+describe("filterJobs — Your matches (mine) facet", () => {
+  const jobs = [
+    mk({ id: "scored-eligible", score: 4.2 }),
+    mk({ id: "pending-eligible" }), // unscored, still in the eligible slice
+    mk({ id: "outside-slice" }), // never in eligibleIds
+  ];
+  const eligibleIds = new Set(["scored-eligible", "pending-eligible"]);
+
+  it("off (default) → the whole catalog, regardless of eligibility", () => {
+    expect(filterJobs(jobs, EMPTY_FILTERS, Date.now(), eligibleIds)).toHaveLength(3);
+  });
+  it("on → only the eligible slice, scored or still pending within it", () => {
+    const got = filterJobs(jobs, { ...EMPTY_FILTERS, mine: true }, Date.now(), eligibleIds).map((j) => j.id);
+    expect(got).toEqual(["scored-eligible", "pending-eligible"]);
+    expect(got).not.toContain("outside-slice");
+  });
+  it("no eligibleIds supplied → fail-safe closed (mine on, no known slice, shows nothing)", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS, mine: true })).toHaveLength(0);
+  });
+  it("ANDs with the other facets (mine + city)", () => {
+    const mix = [
+      mk({ id: "a", city: "Berlin" }),
+      mk({ id: "b", city: "Paris" }),
+    ];
+    const ids = new Set(["a", "b"]);
+    expect(
+      filterJobs(mix, { ...EMPTY_FILTERS, mine: true, cities: ["Berlin"] }, Date.now(), ids).map((j) => j.id),
+    ).toEqual(["a"]);
+  });
+  it("fixtures without a mine key still filter (optional field)", () => {
+    expect(filterJobs(jobs, { ...EMPTY_FILTERS }, Date.now(), eligibleIds)).toHaveLength(3);
+  });
+});
+
+describe("shouldDefaultMineOn (issue #154 default-on rule)", () => {
+  const base = { signedIn: true, hasCv: true, hasScore: true, stored: null as boolean | null };
+
+  it("defaults ON once a signed-in user with a CV has at least one landed score", () => {
+    expect(shouldDefaultMineOn(base)).toBe(true);
+  });
+  it("stays OFF while no score has landed yet, even signed in with a CV", () => {
+    expect(shouldDefaultMineOn({ ...base, hasScore: false })).toBe(false);
+  });
+  it("stays OFF for a logged-out visitor", () => {
+    expect(shouldDefaultMineOn({ ...base, signedIn: false })).toBe(false);
+  });
+  it("stays OFF for a signed-in visitor with no CV on file", () => {
+    expect(shouldDefaultMineOn({ ...base, hasCv: false })).toBe(false);
+  });
+  it("an explicit stored choice always wins over the computed default, either way", () => {
+    expect(shouldDefaultMineOn({ ...base, hasScore: false, stored: true })).toBe(true);
+    expect(shouldDefaultMineOn({ ...base, stored: false })).toBe(false);
+  });
+});
+
+describe("readStoredMine / writeStoredMine (issue #154 per-browser persistence)", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("returns null when nothing has been stored yet", () => {
+    expect(readStoredMine()).toBeNull();
+  });
+  it("round-trips an explicit true/false choice", () => {
+    writeStoredMine(true);
+    expect(readStoredMine()).toBe(true);
+    writeStoredMine(false);
+    expect(readStoredMine()).toBe(false);
+  });
+});
+
+describe("railHeading (issue #154 — 'Best fit' retired)", () => {
+  it("reads 'Your matches' for a scored user on the default landing", () => {
+    expect(railHeading(true, true)).toBe("Your matches");
+  });
+  it("reads 'Your matches' once anything has narrowed the view, scored or not", () => {
+    expect(railHeading(true, false)).toBe("Your matches");
+    expect(railHeading(false, false)).toBe("Your matches");
+  });
+  it("reads 'Hot right now' only for the anon/no-CV default landing", () => {
+    expect(railHeading(false, true)).toBe("Hot right now");
+  });
+  it("never returns 'Best fit'", () => {
+    for (const scored of [true, false]) {
+      for (const defaultView of [true, false]) {
+        expect(railHeading(scored, defaultView)).not.toBe("Best fit");
+      }
+    }
   });
 });
