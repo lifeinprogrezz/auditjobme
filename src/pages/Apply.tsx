@@ -46,6 +46,13 @@ import {
 import { domainFor } from "@/lib/logodev";
 import { cityOf } from "@/lib/geo";
 import { auditHref } from "@/lib/auditLink";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AUDIT_STAGES, runAudit, type AuditData, type AuditStageStatus } from "@/lib/audit/runAudit";
+import { auditProgressOf } from "@/lib/audit/auditProgress";
+import { atAuditLimit, AUDIT_LIMIT_REACHED } from "@/lib/audit/auditLimit";
+import { loadAuditAllowance, type AuditAllowance } from "@/lib/audit/auditAllowance";
+import { saveAuditPrivate } from "@/lib/audit/saveAudit";
+import { downloadPDF } from "@/components/audit/pdfHtml.js";
 import { companyKey, type WarmContact } from "@/lib/connections";
 import { track } from "@/lib/analytics";
 import type { Json } from "@/integrations/supabase/types";
@@ -120,7 +127,7 @@ function AnswerCopy({ text }: { text: string }) {
 
 /** Card section shell (§3.2 page idiom): opaque `--card`, radius 16, padding 24,
  *  the ink page shadow, a micro eyebrow above the section title. */
-function Section({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
+function Section({ eyebrow, title, children }: { eyebrow: string; title: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
       <div className="font-display text-micro uppercase text-muted-foreground">{eyebrow}</div>
@@ -144,12 +151,12 @@ export default function Apply() {
   const [name, setName] = useState("");
   const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<null | "cv" | "cover" | "answer" | "commonPack">(null);
+  const [busy, setBusy] = useState<null | "cv" | "cover" | "answer" | "commonPack" | "audit">(null);
   const [error, setError] = useState("");
   // WHICH step surfaced the error, so the status line renders inline at that
   // card (design direction §3.4 status-as-whisper) instead of orphaned at the
   // page bottom.
-  const [errStep, setErrStep] = useState<null | "cv" | "cover" | "apply" | "answer">(null);
+  const [errStep, setErrStep] = useState<null | "cv" | "cover" | "apply" | "answer" | "audit">(null);
   const [summary, setSummary] = useState<string | null>(null); // editable tailored summary
   const [cover, setCover] = useState<CoverJson | null>(null);
   // Step 4 — application-form questions, answered one at a time (Rober 7-16).
@@ -171,6 +178,14 @@ export default function Apply() {
   const [notesDirty, setNotesDirty] = useState(false);
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesSaved, setNotesSaved] = useState(false);
+  // Company audit (issue #159). The whole step is one button: the seven-stage
+  // pipeline in lib/audit/runAudit.ts runs here, the bar below reports it, and the
+  // finished audit downloads as a PDF. `auditStages` is empty until a run starts.
+  const [auditStages, setAuditStages] = useState<AuditStageStatus[]>([]);
+  const [auditData, setAuditData] = useState<AuditData | null>(null);
+  // How many free audits are left for this account and this device. Null while we
+  // are still asking; the real limit is enforced server-side, never here.
+  const [auditAllowance, setAuditAllowance] = useState<AuditAllowance | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -188,6 +203,8 @@ export default function Apply() {
     setNotesSaved(false);
     setWarmContacts([]);
     setCvStructured(null);
+    setAuditStages([]);
+    setAuditData(null);
     async function load() {
       if (!user) {
         setLoading(false);
@@ -271,6 +288,19 @@ export default function Apply() {
       active = false;
     };
   }, [user, jobUrl]);
+
+  // The free-audit allowance (issue #159). Keyed on the user, not the role: two
+  // free audits are two per person and per device, whatever they are spent on.
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    loadAuditAllowance({ id: user.id, email: user.email }).then((a) => {
+      if (active) setAuditAllowance(a);
+    });
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   // Save / unsave for later (Rober 7-16): the header bookmark, same optimistic
   // idiom as useRolesData.toggleSaved (this page loads its own job row).
@@ -414,6 +444,76 @@ export default function Apply() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Cover letter generation failed");
       setErrStep("cover");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** One click, one company audit, one PDF (issue #159, LOCKED decision 3).
+   *
+   *  It runs the SAME seven-stage pipeline the standalone /audit page runs
+   *  (lib/audit/runAudit.ts), reports the stage it is on inline, saves the audit
+   *  PRIVATE exactly as that page does, and downloads the PDF. There is no
+   *  publish step here and no second page: publishing stays an explicit choice on
+   *  the generator, so nothing this button makes is ever readable by anyone else.
+   *
+   *  A second click after a finished run re-downloads what it already built. It
+   *  never buys a second audit by accident. */
+  async function generateAudit() {
+    if (!job || !cvText || busy !== null) return;
+    if (auditData) {
+      downloadPDF(auditData);
+      return;
+    }
+    if (auditAllowance && atAuditLimit(auditAllowance)) return;
+    setBusy("audit");
+    setError("");
+    setErrStep(null);
+    setAuditStages(AUDIT_STAGES.map(() => "pending"));
+    const startedAt = Date.now();
+    try {
+      const data = await runAudit({
+        cv: { text: cvText },
+        jobLink: job.url,
+        personal: roleContext.trim() || undefined,
+        onStage: (index, status) =>
+          setAuditStages((prev) => {
+            const next = [...prev];
+            next[index] = status;
+            return next;
+          }),
+      });
+      setAuditData(data);
+      track("audit_generated");
+      // The popup can be blocked after a run this long, so the button stays on
+      // screen as "Download again" either way and one click gets the PDF.
+      downloadPDF(data);
+      if (user && !DEV_FIXTURE) {
+        const saved = await saveAuditPrivate({
+          userId: user.id,
+          user,
+          auditData: data,
+          jobLink: job.url,
+          deviceFingerprint: auditAllowance?.fingerprint ?? null,
+          durationSeconds: Math.round((Date.now() - startedAt) / 1000),
+        });
+        if (!saved) {
+          toast.error("Your audit downloaded, but we couldn't save a copy to your bundle.");
+        }
+        setAuditAllowance((a) =>
+          a
+            ? {
+                ...a,
+                auditCount: a.auditCount + 1,
+                deviceAuditCount: a.fingerprint ? a.deviceAuditCount + 1 : a.deviceAuditCount,
+              }
+            : a,
+        );
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Audit generation failed");
+      setErrStep("audit");
+      setAuditStages([]);
     } finally {
       setBusy(null);
     }
@@ -567,6 +667,9 @@ export default function Apply() {
   // Same cap check as genCommonPack itself (issue #151 fix round 1, blocker 3) —
   // the button disables before the click, not just inside the handler.
   const commonPackWouldExceed = qas.length + COMMON_PACK_QUESTIONS.length > MAX_ANSWERS;
+  // The audit bar, from the same pure mapping the stage list uses (issue #159).
+  const auditProgress = auditProgressOf(auditStages);
+  const auditAtLimit = auditAllowance != null && atAuditLimit(auditAllowance);
 
   return (
     <AppShell>
@@ -776,29 +879,106 @@ export default function Apply() {
             )}
           </Section>
 
-          {/* 3 — Company audit (issue #82): a public page about this company that the
-              user generates and sends themselves, entirely INDEPENDENT of the CV and
-              cover letter above — its link is never wired into any generated text, and
-              generating one never touches what's already downloaded (Rober 7-26,
-              explicitly rejected coupling the two). This is a plain link to the
-              standalone audit tool at /audit, prefilled with this job's posting: no
-              generation call happens here, so opening this page never spends anything.
-              The button is the ONLY way it fires; there is no auto-generation on
-              mount or on this step's own render. */}
-          <Section eyebrow="Step 3" title="Company audit">
+          {/* 3 — Company audit (issue #159, LOCKED decisions 3 and 4). It used to be
+              a link to the generator's own page and five sentences of explanation.
+              Now it is one line, one button shaped like the two above it, and the
+              explanation lives in the info control beside the title.
+
+              The button runs the seven-stage pipeline in lib/audit/runAudit.ts —
+              the same one /audit runs — and hands back a PDF. The audit is saved
+              PRIVATE, exactly as the generator saves it; there is no publish step
+              here, so nothing this button makes is readable by anyone but its
+              owner. It stays independent of the CV and the letter above: its
+              content is never wired into them, and running it changes nothing
+              already downloaded (Rober 7-26). Nothing fires on mount: the button
+              is the only thing that spends anything. */}
+          <Section
+            eyebrow="Step 3"
+            title={
+              <span className="inline-flex items-center gap-2">
+                Company audit
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="What the company audit is"
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border font-mono text-caption text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+                    >
+                      i
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 text-caption text-muted-foreground" align="start">
+                    <p className="text-pretty">
+                      <b className="text-foreground">What you get:</b> we read what's public about {job.company}, write
+                      a short diagnosis, three things you'd do first, and the two or three people whose public profiles
+                      put them closest to this hire. It comes back as a PDF you can read, send, or bring to a call.
+                    </p>
+                    <p className="mt-2 text-pretty">
+                      <b className="text-foreground">What it costs you:</b> nothing. It's the most expensive thing we
+                      run, so it's two audits free, and the button tells you when they're gone. The audit is private to
+                      you unless you publish it yourself on the{" "}
+                      <a
+                        href={auditHref(job.url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-foreground underline underline-offset-2"
+                      >
+                        full audit page
+                      </a>
+                      .
+                    </p>
+                  </PopoverContent>
+                </Popover>
+              </span>
+            }
+          >
             <p className="mt-2 text-caption text-muted-foreground text-pretty">
-              A public page built for {job.company}: the diagnosis, a few proposals, and why you're the right fit. It
-              doesn't touch your cover letter or your answers below, and it costs nothing until you generate it. Once
-              it's ready you get a link, and it's yours to send wherever you like: a message, an email, the
-              application itself.
+              Get a company audit as a PDF, with two or three people to reach out to.
             </p>
-            <div className="mt-4">
-              <Button variant="outline" size="sm" className={SECONDARY_CTA} asChild>
-                <a href={auditHref(job.url)} target="_blank" rel="noopener noreferrer">
-                  Prepare an audit for this company
-                </a>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className={SECONDARY_CTA}
+                onClick={generateAudit}
+                disabled={busy !== null || (auditAtLimit && auditData == null)}
+              >
+                {busy === "audit"
+                  ? "Building your audit…"
+                  : auditData != null
+                    ? "Download again"
+                    : "Prepare company audit"}
               </Button>
+              {auditData != null && busy !== "audit" && (
+                <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
+                  <CheckIcon />
+                  Downloaded
+                </span>
+              )}
+              {auditData == null && auditAtLimit && (
+                <span className="text-caption text-muted-foreground">{AUDIT_LIMIT_REACHED}</span>
+              )}
             </div>
+            {/* Same bar and the same tokens as the scoring progress on Today, so a
+                long wait reads the same way everywhere in the product. */}
+            {busy === "audit" && auditProgress && (
+              <div className="mt-3 flex items-center gap-3" role="status" aria-live="polite">
+                <div className="h-1 w-28 shrink-0 overflow-hidden rounded-full bg-foreground/10" aria-hidden="true">
+                  <div
+                    className="h-full rounded-full bg-foreground/45 transition-[width] duration-500"
+                    style={{ width: `${Math.round(auditProgress.fraction * 100)}%` }}
+                  />
+                </div>
+                <span className="font-mono text-caption text-muted-foreground">
+                  {auditProgress.headline} · {auditProgress.detail}
+                </span>
+              </div>
+            )}
+            {errStep === "audit" && (
+              <p className="mt-3 text-caption text-destructive" role="status">
+                {error}
+              </p>
+            )}
           </Section>
 
           {/* 4 — Application-form questions (Rober 7-16; was Step 3 until the company

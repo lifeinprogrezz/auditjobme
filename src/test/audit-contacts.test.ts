@@ -6,10 +6,12 @@
 //   1. validateSections treats an empty contacts list as a MISSING section, so a
 //      run that found nobody goes through the retry gate instead of silently
 //      shipping an audit with no one to reach out to.
-//   2. Audit-time ONLY: the Apply (prep) page must never grow a cold-contacts
-//      fetch. Its people surface is the WARM panel — the user's own connections —
-//      and the two stay separate (issue #41 "Independence"). Checked by reading
-//      the source, the same file-reading idiom as account-export.test.ts.
+//   2. Audit-time ONLY: cold contacts are found by the audit pipeline and nowhere
+//      else. Since issue #159 the Apply page can START that pipeline, but it still
+//      holds no contact search of its own: the search lives in lib/audit/runAudit.ts,
+//      and Apply's own people surface stays the WARM panel — the user's own
+//      connections (issue #41 "Independence"). Checked by reading the source, the
+//      same file-reading idiom as account-export.test.ts.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -36,12 +38,14 @@ describe("audit cold contacts (issue #41)", () => {
     expect(validateSections({ ...filled, contacts })).toEqual([]);
   });
 
-  it("the Apply page carries the warm panel, never a cold-contacts search", () => {
+  it("the Apply page carries the warm panel, never a cold-contacts search of its own", () => {
     const src = readFileSync(join(process.cwd(), "src", "pages", "Apply.tsx"), "utf8");
     // Warm half present: reads the user's OWN connections table.
     expect(src).toContain('from("connections")');
-    // Cold half absent: no web search and no audit-contacts generation here.
+    // Cold half absent from THIS file: no web search, no contact prompt here. The
+    // audit button hands the whole job to the shared pipeline (issue #159).
     expect(src).not.toMatch(/web_search/i);
     expect(src).not.toMatch(/decision.?maker/i);
+    expect(src).toContain('from "@/lib/audit/runAudit"');
   });
 });
