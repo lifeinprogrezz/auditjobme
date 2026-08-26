@@ -63,6 +63,29 @@ export function dataplaneUrl(supabaseUrl: string): string {
   return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/dataplane/dataplane.json`;
 }
 
+/**
+ * Does this artifact carry `jobs.has_jd` (issue #149, item A8)?
+ *
+ * The readability gate fails CLOSED (scorePrefilter.ts hasReadableJd), so an
+ * artifact built before the column joined JOBS_COLUMNS would make every role look
+ * unreadable to the app: no scores applied, nothing counted, a blank-ish map. An
+ * artifact built before a column is not stale data, it is the WRONG COLUMN SET.
+ *
+ * Deliberately NOT part of isDataplane. That guard answers "can renderSite eat
+ * this", and the GEO prerender in vite.config.ts asks it at build time; a missing
+ * scoring column is none of its business, and failing it there would drop every
+ * city page over something the city pages never read.
+ *
+ * This is the runtime half of the rule in docs/ARCHITECTURE.md: a column added to
+ * JOBS_COLUMNS needs an artifact rebuild (`npm run dataplane:build`). Until that
+ * runs, the app degrades to the live queries it kept as a fallback.
+ */
+export function artifactCarriesHasJd(jobs: unknown[]): boolean {
+  const first = jobs[0];
+  if (!first || typeof first !== "object") return true; // no rows, nothing to disagree about
+  return "has_jd" in (first as Record<string, unknown>);
+}
+
 /** Structural check — enough to trust the artifact over live reads. */
 export function isDataplane(x: unknown): x is Dataplane {
   if (!x || typeof x !== "object") return false;
@@ -77,15 +100,19 @@ export function isDataplane(x: unknown): x is Dataplane {
 }
 
 /**
- * Fetch the artifact. Returns null on ANY failure (network, non-200, shape) —
- * the caller keeps the live-read path as fallback.
+ * Fetch the artifact for the APP (the /roles map and everything it feeds).
+ * Returns null on ANY failure (network, non-200, shape, or a column set older
+ * than the app's rules) — the caller keeps the live-read path as fallback.
  */
 export async function fetchDataplane(supabaseUrl: string): Promise<Dataplane | null> {
   try {
     const res = await fetch(dataplaneUrl(supabaseUrl));
     if (!res.ok) return null;
     const body: unknown = await res.json();
-    return isDataplane(body) ? body : null;
+    if (!isDataplane(body)) return null;
+    // #149: an artifact without has_jd would blank every score. Read live instead
+    // until the rebuild lands. See artifactCarriesHasJd.
+    return artifactCarriesHasJd(body.jobs) ? body : null;
   } catch {
     return null;
   }

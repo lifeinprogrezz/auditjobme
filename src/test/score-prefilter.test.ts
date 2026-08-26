@@ -22,6 +22,10 @@ type J = {
   has_jd?: boolean | null;
 };
 
+// has_jd true by default: since #149 the readability gate fails CLOSED, so a
+// fixture that says nothing about its description is a role we cannot read. These
+// cases are about the label and cap rules, so they start from a readable role and
+// the #130 block below overrides the flag where the description is the point.
 const job = (id: string, over: Partial<J> = {}): J => ({
   id,
   title: "Product Manager",
@@ -29,6 +33,7 @@ const job = (id: string, over: Partial<J> = {}): J => ({
   sector: null,
   first_seen_at: "2026-08-18T00:00:00Z",
   posted_at: null,
+  has_jd: true,
   ...over,
 });
 
@@ -255,9 +260,15 @@ describe("hasReadableJd", () => {
     expect(hasReadableJd({ jd_text: "", has_jd: true })).toBe(false);
   });
 
-  it("fails open when neither field is known (a pre-#130 artifact)", () => {
-    expect(hasReadableJd({})).toBe(true);
-    expect(hasReadableJd({ has_jd: null })).toBe(true);
+  // Issue #149 item A8. Failing open here is what let the rail count 367 while
+  // the worker bought 236: the client was reading an artifact built before the
+  // column existed, so every row was "unknown" and the 131 rows with no
+  // description were counted as still-to-score. The worker's rows always carry
+  // the column, so unknown has to count as unreadable for the two to agree, and
+  // for the counter to be able to reach zero.
+  it("fails closed when neither field is known, so the counter can reach zero", () => {
+    expect(hasReadableJd({})).toBe(false);
+    expect(hasReadableJd({ has_jd: null })).toBe(false);
   });
 });
 

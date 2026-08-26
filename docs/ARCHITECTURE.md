@@ -105,6 +105,18 @@ After each scrape, the catalog is written to a public Storage bucket as `datapla
 `jobs.ndjson`. The map fetches the artifact first and falls back to a live read, so an
 anonymous visit to `/` is **one storage GET and zero database reads**.
 
+**A new column in `JOBS_COLUMNS` needs an artifact rebuild, in the same pass.** The column
+sets live in `scripts/dataplane-lib.mjs`; the artifact is a snapshot of them, so between
+adding a column and the next scrape the client is reading rows that predate it. That gap
+cost a day: `jobs.has_jd` was added on 2026-08-26, the artifact in front of users had been
+built at 05:00, and the map counted 367 roles left to score while the worker bought 236
+(issue #149, item A8). Run `npm run dataplane:build` (service-role env, same contract as
+the scrape) right after the migration. `src/lib/dataplane.ts` also enforces this at runtime:
+`fetchDataplane` refuses an artifact whose jobs lack `has_jd`, and the app falls back to the
+live reads, which select it. The refusal is a cost regression, never a broken map. It sits in
+`fetchDataplane`, not in `isDataplane`, because the GEO prerender in `vite.config.ts` shares
+that structural guard and never reads the column.
+
 ### Scoring — two paths, one prompt
 
 `src/lib/scorePrompt.ts` holds the rubric and its `RUBRIC_VERSION`. Both callers share it:
@@ -114,6 +126,13 @@ anonymous visit to `/` is **one storage GET and zero database reads**.
   results land. The backlog predicate is simply "a live job with no `scores` row at the
   current rubric" — a new CV, a changed CV, and a rubric bump all express themselves as
   backlog, so there is no queue table to keep consistent.
+- **`api/score-kick.ts`** (on demand) runs that same drain for ONE user, the moment they save
+  a CV or new targets (issue #149). The schedule above is declared every 10 minutes and
+  throttled by GitHub to roughly hourly, so a new user used to wait an hour for a first
+  score. The drain itself is `runBacklog`, exported from the worker and shared by both paths.
+  The cron path keeps its `CRON_SECRET`; the kick never sees it and instead verifies the
+  caller's own Supabase access token server-side, then drains for that user id only. POST
+  only, one kick per user per two minutes.
 - **`api/nightly.ts`** (mornings) picks each active user's fresh labelled slice, ranks it, and
   sends one email through Resend.
 

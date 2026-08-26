@@ -35,11 +35,14 @@ describe("devFixtureScore", () => {
 
 describe("devFixtureScores", () => {
   it("fills only unscored rows and says the score is synthetic", () => {
+    // has_jd carried explicitly: the readability gate fails closed since #149, so
+    // a row with no flag is a role with no description and never gets a score,
+    // synthetic or paid.
     const out = devFixtureScores([
-      { id: "real", score: 8.1, reason: "A real reason" },
-      { id: "empty", score: null, reason: null },
+      { id: "real", score: 8.1, reason: "A real reason", has_jd: true },
+      { id: "empty", score: null, reason: null, has_jd: true },
     ]);
-    expect(out[0]).toEqual({ id: "real", score: 8.1, reason: "A real reason" });
+    expect(out[0]).toEqual({ id: "real", score: 8.1, reason: "A real reason", has_jd: true });
     expect(out[1].score).toBe(devFixtureScore("empty"));
     expect(out[1].reason).toBe(DEV_FIXTURE_REASON);
   });

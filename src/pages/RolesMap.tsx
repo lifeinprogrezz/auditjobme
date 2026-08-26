@@ -51,6 +51,8 @@ export default function RolesMap() {
     loading,
     scoring,
     remaining,
+    eligibleCount,
+    batchPending,
     eligibleIds,
     applied,
     saved,
@@ -533,6 +535,8 @@ export default function RolesMap() {
           scoring={scoring}
           eligibleIds={eligibleIds}
           remaining={remaining}
+          eligibleCount={eligibleCount}
+          batchPending={batchPending}
           detailJob={detailLive}
           applied={applied}
           saved={saved}

@@ -410,7 +410,13 @@
 .roles-theme .phead { display: none; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
 .roles-theme.scored .phead { display: flex; }
 .roles-theme .ptitle { font-family: var(--font-d); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.035em; color: #fff; margin: 0; }
-.roles-theme .pprog { font-family: var(--font-m); font-size: 11px; color: var(--muted); white-space: nowrap; }
+/* Scoring progress (#149): the old .pprog whisper was a bare "N to go" with no
+   phase and no end. Same typography, now with a thin bar carrying a real
+   fraction. Component: src/components/roles/ScoringProgress.tsx (variant="rail"). */
+.roles-theme .sprog { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.roles-theme .sprog-track { width: 54px; height: 3px; flex: none; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, 0.14); }
+.roles-theme .sprog-fill { height: 100%; border-radius: 999px; background: var(--muted); transition: width .5s ease; }
+.roles-theme .sprog-label { font-family: var(--font-m); font-size: 11px; color: var(--muted); text-align: right; }
 /* Map-selection chips (company + city, each independently removable). */
 .roles-theme .selhdr { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 11px; }
 .roles-theme .selchips { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -747,6 +753,7 @@
 .roles-theme.light .panel-toggle { color: var(--muted); }
 .roles-theme.light .panel-toggle:hover { color: #0b1f26; background: var(--act-tint); }
 .roles-theme.light .ptitle { color: var(--text); }
+.roles-theme.light .sprog-track { background: rgba(11, 31, 38, 0.12); }
 .roles-theme.light .cards::-webkit-scrollbar-thumb { background: rgba(11, 31, 38, 0.15); }
 
 /* cards */

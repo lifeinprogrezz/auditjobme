@@ -29,6 +29,7 @@ import { RUBRIC_VERSION } from "@/lib/score";
 import { DEV_FIXTURE, devFixtureBatch } from "@/lib/devFixture";
 import FitChip from "@/components/roles/FitChip";
 import { hasReadableJd, pendingLabelOf, scoreStatusOf } from "@/lib/scorePrefilter";
+import { ScoringProgress } from "@/components/roles/ScoringProgress";
 
 // §3.3 secondary CTA — the ONE idiom for every list-row action on this page (there is
 // no second primary): control type (13/600), radius 10, a hairline ink/20 border that
@@ -65,6 +66,8 @@ export default function Today() {
     scored,
     scoring,
     remaining,
+    eligibleCount,
+    batchPending,
     eligibleIds,
     applied,
     markApplied,
@@ -339,11 +342,16 @@ export default function Today() {
       <p className="text-body text-muted-foreground">
         <span className="font-semibold text-foreground">Your matches for today</span>, refreshed every morning.
       </p>
-      {scoring && (
-        <p className="mt-3 font-mono text-caption text-muted-foreground" role="status" aria-live="polite">
-          Scoring the roles that match your targets · {remaining} to go. New matches drop in as they land.
-        </p>
-      )}
+      {/* #149 (item C2): the same progress component the map rail shows, so both
+          surfaces read one phase off one set of numbers. It hides itself. */}
+      <ScoringProgress
+        variant="page"
+        hasCv={scored}
+        ready={!loading}
+        total={eligibleCount}
+        scored={eligibleCount - remaining}
+        batchPending={batchPending}
+      />
 
       {/* New (issue #72 slice 1): the exact roles the nightly email just sent, in the
           same rank order, still actionable. */}
