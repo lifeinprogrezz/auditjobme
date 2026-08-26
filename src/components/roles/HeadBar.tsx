@@ -202,9 +202,12 @@ export default function HeadBar({ scored, signedIn, filters, onFilters, roleOpti
     (key: "role" | "level" | "city" | "workplace" | "sector" | "size" | "language" | "freshness" | "sponsor") => () =>
       setOpenChip(openChip === key ? null : key);
 
-  // Any filter active → show the headbar-wide Clear all (Rober 7-09).
+  // Any filter active → show the headbar-wide Clear all (Rober 7-09). "Your
+  // matches" is deliberately EXCLUDED (issue #154 fix round 1, blocker 2),
+  // mirroring RolesMap's isDefaultView: it's scope, not a narrowing filter, so
+  // a scored user's resting default state (mine on, nothing else set) must not
+  // show "Clear all" as permanently active.
   const anyActive =
-    Boolean(filters.mine) ||
     (filters.roles?.length ?? 0) > 0 ||
     filters.levels.length > 0 ||
     filters.cities.length > 0 ||

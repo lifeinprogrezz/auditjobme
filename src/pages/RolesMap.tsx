@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import "@/styles/roles.css";
 import GlobeMap from "@/components/roles/GlobeMap";
@@ -23,8 +23,6 @@ import {
   sizeBandOrder,
   readStoredMine,
   writeStoredMine,
-  settleMineDefault,
-  shouldForceMineOff,
   type RoleJob,
   type RolesFilters,
 } from "@/lib/roles";
@@ -32,6 +30,7 @@ import { ROLE_FAMILY_OPTIONS } from "@/lib/labels";
 import { pickableSectors, sectorLiquidity } from "@/lib/sectors";
 import { coordsOf } from "@/lib/geo";
 import { useRolesData } from "@/hooks/useRolesData";
+import { useYourMatchesDefault } from "@/hooks/useYourMatchesDefault";
 import { useTheme } from "@/lib/theme";
 import { BRAND_NAME } from "@/lib/brandName";
 
@@ -103,48 +102,42 @@ export default function RolesMap() {
     if (needsCv && !AUTH_BYPASSED) setCvModalOpen(true);
   }, [needsCv]);
   const [filters, setFilters] = useState<RolesFilters>(EMPTY_FILTERS);
-  // "Your matches" (issue #154): every explicit flip — the header chip, the
-  // panel dismiss, and the default below — is routed through this one setter so
-  // it always lands in localStorage too (lib/roles.ts read/writeStoredMine), and
-  // the next page load in this browser opens the same way.
+  // "Your matches" (issue #154). Two setters, deliberately NOT the same function
+  // (fix round 1, blocker 1): `setMine` only ever updates the live filter, and
+  // `toggleMine` is the ONE place an explicit user choice — the header chip, the
+  // panel dismiss — lands in localStorage (lib/roles.ts writeStoredMine), so the
+  // next page load in this browser opens the same way. The computed default and
+  // the sign-out/CV-clear force-off (both wired below via useYourMatchesDefault)
+  // call `setMine` only: persisting THEIR output would let a landing-page
+  // "false" — written before auth/profile ever resolve — permanently override
+  // the default-on rule for every later, signed-in-with-a-CV visit. A stored
+  // value is trustworthy as "the user chose this" only if nothing else writes it.
   const setMine = useCallback((next: boolean) => {
-    writeStoredMine(next);
     setFilters((f) => ({ ...f, mine: next }));
   }, []);
-  // Settle the default exactly once per page load — but NOT before auth (and, for
-  // a signed-in visitor, the profile fetch) have actually resolved (issue #154 fix
-  // round 1, blocker 1): at first render useAuth().loading is still true and
-  // signedIn/scored both read false, so settling then would write a PERMANENT
-  // "off" to storage and no user would ever see the default-on behavior.
-  // settleMineDefault (lib/roles.ts) is the pure "wait" | boolean decision; once it
-  // stops waiting, this effect fires exactly once (a stored explicit choice wins
-  // immediately either way; with none stored, it keeps waiting for this user's
-  // first landed score, re-checking as eligibleCount/remaining move).
-  const mineDefaultSettled = useRef(false);
-  useEffect(() => {
-    if (mineDefaultSettled.current) return;
-    const stored = readStoredMine();
-    const hasScore = eligibleCount > remaining;
-    const decision = settleMineDefault({
+  const toggleMine = useCallback(() => {
+    setFilters((f) => {
+      const next = !f.mine;
+      writeStoredMine(next);
+      return { ...f, mine: next };
+    });
+  }, []);
+  // Settle-once default + sign-out/CV-clear force-off (issue #154 fix round 1,
+  // blockers 1+2) — the pure decisions live in lib/roles.ts (settleMineDefault /
+  // shouldForceMineOff), pinned by hooks/useYourMatchesDefault.test.ts at the
+  // wiring level this page can't otherwise be tested at.
+  useYourMatchesDefault(
+    {
       authLoading,
       profileChecked,
       signedIn,
       hasCv: scored,
-      hasScore,
-      stored,
-    });
-    if (decision === "wait") return;
-    mineDefaultSettled.current = true;
-    setMine(decision);
-  }, [authLoading, profileChecked, signedIn, scored, eligibleCount, remaining, setMine]);
-  // The settle effect above is one-shot, so it never revisits an already-settled
-  // "Your matches" — a mid-session sign-out (SPA, no reload) or a CV clearing
-  // must force it back off itself (issue #154 fix round 1, blocker 2), or the view
-  // stays narrowed to the anonymous fallback slice (scorePrefilter's
-  // FALLBACK_CAP) with the badge reading "N of 8,155" and no visible way out.
-  useEffect(() => {
-    if (shouldForceMineOff({ signedIn, hasCv: scored, mine: Boolean(filters.mine) })) setMine(false);
-  }, [signedIn, scored, filters.mine, setMine]);
+      hasScore: eligibleCount > remaining,
+      stored: readStoredMine(),
+      mine: Boolean(filters.mine),
+    },
+    setMine,
+  );
   const [detailJob, setDetailJob] = useState<RoleJob | null>(null);
   // A panel-card click flies the map to the role's city (see openDetail); the
   // nonce forces a re-fly even when the same city is reopened.
@@ -540,7 +533,11 @@ export default function RolesMap() {
         onResetView={() => {
           setSel({ co: null, city: null });
           setDetailJob(null);
-          setFilters(EMPTY_FILTERS);
+          // "Your matches" is scope, not a narrowing filter (see isDefaultView) —
+          // a reset/clear must not silently turn it off (issue #154 fix round 1,
+          // blocker 2), or a scored user's brand-click "home" would show the full
+          // 8,155-role catalog while a page reload shows their matches.
+          setFilters((f) => ({ ...EMPTY_FILTERS, mine: f.mine }));
           setHasExplored(false);
         }}
       />
@@ -561,18 +558,19 @@ export default function RolesMap() {
           freshnessOptions={freshnessOptions}
           sponsorOptions={sponsorOptions}
           onClearAll={() => {
-            setFilters(EMPTY_FILTERS);
+            // Same "mine is scope, not a filter" preservation as onResetView above.
+            setFilters((f) => ({ ...EMPTY_FILTERS, mine: f.mine }));
             setSel({ co: null, city: null });
           }}
           onAddCv={() => setCvModalOpen(true)}
           onSignIn={signInWithGoogle}
-          onToggleMine={() => setMine(!filters.mine)}
+          onToggleMine={toggleMine}
           // Brand = home: same state reset as the map's reset control, plus a camera
           // re-frame to the Europe landing (europeFrame bump eases the globe back).
           onBrand={() => {
             setSel({ co: null, city: null });
             setDetailJob(null);
-            setFilters(EMPTY_FILTERS);
+            setFilters((f) => ({ ...EMPTY_FILTERS, mine: f.mine }));
             setHasExplored(false);
             setEuropeFrame((n) => n + 1);
           }}
@@ -586,7 +584,7 @@ export default function RolesMap() {
           defaultView={isDefaultView}
           filters={filters}
           onFilters={setFilters}
-          onToggleMine={() => setMine(!filters.mine)}
+          onToggleMine={toggleMine}
           selCo={sel.co}
           selCity={sel.city}
           onClearCo={() => setSel((s) => ({ ...s, co: null }))}

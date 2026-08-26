@@ -130,4 +130,28 @@ describe("HeadBar — Your matches chip", () => {
     expect(btn.className).toContain("active");
     expect(btn).toHaveTextContent("×");
   });
+
+  // Issue #154 fix round 1, blocker 2: "Your matches" is scope, not a narrowing
+  // filter (mirrors RolesMap's isDefaultView, which never counts filters.mine) —
+  // so a scored user's RESTING DEFAULT state (mine on, nothing else set) must not
+  // show "Clear all" as permanently active.
+  it("'Clear all' stays inert when Your matches is the ONLY active thing", () => {
+    renderBar({ signedIn: true, scored: true, filters: { ...EMPTY_FILTERS, mine: true } });
+    openRow();
+    const clearAll = screen.getByRole("button", { name: "Clear all filters" });
+    expect(clearAll.className).toContain("disabled");
+    expect(clearAll).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("'Clear all' still activates on a real filter even while Your matches is on", () => {
+    renderBar({
+      signedIn: true,
+      scored: true,
+      filters: { ...EMPTY_FILTERS, mine: true, cities: ["Berlin"] },
+    });
+    openRow();
+    const clearAll = screen.getByRole("button", { name: "Clear all filters" });
+    expect(clearAll.className).not.toContain("disabled");
+    expect(clearAll).toHaveAttribute("aria-disabled", "false");
+  });
 });

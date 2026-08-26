@@ -9,6 +9,7 @@ import {
   EMPTY_FILTERS,
   FRESHNESS_WINDOWS,
   LEVELS,
+  ROLE_FAMILY_OTHER,
   UK_SPONSOR_STATUSES,
   WORKPLACES,
   fitLabel,
@@ -22,6 +23,7 @@ import {
   type RoleJob,
   type RolesFilters,
 } from "@/lib/roles";
+import { ROLE_FAMILY_OPTIONS } from "@/lib/labels";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { hasReadableJd, pendingLabelOf, scoreStatusOf } from "@/lib/scorePrefilter";
 import { ScoringProgress } from "@/components/roles/ScoringProgress";
@@ -175,6 +177,12 @@ export default function RolesPanel({
   // removable. They read/write the SAME filter state the headbar uses, so the two
   // can never drift out of sync (Rober 7-06).
   const levelLabel = (v: string) => LEVELS.find((l) => l.value === v)?.label ?? v;
+  // Role vertical labels come from the ONE role vocabulary (issue #70) — the same
+  // Title-Case display names the headbar's Role facet uses — plus "Other" for the
+  // unlabelled-family bucket (roleFamily's fallback), so a chip never falls back
+  // to the raw lowercase stored value ("product", not "Product").
+  const roleFamilyLabel = (v: string) =>
+    ROLE_FAMILY_OPTIONS.find((o) => o.value === v)?.label ?? (v === ROLE_FAMILY_OTHER ? "Other" : v);
   const remove = (key: "levels" | "cities" | "sectors" | "sizes", v: string) =>
     onFilters({ ...filters, [key]: (filters[key] as string[]).filter((x) => x !== v) });
   const activeChips: { key: string; label: string; bold?: boolean; onX?: () => void }[] = [
@@ -183,6 +191,14 @@ export default function RolesPanel({
     ...(filters.query
       ? [{ key: "q", label: `“${filters.query}”`, onX: () => onFilters({ ...filters, query: "" }) }]
       : []),
+    // Role + Language (issue #154 fix round 1, blocker 3): every other headbar
+    // facet already renders a chip under "Your matches" — these two were missing,
+    // so the spec's own "Your matches — Product ×" example never rendered.
+    ...(filters.roles ?? []).map((v) => ({
+      key: `ro-${v}`,
+      label: roleFamilyLabel(v),
+      onX: () => onFilters({ ...filters, roles: (filters.roles ?? []).filter((x) => x !== v) }),
+    })),
     ...filters.levels.map((v) => ({ key: `lv-${v}`, label: levelLabel(v), onX: () => remove("levels", v) })),
     ...filters.cities.map((v) => ({ key: `ci-${v}`, label: v, onX: () => remove("cities", v) })),
     ...filters.sectors.map((v) => ({ key: `se-${v}`, label: v, onX: () => remove("sectors", v) })),
@@ -202,9 +218,18 @@ export default function RolesPanel({
       label: UK_SPONSOR_STATUSES.find((st) => st.value === v)?.label ?? v,
       onX: () => onFilters({ ...filters, sponsors: (filters.sponsors ?? []).filter((x) => x !== v) }),
     })),
+    ...(filters.languages ?? []).map((v) => ({
+      key: `la-${v}`,
+      label: v,
+      onX: () => onFilters({ ...filters, languages: (filters.languages ?? []).filter((x) => x !== v) }),
+    })),
   ];
   const clearAllFilters = () => {
-    onFilters(EMPTY_FILTERS);
+    // "Your matches" is scope, not a narrowing filter (RolesMap's isDefaultView
+    // never counts it) — a "Clear all" here must not silently turn it off
+    // (issue #154 fix round 1, blocker 2), same fix as RolesMap's onResetView /
+    // onClearAll / onBrand.
+    onFilters({ ...EMPTY_FILTERS, mine: filters.mine });
     onClearCo?.();
     onClearCity?.();
   };
