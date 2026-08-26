@@ -32,10 +32,17 @@ export type RangeQuery<T> = {
  * a count costs an extra round trip and can disagree with the rows under concurrent writes.
  * `maxPages` is a loop guard, not a limit anyone should rely on; hitting it means the
  * caller is reading something far larger than expected and should say so.
+ *
+ * `strict` changes what a failed page does: throw instead of returning the partial set.
+ * Every caller that is a TanStack `queryFn` MUST pass it. A queryFn that resolves with a
+ * short or empty array reports a SUCCESSFUL fetch, so the cache replaces the last good
+ * rows with the failure's leftovers and every consumer re-derives off them; throwing
+ * keeps the cached rows, marks the query `isError` and retries. Non-cached callers (the
+ * nightly job) keep the lenient default, where a partial read beats no read at all.
  */
 export async function fetchAllPages<T>(
   build: () => RangeQuery<T>,
-  opts: { pageSize?: number; maxPages?: number; label?: string } = {},
+  opts: { pageSize?: number; maxPages?: number; label?: string; strict?: boolean } = {},
 ): Promise<T[]> {
   const pageSize = opts.pageSize ?? PAGE_SIZE;
   const maxPages = opts.maxPages ?? 50;
@@ -45,9 +52,11 @@ export async function fetchAllPages<T>(
     const from = page * pageSize;
     const { data, error } = await build().range(from, from + pageSize - 1);
     if (error) {
+      const what = `${opts.label ?? "query"} failed at page ${page}: ${error.message}`;
+      if (opts.strict) throw new Error(`[pagedSelect] ${what}`);
       // Return what we have rather than throwing: a partial map beats a blank one, and
       // the caller's own error handling already covers the empty case.
-      console.warn(`[pagedSelect] ${opts.label ?? "query"} failed at page ${page}: ${error.message}`);
+      console.warn(`[pagedSelect] ${what}`);
       return out;
     }
     const rows = data ?? [];
