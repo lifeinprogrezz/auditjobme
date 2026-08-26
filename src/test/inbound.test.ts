@@ -15,6 +15,9 @@ import {
   extractGmailConfirmationCode,
   FORWARDING_DOMAIN,
   forwardingAddress,
+  forwardingStatus,
+  isConfirmUrl,
+  isGmailConfirmSuccess,
   isGmailForwardingConfirmation,
   matchApplication,
   normalizeCompany,
@@ -479,6 +482,27 @@ describe("extractGmailConfirmationLink (the real Gmail flow)", () => {
     expect(link).toContain("/mail/vf-");
   });
 
+  it("returns null on a body carrying ONLY the cancel link, so the handler never fetches it", () => {
+    // Not derived from REAL_BODY (which has both links) — an isolated fixture with
+    // just the uf- cancel link, matching a mail where the confirm link is absent or
+    // was already stripped. If the regex ever loosened to "any /mail/*- link",
+    // extraction alone would hand back the cancel URL. Issue #157 acceptance item 1:
+    // pins the extraction, not just the isConfirmUrl guard downstream — the handler
+    // (api/inbound-email.ts) only calls confirmGmailForwarding when `link` is
+    // truthy, so a null here means it skips the auto-confirm fetch entirely.
+    const UF_ONLY_BODY = [
+      "quinterostudio3@gmail.com has requested to automatically forward mail",
+      "to your email",
+      "address u-cd4b7288dfac41c389c34b0fe78193ce@northgoing.com.",
+      "",
+      "If you do not approve of this request, no further action is required.",
+      "click this link to cancel this",
+      "verification:",
+      "https://mail.google.com/mail/uf-%5BANGjdJ8lD5qR5FyuGLKUzxmx1odsM_wMxybG6L9Wa7I%5D-8JA0s_VWEX",
+    ].join("\n");
+    expect(extractGmailConfirmationLink(UF_ONLY_BODY)).toBeNull();
+  });
+
   it("finds the link in html mail too, where it arrives inside an anchor", () => {
     const html = '<p>confirm: <a href="https://mail.google.com/mail/vf-%5BABC%5D-XYZ">Confirm</a></p>';
     expect(extractGmailConfirmationLink(html)).toBe("https://mail.google.com/mail/vf-%5BABC%5D-XYZ");
@@ -488,5 +512,114 @@ describe("extractGmailConfirmationLink (the real Gmail flow)", () => {
     expect(extractGmailConfirmationLink("no link here")).toBeNull();
     expect(extractGmailConfirmationLink("")).toBeNull();
     expect(extractGmailConfirmationLink(null)).toBeNull();
+  });
+});
+
+describe("isConfirmUrl (issue #157 — the guard right before the auto-confirm fetch)", () => {
+  const VF = "https://mail.google.com/mail/vf-%5BANGjdJ-AzkPg8TYF11%5D-8JA0s_VWEX";
+  const UF = "https://mail.google.com/mail/uf-%5BANGjdJ8lD5qR5FyuGLKUzxmx1%5D-8JA0s_VWEX";
+
+  it("accepts the real confirm link", () => {
+    expect(isConfirmUrl(VF)).toBe(true);
+  });
+
+  it("refuses the cancel link one letter away, even though it is the same host", () => {
+    expect(isConfirmUrl(UF)).toBe(false);
+  });
+
+  it("refuses a lookalike host", () => {
+    expect(isConfirmUrl("https://mail.google.com.evil.example/mail/vf-x")).toBe(false);
+    expect(isConfirmUrl("https://evil-mail.google.com/mail/vf-x")).toBe(false);
+    expect(isConfirmUrl("https://not-google.com/mail/vf-x")).toBe(false);
+  });
+
+  it("refuses a non-https scheme and an unparseable or empty value", () => {
+    expect(isConfirmUrl("http://mail.google.com/mail/vf-x")).toBe(false);
+    expect(isConfirmUrl("not a url")).toBe(false);
+    expect(isConfirmUrl("")).toBe(false);
+    expect(isConfirmUrl(null)).toBe(false);
+    expect(isConfirmUrl(undefined)).toBe(false);
+  });
+});
+
+describe("isGmailConfirmSuccess (reading the fetch that follows the confirm link)", () => {
+  it("is true on a 200 with an ordinary confirmation page", () => {
+    expect(isGmailConfirmSuccess(200, "<html>Forwarding confirmed. You're all set.</html>")).toBe(true);
+  });
+
+  it("is false on a 200 whose body reads like Gmail rejected the link", () => {
+    expect(isGmailConfirmSuccess(200, "This link has expired.")).toBe(false);
+    expect(isGmailConfirmSuccess(200, "Invalid request.")).toBe(false);
+    expect(isGmailConfirmSuccess(200, "An error occurred.")).toBe(false);
+  });
+
+  it("is false on any non-200, whatever the body says", () => {
+    expect(isGmailConfirmSuccess(500, "confirmed")).toBe(false);
+    expect(isGmailConfirmSuccess(403, "confirmed")).toBe(false);
+  });
+
+  it("matches the reject words on boundaries only, so a substring like 'onerror' in page script doesn't false-reject a real confirmation", () => {
+    expect(
+      isGmailConfirmSuccess(200, "<script>window.onerror=function(){};</script>Forwarding confirmed."),
+    ).toBe(true);
+  });
+});
+
+describe("forwardingStatus (the Settings live status line, 4 states)", () => {
+  it("is none before a token row exists", () => {
+    expect(forwardingStatus(null)).toBe("none");
+    expect(forwardingStatus(undefined)).toBe("none");
+  });
+
+  it("is created once the row exists but Gmail hasn't sent a confirmation yet", () => {
+    expect(forwardingStatus({ gmail_confirmation_url: null, gmail_confirmation_code: null, gmail_confirmed_at: null })).toBe(
+      "created",
+    );
+  });
+
+  it("is received once either shape of the confirmation mail landed", () => {
+    expect(
+      forwardingStatus({ gmail_confirmation_url: "https://mail.google.com/mail/vf-x", gmail_confirmation_code: null, gmail_confirmed_at: null }),
+    ).toBe("received");
+    expect(forwardingStatus({ gmail_confirmation_url: null, gmail_confirmation_code: "123456789", gmail_confirmed_at: null })).toBe(
+      "received",
+    );
+  });
+
+  it("is confirmed once the server auto-confirmed it, even if the link is still on the row", () => {
+    expect(
+      forwardingStatus({
+        gmail_confirmation_url: "https://mail.google.com/mail/vf-x",
+        gmail_confirmation_code: null,
+        gmail_confirmation_at: "2026-08-27T09:00:00Z",
+        gmail_confirmed_at: "2026-08-27T10:00:00Z",
+      }),
+    ).toBe("confirmed");
+  });
+
+  it("stays confirmed when gmail_confirmation_at is missing (older rows, before that column existed)", () => {
+    expect(
+      forwardingStatus({
+        gmail_confirmation_url: "https://mail.google.com/mail/vf-x",
+        gmail_confirmation_code: null,
+        gmail_confirmed_at: "2026-08-27T10:00:00Z",
+      }),
+    ).toBe("confirmed");
+  });
+
+  it("falls back to received when a NEWER confirmation mail arrived after the last auto-confirm (the stale-confirmed hole)", () => {
+    // User removed and re-added the forwarding address: Gmail sent a fresh
+    // confirmation mail (bumping gmail_confirmation_at) but this cycle's
+    // auto-confirm fetch hasn't landed yet — the old gmail_confirmed_at must
+    // not still read "confirmed", or the manual fallback button can never
+    // reappear if the fetch ultimately fails.
+    expect(
+      forwardingStatus({
+        gmail_confirmation_url: "https://mail.google.com/mail/vf-y",
+        gmail_confirmation_code: null,
+        gmail_confirmation_at: "2026-08-28T09:00:00Z",
+        gmail_confirmed_at: "2026-08-27T10:00:00Z",
+      }),
+    ).toBe("received");
   });
 });
