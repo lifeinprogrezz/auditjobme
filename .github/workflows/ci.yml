@@ -98,7 +98,11 @@ jobs:
     # through public.schema_snapshot() with the service role. Catches an object
     # applied through the dashboard or MCP that nobody mirrored into the repo.
     # Secrets are absent on pull requests from forks, so the step skips there.
+    # Runs on pushes to main ONLY: a pull request that ADDS a migration cannot
+    # match production until that migration is applied, which by policy happens
+    # at merge time. On a PR this job is red by construction, not by drift.
     name: schema drift (production)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
