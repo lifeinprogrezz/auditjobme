@@ -158,6 +158,20 @@ const ARTIFACT = {
   offices: [],
 };
 
+/** Two roles, one scored and one not, so the 20-second score poll stays armed
+ *  (`hasUnscored`). The single-job ARTIFACT above cannot arm it. */
+const TWO_JOB_ARTIFACT = {
+  ...ARTIFACT,
+  counts: { jobs: 2, companies: 1, offices: 0 },
+  jobs: [
+    ARTIFACT.jobs[0],
+    { ...ARTIFACT.jobs[0], id: "job-2", title: "Senior Product Manager", url: "https://example.invalid/jobs/2" },
+  ],
+};
+
+/** The one score already in hand when the poll fails below. */
+const LANDED = [{ job_id: "job-1", score: 4.2, signals: null }];
+
 /** The SHARED reads — the map artifact plus the five own-row tables Settings and
  *  the map both need. score_batches is deliberately outside this set: it is the
  *  score poll's own one-row phase check (#149), which is meant to run per mount. */
@@ -188,6 +202,7 @@ describe("useRolesData caches its reads (issue #152)", () => {
     localStorage.clear();
     for (const k of Object.keys(reads)) delete reads[k];
     for (const k of Object.keys(failOnce)) delete failOnce[k];
+    rowsByTable.scores = [];
     fetchDataplane.mockReset().mockResolvedValue(ARTIFACT);
     currentUser = { id: "user-1" };
   });
@@ -274,6 +289,47 @@ describe("useRolesData caches its reads (issue #152)", () => {
     // And the mechanism: the read was recorded as a FAILURE, so TanStack will retry it,
     // rather than as a successful fetch of nothing.
     expect(client.getQueryState(rolesKeys.profile("user-1"))?.errorUpdateCount).toBe(1);
+  });
+
+  // The same strictness, on the OTHER kind of caller. `fetchScores` throws on a failed
+  // page so the TanStack queryFn above cannot overwrite good rows with leftovers — but
+  // the 20-second score poll and the manual "check now" call it as fire-and-forget
+  // `void`s. Un-caught, a scoring drain over a waking laptop turns every tick into an
+  // unhandled rejection, and main.tsx's Sentry GlobalHandlers integration ships each one
+  // as a production error event: a silent read failure becomes a 3-per-minute error feed.
+  // A failed poll must be a non-event — warn, keep what is already on screen, try again.
+  it("a failed score poll keeps the cached scores and never rejects", async () => {
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on("unhandledRejection", onRejection);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      fetchDataplane.mockResolvedValue(TWO_JOB_ARTIFACT);
+      rowsByTable.scores = LANDED;
+
+      const client = makeClient();
+      const { result } = renderHook(() => useRolesData(), { wrapper: wrapperFor(client) });
+      await waitFor(() => expect(result.current.profileChecked).toBe(true));
+      await settle();
+      // job-2 is eligible and unscored, so the poll effect is armed.
+      expect(result.current.jobs.find((j) => j.id === "job-1")?.score).toBe(4.2);
+      expect(result.current.jobs.find((j) => j.id === "job-2")?.score).toBeNull();
+
+      // One poll tick, wifi still down.
+      failOnce.scores = "boom";
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20_000);
+      });
+      await settle();
+
+      expect(rejections).toEqual([]);
+      // And nothing the person had was lost.
+      expect(client.getQueryData(rolesKeys.scores("user-1"))).toEqual(LANDED);
+      expect(result.current.jobs.find((j) => j.id === "job-1")?.score).toBe(4.2);
+    } finally {
+      vi.useRealTimers();
+      process.off("unhandledRejection", onRejection);
+    }
   });
 
   it("signed out, nothing personal is read and the profile gate stays shut", async () => {

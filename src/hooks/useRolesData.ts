@@ -487,9 +487,27 @@ export function useRolesData() {
   }, [userId]);
 
   /** Pull the user's landed scores and merge them into the map. The server worker
-   *  writes them continuously; this is the read side of the poll. */
+   *  writes them continuously; this is the read side of the poll.
+   *
+   *  The failure MUST be swallowed here. `fetchScores` is strict (lib/pagedSelect.ts):
+   *  it throws rather than resolve with a partial set, which is right for the TanStack
+   *  queryFn — a short resolve would overwrite the cached rows. But both callers below
+   *  are fire-and-forget `void`s: the 20 s poll and the manual "check now". Un-caught,
+   *  every failed poll during a scoring drain (a laptop waking before the wifi is back,
+   *  a PostgREST hiccup) is an unhandled rejection every 20 s, and main.tsx's Sentry
+   *  GlobalHandlers integration ships each one as a production error event.
+   *
+   *  A failed pull is a NON-EVENT for the person: nothing is pushed, the cached scores
+   *  stay exactly as they were, and the next tick tries again 20 s later. Pinned by
+   *  src/test/roles-data-cache.test.tsx ("a failed score poll…"). */
   async function refreshScores(uid: string) {
-    const data = await fetchScores(uid);
+    let data: ScoreRow[];
+    try {
+      data = await fetchScores(uid);
+    } catch (err) {
+      console.warn("[scores] poll failed; keeping the scores already loaded", err);
+      return;
+    }
     if (!data.length || currentUserRef.current !== uid) return;
     scoreBufferRef.current?.push(new Map(data.map((row) => [row.job_id, row] as const)));
   }
