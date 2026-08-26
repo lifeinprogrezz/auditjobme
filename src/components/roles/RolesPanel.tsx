@@ -75,7 +75,7 @@ export type RolesPanelProps = {
   onClearCity?: () => void;
 };
 
-/** Logo.dev → site favicon (DuckDuckGo, then Google) → colored initial. logo.dev
+/** Logo.dev → site favicon (icon.horse, then Google) → colored initial. logo.dev
  *  404s when it lacks the brand, so the favicon step shows the real mark instead
  *  of logo.dev's generic pinwheel placeholder (the TravelPerk case). The logo.dev
  *  theme follows the ACTIVE app theme (design direction §5.5 / skill Logo.dev rule):

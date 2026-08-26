@@ -235,7 +235,7 @@ export function buildPin(p: PinProps): HTMLDivElement {
   fallback.textContent = p.co.charAt(0) || "?";
   // light theme: the pin is a WHITE disc — dark-theme marks are white-on-white.
   // Chain: logo.dev (skipped for its 2 placeholder domains) → the site's real
-  // favicon (DuckDuckGo, then Google) → colored initial. Falling through to the
+  // favicon (icon.horse, then Google) → colored initial. Falling through to the
   // favicon is what shows a correct TravelPerk mark, not logo.dev's pinwheel.
   // No domain on file at all (issue #153 item B1, same law as PaperLogo/RolesPanel):
   // one last-resort guessed-domain favicon before the coloured initial — this is

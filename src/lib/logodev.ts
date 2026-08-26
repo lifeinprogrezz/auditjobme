@@ -153,13 +153,24 @@ export function logoUrl(domain: string, theme: "dark" | "light" = "dark"): strin
 }
 
 /** Site favicon fallback chain (real brand mark for domains logo.dev lacks).
- *  icon.horse serves the site's high-res apple-touch-icon (~180px) — much crisper
- *  than DuckDuckGo's 32px — with DuckDuckGo then Google as reliable fallbacks when
- *  icon.horse can't reach a site. */
+ *  icon.horse serves the site's high-res apple-touch-icon (~180px), with Google
+ *  favicons as the reliable fallback when icon.horse can't reach a site.
+ *
+ *  icons.duckduckgo.com was a middle hop here until issue #153 UI round 2: for
+ *  any domain it has no real icon for, it answers HTTP 404 but WITH a
+ *  decodable image body — its own generic "no icon on file" placeholder,
+ *  byte-identical (confirmed via curl: same 1478-byte 48x48 PNG, same MD5)
+ *  across every domain lacking a real one. A browser <img> that successfully
+ *  decodes a response fires onload, not onerror, on the strength of the body
+ *  alone — the HTTP status doesn't gate it — so the onError-driven fallback
+ *  chain below (and its copies in GlobeMap/PaperLogo) got stuck showing that
+ *  grey placeholder glyph instead of ever reaching Google or the coloured
+ *  initial. No CORS header ships on any icons.duckduckgo.com response either,
+ *  so there is no client-side way to hash/inspect the body and route around
+ *  it — the domain is dropped from the chain rather than guessed at. */
 export function faviconUrls(domain: string): string[] {
   return [
     `https://icon.horse/icon/${domain}`,
-    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
     `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
   ];
 }

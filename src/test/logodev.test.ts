@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { domainFor, logoUrl, guessedDomain, guessedFaviconUrl } from "@/lib/logodev";
+import { domainFor, logoUrl, faviconUrls, guessedDomain, guessedFaviconUrl } from "@/lib/logodev";
 
 describe("domainFor", () => {
   it("derives the domain from big-tech scraper sources", () => {
@@ -65,6 +65,28 @@ describe("logoUrl", () => {
   it("returns null when the token is empty or missing", () => {
     vi.stubEnv("VITE_LOGODEV_TOKEN", "");
     expect(logoUrl("personio.com")).toBeNull();
+  });
+});
+
+describe("faviconUrls", () => {
+  // PR #164 live-verify round 2: icons.duckduckgo.com answers HTTP 404 for a
+  // domain it has no real icon for, but WITH a decodable, byte-identical
+  // placeholder PNG body — the <img> element fires onload on that body
+  // regardless of status, so the onError-driven fallback chain (RolesPanel
+  // Logo, PaperLogo, GlobeMap buildPin) got stuck on DuckDuckGo's generic
+  // grey placeholder instead of ever reaching Google or the coloured initial,
+  // and the browser still logged the underlying 404 to console either way.
+  // Dropped from the chain entirely — pinned here so it never sneaks back in.
+  it("never includes icons.duckduckgo.com", () => {
+    const urls = faviconUrls("personio.com");
+    expect(urls.some((u) => u.includes("duckduckgo"))).toBe(false);
+  });
+
+  it("chains icon.horse then Google favicons", () => {
+    expect(faviconUrls("personio.com")).toEqual([
+      "https://icon.horse/icon/personio.com",
+      "https://www.google.com/s2/favicons?domain=personio.com&sz=128",
+    ]);
   });
 });
 
