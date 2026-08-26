@@ -144,13 +144,20 @@ export const ROLE_ARCHETYPES = [
 ] as const;
 export type RoleArchetype = (typeof ROLE_ARCHETYPES)[number];
 
-/** How many label chips of each kind a user may select. */
-export const LABEL_CAP = 3;
+/** How many target-role chips a user may select (issue #156, LOCKED decision 1:
+ *  fewer roles = a smaller, sharper paid scoring slice). Roles are AND-ed into
+ *  the slice, so this stays tighter than SECTOR_CAP below. */
+export const ROLE_CAP = 2;
+
+/** How many target-industry chips a user may select. Industries are OR-ed
+ *  inside the slice, so this can sit one higher than ROLE_CAP without widening
+ *  the run as much (issue #156, LOCKED decision 1). */
+export const SECTOR_CAP = 3;
 
 /** How many industry chips the CV-unlock modal always shows (top by live-role
  *  frequency) before the tail's search row (issue #44). A DISPLAY cap, distinct
- *  from LABEL_CAP (the selection cap, parked at #35) — this one just bounds how
- *  much of the ~50-sector catalog renders as chips vs. lives behind search. */
+ *  from SECTOR_CAP (the selection cap) — this one just bounds how much of the
+ *  ~50-sector catalog renders as chips vs. lives behind search. */
 export const TOP_SECTOR_CHIPS = 12;
 
 type SectorOption = { value: string; label: string; count: number };

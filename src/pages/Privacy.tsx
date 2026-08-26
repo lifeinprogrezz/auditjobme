@@ -2,6 +2,7 @@
 // the job-search product (not just the audit tool). Warm voice, no em-dashes.
 import LegalLayout, { LegalSection } from "@/components/app/LegalLayout";
 import { BRAND_NAME } from "@/lib/brandName";
+import { USER_DATA_TABLES } from "@/lib/account";
 
 export default function Privacy() {
   return (
@@ -54,7 +55,20 @@ export default function Privacy() {
 
       <LegalSection heading="6. Your rights">
         <p>
-          You can ask us to delete your account and everything tied to it at any time. Just email us at{" "}
+          You can ask us to delete your account and everything tied to it at any time, straight away and with no
+          undo, right from Settings or by emailing us. Deleting removes:
+        </p>
+        {/* Generated from USER_DATA_TABLES, the same list the account export reads
+            (issue #156), so this promise cannot drift from the code. Keyed by
+            table AND column: a table can appear twice, once per user column
+            (referrals is read by referee_id and by referrer_id). */}
+        <ul className="list-disc space-y-1 pl-5">
+          {USER_DATA_TABLES.map((t) => (
+            <li key={`${t.table}.${t.column}`}>{t.label}</li>
+          ))}
+        </ul>
+        <p>
+          Just email us at{" "}
           <a href="mailto:hello@lifeinprogrezz.com" className="text-foreground underline underline-offset-2">
             hello@lifeinprogrezz.com
           </a>
