@@ -14,6 +14,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { buildScoreSystem, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION, type ParsedScore } from "../src/lib/scorePrompt.js";
 import { cronAuthResult } from "../src/lib/nightly.js";
+import { toScoresRow, SCORES_ON_CONFLICT } from "../src/lib/scoreLedger.js";
 import { BRAND_NAME } from "../src/lib/brandName.js";
 import {
   RUN_BUDGET_MS,
@@ -280,22 +281,10 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         summary.failed++;
         continue;
       }
-      const { error: upErr } = await admin.from("scores").upsert(
-        {
-          user_id: userId,
-          job_id: r.customId,
-          score: parsed.score,
-          rubric_version: RUBRIC_VERSION,
-          cv_hash: cvHash, // which CV this judgment was made from (#123)
-          signals: {
-            reason: parsed.reason,
-            fit_bullets: parsed.fitBullets,
-            subscores: parsed.subscores,
-            evidence: parsed.evidence,
-          },
-        },
-        { onConflict: "user_id,job_id,rubric_version" },
-      );
+      // Row shape shared with the nightly's write-through (#135).
+      const { error: upErr } = await admin
+        .from("scores")
+        .upsert(toScoresRow(userId, r.customId, parsed, cvHash), { onConflict: SCORES_ON_CONFLICT });
       if (upErr) {
         console.warn(`[score-backlog] batch upsert failed for ${userId}/${r.customId}:`, upErr.message);
         summary.failed++;
@@ -544,22 +533,10 @@ export default async function handler(req: Req, res: Res): Promise<void> {
               summary.failed++;
               return;
             }
-            const { error: upErr } = await admin.from("scores").upsert(
-              {
-                user_id: userId,
-                job_id: j.id,
-                score: result.score,
-                rubric_version: RUBRIC_VERSION,
-                cv_hash: cvHash, // which CV this judgment was made from (#123)
-                signals: {
-                  reason: result.reason,
-                  fit_bullets: result.fitBullets,
-                  subscores: result.subscores,
-                  evidence: result.evidence,
-                },
-              },
-              { onConflict: "user_id,job_id,rubric_version" },
-            );
+            // Row shape shared with the nightly's write-through (#135).
+            const { error: upErr } = await admin
+              .from("scores")
+              .upsert(toScoresRow(userId, j.id, result, cvHash), { onConflict: SCORES_ON_CONFLICT });
             if (upErr) {
               console.warn(`[score-backlog] upsert failed for ${userId}/${j.id}:`, upErr.message);
               summary.failed++;
