@@ -39,7 +39,9 @@ describe("PaperLogo — theme-aware page logo (§5.5) + reset-on-theme (nit 5a)"
     expect(img.getAttribute("src")).toBe("https://logo.test/acme.com?theme=dark");
   });
 
-  it("falls back to a coloured initial when there is no domain", () => {
+  it("renders the initial straight away when there is no domain — no guessed favicon request", () => {
+    // PR #164 live-verify rounds 1+2: a name-based favicon guess 404s and the
+    // browser logs every failed <img> load to console; no guess is made.
     const { container } = render(<PaperLogo domain={null} company="Zeta" size={24} />);
     expect(container.querySelector("img")).toBeNull();
     const span = container.querySelector("span") as HTMLElement;
@@ -47,5 +49,11 @@ describe("PaperLogo — theme-aware page logo (§5.5) + reset-on-theme (nit 5a)"
     // Tile size maps to the 24px box; radius stays on the {…,10,…} scale.
     expect(span.className).toContain("h-6");
     expect(span.className).toContain("rounded-[10px]");
+  });
+
+  it("falls straight to the initial for an empty company name", () => {
+    const { container } = render(<PaperLogo domain={null} company="" size={24} />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("span")).not.toBeNull();
   });
 });

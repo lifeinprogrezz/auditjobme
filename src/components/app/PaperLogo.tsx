@@ -25,6 +25,8 @@ export default function PaperLogo({
   size?: PaperLogoSize;
 }) {
   const { theme } = useTheme();
+  // No domain on file at all → straight to the coloured initial. No name-based
+  // favicon guess (see the note at the end of lib/logodev.ts).
   const chain = domain
     ? [logoUrl(domain, theme === "dark" ? "dark" : "light"), ...faviconUrls(domain)].filter(Boolean)
     : [];

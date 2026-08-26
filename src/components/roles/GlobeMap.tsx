@@ -136,7 +136,7 @@ function dur(ms: number): number {
   return prefersReducedMotion() ? 0 : ms;
 }
 
-type PinProps = {
+export type PinProps = {
   id: string;
   co: string;
   domain: string | null;
@@ -221,7 +221,7 @@ function pinSig(p: PinProps): string {
   return `${p.score ?? ""}|${p.bucket}`;
 }
 
-function buildPin(p: PinProps): HTMLDivElement {
+export function buildPin(p: PinProps): HTMLDivElement {
   // Wrapper = the maplibre Marker root: maplibre owns its inline transform
   // (translate), so the hover scale must live on the inner disc — a transform
   // on the root would fight the marker positioning.
@@ -235,9 +235,14 @@ function buildPin(p: PinProps): HTMLDivElement {
   fallback.textContent = p.co.charAt(0) || "?";
   // light theme: the pin is a WHITE disc — dark-theme marks are white-on-white.
   // Chain: logo.dev (skipped for its 2 placeholder domains) → the site's real
-  // favicon (DuckDuckGo, then Google) → colored initial. Falling through to the
+  // favicon (icon.horse, then Google) → colored initial. Falling through to the
   // favicon is what shows a correct TravelPerk mark, not logo.dev's pinwheel.
-  const chain = p.domain ? [logoUrl(p.domain, "light"), ...faviconUrls(p.domain)].filter(Boolean) as string[] : [];
+  // No domain on file at all → straight to the coloured initial. No name-based
+  // favicon guess (see the note at the end of lib/logodev.ts); coverage comes
+  // from the server-side company-records + logo-backfill scripts.
+  const chain = (p.domain ? [logoUrl(p.domain, "light"), ...faviconUrls(p.domain)] : []).filter(
+    Boolean,
+  ) as string[];
   if (chain.length) {
     const img = document.createElement("img");
     img.alt = "";

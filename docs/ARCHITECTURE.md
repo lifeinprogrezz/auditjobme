@@ -99,6 +99,37 @@ Rows are filtered by `job-filters.mjs`, enriched (`enrich-companies.mjs`,
 `company`, `title`, or `url` are dropped before the upsert with a logged count** — one null
 company once failed an entire run, so the filter and its log line are load-bearing.
 
+### Company records, logos, offices (issue #153)
+
+Three steps close the gap between "a name on a job listing" and a real map pin, in this order
+(after the enrichment above, before the dataplane publish):
+
+- **`scripts/company-records.mjs`** — a `companies` row for every distinct company on live jobs
+  that lacks one. Name = the most common exact spelling seen today (`groupByCompanyName`,
+  `company-records-lib.mjs`), the SAME key `public.link_jobs_to_companies()` matches on, so the
+  new row is linked to its jobs in the same run. Slug via `slugForCompany()`, matching the
+  underscore convention already live in the table. Bounded 400 rows/run, idempotent (upsert,
+  `ignoreDuplicates`).
+- **`scripts/logo-backfill.mjs`** — unchanged for companies with a `careers_url`/`website`
+  already on file; extended so a company with NEITHER (the job-derived rows above) falls to the
+  host of its own apply URL (`resolveLogoDomain`, `logo-lib.mjs`) — never a hosted-ATS/platform
+  host, so a resolved domain is always the company's own site. Client-side, `src/lib/logodev.ts`
+  never guesses a domain from the name: a company with no domain on file renders the coloured
+  initial (a speculative favicon request 404s and the browser logs every failed image load to
+  the console, which no `onError` handler can silence).
+- **`scripts/geocode-companies.mjs`** — real street coordinates per company × city. Two Nominatim
+  queries per candidate: the company + its job location, then the resolved city name alone (a
+  query hundreds of other companies in the same city share, so it is almost always a free cache
+  hit after the first). Within 50km of each other → `company_offices`; else nothing. Cached
+  forever in `geocode_cache` (migration `20260827110000`), rate-limited to 1 req/s, bounded
+  200 network calls/run — a repeat run never re-asks a question it already has the answer to, and
+  the gap closes over days. Mapbox instead of Nominatim when `MAPBOX_TOKEN`/`MAPBOX_ACCESS_TOKEN`
+  is set. Degrades gracefully (skips caching only) if the migration is not applied yet.
+
+A company still without a resolved office keeps the client's centroid disc
+(`src/hooks/useRolesData.ts` `centroidPlace`) — widened per city by `discRadiusFor(n)` so a dense
+city (30+ office-less companies) fans pins out instead of stacking them at a fixed radius.
+
 ### Publication — `scripts/build-dataplane.mjs`
 
 After each scrape, the catalog is written to a public Storage bucket as `dataplane.json` and

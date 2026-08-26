@@ -75,13 +75,16 @@ export type RolesPanelProps = {
   onClearCity?: () => void;
 };
 
-/** Logo.dev → site favicon (DuckDuckGo, then Google) → colored initial. logo.dev
+/** Logo.dev → site favicon (icon.horse, then Google) → colored initial. logo.dev
  *  404s when it lacks the brand, so the favicon step shows the real mark instead
  *  of logo.dev's generic pinwheel placeholder (the TravelPerk case). The logo.dev
  *  theme follows the ACTIVE app theme (design direction §5.5 / skill Logo.dev rule):
  *  dark card → theme=dark (light marks), light card → theme=light (dark marks) — a
- *  hardcoded param breaks on theme switch (the broken-logos bug, both directions). */
-function Logo({ domain, company }: { domain: string | null; company: string }) {
+ *  hardcoded param breaks on theme switch (the broken-logos bug, both directions).
+ *  No domain on file at all → straight to the coloured initial (same hue helper
+ *  and `fallback` class as the map pin in GlobeMap's buildPin): a name-based
+ *  favicon guess is never made here — see the note at the end of lib/logodev.ts. */
+export function Logo({ domain, company }: { domain: string | null; company: string }) {
   const { theme } = useTheme();
   const chain = domain
     ? [logoUrl(domain, theme === "dark" ? "dark" : "light"), ...faviconUrls(domain)].filter(Boolean)
@@ -94,8 +97,8 @@ function Logo({ domain, company }: { domain: string | null; company: string }) {
   const src = chain[stage] ?? null;
   if (!src) {
     return (
-      <span className="fb" style={{ background: hueFor(company) }}>
-        {company.charAt(0)}
+      <span className="fb fallback" style={{ background: hueFor(company) }}>
+        {company.charAt(0) || "?"}
       </span>
     );
   }

@@ -13,7 +13,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "schema:drift": "node scripts/schema-drift-check.mjs",
-    "dataplane:build": "node scripts/build-dataplane.mjs"
+    "dataplane:build": "node scripts/build-dataplane.mjs",
+    "company:records": "node scripts/company-records.mjs",
+    "logo:backfill": "node scripts/logo-backfill.mjs",
+    "geocode:companies": "node scripts/geocode-companies.mjs"
   },
   "dependencies": {
     "@fingerprintjs/fingerprintjs": "^4",

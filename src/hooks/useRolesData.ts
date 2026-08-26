@@ -112,13 +112,27 @@ function officeFor(centroid: [number, number], coords: [number, number][]): [num
   return best;
 }
 
-// Companies without a street office fan out on a SMALL golden-angle disc around
-// the city centroid — capped at ~0.85km so pins never reach the sea (the old
-// per-role sunflower spread ~6km and dropped logos in the Mediterranean/port).
+// Companies without a street office fan out on a golden-angle disc around the
+// city centroid. Base radius ~0.85km (the old per-role sunflower spread ~6km
+// and dropped logos in the Mediterranean/port) — but a dense city with dozens
+// of office-less companies stacks pins at that fixed radius (issue #153 item
+// B2: 1Password, Adobe and hundreds more landed exactly on top of each other
+// in Barcelona/London/Berlin). The radius now grows with how many companies
+// actually share the disc, capped so it still never reaches the sea.
 const CO_DISC_DEG = 0.0085;
+const CO_DISC_DEG_MAX = 0.03;
+/** Per-city disc radius (degrees) for the n companies with no matched office
+ *  sharing it. n=10 (a typical smaller city) reproduces the original fixed
+ *  0.0085; a city with 30+ such companies (Barcelona, London, Berlin) fans out
+ *  further, capped at CO_DISC_DEG_MAX. Pure — pinned by
+ *  src/test/roles-disc-radius.test.ts. */
+export function discRadiusFor(n: number): number {
+  return Math.min(CO_DISC_DEG_MAX, CO_DISC_DEG * Math.sqrt(n / 10));
+}
 function centroidPlace(centroid: [number, number], idx: number, n: number): [number, number] {
-  const a = idx * 2.399963; // golden angle; idx is the company's stable rank in the city
-  const r = CO_DISC_DEG * Math.sqrt((idx + 0.5) / Math.max(n, 1));
+  const a = idx * 2.399963; // golden angle; idx is the company's stable rank among office-less peers in the city
+  const radius = discRadiusFor(n);
+  const r = radius * Math.sqrt((idx + 0.5) / Math.max(n, 1));
   return [
     centroid[0] + (r * Math.cos(a)) / Math.cos((centroid[1] * Math.PI) / 180),
     centroid[1] + r * Math.sin(a),
@@ -132,6 +146,7 @@ function enrichAll(
 ): RoleJob[] {
   const cityById = new Map<string, string | null>();
   const companiesByCity = new Map<string, Set<string>>(); // city -> set of normalized company names
+  const companyIdByGroup = new Map<string, string | null>(); // `${city}|${co}` -> a representative company_id
   for (const r of rows) {
     const city = cityOf(r.location);
     cityById.set(r.id, city);
@@ -139,35 +154,45 @@ function enrichAll(
       const set = companiesByCity.get(city) ?? new Set<string>();
       set.add(normName(r.company));
       companiesByCity.set(city, set);
+      const gk = `${city}|${normName(r.company)}`;
+      if (!companyIdByGroup.has(gk)) companyIdByGroup.set(gk, r.company_id);
     }
   }
-  // Stable per-company rank within each city (sorted) → deterministic disc slot.
-  const coIdx = new Map<string, number>(); // `${city}|${co}` -> idx
-  const coCount = new Map<string, number>(); // city -> distinct company count
-  for (const [city, set] of companiesByCity) {
-    const arr = [...set].sort();
-    coCount.set(city, arr.length);
-    arr.forEach((cn, i) => coIdx.set(`${city}|${cn}`, i));
-  }
+  // Pass 1: every company that HAS a matched office gets its position now, at
+  // the real coordinate — it never touches the sunflower disc. Everything else
+  // queues up per city, in stable sorted order, so the disc's radius (below)
+  // can be sized to the group that will actually share it.
   const posByGroup = new Map<string, [number, number] | null>(); // `${city}|${co}` -> shared point
+  const needsDiscByCity = new Map<string, string[]>(); // city -> [`${city}|${co}`, ...] sorted
+  for (const [city, set] of companiesByCity) {
+    const centroid = coordsOf(city);
+    const queue: string[] = [];
+    for (const cn of [...set].sort()) {
+      const gk = `${city}|${cn}`;
+      const companyId = companyIdByGroup.get(gk);
+      let pos: [number, number] | null = null;
+      if (centroid) {
+        const cands: [number, number][] = companyId ? [...(officesBySlug.get(companyId) ?? [])] : [];
+        const dim = companyId ? dims.get(companyId) : undefined;
+        if (dim && dim.lat != null && dim.lng != null) cands.push([dim.lng, dim.lat]);
+        pos = officeFor(centroid, cands);
+      }
+      if (pos) posByGroup.set(gk, pos);
+      else queue.push(gk);
+    }
+    if (queue.length) needsDiscByCity.set(city, queue);
+  }
+  // Pass 2: place the office-less queue on the disc, radius sized to ITS count.
+  for (const [city, queue] of needsDiscByCity) {
+    const centroid = coordsOf(city);
+    const n = queue.length;
+    queue.forEach((gk, idx) => {
+      posByGroup.set(gk, centroid ? centroidPlace(centroid, idx, n) : null);
+    });
+  }
   const posFor = (city: string | null, r: JobsRow): [number, number] | null => {
     if (!city) return null;
-    const gk = `${city}|${normName(r.company)}`;
-    const cached = posByGroup.get(gk);
-    if (cached !== undefined) return cached;
-    const centroid = coordsOf(city);
-    let pos: [number, number] | null = null;
-    if (centroid) {
-      // Candidate offices: the company's per-city offices (company_offices) plus
-      // its single companies.lat/lng, all treated as candidates — the nearest one
-      // within snap wins, so the Barcelona role lands on the Barcelona office.
-      const cands: [number, number][] = r.company_id ? [...(officesBySlug.get(r.company_id) ?? [])] : [];
-      const dim = r.company_id ? dims.get(r.company_id) : undefined;
-      if (dim && dim.lat != null && dim.lng != null) cands.push([dim.lng, dim.lat]);
-      pos = officeFor(centroid, cands) ?? centroidPlace(centroid, coIdx.get(gk) ?? 0, coCount.get(city) ?? 1);
-    }
-    posByGroup.set(gk, pos);
-    return pos;
+    return posByGroup.get(`${city}|${normName(r.company)}`) ?? null;
   };
   return rows.map((r) => {
     const city = cityById.get(r.id) ?? null;
