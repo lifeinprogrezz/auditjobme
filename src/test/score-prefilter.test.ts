@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   FALLBACK_CAP,
   PREFILTER_CAP,
+  hasReadableJd,
   prefilterJobs,
   prefilterTierOf,
 } from "@/lib/scorePrefilter";
@@ -17,6 +18,8 @@ type J = {
   sector?: string | null;
   first_seen_at?: string | null;
   posted_at?: string | null;
+  jd_text?: string | null;
+  has_jd?: boolean | null;
 };
 
 const job = (id: string, over: Partial<J> = {}): J => ({
@@ -229,5 +232,59 @@ describe("legacy stored labels are shimmed inside the predicate (#70 P1)", () =>
     const out = prefilterJobs(rows, { roles: ["Design"], sectors: [] });
     expect(out.length).toBe(rows.length);
     expect(prefilterTierOf(rows, { roles: ["Design"], sectors: [] })).toBe("newest");
+  });
+});
+
+// Issue #130: a role with no readable description never enters a paid slice.
+// Measured on production (12,623 scores): JD-less roles reach >=4.0 at 6.0% vs
+// 1.8% for roles with a JD, because nothing in an empty JD can disqualify a CV.
+describe("hasReadableJd", () => {
+  it("reads jd_text when it is present", () => {
+    expect(hasReadableJd({ jd_text: "We build things." })).toBe(true);
+    expect(hasReadableJd({ jd_text: "" })).toBe(false);
+    expect(hasReadableJd({ jd_text: "   \n\t " })).toBe(false);
+    expect(hasReadableJd({ jd_text: null })).toBe(false);
+  });
+
+  it("falls back to the has_jd flag when jd_text was not fetched", () => {
+    expect(hasReadableJd({ has_jd: true })).toBe(true);
+    expect(hasReadableJd({ has_jd: false })).toBe(false);
+  });
+
+  it("jd_text wins over the flag when both are present", () => {
+    expect(hasReadableJd({ jd_text: "", has_jd: true })).toBe(false);
+  });
+
+  it("fails open when neither field is known (a pre-#130 artifact)", () => {
+    expect(hasReadableJd({})).toBe(true);
+    expect(hasReadableJd({ has_jd: null })).toBe(true);
+  });
+});
+
+describe("prefilterJobs — no description, no score (#130)", () => {
+  it("drops JD-less rows from a targeted slice", () => {
+    const jobs = [job("with", { has_jd: true }), job("without", { has_jd: false }), job("blank", { jd_text: "  " })];
+    expect(ids(prefilterJobs(jobs, { roles: ["product"], sectors: [] }))).toEqual(["with"]);
+  });
+
+  it("drops JD-less rows from the no-labels newest slice", () => {
+    const jobs = [job("with", { has_jd: true }), job("without", { has_jd: false })];
+    expect(ids(prefilterJobs(jobs, { roles: [], sectors: [] }))).toEqual(["with"]);
+  });
+
+  it("drops them BEFORE the cap, so the slice is the freshest N readable roles", () => {
+    const jobs: J[] = [];
+    for (let i = 0; i < PREFILTER_CAP + 50; i++) {
+      // The 50 newest rows have no JD: they must not eat cap slots.
+      jobs.push(
+        job(`j${String(i).padStart(5, "0")}`, {
+          first_seen_at: new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString(),
+          has_jd: i < PREFILTER_CAP,
+        }),
+      );
+    }
+    const out = prefilterJobs(jobs, { roles: ["product"], sectors: [] });
+    expect(out.length).toBe(PREFILTER_CAP);
+    expect(out.every((j) => j.has_jd === true)).toBe(true);
   });
 });

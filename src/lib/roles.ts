@@ -6,6 +6,7 @@ import type { ScoreSubscore, ScoreEvidence } from "@/lib/scorePrompt";
 // nightly.ts is dependency-free, so the browser bundle and the Node nightly worker
 // share the exact same fallback instead of drifting apart. Issue #73 slice 3.
 import { jobSeenMs } from "@/lib/nightly";
+import { hasReadableJd } from "@/lib/scorePrefilter";
 
 /** Role-level structured facts extracted from the JD (jobs.extraction JSONB,
  *  written by scripts/extract-jd.mjs). Every field nullable; null = unknown →
@@ -45,6 +46,10 @@ export type RoleJob = {
    *  Null = unknown → workplaceOf() falls back to extraction.remote_policy, then
    *  the remote flag. Drives the headbar Workplace facet. */
   workplace?: string | null;
+  /** jobs.has_jd (generated): true when the description body has text. A role
+   *  without one is never scored and never shows a score (#130, hasReadableJd).
+   *  Optional only for a dataplane artifact built before the column existed. */
+  has_jd?: boolean | null;
   posted_at: string | null;
   /** When the scrape first saw this role (jobs.first_seen_at, NOT NULL in the DB).
    *  Optional here only because a pre-#73 dataplane artifact predates the column;
@@ -395,7 +400,9 @@ export function applyLandedScores(
   sort: boolean,
 ): RoleJob[] {
   const next = prev.map((x) => {
-    const hit = landed.get(x.id);
+    // #130: a score bought for a role with no description is never applied, so
+    // a stale row cannot rank it. The row keeps its identity.
+    const hit = hasReadableJd(x) ? landed.get(x.id) : undefined;
     return hit
       ? {
           ...x,

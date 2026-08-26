@@ -43,6 +43,7 @@
   URL canonicalization) · `location_raw` · `country` · `city` · `remote_mode`
   (onsite | hybrid | remote_eu | remote_global) · `posted_at` (nullable) ·
   `first_seen_at` · `last_seen_at` · `status` (live | dead | expired) · `jd_text` ·
+  `has_jd` (generated: `jd_text` has non-blank text; issue #130) ·
   `jd_lang` · `source` (which scraper) · `uk_sponsor_licensed` (nullable boolean — from
   the UK Home Office register; null = unknown/ambiguous → shown with a warning, never hidden).
 
@@ -58,7 +59,10 @@
 - `user_id` + `job_id` (composite pk) · `rubric_version` · `signals` (jsonb — the LLM
   signal breakdown) · `raw_score` · `effective_score` (after penalties/boosts) ·
   `scored_at`. Hard prefilters (geo, title, language) run BEFORE scoring — jobs failing
-  them get no row, not a low score. That is the cost-control discipline.
+  them get no row, not a low score. That is the cost-control discipline. A job with no
+  readable `jd_text` (null or blank; `jobs.has_jd` is the generated stand-in) is never
+  scored by any path and any older score it holds is not shown (issue #130,
+  `hasReadableJd` in `src/lib/scorePrefilter.ts`).
 
 **applications** — the tracker.
 - `id` (pk) · `user_id` · `job_id` · `status` (saved | applied | responded | interview |

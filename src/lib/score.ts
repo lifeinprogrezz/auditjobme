@@ -9,6 +9,7 @@ import {
   type ScoreableProfile,
   type ScoreableJob,
 } from "@/lib/scorePrompt";
+import { hasReadableJd } from "@/lib/scorePrefilter";
 
 // Rubric, prompt shaping, and parsing live in scorePrompt.ts (pure, no client
 // import) so the nightly worker (api/nightly.ts) reuses the exact same rubric.
@@ -21,6 +22,8 @@ export async function scoreJob(
   profile: ScoreableProfile,
   job: ScoreableJob,
 ): Promise<ParsedScore | null> {
+  // #130: no readable description, no paid call. Same predicate as every other path.
+  if (!hasReadableJd(job)) return null;
   const userMsg = buildScoreUserMessage(profile, job);
 
   const { data, error } = await supabase.functions.invoke("anthropic-proxy", {

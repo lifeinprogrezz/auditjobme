@@ -30,6 +30,7 @@
 //   GitHub Action sends it as `Authorization: Bearer <CRON_SECRET>`).
 import { createClient } from "@supabase/supabase-js";
 import { pickScoringSlice } from "../src/lib/labels.js";
+import { hasReadableJd } from "../src/lib/scorePrefilter.js";
 import { buildScoreSystem, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION, type ParsedScore } from "../src/lib/scorePrompt.js";
 import { splitByLedger, toScoresRow, SCORES_ON_CONFLICT, type LedgerRow } from "../src/lib/scoreLedger.js";
 import {
@@ -382,12 +383,17 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     sector: r.company_id ? (sectorBySlug.get(r.company_id) ?? null) : null,
     first_seen_at: r.first_seen_at,
     posted_at: r.posted_at,
-  }));
+  }))
+    // #130: a role with no readable description is never a nightly candidate,
+    // neither bought nor reused from the ledger. Filtered BEFORE the top-N cut.
+    .filter(hasReadableJd);
   // url → {company,title,location} for rebuilding the email preview on the
   // retry-email path (daily_matches stores only job_url, not the display fields).
   // Location joined the set with the per-role email rows (issue #72 slice 3).
+  // Built from every live row, not the #130-filtered candidates: a match stored
+  // before the rule may point at a JD-less role and still needs its display fields.
   const jobByUrl = new Map(
-    jobs.map((j) => [j.url, { company: j.company, title: j.title, location: j.location ?? null }]),
+    (jobRows ?? []).map((j) => [j.url, { company: j.company, title: j.title, location: j.location ?? null }]),
   );
 
   const summary = {

@@ -65,3 +65,20 @@ describe("applyLandedScores", () => {
     expect(out.find((j) => j.id === "a")?.score).toBeNull();
   });
 });
+
+// Issue #130: a landed score for a role with no readable description is never
+// applied, so a stale row cannot rank it. The row keeps its identity (no rebuild).
+describe("applyLandedScores — no description (#130)", () => {
+  it("skips a landed score whose role has no description", () => {
+    const noJd = { ...job("x", "Xi"), has_jd: false } as RoleJob;
+    const withJd = { ...job("y", "Psi"), has_jd: true } as RoleJob;
+    const landed = new Map([
+      ["x", { score: 4.9, reason: "empty JD, nothing to disqualify" }],
+      ["y", { score: 3.1, reason: "real fit" }],
+    ]);
+    const out = applyLandedScores([noJd, withJd], landed, true);
+    expect(out.find((j) => j.id === "x")).toBe(noJd);
+    expect(out.find((j) => j.id === "y")).toMatchObject({ score: 3.1 });
+    expect(out.map((j) => j.id)).toEqual(["y", "x"]);
+  });
+});

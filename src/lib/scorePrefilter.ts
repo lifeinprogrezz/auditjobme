@@ -4,6 +4,8 @@
 // user's chosen targets with a hard cost ceiling. Shared by the backlog worker
 // (api/score-backlog.ts — what gets paid for) and useRolesData (what "still
 // scoring" means) — the two MUST agree or /roles polls forever.
+// Issue #130 adds the readability gate (hasReadableJd): a role with no description
+// never enters a slice, on any paid path. That removes ~31% of score purchases.
 // Client-import-free (like labels.ts). Pinned by src/test/score-prefilter.test.ts.
 // Spec: planning repo docs/specs/2026-08-19-score-backlog-prefilter-design.md.
 // The .js extension is load-bearing, not style: api/score-backlog.ts imports this
@@ -38,7 +40,28 @@ export type PrefilterJob = {
   sector?: string | null;
   first_seen_at?: string | null;
   posted_at?: string | null;
+  /** Description body, when the caller fetched it (nightly, the interactive scorer). */
+  jd_text?: string | null;
+  /** jobs.has_jd — a generated column, true when jd_text has non-blank text. The
+   *  lightweight stand-in for callers that do not fetch the multi-KB body (the
+   *  backlog worker, the dataplane artifact, the client). */
+  has_jd?: boolean | null;
 };
+
+/** A job the scorer can actually read (issue #130). The ONE predicate every
+ *  paid path and every score render routes through. Measured on production
+ *  (12,623 scores): roles with an empty jd_text scored >=4.0 at 6.0% versus 1.8%
+ *  for roles with a JD, because nothing in an empty JD can disqualify a CV. The
+ *  owner's rule: only roles we can read get a score; the rest wait.
+ *
+ *  jd_text wins when present (null or blank = unreadable); otherwise the has_jd
+ *  flag. Neither known = fail OPEN: that is a dataplane artifact built before the
+ *  column existed, and missing knowledge is not a missing description. */
+export function hasReadableJd(job: { jd_text?: string | null; has_jd?: boolean | null }): boolean {
+  if (job.jd_text !== undefined) return typeof job.jd_text === "string" && job.jd_text.trim().length > 0;
+  if (typeof job.has_jd === "boolean") return job.has_jd;
+  return true;
+}
 
 /** When this row appeared, epoch ms: first_seen_at → posted_at → 0 (unknown
  *  sorts last, but is never filtered out — fail-open on missing dates). */
@@ -65,7 +88,7 @@ function sectorOk(j: PrefilterJob, sectors: string[]): boolean {
 /** How a role's fit should be presented. Before the prefilter, every unscored
  *  role was genuinely mid-pass; now a role outside the paid slice never scores,
  *  so "scoring…" copy would be a permanent lie. Pinned by score-status.test.ts. */
-export type ScoreStatus = "scored" | "scoring" | "not-scored";
+export type ScoreStatus = "scored" | "scoring" | "not-scored" | "no-description";
 
 /** Which rung of the degradation ladder produced a slice.
  *  targeted  — every label the user picked was honoured.
@@ -76,9 +99,23 @@ export type PrefilterTier = "targeted" | "role-only" | "newest";
 
 /** The single decision point for that distinction — every surface that renders a
  *  pending state MUST route through here rather than testing `score == null`. */
-export function scoreStatusOf(score: number | null | undefined, eligible: boolean): ScoreStatus {
+export function scoreStatusOf(
+  score: number | null | undefined,
+  eligible: boolean,
+  readable: boolean = true,
+): ScoreStatus {
+  // #130: checked FIRST. A JD-less role may still hold a score bought before the
+  // rule; it is not shown, so the role cannot rank on it.
+  if (!readable) return "no-description";
   if (score != null) return "scored";
   return eligible ? "scoring" : "not-scored";
+}
+
+/** Plain copy for a pending status, shared by every card and chip. */
+export function pendingLabelOf(status: ScoreStatus): string {
+  if (status === "scoring") return "Scoring";
+  if (status === "no-description") return "No description yet";
+  return "Not scored yet";
 }
 
 /**
@@ -110,6 +147,10 @@ export function prefilterWithTier<T extends PrefilterJob>(
   const sectors = normalizeTargetSectors(labels.sectors);
   const byNewest = (a: T, b: T) => seenMs(b) - seenMs(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const take = (rows: T[], cap: number) => rows.sort(byNewest).slice(0, cap);
+
+  // #130: a role the scorer cannot read never enters a slice. Dropped BEFORE the
+  // caps so a JD-less row never holds a slot the freshest readable role should get.
+  jobs = jobs.filter(hasReadableJd);
 
   if (roles.length === 0 && sectors.length === 0) {
     return { jobs: take([...jobs], FALLBACK_CAP), tier: "newest" };

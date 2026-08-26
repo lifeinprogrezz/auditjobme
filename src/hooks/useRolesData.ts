@@ -9,7 +9,7 @@ import { inFlightCompanyKeys } from "@/lib/product";
 import { isInFlightStatus } from "@/lib/tracker";
 import { hashCv, readCvStash, clearCvStash, normalizeTargetRoles } from "@/lib/labels";
 import { normalizeTargetSectors } from "@/lib/sectors";
-import { prefilterJobs } from "@/lib/scorePrefilter";
+import { hasReadableJd, prefilterJobs } from "@/lib/scorePrefilter";
 import { fetchAllPages } from "@/lib/pagedSelect";
 import { shouldPromptCv } from "@/lib/deviceSession";
 import { cityOf, coordsOf } from "@/lib/geo";
@@ -37,6 +37,8 @@ type JobsRow = {
   extraction: RoleExtraction | null;
   role_family: string | null;
   workplace: string | null;
+  /** jobs.has_jd (#130): optional only for an artifact built before the column. */
+  has_jd?: boolean | null;
 };
 
 const PAGE = 1000; // PostgREST caps un-ranged selects at 1000 rows — page past it.
@@ -420,7 +422,7 @@ export function useRolesData() {
         for (let from = 0; ; from += PAGE) {
           const { data, error } = await supabase
             .from("jobs")
-            .select("id, company, title, url, location, remote, source, seniority, posted_at, first_seen_at, company_id, extraction, role_family, workplace")
+            .select("id, company, title, url, location, remote, source, seniority, posted_at, first_seen_at, company_id, extraction, role_family, workplace, has_jd")
             .eq("is_live", true)
             .range(from, from + PAGE - 1);
           if (error || !data) break;
@@ -515,14 +517,19 @@ export function useRolesData() {
           evidence: sig?.evidence ?? null,
         };
       });
-      const scoredRows = enrichAll(rows, dims, officesBySlug).map((j) => ({
-        ...j,
-        score: scoreByJob[j.id]?.score ?? null,
-        reason: scoreByJob[j.id]?.reason ?? null,
-        fitBullets: scoreByJob[j.id]?.fitBullets ?? null,
-        subscores: scoreByJob[j.id]?.subscores ?? null,
-        evidence: scoreByJob[j.id]?.evidence ?? null,
-      }));
+      const scoredRows = enrichAll(rows, dims, officesBySlug).map((j) => {
+        // #130: a score held by a role with no description is not applied, so
+        // the role renders as unscored and cannot rank on a stale row.
+        const hit = hasReadableJd(j) ? scoreByJob[j.id] : undefined;
+        return {
+          ...j,
+          score: hit?.score ?? null,
+          reason: hit?.reason ?? null,
+          fitBullets: hit?.fitBullets ?? null,
+          subscores: hit?.subscores ?? null,
+          evidence: hit?.evidence ?? null,
+        };
+      });
       // Dev-only (VITE_E2E_BYPASS_AUTH under vite dev): the mock user has no JWT, so
       // the query above returns nothing and every authed surface renders empty. Fill
       // the gaps with obviously-labelled synthetic scores so an automated walk can

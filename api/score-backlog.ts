@@ -63,6 +63,9 @@ type LiveJob = {
   first_seen_at: string | null;
   posted_at: string | null;
   sector: string | null;
+  /** jobs.has_jd (#130): the prefilter drops rows without a readable JD, so the
+   *  multi-KB body is still fetched only per scoring batch. */
+  has_jd: boolean | null;
 };
 
 /** Score one job for one user through the proxy's service-role path. Never throws.
@@ -215,7 +218,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // sector lives on companies — embedded here so the prefilter's sector
       // dimension (#114) sees the same value the map's dataplane join carries.
       .select(
-        "id, company, title, location, remote, seniority, extraction, role_family, first_seen_at, posted_at, companies:company_id (sector)",
+        "id, company, title, location, remote, seniority, extraction, role_family, first_seen_at, posted_at, has_jd, companies:company_id (sector)",
       )
       .eq("is_live", true)
       .range(from, from + PAGE - 1);

@@ -555,6 +555,7 @@ export type Database = {
           extraction: Json | null
           extraction_version: string | null
           first_seen_at: string
+          has_jd: boolean | null
           id: string
           is_live: boolean
           jd_hash: string | null
