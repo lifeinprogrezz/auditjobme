@@ -162,7 +162,7 @@ export function isConfirmUrl(url: string | undefined | null): boolean {
  */
 export function isGmailConfirmSuccess(status: number, bodyText: string): boolean {
   if (status !== 200) return false;
-  return !/error|invalid|expired/i.test(bodyText);
+  return !/\b(error|invalid|expired)\b/i.test(bodyText);
 }
 
 /** The Settings live status line ("Address created · Confirmation received ·

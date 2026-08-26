@@ -536,6 +536,12 @@ describe("isGmailConfirmSuccess (reading the fetch that follows the confirm link
     expect(isGmailConfirmSuccess(500, "confirmed")).toBe(false);
     expect(isGmailConfirmSuccess(403, "confirmed")).toBe(false);
   });
+
+  it("matches the reject words on boundaries only, so a substring like 'onerror' in page script doesn't false-reject a real confirmation", () => {
+    expect(
+      isGmailConfirmSuccess(200, "<script>window.onerror=function(){};</script>Forwarding confirmed."),
+    ).toBe(true);
+  });
 });
 
 describe("forwardingStatus (the Settings live status line, 4 states)", () => {

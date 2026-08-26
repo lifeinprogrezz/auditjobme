@@ -109,6 +109,19 @@ export async function confirmGmailForwarding(url: string, fetchImpl: typeof fetc
     // jsdom's AbortSignal (vitest environment) has no .timeout — degrade to no signal there.
     const signal = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(10_000) : undefined;
     const res = await fetchImpl(url, { method: "GET", redirect: "follow", signal });
+    // redirect:'follow' from an unauthenticated fetch means Gmail can bounce the
+    // request to a sign-in or consent interstitial (accounts.google.com,
+    // consent.google.com) instead of ever reaching the confirm page — and that
+    // interstitial is itself a 200 whose body may not contain "error"/"invalid"/
+    // "expired". The word check alone can't tell that apart from a real
+    // confirmation, so the final URL must have actually landed on Gmail.
+    let landedOnGmail = false;
+    try {
+      landedOnGmail = new URL(res.url).hostname === "mail.google.com";
+    } catch {
+      landedOnGmail = false;
+    }
+    if (!landedOnGmail) return false;
     const text = await res.text();
     return isGmailConfirmSuccess(res.status, text);
   } catch {
