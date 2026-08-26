@@ -1,0 +1,60 @@
+# Company records + logo domains + geocoded offices, ON DEMAND, with a bigger
+# budget than the daily scrape's polite per-run caps (400 records / 200 geocodes).
+# The daily scrape keeps its small caps; this one exists to catch up fast when
+# the catalog grows (2026-08-26: 1,220 companies on the map, 262 with a real
+# office after the first run — the owner wants the startupmap look, logos at
+# real addresses, this week not next month). Nominatim is still called at
+# 1 request/second by the script itself; a budget of 1,000 is ~17 minutes.
+# Publishes the dataplane at the end so the map picks the new offices up.
+name: Company data catch-up
+
+on:
+  workflow_dispatch:
+    inputs:
+      geocode_budget:
+        description: "Geocoder calls this run (1 req/s; 1000 ≈ 17 min)"
+        required: false
+        default: "1000"
+      records_limit:
+        description: "Company records to create this run"
+        required: false
+        default: "1000"
+
+permissions:
+  contents: read
+
+jobs:
+  company-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - name: Create company records for job-derived companies
+        run: node scripts/company-records.mjs --limit=${{ github.event.inputs.records_limit || '1000' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Backfill missing company logo domains
+        continue-on-error: true
+        run: node scripts/logo-backfill.mjs --apply
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Geocode company offices
+        continue-on-error: true
+        run: node scripts/geocode-companies.mjs --budget=${{ github.event.inputs.geocode_budget || '1000' }} --max-tuples=5000
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+      - name: Publish the static dataplane (jobs + companies + offices → Storage)
+        run: node scripts/build-dataplane.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
