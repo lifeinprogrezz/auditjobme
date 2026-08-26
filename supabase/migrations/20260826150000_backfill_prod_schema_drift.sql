@@ -69,12 +69,21 @@ alter table public.companies
 -- ALL whitespace removed, lower-cased: production carries some functions as
 -- re-applied compact copies of the same code (uppercase keywords, comments
 -- stripped), and that formatting is not drift. A changed token is.
+--
+-- search_path is pinned to `public` (not '') on purpose: pg_get_constraintdef,
+-- pg_get_triggerdef, pg_get_viewdef and pg_policies qualify names relative to
+-- the session search_path, so with '' every definition reads `public.jobs`
+-- while a capture over an ordinary connection reads `jobs`. Pinning it makes
+-- the output the same on every transport. Every catalog reference below is
+-- schema-qualified anyway, so nothing here resolves through the path.
+-- (The compare also normalises the prefix away — scripts/schema-drift-lib.mjs
+-- — so a snapshot taken under either setting still matches.)
 create or replace function public.schema_snapshot()
 returns jsonb
 language sql
 stable
 security definer
-set search_path = ''
+set search_path = public
 as $$
   select jsonb_build_object(
     'tables', (

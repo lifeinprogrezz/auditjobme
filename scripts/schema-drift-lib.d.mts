@@ -7,6 +7,9 @@ export type SchemaSnapshot = Partial<Record<string, SnapshotRow[]>>;
 /** The sections public.schema_snapshot() emits and the compare walks. */
 export const SNAPSHOT_SECTIONS: readonly string[];
 
+/** Strip `public.` qualification and collapse whitespace in a definition string; non-strings pass through. */
+export function normalizeDef<T>(v: T): T;
+
 /** Stable, sorted form of a snapshot for committing. */
 export function canonicalSnapshot(snapshot: SchemaSnapshot): SchemaSnapshot;
 

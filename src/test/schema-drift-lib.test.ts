@@ -101,6 +101,30 @@ describe("diffSchemaSnapshots", () => {
     expect(diffSchemaSnapshots(canonicalSnapshot(a), a)).toEqual([]);
   });
 
+  it("ignores schema qualification and whitespace, which vary with the session search_path", () => {
+    const live = base();
+    live.constraints[0].def = "FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON DELETE CASCADE";
+    const snap = base();
+    snap.constraints[0].def = "FOREIGN KEY (job_id)  REFERENCES jobs(id) ON DELETE CASCADE ";
+    live.triggers[0].def = "CREATE TRIGGER t AFTER INSERT ON public.applications FOR EACH ROW EXECUTE FUNCTION public.log_application_status_event()";
+    snap.triggers[0].def = "CREATE TRIGGER t AFTER INSERT ON applications FOR EACH ROW EXECUTE FUNCTION log_application_status_event()";
+    live.views[0].def = " SELECT id,\n    username\n   FROM public.profiles p";
+    snap.views[0].def = " SELECT id,\n    username\n   FROM profiles p";
+    live.policies[0].qual = "(EXISTS ( SELECT 1 FROM public.applications a WHERE (a.job_id = jobs.id)))";
+    snap.policies[0].qual = "(EXISTS ( SELECT 1\n   FROM applications a\n  WHERE (a.job_id = jobs.id)))";
+    expect(diffSchemaSnapshots(snap, live)).toEqual([]);
+  });
+
+  it("still reports a real change inside a definition after normalisation", () => {
+    const live = base();
+    live.constraints[0].def = "FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON DELETE SET NULL";
+    const snap = base();
+    snap.constraints[0].def = "FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE";
+    expect(diffSchemaSnapshots(snap, live)).toEqual([
+      '~ constraints jobs.jobs_pkey: def snapshot="FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE" live="FOREIGN KEY (job_id) REFERENCES public.jobs(id) ON DELETE SET NULL"',
+    ]);
+  });
+
   it("covers every section the snapshot function emits", () => {
     expect([...SNAPSHOT_SECTIONS].sort()).toEqual(
       ["columns", "constraints", "functions", "indexes", "policies", "tables", "triggers", "views"],

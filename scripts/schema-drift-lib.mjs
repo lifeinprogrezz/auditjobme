@@ -28,8 +28,20 @@ function keyOf(section, row) {
   return String(row.name);
 }
 
+/**
+ * Definitions come out of pg_get_constraintdef / pg_get_triggerdef / pg_get_viewdef
+ * / pg_policies with names schema-qualified or not depending on the session
+ * search_path (`REFERENCES public.jobs(id)` vs `REFERENCES jobs(id)`), and with
+ * whatever line breaks the deparser chose. Neither is drift. Strip the `public.`
+ * prefix and collapse whitespace before comparing; the reported values stay raw.
+ */
+export function normalizeDef(v) {
+  if (typeof v !== "string") return v;
+  return v.replace(/\bpublic\./g, "").replace(/\s+/g, " ").trim();
+}
+
 function same(a, b) {
-  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  return JSON.stringify(normalizeDef(a) ?? null) === JSON.stringify(normalizeDef(b) ?? null);
 }
 
 function show(v) {
