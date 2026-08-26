@@ -483,4 +483,21 @@ describe("nightlyRunVerdict (a total failure must not report success)", () => {
     expect(v.status).toBe(200);
     expect(v.failed).toBe(2);
   });
+
+  // The morning drain window ticks every 10 minutes. After the first tick has served
+  // everyone, every later tick finds each user "already matched and notified today",
+  // takes the skip path, and processes nobody — that is the job DONE, not an outage.
+  // From 2026-08-20 to 08-26 this shape answered 500 on every follow-up tick, so the
+  // scheduled Action went red 4-5 times each morning after a real success.
+  it("succeeds when every user was already served today (processed 0, done N)", () => {
+    const v = nightlyRunVerdict({ users: 1, processed: 0, failed: 0, done: 1 });
+    expect(v.ok).toBe(true);
+    expect(v.status).toBe(200);
+  });
+
+  it("still FAILS when nobody was processed and nobody was already done", () => {
+    const v = nightlyRunVerdict({ users: 2, processed: 0, failed: 0, done: 0 });
+    expect(v.ok).toBe(false);
+    expect(v.status).toBe(500);
+  });
 });
