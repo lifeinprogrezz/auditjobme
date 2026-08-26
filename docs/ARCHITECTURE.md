@@ -203,6 +203,20 @@ Migrations are plain SQL in `supabase/migrations/`, timestamp-prefixed (39 today
   the repository stays the canonical record.
 - **The project reference of record is `VITE_SUPABASE_URL` in the frontend `.env`**, not
   `config.toml` — a stale reference in `config.toml` once mis-aimed tooling at a dead project.
+- **The migration set must reproduce production, and CI proves it** (issue #132).
+  `supabase/schema-snapshot.json` is production's public schema — tables, columns,
+  constraints, indexes, policies, functions (signature, `SECURITY DEFINER`, `search_path`,
+  and a hash of the body with comments, whitespace and letter case removed), triggers and
+  views — as returned by `public.schema_snapshot()`. Two CI jobs compare against it:
+  `migrations-rls` builds a database from `supabase/migrations/` and diffs it (a `+` line is
+  an object only production has: write a migration; a `-` line is a migration never
+  applied there), and `schema-drift-prod` reads production through the service role.
+  Grants are not in the snapshot: the hosted stack and the local one differ in their
+  default privileges. After a schema change lands in both places, refresh the file with
+  `npm run schema:drift -- --write` (needs `DATABASE_URL` plus `psql`, or `SUPABASE_URL`
+  plus `SUPABASE_SERVICE_ROLE_KEY`) and commit it in the same change. `npm run schema:drift`
+  alone runs the comparison. Compare logic: `scripts/schema-drift-lib.mjs`, pinned by
+  `src/test/schema-drift-lib.test.ts`.
 
 Row-level security is the enforcement layer; client-side checks are decoration. Per-user
 tables expose own-row policies only. `usage_events` is **not** client-writable — the proxy
