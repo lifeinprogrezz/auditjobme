@@ -218,6 +218,65 @@ describe("useYourMatchesDefault — settle waits for hasCv, not just hasScore (f
     act(() => rerender({ ...settled, hasCv: true, hasScore: false, mine: result.current.mine }));
     expect(result.current.mine).toBe(true);
   });
+
+  it("the real page-load order: profileChecked lands with hasCv still false, then hasCv rises (fix round 3, blocker 1)", () => {
+    // The exact repro from fix round 3: unlike the test above, hasCv never
+    // drops back to false at any point — it starts false and rises exactly
+    // once. The round-2 fix's reset effect (keyed on a hasCv value CHANGE)
+    // never fired on the false renders, so the lock the settle effect took
+    // while hasCv was false survived into the render where hasCv turned
+    // true, and that render's own settle pass found itself already locked
+    // out — swallowing the stored "1" until a full reload.
+    writeStoredMine(true);
+    const base: YourMatchesSignals = {
+      authLoading: true,
+      profileChecked: false,
+      signedIn: false,
+      hasCv: false,
+      hasScore: false,
+      stored: null,
+      mine: false,
+    };
+    const { result, rerender } = renderHook((signals: YourMatchesSignals) => useHarness(signals), {
+      initialProps: base,
+    });
+    expect(result.current.mine).toBe(false);
+
+    // Auth resolves: signed in, but hasCv is still false.
+    act(() =>
+      rerender({ ...base, authLoading: false, signedIn: true, stored: readStoredMine(), mine: result.current.mine }),
+    );
+    expect(result.current.mine).toBe(false);
+
+    // profileChecked lands — hasCv is STILL false. This is the render that
+    // used to lock `settled.current` permanently via the stored-choice
+    // bypass in settleMineDefault.
+    act(() =>
+      rerender({
+        ...base,
+        authLoading: false,
+        signedIn: true,
+        profileChecked: true,
+        stored: readStoredMine(),
+        mine: result.current.mine,
+      }),
+    );
+    expect(result.current.mine).toBe(false);
+
+    // CV added in-session, no reload — the stored explicit "1" must land.
+    act(() =>
+      rerender({
+        ...base,
+        authLoading: false,
+        signedIn: true,
+        profileChecked: true,
+        hasCv: true,
+        stored: readStoredMine(),
+        mine: result.current.mine,
+      }),
+    );
+    expect(result.current.mine).toBe(true); // was stuck at false before the fix
+  });
 });
 
 describe("useYourMatchesDefault — an explicit toggle (not this hook) is the only writer", () => {
