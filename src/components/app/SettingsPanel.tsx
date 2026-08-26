@@ -477,8 +477,11 @@ export default function SettingsPanel({
           This deletes your account and everything stored with it:
         </p>
         <ul className="mt-3 list-disc space-y-1 pl-5 text-body text-muted-foreground">
+          {/* Keyed by table AND column: a table can appear twice, once per user
+              column (referrals is read by referee_id and by referrer_id), and the
+              table alone then repeats a key and React drops one line silently. */}
           {USER_DATA_TABLES.map((t) => (
-            <li key={t.table}>{t.label}</li>
+            <li key={`${t.table}.${t.column}`}>{t.label}</li>
           ))}
         </ul>
         <p className="mt-3 text-body text-muted-foreground text-pretty">

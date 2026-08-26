@@ -125,6 +125,19 @@ describe("SettingsPanel — account section (issue #84)", () => {
     }
   });
 
+  // The list is keyed per ENTRY, not per table: referrals appears twice, once per
+  // user column. Keyed by table alone it repeated a key, which React reports as an
+  // error on every /settings load and which lets one line be dropped or reordered.
+  it("keys the delete list per entry, so a table listed twice never repeats a key", () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    const duplicateKeyWarnings = errors.mock.calls.filter((args) =>
+      args.some((a) => typeof a === "string" && /same key/i.test(a)),
+    );
+    expect(duplicateKeyWarnings).toEqual([]);
+    errors.mockRestore();
+  });
+
   it("a single click never deletes: confirmation is typed, and the wrong word stays disabled", () => {
     const { onDeleteAccount } = renderPanel();
     fireEvent.click(screen.getByRole("button", { name: /Delete my account/i }));
