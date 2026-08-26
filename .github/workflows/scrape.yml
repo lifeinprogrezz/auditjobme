@@ -41,9 +41,14 @@ jobs:
           # Optional: residential/rotating proxy for the datacenter-IP-blocked sources
           # (startupmap, Meta). Unset = those two fetch direct (and get blocked from CI).
           SCRAPE_PROXY_URL: ${{ secrets.SCRAPE_PROXY_URL }}
-      - name: Backfill missing JD bodies via ATS detail APIs (LLM-free)
+      # Issue #143 (follow-up to #130): a role with no readable jd_text is never
+      # scored, so every blank row this fills is a role that can rank tomorrow.
+      # Runs AFTER ingestion, BEFORE extraction, so a filled body is extracted in
+      # the same run and scored on the next backlog tick. Bounded: 300 rows per
+      # run, newest first (the cap is BACKFILL_LIMIT in scripts/jd-backfill-lib.mjs).
+      - name: Backfill missing JD bodies via ATS detail APIs (LLM-free, 300 rows/run)
         continue-on-error: true # additive; a hiccup must never fail the core scrape
-        run: node scripts/jd-backfill.mjs
+        run: node scripts/jd-backfill.mjs --limit 300
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
