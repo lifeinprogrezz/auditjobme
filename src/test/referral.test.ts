@@ -1,6 +1,7 @@
-// Pins the client half of referral attribution (issue #78, attribution only — the
-// reward half is blocked on #35). Two behaviours matter and both have failure modes
-// that would silently lose the referral graph:
+// Pins the client half of referral attribution (issue #78) plus the issue #160
+// count/perk additions (the money reward half still stays blocked on #35). Two
+// capture/claim behaviours matter and both have failure modes that would silently
+// lose the referral graph:
 //   1. CAPTURE — `?ref={token}` must survive the sign-up flow. Google OAuth lands
 //      back on the bare origin, so the token's only way across is localStorage; a
 //      capture that drops it, or that accepts junk, breaks attribution or stores
@@ -17,6 +18,8 @@ import {
   refTokenFromSearch,
   inviteLink,
   claimStoredReferral,
+  formatReferralCount,
+  isMissingReferralCountFn,
   type ClaimRpc,
   type RefStorage,
 } from "@/lib/referral";
@@ -132,5 +135,33 @@ describe("claim: fires once, clears on settled outcomes, retries on transport er
     expect(await claimStoredReferral(rpc, storage)).toBe("none");
     expect(rpc.calls).toHaveLength(0);
     expect(storage.map.has(REF_STORAGE_KEY)).toBe(false);
+  });
+});
+
+describe("formatReferralCount: the Settings attribution line (issue #160)", () => {
+  it("hides the line when the count is not available", () => {
+    expect(formatReferralCount(null)).toBe(null);
+  });
+  it("singular for exactly one", () => {
+    expect(formatReferralCount(1)).toBe("1 person joined through you.");
+  });
+  it("plural for zero and for many", () => {
+    expect(formatReferralCount(0)).toBe("0 people joined through you.");
+    expect(formatReferralCount(7)).toBe("7 people joined through you.");
+  });
+});
+
+describe("isMissingReferralCountFn: my_referral_count absent on this environment", () => {
+  it("recognizes the Postgres and PostgREST missing-function shapes", () => {
+    expect(isMissingReferralCountFn({ code: "42883", message: "function does not exist" })).toBe(true);
+    expect(isMissingReferralCountFn({ code: "PGRST202", message: "Could not find the function" })).toBe(true);
+    expect(
+      isMissingReferralCountFn({ message: "Could not find the function public.my_referral_count" }),
+    ).toBe(true);
+  });
+  it("does not misfire on an unrelated error", () => {
+    expect(isMissingReferralCountFn({ code: "PGRST116", message: "no rows" })).toBe(false);
+    expect(isMissingReferralCountFn({ message: "network error" })).toBe(false);
+    expect(isMissingReferralCountFn(null)).toBe(false);
   });
 });

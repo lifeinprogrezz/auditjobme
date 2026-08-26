@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   selectBacklog,
+  prioritizeUsers,
   runPool,
   shouldSendReadyEmail,
   buildReadySubject,
@@ -17,6 +18,34 @@ describe("selectBacklog", () => {
   });
   it("fully scored → empty backlog", () => {
     expect(selectBacklog(jobs, new Set(["a", "b", "c"]))).toEqual([]);
+  });
+});
+
+describe("prioritizeUsers: issue #160 invite perk (queue priority, not a cap)", () => {
+  const users = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
+
+  it("moves referred users first, keeping everyone", () => {
+    const out = prioritizeUsers(users, new Set(["c"]));
+    expect(out.map((u) => u.id)).toEqual(["c", "a", "b", "d"]);
+    expect(out).toHaveLength(users.length); // nobody dropped — order only
+  });
+
+  it("stable within each group: no referrals leaves the order untouched", () => {
+    expect(prioritizeUsers(users, new Set()).map((u) => u.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("multiple referred users keep their relative order, then the rest keep theirs", () => {
+    const out = prioritizeUsers(users, new Set(["d", "b"]));
+    expect(out.map((u) => u.id)).toEqual(["b", "d", "a", "c"]);
+  });
+
+  it("everyone referred is a no-op reorder", () => {
+    const out = prioritizeUsers(users, new Set(["a", "b", "c", "d"]));
+    expect(out.map((u) => u.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("empty user list", () => {
+    expect(prioritizeUsers([], new Set(["a"]))).toEqual([]);
   });
 });
 

@@ -27,6 +27,25 @@ export function selectBacklog<T extends { id: string }>(
 }
 
 /**
+ * Issue #160: the honest perk on an invite — "people you invite get scored first".
+ * A stable partition, not a filter: every user still gets scored (no cap, nobody is
+ * refused anything), referred users just drain first within this tick's time budget.
+ * Ties (referred-vs-referred, non-referred-vs-non-referred) keep the caller's
+ * existing order, so this changes nothing for a run with no referrals at all.
+ */
+export function prioritizeUsers<T extends { id: string }>(
+  users: T[],
+  referredIds: Set<string>,
+): T[] {
+  const referred: T[] = [];
+  const rest: T[] = [];
+  for (const u of users) {
+    (referredIds.has(u.id) ? referred : rest).push(u);
+  }
+  return [...referred, ...rest];
+}
+
+/**
  * Bounded worker pool with a deadline: `limit` workers pull items until the list
  * is exhausted OR `now() >= deadlineMs` (in-flight calls always finish; no new
  * ones start past the deadline). Returns how many items were processed — the

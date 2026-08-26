@@ -160,9 +160,10 @@ export default function Settings() {
           section: owns its token read/create, so the pure SettingsPanel and its
           test stay untouched. */}
       <ForwardingSection />
-      {/* Issue #78 — referral attribution: the invite link, nothing more (the
-          reward half is blocked on #35). Self-contained like ForwardingSection,
-          so the pure SettingsPanel and its test stay untouched. */}
+      {/* Issue #78 — referral attribution: the invite link, "N people joined
+          through you" and the #160 queue-priority perk (the money reward stays
+          blocked on #35). Self-contained like ForwardingSection, so the pure
+          SettingsPanel and its test stay untouched. */}
       <ReferralSection />
     </AppShell>
   );
