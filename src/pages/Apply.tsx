@@ -290,8 +290,15 @@ export default function Apply() {
   /** Persist a generated artifact. Returns whether the write landed so callers can
    *  surface a failure instead of losing the ledger row silently (issue #54).
    *  Carries the per-role context (issue #76) on the artifact row itself, never
-   *  on the profile — it's a record of what shaped THIS role's generated text. */
+   *  on the profile — it's a record of what shaped THIS role's generated text.
+   *
+   *  Dev-only: same gate as saveRoleNotes — the mock user carries no JWT, so the
+   *  real call 401s every time. Report success without the round-trip; this was
+   *  already done ad hoc at the CV call site, applied here so cover-letter,
+   *  single-answer, and common-pack saves stop surfacing a false "couldn't save
+   *  a copy" toast under the fixture (issue #151 round 2, defect 3). */
   async function saveArtifact(kind: string, content: Json): Promise<boolean> {
+    if (DEV_FIXTURE) return true;
     if (!user || !job) return false;
     await supabase.from("artifacts").delete().match({ user_id: user.id, job_id: job.id, kind });
     const { error } = await supabase
@@ -365,8 +372,9 @@ export default function Apply() {
       track("cv_tailored");
       await downloadCvPdf({ name, summary: s, cvText, company: job.company, structured: cvStructured });
       // Same gate: there is no profiles row to hang an artifact off, and the write
-      // would only fail and report a save problem that is not one.
-      const saved = DEV_FIXTURE ? true : await saveArtifact("cv", { summary: s });
+      // would only fail and report a save problem that is not one. Now handled
+      // inside saveArtifact itself (issue #151 round 2, defect 3).
+      const saved = await saveArtifact("cv", { summary: s });
       if (!saved) {
         toast.error("Your CV downloaded, but we couldn't save a copy to your bundle.");
       }
