@@ -27,13 +27,13 @@ as $$
       date_trunc('day', now() at time zone 'utc') - interval '8 days' as trailing_start,
       date_trunc('month', now() at time zone 'utc') as month_start
   ),
-  trailing as (
+  trailing_totals as (
     select d::date as day,
            coalesce((select sum(e.cost_usd) from public.usage_events e
                      where e.created_at >= d and e.created_at < d + interval '1 day'), 0)::numeric as cost
     from bounds b, generate_series(b.trailing_start, b.yesterday - interval '1 day', interval '1 day') as d
   ),
-  users as (
+  yesterday_users_cte as (
     select e.user_id, sum(e.cost_usd)::numeric as cost
     from public.usage_events e, bounds b
     where e.created_at >= b.yesterday and e.created_at < b.today
@@ -45,8 +45,8 @@ as $$
                   where e.created_at >= b.yesterday and e.created_at < b.today),
     'month_to_date', (select coalesce(sum(e.cost_usd), 0)::numeric from public.usage_events e, bounds b
                       where e.created_at >= b.month_start),
-    'trailing_days', (select coalesce(jsonb_agg(jsonb_build_object('day', day, 'cost', cost) order by day), '[]'::jsonb) from trailing),
-    'yesterday_users', (select coalesce(jsonb_agg(jsonb_build_object('user_id', user_id, 'cost', cost)), '[]'::jsonb) from users)
+    'trailing_days', (select coalesce(jsonb_agg(jsonb_build_object('day', day, 'cost', cost) order by day), '[]'::jsonb) from trailing_totals),
+    'yesterday_users', (select coalesce(jsonb_agg(jsonb_build_object('user_id', user_id, 'cost', cost)), '[]'::jsonb) from yesterday_users_cte)
   );
 $$;
 
