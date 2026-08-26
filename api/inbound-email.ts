@@ -39,6 +39,9 @@ import {
 import { normStatus } from "../src/lib/tracker.js";
 import { parseResendInboundEvent } from "../src/lib/inbound.js";
 import { verifySvixSignature } from "../src/lib/svix.js";
+// #145: thrown errors + the Resend non-ok line go to Sentry (ids and counts only —
+// see src/lib/apiSentry.ts; mail content never leaves). No DSN → no-op.
+import { reportApiError, withSentry } from "../src/lib/apiSentry.js";
 
 // Minimal Vercel Node handler types (avoids a @vercel/node dependency).
 type Req = {
@@ -78,6 +81,7 @@ async function fetchResendContent(
     });
     if (!r.ok) {
       console.warn(`[inbound] Resend content fetch ${r.status} for ${emailId}`);
+      reportApiError(`[inbound] Resend content fetch non-ok ${r.status}`, { status: r.status, emailId });
       return null;
     }
     return (await r.json()) as { text?: string; html?: string; subject?: string };
@@ -115,7 +119,7 @@ function parseEmailDate(raw: string | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-export default async function handler(req: Req, res: Res): Promise<void> {
+async function handler(req: Req, res: Res): Promise<void> {
   if (req.method !== "POST") {
     res.status(405).json({ error: "POST only" });
     return;
@@ -374,6 +378,8 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   await log({ classification: kind, action: "skipped", detail: decision.reason, application_id: matched.id });
   res.status(200).json({ ok: true, action: "skipped", reason: decision.reason });
 }
+
+export default withSentry("inbound-email", handler);
 
 function safeParse(s: string): unknown {
   try {

@@ -37,6 +37,9 @@ import {
   parseBatchResults,
   partitionOnboarding,
 } from "../src/lib/scoreBatch.js";
+// #145: thrown errors + the explicit failure lines below go to Sentry (ids and
+// counts only — see src/lib/apiSentry.ts). No DSN → every call is a no-op.
+import { reportApiError, setRunSummary, withSentry } from "../src/lib/apiSentry.js";
 
 type Req = { method?: string; headers: Record<string, string | string[] | undefined> };
 type Res = { status: (code: number) => Res; json: (body: unknown) => void };
@@ -168,6 +171,7 @@ async function sendEmail(
     });
     if (!res.ok) {
       console.warn(`[score-backlog] Resend ${res.status}:`, await res.text().catch(() => ""));
+      reportApiError(`[score-backlog] Resend non-ok ${res.status}`, { status: res.status });
       return false;
     }
     return true;
@@ -177,7 +181,7 @@ async function sendEmail(
   }
 }
 
-export default async function handler(req: Req, res: Res): Promise<void> {
+async function handler(req: Req, res: Res): Promise<void> {
   const startedMs = Date.now();
   const deadlineMs = startedMs + RUN_BUDGET_MS;
 
@@ -290,6 +294,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         .upsert(toScoresRow(userId, r.customId, parsed, cvHash), { onConflict: SCORES_ON_CONFLICT });
       if (upErr) {
         console.warn(`[score-backlog] batch upsert failed for ${userId}/${r.customId}:`, upErr.message);
+        reportApiError("[score-backlog] batch upsert failed", { userId, jobId: r.customId, code: upErr.code, message: upErr.message });
         summary.failed++;
         continue;
       }
@@ -542,6 +547,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
               .upsert(toScoresRow(userId, j.id, result, cvHash), { onConflict: SCORES_ON_CONFLICT });
             if (upErr) {
               console.warn(`[score-backlog] upsert failed for ${userId}/${j.id}:`, upErr.message);
+              reportApiError("[score-backlog] upsert failed", { userId, jobId: j.id, code: upErr.code, message: upErr.message });
               summary.failed++;
               return;
             }
@@ -596,5 +602,8 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     }
   }
 
+  setRunSummary(summary);
   res.status(200).json({ ok: true, ms: Date.now() - startedMs, ...summary });
 }
+
+export default withSentry("score-backlog", handler);

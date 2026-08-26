@@ -64,7 +64,7 @@
  */
 
 import type { Breadcrumb, ErrorEvent as SentryErrorEvent } from "@sentry/react";
-import { sanitizeAnalyticsProperties, sanitizeString, sanitizeUrl } from "./analytics-sanitize";
+import { sanitizeAnalyticsProperties, sanitizeString, sanitizeUrl } from "./analytics-sanitize.js";
 
 /**
  * Breadcrumb `data` keys the browser integrations fill with a URL. These are handled
