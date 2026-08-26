@@ -7,6 +7,7 @@ import AppShell from "@/components/app/AppShell";
 import ForwardingSection from "@/components/app/ForwardingSection";
 import ReferralSection from "@/components/app/ReferralSection";
 import SettingsPanel from "@/components/app/SettingsPanel";
+import CvEditor from "@/components/app/CvEditor";
 import { useAuth } from "@/components/AuthProvider";
 import { useRolesData } from "@/hooks/useRolesData";
 import { useMemo } from "react";
@@ -140,6 +141,9 @@ export default function Settings() {
         // The CV-unlock flow lives on the map — deep-link it open rather than
         // rebuilding the parsed-upload modal on paper.
         onReplaceCv={() => navigate("/?cv=1")}
+        // Issue #150 — correcting what we read from the CV. Self-contained (its own
+        // reads and writes), handed in as a node so SettingsPanel stays pure.
+        cvEditor={user && cvText ? <CvEditor userId={user.id} cvText={cvText} /> : null}
         sectorOptions={sectorOptions}
         onSaveTargets={saveTargets}
         email={user?.email ?? null}

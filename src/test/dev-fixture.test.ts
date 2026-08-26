@@ -5,11 +5,16 @@
 import { describe, it, expect } from "vitest";
 import {
   DEV_FIXTURE,
+  DEV_FIXTURE_CV_STRUCTURED,
+  DEV_FIXTURE_CV_TEXT,
   DEV_FIXTURE_REASON,
+  DEV_FIXTURE_REFERRAL_TOKEN,
   devFixtureBatch,
   devFixtureScore,
   devFixtureScores,
 } from "@/lib/devFixture";
+import { isCvStructuredUsable, validateCvStructured } from "@/lib/cvStructured";
+import { REF_TOKEN_RE } from "@/lib/referral";
 
 describe("dev fixture gate", () => {
   it("is off without VITE_E2E_BYPASS_AUTH, even in a dev/test environment", () => {
@@ -67,5 +72,22 @@ describe("devFixtureBatch", () => {
     const before = jobs.map((j) => j.id);
     devFixtureBatch(jobs, "2026-07-26", "v9");
     expect(jobs.map((j) => j.id)).toEqual(before);
+  });
+});
+
+// The fixture CV stands in for a stored parse on the Settings editor and the apply
+// page. It is held to the SAME grounding rule as a real parse: a fixture that printed
+// a bullet its own CV text does not carry would teach a walk the wrong thing about
+// what the product is allowed to print.
+describe("the fixture CV", () => {
+  it("is renderable, and says nothing the fixture CV text does not", () => {
+    expect(isCvStructuredUsable(DEV_FIXTURE_CV_STRUCTURED)).toBe(true);
+    const { drops, dropped } = validateCvStructured(DEV_FIXTURE_CV_STRUCTURED, DEV_FIXTURE_CV_TEXT);
+    expect(dropped).toEqual([]);
+    expect(drops).toBe(0);
+  });
+
+  it("carries an invite token in the real token's shape", () => {
+    expect(REF_TOKEN_RE.test(DEV_FIXTURE_REFERRAL_TOKEN)).toBe(true);
   });
 });

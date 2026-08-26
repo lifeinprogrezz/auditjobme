@@ -38,8 +38,12 @@ bring-your-own-key tier's `ConnectProvider` prototype was deleted in #57
 resurrect it into v1.
 
 ## Hard rules
-1. **CV trust rule:** the user's CV body is never rewritten by an LLM — rendered verbatim
-   from their upload. LLM output = professional summary + cover letter only.
+1. **CV trust rule:** the user's CV body is never written by an LLM. One parse at upload
+   turns `cv_text` into `cv_structured`; `validateCvStructured` drops any bullet or date
+   that is not verbatim in `cv_text` before it is stored (`src/lib/cvStructured.ts`). The
+   owner edits that structure in Settings, `buildStructuredCvDoc` renders it
+   deterministically (`src/lib/pdf.ts`), and a profile with no structure falls back to the
+   verbatim `cv_text` render. Per-role LLM output = professional summary + cover letter only.
 2. **RLS is the security model.** Every table gets row-level-security policies, tested in
    CI. Assume every reader of this code is hostile.
 3. **No secrets in this repo, ever.** `VITE_`-prefixed Supabase publishable values in

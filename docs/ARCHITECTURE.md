@@ -244,13 +244,22 @@ Vite plus React plus TypeScript, single-page, no framework router beyond `react-
   four seconds.
 - **`src/lib/` is where logic lives, and it is where the tests point.** Components stay thin;
   anything worth pinning gets extracted (`roles.ts`, `nightly.ts`, `scoreBacklog.ts`,
-  `tracker.ts`, `labels.ts`, `tailor.ts`, `cvHtml.ts`, `pdf.ts`).
+  `tracker.ts`, `labels.ts`, `tailor.ts`, `cvStructured.ts`, `cvParse.ts`, `pdf.ts`).
 
 ### Two trust rules that are not negotiable
 
-1. **The CV body is rendered verbatim from the user's `cv_text`** (`cvHtml.ts`, `pdf.ts`).
-   The only generated text is the tailored summary. Never reorder, reword, or drop a line of
-   someone's CV.
+1. **The CV body is the user's own words, never the model's.** A CV is parsed ONCE, at
+   upload, from `cv_text` into `cv_structured` (`cvStructured.ts`, stored by `cvParse.ts`).
+   `validateCvStructured` refuses any bullet or date that is not a verbatim substring of
+   `cv_text`: an ungrounded line is dropped, never stored. The owner corrects the result in
+   Settings (`CvEditor.tsx`), `buildStructuredCvDoc` (`pdf.ts`) renders it deterministically,
+   and a profile with no structure falls back to the verbatim `cv_text` render. The only
+   generated text is the tailored summary — one language model call per role, not per CV.
+   Never invent, reword, or drop a line of someone's CV.
+
+   Two guards keep that honest and affordable, both pinned by `cvParse.test.ts`: a structure
+   stamped BEFORE `cv_changed_at` belongs to a previous CV and is thrown away rather than
+   printed, and a parse that already ran is never bought again on the next page load.
 2. **Generated PDFs carry a real text layer** (pdfmake, never a rasterized page image), or
    applicant tracking systems cannot parse them and the feature is worse than useless.
 

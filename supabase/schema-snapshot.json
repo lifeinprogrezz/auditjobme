@@ -1581,6 +1581,24 @@
   {
    "default": null,
    "generated": null,
+   "name": "cv_structured",
+   "nullable": true,
+   "table": "profiles",
+   "type": "jsonb",
+   "udt": "jsonb"
+  },
+  {
+   "default": null,
+   "generated": null,
+   "name": "cv_structured_at",
+   "nullable": true,
+   "table": "profiles",
+   "type": "timestamp with time zone",
+   "udt": "timestamptz"
+  },
+  {
+   "default": null,
+   "generated": null,
    "name": "cv_text",
    "nullable": true,
    "table": "profiles",

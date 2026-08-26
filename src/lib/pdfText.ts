@@ -1,11 +1,13 @@
 import * as pdfjsLib from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { linesFromItems, type PdfTextItem } from "./pdfLines";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 /**
  * Extract plain text from a PDF file entirely client-side (no LLM, deterministic).
- * Joins text items on a page with spaces and separates pages with blank lines.
+ * Rebuilds each page's lines from the text runs' positions (pdfLines.ts) and
+ * separates pages with blank lines.
  * Throws a clear Error if the file can't be read or parsed as a PDF.
  */
 export async function extractPdfText(file: File): Promise<string> {
@@ -28,11 +30,10 @@ export async function extractPdfText(file: File): Promise<string> {
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const content = await page.getTextContent();
-      const pageText = content.items
-        .map((item) => ("str" in item ? item.str : ""))
-        .join(" ")
-        .replace(/[ \t]+/g, " ")
-        .trim();
+      // Line structure is rebuilt from the runs' positions (pdfLines.ts) instead of
+      // flattening the page into one paragraph: the CV parser and the plain-text
+      // render both need headings, dates and bullets to stay on their own lines.
+      const pageText = linesFromItems(content.items as PdfTextItem[]).join("\n").trim();
       if (pageText) pages.push(pageText);
     }
     const text = pages.join("\n\n").trim();

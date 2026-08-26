@@ -6,10 +6,19 @@
 // to ATS parsers, defeating the product). The library is imported dynamically so it
 // stays out of the main bundle until the first download.
 //
-// THE TRUST RULE (same as cvHtml.ts): the CV BODY is the user's cv_text rendered
-// VERBATIM — whitespace preserved, never reordered, reworded, or dropped. Only the
-// tailored Professional Summary is prepended.
+// THE TRUST RULE: the CV BODY is the user's own words. Nothing here is written by a
+// language model except the tailored Professional Summary that goes on top.
+//
+// Two body paths, same rule (#150):
+//  - STRUCTURED (preferred): the parsed profile from cvStructured.ts, rendered with
+//    the personal engine's layout — letterhead, section headers, one block per job
+//    with real bullets and dates. Every bullet and date in it was checked against
+//    cv_text before it was stored, and the render is a pure function of the stored
+//    structure, so the same profile prints the same document every time.
+//  - TEXT (fallback, unchanged): cv_text printed verbatim, whitespace preserved, for
+//    a profile that has not been parsed yet.
 import { stripLeadingSummary } from "./cvHtml";
+import { isCvStructuredUsable, normalizeForAts, type CvStructured } from "./cvStructured";
 import type { CoverJson } from "./tailor";
 
 /** pdfmake text run: **markers** become bold runs, everything else stays plain. */
@@ -29,9 +38,9 @@ export function boldRuns(text: string): TextRun[] {
 // pdfmake document definitions are plain objects — kept pure and exported for tests.
 type DocDef = Record<string, unknown>;
 
-// Shared letterhead + section-header treatment so the CV and the cover letter read as one
-// matched pair (same applicant, same document family) instead of two independently-tuned
-// pages. Presentation only — no color blocks, no rules, one typeface family throughout.
+// Letterhead + section-header treatment shared by the cover letter and the
+// unparsed-text CV fallback: one matched document pair for a profile that is not
+// parsed yet. Presentation only — no color blocks, no rules, one typeface family.
 const PAGE_MARGINS = [54, 50, 54, 50] as number[];
 const NAME_STYLE = { fontSize: 20, bold: true, margin: [0, 0, 0, 6] as number[] };
 // Section headers get a touch of tracked-caps spacing — a recruiter-CV convention that
@@ -45,7 +54,191 @@ const SECTION_HEADER = {
 };
 const META_STYLE = { fontSize: 10, color: "#4a5a4a", margin: [0, 0, 0, 16] as number[] };
 
-export function buildCvDoc({ name, summary, cvText }: { name: string; summary: string; cvText: string }): DocDef {
+// ─── Structured CV typography: the personal engine's stylesheet, unit for unit ──────
+// Source: career-ops lib/tailor-cv.mjs SHARED_CV_CSS (Arial/Helvetica, 11pt body on a
+// 1.42 line height, black, no colour tint and no letter-spacing on headings). Font
+// sizes carry over as points. The engine's pixel margins convert at the CSS print
+// ratio, 1px = 0.75pt, so the page keeps the same rhythm as the engine's HTML print.
+/** CSS pixels (the engine's margin unit) to PDF points. */
+const px = (n: number): number => n * 0.75;
+/** PDF standard font — no embedded file, registered at download time (see download()). */
+export const CV_FONT = "Helvetica";
+const CV_DEFAULT_STYLE = { font: CV_FONT, fontSize: 11, lineHeight: 1.42, color: "#000" };
+/** h1: the applicant's full name. */
+const CV_NAME_STYLE = { fontSize: 20, bold: true, margin: [0, 0, 0, px(10)] as number[] };
+/** .contact p: one item per line, label bold. */
+const CONTACT_LINE_STYLE = { fontSize: 11 };
+/** .contact a: coloured, underlined, clickable. */
+const LINK_STYLE = { color: "#1155cc", decoration: "underline" };
+/** h2: 13pt bold UPPERCASE, margin-top 20px, margin-bottom 9px. */
+const CV_SECTION_HEADER = { fontSize: 13, bold: true, margin: [0, px(20), 0, px(9)] as number[] };
+/** h3: company / school name. Its 13px top margin is applied per block (blockMargin). */
+const COMPANY_STYLE = { fontSize: 11, bold: true };
+/** .role: job title / degree. */
+const ROLE_STYLE = { fontSize: 11, bold: true };
+/** .meta: "dates | location" (11pt regular, black, per the owner's brief). */
+const JOB_META_STYLE = { fontSize: 11, margin: [0, 0, 0, px(5)] as number[] };
+/** li: margin-bottom 3px between bullets. */
+const BULLET_MARGIN = [0, 0, 0, px(3)] as number[];
+
+/**
+ * One job or one degree, kept off a page seam so a heading never strands its bullets.
+ * The engine's h3 carries margin-top 13px; CSS collapses it with the h2's 9px bottom
+ * margin for the FIRST block of a section, so that one only adds the difference.
+ */
+function blockMargin(index: number): number[] {
+  return [0, index === 0 ? px(13) - px(9) : px(13), 0, 0];
+}
+
+/** Every printed string goes through applicant-tracking-system normalisation. */
+const ats = (text: string): string => normalizeForAts(text || "").trim();
+
+/** "09/2021 - Present | Barcelona, Spain" from whichever parts the CV actually had. */
+export function jobMetaLine(job: { start?: string; end?: string; location?: string }): string {
+  const dates = [ats(job.start ?? ""), ats(job.end ?? "")].filter(Boolean).join(" - ");
+  return [dates, ats(job.location ?? "")].filter(Boolean).join(" | ");
+}
+
+/** One line of the contact block: "Label: text", the text a link when `link` is set. */
+export type ContactLine = { label: string; text: string; link?: string };
+
+/** A link as the CV wrote it ("linkedin.com/in/jane") becomes a clickable https URL. */
+export function linkHref(url: string): string {
+  const trimmed = url.trim();
+  return /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+/** The engine's link labels, by host: linkedin.com → LinkedIn, github.com → GitHub, else Portfolio. */
+export function linkLabel(url: string): "LinkedIn" | "GitHub" | "Portfolio" {
+  let host = "";
+  try {
+    host = new URL(linkHref(url)).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "Portfolio";
+  }
+  if (host === "linkedin.com" || host.endsWith(".linkedin.com")) return "LinkedIn";
+  if (host === "github.com" || host.endsWith(".github.com")) return "GitHub";
+  return "Portfolio";
+}
+
+/**
+ * The engine's multi-line contact block, in its order: Location · Mobile · Email ·
+ * Portfolio · GitHub · LinkedIn. Only a line whose data exists is rendered. (The
+ * engine's Nationality line has no field in cv_structured.contact, so it never prints.)
+ */
+export function contactLines(contact: CvStructured["contact"]): ContactLine[] {
+  const lines: ContactLine[] = [];
+  const location = ats(contact.location ?? "");
+  const phone = ats(contact.phone ?? "");
+  const email = ats(contact.email ?? "");
+  if (location) lines.push({ label: "Location", text: location });
+  if (phone) lines.push({ label: "Mobile", text: phone });
+  if (email) lines.push({ label: "Email", text: email, link: `mailto:${email}` });
+  const links = contact.links.map(ats).filter(Boolean);
+  for (const label of ["Portfolio", "GitHub", "LinkedIn"] as const) {
+    for (const url of links) {
+      if (linkLabel(url) === label) lines.push({ label, text: url, link: linkHref(url) });
+    }
+  }
+  return lines;
+}
+
+/** pdfmake text for one contact line: bold label, then the value (a link when it is one). */
+function contactItem({ label, text, link }: ContactLine): DocDef {
+  const value: DocDef = link ? { text, link, ...LINK_STYLE } : { text };
+  return { text: [{ text: `${label}: `, bold: true }, value], ...CONTACT_LINE_STYLE };
+}
+
+/** A real bullet list with the engine's 3px gap between items. */
+function bulletList(items: DocDef[]): DocDef {
+  return { ul: items.map((item) => ({ ...item, margin: BULLET_MARGIN })) };
+}
+
+/**
+ * The deterministic CV: the personal engine's layout, built from the parsed profile.
+ * Pure — same structure in, byte-identical document definition out (pinned in
+ * pdf.test.ts). The tailored summary REPLACES the summary the CV came with, so the
+ * old one can never print twice.
+ */
+export function buildStructuredCvDoc({ name, summary, cv }: { name: string; summary: string; cv: CvStructured }): DocDef {
+  const headline = ats(cv.contact.name || name);
+  const contact = contactLines(cv.contact);
+  const summaryText = ats(summary) || ats(cv.summary);
+  const content: DocDef[] = [];
+
+  if (headline) content.push({ text: headline, ...CV_NAME_STYLE });
+  if (contact.length > 0) content.push({ stack: contact.map(contactItem) });
+
+  if (summaryText) {
+    content.push({ text: "PROFESSIONAL SUMMARY", ...CV_SECTION_HEADER });
+    content.push({ text: boldRuns(summaryText) });
+  }
+
+  if (cv.experience.length > 0) {
+    content.push({ text: "PROFESSIONAL EXPERIENCE", ...CV_SECTION_HEADER });
+    cv.experience.forEach((job, i) => {
+      const stack: DocDef[] = [];
+      if (job.company) stack.push({ text: ats(job.company), ...COMPANY_STYLE });
+      if (job.role) stack.push({ text: ats(job.role), ...ROLE_STYLE });
+      const meta = jobMetaLine(job);
+      if (meta) stack.push({ text: meta, ...JOB_META_STYLE });
+      // Bullets stay VERBATIM: no ** promotion, unlike the summary. The user's own
+      // asterisks print as asterisks.
+      const bullets = job.bullets.map(ats).filter(Boolean);
+      if (bullets.length > 0) stack.push(bulletList(bullets.map((text) => ({ text }))));
+      content.push({ stack, unbreakable: true, margin: blockMargin(i) });
+    });
+  }
+
+  if (cv.education.length > 0) {
+    content.push({ text: "EDUCATION", ...CV_SECTION_HEADER });
+    cv.education.forEach((school, i) => {
+      const stack: DocDef[] = [];
+      if (school.school) stack.push({ text: ats(school.school), ...COMPANY_STYLE });
+      if (school.degree) stack.push({ text: ats(school.degree), ...ROLE_STYLE });
+      const meta = jobMetaLine(school);
+      if (meta) stack.push({ text: meta, ...JOB_META_STYLE });
+      content.push({ stack, unbreakable: true, margin: blockMargin(i) });
+    });
+  }
+
+  const skillItems: DocDef[] = [];
+  for (const group of cv.skills) {
+    const items = group.items.map(ats).filter(Boolean).join(", ");
+    if (group.group && items) skillItems.push({ text: [{ text: `${ats(group.group)}: `, bold: true }, { text: items }] });
+    else if (items) skillItems.push({ text: items });
+    else if (group.group) skillItems.push({ text: ats(group.group) });
+  }
+  for (const extra of cv.extras.map(ats).filter(Boolean)) skillItems.push({ text: extra });
+  if (skillItems.length > 0) {
+    content.push({ text: "SKILLS & ADDITIONAL INFORMATION", ...CV_SECTION_HEADER });
+    content.push(bulletList(skillItems));
+  }
+
+  return {
+    pageSize: "A4",
+    pageMargins: PAGE_MARGINS,
+    defaultStyle: CV_DEFAULT_STYLE,
+    content,
+  };
+}
+
+/**
+ * The tailored CV. A parsed profile renders through the structured layout; anything
+ * else falls back to the original verbatim-text render, unchanged.
+ */
+export function buildCvDoc({
+  name,
+  summary,
+  cvText,
+  structured,
+}: {
+  name: string;
+  summary: string;
+  cvText: string;
+  structured?: CvStructured | null;
+}): DocDef {
+  if (structured && isCvStructuredUsable(structured)) return buildStructuredCvDoc({ name, summary, cv: structured });
   const body = stripLeadingSummary(cvText);
   return {
     pageSize: "A4",
@@ -92,16 +285,26 @@ export function pdfFilename(...parts: (string | null | undefined)[]): string {
 type DownloadableDoc = { download: (defaultFileName: string, cb: () => void) => void };
 
 async function download(def: DocDef, filename: string): Promise<void> {
-  const [{ default: pdfMake }, { default: vfsFonts }] = await Promise.all([
+  const [{ default: pdfMake }, { default: vfsFonts }, { default: helvetica }] = await Promise.all([
     import("pdfmake/build/pdfmake"),
     import("pdfmake/build/vfs_fonts"),
+    import("pdfmake/build/standard-fonts/Helvetica"),
   ]);
+  // Roboto (embedded) for the cover letter and the text fallback; Helvetica — a PDF
+  // standard font, metrics only, no font file — for the structured CV (CV_FONT).
   pdfMake.addVirtualFileSystem(vfsFonts);
+  pdfMake.addFontContainer(helvetica);
   const doc = pdfMake.createPdf(def as never) as unknown as DownloadableDoc;
   await new Promise<void>((resolve) => doc.download(filename, () => resolve()));
 }
 
-export async function downloadCvPdf(input: { name: string; summary: string; cvText: string; company: string }): Promise<void> {
+export async function downloadCvPdf(input: {
+  name: string;
+  summary: string;
+  cvText: string;
+  company: string;
+  structured?: CvStructured | null;
+}): Promise<void> {
   await download(buildCvDoc(input), pdfFilename(input.name, "CV", input.company));
 }
 

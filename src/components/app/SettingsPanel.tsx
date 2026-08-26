@@ -3,7 +3,7 @@
 // "a proper good definition on the app"). Same data contract the modal had, so the
 // pinned states carry over: CV-on-file vs empty, Replace wiring, editable target
 // roles / industries, Save persistence. Paper idiom throughout (§3.2 sections).
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -29,6 +29,10 @@ export type SettingsPanelProps = {
   cvUpdatedAt: string | null;
   /** Routes into the CV-unlock flow on the map — Replace reuses it, never rebuilds it. */
   onReplaceCv: () => void;
+  /** The structured-CV editor (issue #150), rendered inside this section. Passed in
+   *  as a node rather than imported: it owns its own reads and writes, and this panel
+   *  stays pure and prop-driven, like the Forwarding and Referral sections do. */
+  cvEditor?: ReactNode;
   /** Industries a user may PICK: the live catalog's sectors, gated on liquidity so
    *  a chosen one can actually return roles (issue #70). */
   sectorOptions: FilterOption[];
@@ -85,6 +89,7 @@ const CHIP_ON = "on rounded-full border border-foreground bg-foreground px-3 py-
 
 export default function SettingsPanel({
   cvText,
+  cvEditor,
   targetRoles,
   targetSectors,
   cvUpdatedAt,
@@ -224,6 +229,7 @@ export default function SettingsPanel({
               </button>
             </p>
             {uploaded && <p className="mt-1 text-caption text-muted-foreground">Uploaded {uploaded}</p>}
+            {cvEditor}
           </>
         ) : (
           <>
@@ -471,8 +477,11 @@ export default function SettingsPanel({
           This deletes your account and everything stored with it:
         </p>
         <ul className="mt-3 list-disc space-y-1 pl-5 text-body text-muted-foreground">
+          {/* Keyed by table AND column: a table can appear twice, once per user
+              column (referrals is read by referee_id and by referrer_id), and the
+              table alone then repeats a key and React drops one line silently. */}
           {USER_DATA_TABLES.map((t) => (
-            <li key={t.table}>{t.label}</li>
+            <li key={`${t.table}.${t.column}`}>{t.label}</li>
           ))}
         </ul>
         <p className="mt-3 text-body text-muted-foreground text-pretty">
