@@ -17,7 +17,7 @@ vi.mock("@/components/AuthProvider", () => ({
 
 function renderShell(route = "/today", title?: string) {
   return render(
-    <MemoryRouter initialEntries={[route]}>
+    <MemoryRouter initialEntries={[route]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AppShell title={title}>
         <p>body</p>
       </AppShell>
@@ -79,7 +79,7 @@ describe("legal pages are reachable (#audit)", () => {
   // "the page exists at a URL" is not the same as having provided the information.
   it("every product page links to Privacy and Terms", () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AppShell title="Test">content</AppShell>
       </MemoryRouter>,
     );

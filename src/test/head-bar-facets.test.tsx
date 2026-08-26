@@ -25,7 +25,7 @@ const sponsorOptions = [
 function renderBar(props: Partial<React.ComponentProps<typeof HeadBar>> = {}) {
   const onFilters = vi.fn();
   const utils = render(
-    <MemoryRouter>
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <HeadBar
         scored={false}
         signedIn={false}

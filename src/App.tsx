@@ -47,7 +47,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Suspense fallback={<PageFallback />}>
             <Routes>
               {/* Pre-launch: the interactive roles map is the only live surface and
