@@ -21,10 +21,20 @@ import PaperLogo from "@/components/app/PaperLogo";
 import FitChip from "@/components/roles/FitChip";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { tailorSummary, tailorCover, answerQuestion, HAIKU, MAX_ANSWERS, type CoverJson } from "@/lib/tailor";
+import {
+  tailorSummary,
+  tailorCover,
+  answerQuestion,
+  answerCommonPack,
+  COMMON_PACK_QUESTIONS,
+  HAIKU,
+  MAX_ANSWERS,
+  type CoverJson,
+} from "@/lib/tailor";
 import { downloadCvPdf, downloadCoverPdf } from "@/lib/pdf";
 import { ensureCvStructured } from "@/lib/cvParse";
 import type { CvStructured } from "@/lib/cvStructured";
+import { NOTES_KIND, latestRoleContext } from "@/lib/roleNotes";
 import {
   DEV_FIXTURE,
   DEV_FIXTURE_CV_TEXT,
@@ -132,7 +142,7 @@ export default function Apply() {
   const [name, setName] = useState("");
   const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<null | "cv" | "cover" | "answer">(null);
+  const [busy, setBusy] = useState<null | "cv" | "cover" | "answer" | "commonPack">(null);
   const [error, setError] = useState("");
   // WHICH step surfaced the error, so the status line renders inline at that
   // card (design direction §3.4 status-as-whisper) instead of orphaned at the
@@ -152,6 +162,13 @@ export default function Apply() {
   // three generated surfaces for THIS role only, never the profile. Empty box =
   // every prompt stays byte-identical to before (pinned in tailor.test.ts).
   const [roleContext, setRoleContext] = useState("");
+  // Persistence for the box above (issue #151 / D4): `notesDirty` is true from the
+  // first edit since the last successful save or page load; the Save button and
+  // autosave-on-blur both write through `saveRoleNotes`, which clears it. Saving
+  // never regenerates anything — it is one Supabase write, nothing else.
+  const [notesDirty, setNotesDirty] = useState(false);
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -164,6 +181,9 @@ export default function Apply() {
     setQuestion("");
     setQas([]);
     setRoleContext("");
+    setNotesDirty(false);
+    setNotesSaving(false);
+    setNotesSaved(false);
     setWarmContacts([]);
     setCvStructured(null);
     async function load() {
@@ -192,7 +212,7 @@ export default function Apply() {
         // the context header can show the FitChip that motivated the apply (§6.1 AP3).
         // Warm contacts (issue #41) ride along: the stored company_key was computed by
         // the same companyKey() at upload time, so the two sides always agree.
-        const [{ data: app }, { data: scoreRow }, { data: savedRow }, { data: connRows }] = await Promise.all([
+        const [{ data: app }, { data: scoreRow }, { data: savedRow }, { data: connRows }, { data: contextRows }] = await Promise.all([
           supabase.from("applications").select("id").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
           supabase.from("scores").select("score").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
           supabase.from("saved_jobs").select("id").eq("user_id", user.id).eq("job_id", (jobData as Job).id).maybeSingle(),
@@ -204,6 +224,11 @@ export default function Apply() {
             .select("full_name, company, company_key, position, linkedin_url")
             .eq("user_id", user.id)
             .eq("company_key", companyKey((jobData as Job).company)),
+          // Every artifact kind carries the SAME per-role box (issue #76); the most
+          // recently updated row's context is the last thing typed, whether it was
+          // saved by the Save button or as a side effect of generating something
+          // (issue #151 / D4 — the box used to be cleared on every page load).
+          supabase.from("artifacts").select("context, updated_at").eq("user_id", user.id).eq("job_id", (jobData as Job).id),
         ]);
         if (active && app) setHasApplied(true);
         if (active && scoreRow) setScore(scoreRow.score ?? null);
@@ -218,6 +243,13 @@ export default function Apply() {
               linkedinUrl: r.linkedin_url,
             })),
           );
+        if (active) {
+          const savedContext = latestRoleContext(contextRows ?? []);
+          if (savedContext) {
+            setRoleContext(savedContext);
+            setNotesSaved(true);
+          }
+        }
       }
       if (active) setLoading(false);
       // Lazy migration (issue #150): a CV uploaded before the structured parse
@@ -264,6 +296,28 @@ export default function Apply() {
       .from("artifacts")
       .insert({ user_id: user.id, job_id: job.id, kind, content, model: HAIKU, context: roleContext.trim() || null });
     return !error;
+  }
+
+  /** Save button + autosave-on-blur for the "anything specific?" box (issue #151
+   *  / D4). Writes the box on its own, independent of generating a CV, letter,
+   *  or answer — one Supabase upsert, no LLM call, nothing regenerated. The next
+   *  generation on this role picks it up through the usual `roleContext` state. */
+  async function saveRoleNotes() {
+    if (!user || !job) return;
+    setNotesSaving(true);
+    const { error } = await supabase
+      .from("artifacts")
+      .upsert(
+        { user_id: user.id, job_id: job.id, kind: NOTES_KIND, content: {}, context: roleContext.trim() || null },
+        { onConflict: "user_id,job_id,kind" },
+      );
+    setNotesSaving(false);
+    if (error) {
+      toast.error("Couldn't save your note. Please try again.");
+      return;
+    }
+    setNotesDirty(false);
+    setNotesSaved(true);
   }
 
   /** ONE click (Rober 7-16): tailor the summary, build the text-based PDF, and
@@ -313,11 +367,13 @@ export default function Apply() {
     }
   }
 
-  /** Same one-click contract for the cover letter. */
+  /** Same one-click contract for the cover letter. Carries the parsed contact
+   *  (issue #151): the letter gets the SAME letterhead + a dateline as the
+   *  structured CV, so the two documents read as one bundle. */
   async function generateAndDownloadCover() {
     if (!job || !cvText) return;
     if (cover != null) {
-      await downloadCoverPdf({ name, company: job.company, cover });
+      await downloadCoverPdf({ name, company: job.company, cover, contact: cvStructured?.contact ?? null });
       track("cover_letter_downloaded");
       return;
     }
@@ -330,7 +386,7 @@ export default function Apply() {
         name,
       );
       setCover(c);
-      await downloadCoverPdf({ name, company: job.company, cover: c });
+      await downloadCoverPdf({ name, company: job.company, cover: c, contact: cvStructured?.contact ?? null });
       track("cover_letter_downloaded");
       const saved = await saveArtifact("letter", { cover: c as unknown as Json });
       if (!saved) {
@@ -368,6 +424,40 @@ export default function Apply() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Answer generation failed");
+      setErrStep("answer");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** One click, four answers in one call ("Answer the usual four", issue #151 /
+   *  D4): why this company, why a fit, a product shipped, how success is
+   *  measured — career-ops apply-sheet.mjs's common pack, the narrative half.
+   *  Counts as 4 toward MAX_ANSWERS, same as drafting them one at a time would;
+   *  MAX_ANSWERS was raised 8 -> 12 so Step 4's manual flow keeps its full 8
+   *  after this runs once. */
+  async function genCommonPack() {
+    if (!job || !cvText || busy !== null || commonPackDone) return;
+    setBusy("commonPack");
+    setError("");
+    setErrStep(null);
+    try {
+      const pack = await answerCommonPack({
+        role: job.title,
+        company: job.company,
+        jdText: job.jd_text,
+        cvText,
+        context: roleContext.trim() || undefined,
+      });
+      const next = [...qas, ...COMMON_PACK_QUESTIONS.map(({ key, label }) => ({ q: label, a: pack[key] }))];
+      setQas(next);
+      track("common_pack_drafted", { answer_count: next.length });
+      const saved = await saveArtifact("answers", { qa: next as unknown as Json });
+      if (!saved) {
+        toast.error("Answered, but we couldn't save a copy to your bundle.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Common pack generation failed");
       setErrStep("answer");
     } finally {
       setBusy(null);
@@ -438,6 +528,10 @@ export default function Apply() {
   // Real logo domain from the companies row; the name-guess is only the fallback.
   const domain = job.companies?.logo_domain ?? domainFor(job.company, job.source);
   const city = cityOf(job.location) ?? job.location ?? (job.remote ? "Remote" : null);
+  // Derived, not stored: the common pack is "done" once every one of its four
+  // labels already sits in qas — covers both a fresh generation and a reload
+  // from a saved "answers" artifact, with nothing to keep in sync.
+  const commonPackDone = COMMON_PACK_QUESTIONS.every((q) => qas.some((qa) => qa.q === q.label));
 
   return (
     <AppShell>
@@ -573,7 +667,9 @@ export default function Apply() {
         <div className="mt-8 flex flex-col gap-6">
           {/* Per-role context (issue #76), above Step 1: feeds the tailored summary,
               cover letter, and drafted answers below with a fact the candidate
-              supplies, never invents. Never touches the CV body. */}
+              supplies, never invents. Never touches the CV body. Saved with a
+              Save button and autosave-on-blur, and reloaded on the next visit
+              (issue #151 / D4) — saving never regenerates anything. */}
           <Section eyebrow="Optional" title="Anything specific for this one?">
             <p className="mt-2 text-caption text-muted-foreground text-pretty">
               Why this company, a referral, a hook, anything that's specific to this application. We'll only use
@@ -583,8 +679,26 @@ export default function Apply() {
               className="mt-4 min-h-20 rounded-[10px] font-sans text-body"
               placeholder={`e.g. "A former colleague on the team pointed me here" or "I've been following your product closely and have a specific idea for it."`}
               value={roleContext}
-              onChange={(e) => setRoleContext(e.target.value)}
+              onChange={(e) => {
+                setRoleContext(e.target.value);
+                setNotesDirty(true);
+                setNotesSaved(false);
+              }}
+              onBlur={() => {
+                if (notesDirty) saveRoleNotes();
+              }}
             />
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button variant="outline" size="sm" className={SECONDARY_CTA} onClick={saveRoleNotes} disabled={notesSaving}>
+                {notesSaving ? "Saving…" : "Save"}
+              </Button>
+              {!notesSaving && !notesDirty && notesSaved && (
+                <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
+                  <CheckIcon />
+                  Saved
+                </span>
+              )}
+            </div>
           </Section>
 
           {/* 1 — Tailored CV: ONE click, PDF straight to disk (Rober 7-16). */}
@@ -656,8 +770,24 @@ export default function Apply() {
               audit stepped in ahead of it, Rober 7-26 — issue #82): paste ONE question
               from the real form, get an answer grounded in the CV + JD. One at a time
               keeps the UI clean and each call cheap; MAX_ANSWERS bounds the sponsored
-              spend. */}
+              spend. The common pack (issue #151 / D4) covers the four questions almost
+              every form asks in one click, ahead of the manual flow below. */}
           <Section eyebrow="Step 4" title="Answer the form's questions">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className={`mt-4 ${SECONDARY_CTA}`}
+                onClick={genCommonPack}
+                disabled={busy !== null || commonPackDone}
+              >
+                {busy === "commonPack" ? "Answering the usual four…" : commonPackDone ? "Answered the usual four" : "Answer the usual four"}
+              </Button>
+            </div>
+            <p className="mt-2 text-caption text-muted-foreground text-pretty">
+              Why this company, why you're a fit, a product you shipped, how you measure success. The four
+              questions almost every form asks, drafted together.
+            </p>
             <Textarea
               className="mt-4 min-h-20 rounded-[10px] font-sans text-body"
               placeholder={`Paste one question from the application form, e.g. "Why do you want to work at ${job.company}?"`}

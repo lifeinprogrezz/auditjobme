@@ -6,6 +6,8 @@ import {
   buildCoverDoc,
   buildStructuredCvDoc,
   contactLines,
+  coverDateLine,
+  formatDateEN,
   jobMetaLine,
   linkHref,
   linkLabel,
@@ -108,32 +110,54 @@ describe("pdf doc builders", () => {
     expect(bodyItem?.text).toBe(cvWithMarkers);
   });
 
-  it("cover doc renders salutation, the three body paragraphs, then the sign-off, in that structural order", () => {
+  it("cover doc with no parsed contact renders a name, a dateline, salutation, the three body paragraphs, then the sign-off, in that order", () => {
     const doc = buildCoverDoc({
       name: "Jane Doe",
       company: "Acme",
       cover: { greeting: "Hi,", p1: "one", p2: "two", p3: "three", sign: "Warmly, Jane Doe" },
+      date: new Date(2026, 7, 26),
     });
     const content = doc.content as ContentItem[];
     const texts = content.map((c) => c.text);
-    expect(texts).toEqual(["Jane Doe", "Cover letter - Acme", "Hi,", "one", "two", "three", "Warmly, Jane Doe"]);
+    // No contact on file: no location for a city, so the dateline is the bare date.
+    expect(texts).toEqual(["Jane Doe", "26 August 2026", "Hi,", "one", "two", "three", "Warmly, Jane Doe"]);
   });
 
-  it("name heading style is IDENTICAL across the CV and the cover letter — one matched document pair", () => {
-    const cvDoc = buildCvDoc({ name: "Jane Doe", summary: "s", cvText: "body" });
+  it("cover doc with a parsed contact prints the letterhead's contact block and a city dateline (issue #151)", () => {
+    const doc = buildCoverDoc({
+      name: "ignored — the contact's own name wins",
+      company: "Acme",
+      cover: { greeting: "Hi,", p1: "one", p2: "two", p3: "three", sign: "Jane" },
+      contact: { name: "Jane Doe", email: "jane@example.com", location: "Barcelona, Spain", links: [] },
+      date: new Date(2026, 7, 26),
+    });
+    const content = doc.content as ContentItem[];
+    expect(content[0].text).toBe("Jane Doe");
+    expect(Array.isArray(content[1].stack)).toBe(true); // the contactLines block
+    expect(content[2].text).toBe("Barcelona, 26 August 2026");
+    expect(content[3].text).toBe("Hi,");
+  });
+
+  it("letterhead is IDENTICAL to the structured CV's — the cover letter shares it, not a second design", () => {
+    const cvDoc = buildStructuredCvDoc({ name: "ignored", summary: "s", cv: STRUCTURED });
     const coverDoc = buildCoverDoc({
-      name: "Jane Doe",
+      name: "ignored",
       company: "Acme",
       cover: { greeting: "Hi,", p1: "a", p2: "b", p3: "c", sign: "Jane" },
+      contact: STRUCTURED.contact,
+      date: new Date(2026, 7, 26),
     });
     const nameItem = (doc: Record<string, unknown>) => (doc.content as ContentItem[])[0];
-    const cvName = nameItem(cvDoc);
-    const coverName = nameItem(coverDoc);
-    expect(cvName.text).toBe("Jane Doe");
-    expect(coverName.text).toBe("Jane Doe");
-    expect(cvName.fontSize).toBe(coverName.fontSize);
-    expect(cvName.bold).toBe(coverName.bold);
-    expect(cvName.margin).toEqual(coverName.margin);
+    expect(nameItem(coverDoc)).toEqual(nameItem(cvDoc));
+    expect(coverDoc.defaultStyle).toEqual(cvDoc.defaultStyle);
+  });
+
+  it("formatDateEN and coverDateLine format the letter's dateline, city from the contact location", () => {
+    const d = new Date(2026, 7, 26);
+    expect(formatDateEN(d)).toBe("26 August 2026");
+    expect(coverDateLine("Barcelona, Spain", d)).toBe("Barcelona, 26 August 2026");
+    expect(coverDateLine(undefined, d)).toBe("26 August 2026");
+    expect(coverDateLine("", d)).toBe("26 August 2026");
   });
 
   it("both docs stay real, ATS-parseable text — no rasterized image or canvas content anywhere in the definition", () => {
