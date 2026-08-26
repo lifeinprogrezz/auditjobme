@@ -60,6 +60,9 @@ import {
   isMissingBatchTable,
   parseBatchResults,
 } from "../src/lib/scoreBatch.js";
+// #145: thrown errors + the explicit failure lines below go to Sentry (ids and
+// counts only — see src/lib/apiSentry.ts). No DSN → every call is a no-op.
+import { reportApiError, setRunSummary, withSentry } from "../src/lib/apiSentry.js";
 
 // Minimal Vercel Node handler types (avoids a @vercel/node dependency).
 type Req = { method?: string; headers: Record<string, string | string[] | undefined> };
@@ -206,6 +209,7 @@ async function sendEmail(
     });
     if (!res.ok) {
       console.warn(`[nightly] Resend ${res.status}:`, await res.text().catch(() => ""));
+      reportApiError(`[nightly] Resend non-ok ${res.status}`, { status: res.status });
       return false;
     }
     return true;
@@ -216,7 +220,7 @@ async function sendEmail(
 }
 
 
-export default async function handler(req: Req, res: Res): Promise<void> {
+async function handler(req: Req, res: Res): Promise<void> {
   // ── Cron-caller auth (fail CLOSED) ────────────────────────────────────────
   // Vercel Cron invokes this endpoint over GET with `Authorization: Bearer
   // <CRON_SECRET>`. A MISSING CRON_SECRET is a misconfiguration (500), NOT a
@@ -847,6 +851,12 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   // Action went green through a total outage. Zero matches is still a fine night;
   // zero SURVIVING users is not. See nightlyRunVerdict + its tests.
   const verdict = nightlyRunVerdict({ users: summary.users, processed: summary.processed, failed: summary.failed, done: summary.done });
-  if (!verdict.ok) console.error(`[nightly] ${verdict.reason}`);
+  setRunSummary(summary);
+  if (!verdict.ok) {
+    console.error(`[nightly] ${verdict.reason}`);
+    reportApiError(`[nightly] ${verdict.reason}`, { status: verdict.status });
+  }
   res.status(verdict.status).json({ ok: verdict.ok, date: today, ...summary, ...(verdict.reason ? { reason: verdict.reason } : {}) });
 }
+
+export default withSentry("nightly", handler);

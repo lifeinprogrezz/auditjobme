@@ -167,6 +167,19 @@ the numbers as JSON, and it logs them either way. Its job is to make a cost step
 invoice. It enforces nothing; the no-cap decision above still stands. Change the thresholds
 only alongside `spendAlert.test.ts`.
 
+### Errors from functions go to Sentry
+
+The four functions under `api/` report to the same Sentry project as the client
+(`src/lib/apiSentry.ts`, issue #145). The Vercel runtime-log API stopped answering on the
+Hobby plan, so console output alone is not durable. `withSentry` wraps each handler: a
+thrown error is captured with a `function` tag and rethrown (the platform still answers
+500); the explicit failure lines (`nightlyRunVerdict` non-ok, `[score-backlog]` upsert
+failures, Resend non-ok responses) are sent as error-level messages; the per-run summary
+is attached as a `run` context. Only ids and counts leave: `scrubContent` drops CV text,
+job descriptions, mail subjects and bodies, and email addresses, on top of the credential
+rule shared with the client. Reads `SENTRY_DSN`, falling back to `VITE_SENTRY_DSN`; with
+neither set every call is a no-op. Change it only alongside `apiSentry.test.ts`.
+
 ## The front end
 
 Vite plus React plus TypeScript, single-page, no framework router beyond `react-router`.
@@ -219,7 +232,8 @@ Client (`VITE_`-prefixed, baked into the bundle, all public by design):
 Server (Vercel environment and GitHub secrets, never in the bundle):
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`,
 `CRON_SECRET`, `SCRAPE_PROXY_URL`, `OWNER_ALERT_EMAIL` (optional; the spend alert's
-recipient, defaults to `hello@lifeinprogrezz.com`).
+recipient, defaults to `hello@lifeinprogrezz.com`), `SENTRY_DSN` (the functions' Sentry
+DSN; falls back to `VITE_SENTRY_DSN`).
 
 `SUPABASE_SERVICE_ROLE_KEY` must be the legacy `eyJ…` service-role JWT. Note that the
 dashboard's service-role token and the one an edge function receives are *different but both

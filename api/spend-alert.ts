@@ -19,6 +19,9 @@ import {
   buildSpendAlertBody,
   type SpendSnapshot,
 } from "../src/lib/spendAlert.js";
+// #145: thrown errors + the explicit failure lines below go to Sentry (ids and
+// counts only — see src/lib/apiSentry.ts). No DSN → every call is a no-op.
+import { reportApiError, setRunSummary, withSentry } from "../src/lib/apiSentry.js";
 
 type Req = { method?: string; headers: Record<string, string | string[] | undefined> };
 type Res = { status: (code: number) => Res; json: (body: unknown) => void };
@@ -67,6 +70,7 @@ async function sendEmail(apiKey: string, to: string, subject: string, text: stri
     });
     if (!res.ok) {
       console.warn(`[spend-alert] Resend ${res.status}:`, await res.text().catch(() => ""));
+      reportApiError(`[spend-alert] Resend non-ok ${res.status}`, { status: res.status });
       return false;
     }
     return true;
@@ -76,7 +80,7 @@ async function sendEmail(apiKey: string, to: string, subject: string, text: stri
   }
 }
 
-export default async function handler(req: Req, res: Res): Promise<void> {
+async function handler(req: Req, res: Res): Promise<void> {
   const authError = cronAuthResult(process.env.CRON_SECRET, req.headers["authorization"]);
   if (authError) {
     res.status(authError.status).json({ error: authError.error });
@@ -95,6 +99,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   const { data, error } = await admin.rpc("spend_alert_snapshot");
   if (error) {
     console.error("[spend-alert] snapshot read failed:", error.message);
+    reportApiError("[spend-alert] snapshot read failed", { code: error.code, message: error.message });
     res.status(500).json({ error: `spend_alert_snapshot failed: ${error.message}` });
     return;
   }
@@ -112,6 +117,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     topUser: decision.topUser,
   };
   console.log("[spend-alert]", JSON.stringify({ alert: decision.alert, reasons: decision.reasons, ...numbers }));
+  setRunSummary({ alert: decision.alert, reasons: decision.reasons, ...numbers });
 
   let emailed = false;
   if (decision.alert) {
@@ -129,3 +135,5 @@ export default async function handler(req: Req, res: Res): Promise<void> {
 
   res.status(200).json({ ok: true, alert: decision.alert, reasons: decision.reasons, emailed, ...numbers });
 }
+
+export default withSentry("spend-alert", handler);
