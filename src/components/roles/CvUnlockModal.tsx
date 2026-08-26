@@ -8,7 +8,8 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ROLE_FAMILY_OPTIONS,
-  LABEL_CAP,
+  ROLE_CAP,
+  SECTOR_CAP,
   TOP_SECTOR_CHIPS,
   visibleSectorChips,
   filterSectorSearch,
@@ -254,37 +255,47 @@ export default function CvUnlockModal({
 
             <div className="cvsec">
               <div className="cvlbl">
-                Target roles <span className="cvcap">pick up to {LABEL_CAP}</span>
+                Target roles <span className="cvcap">pick up to {ROLE_CAP}</span>
               </div>
               <div className="cvchips">
-                {ROLE_FAMILY_OPTIONS.map((r) => (
-                  <button
-                    key={r.value}
-                    type="button"
-                    className={"cvchip" + (roles.includes(r.value) ? " on" : "")}
-                    onClick={() => setRoles((cur) => toggleCapped(cur, r.value, LABEL_CAP))}
-                  >
-                    {r.label}
-                  </button>
-                ))}
+                {ROLE_FAMILY_OPTIONS.map((r) => {
+                  const selected = roles.includes(r.value);
+                  const capped = !selected && roles.length >= ROLE_CAP;
+                  return (
+                    <button
+                      key={r.value}
+                      type="button"
+                      disabled={capped}
+                      className={"cvchip" + (selected ? " on" : "")}
+                      onClick={() => setRoles((cur) => toggleCapped(cur, r.value, ROLE_CAP))}
+                    >
+                      {r.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div className="cvsec">
               <div className="cvlbl">
-                Target industries <span className="cvcap">pick up to {LABEL_CAP}</span>
+                Target industries <span className="cvcap">pick up to {SECTOR_CAP}</span>
               </div>
               <div className="cvchips">
-                {industryOptions.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className={"cvchip" + (sectors.includes(s) ? " on" : "")}
-                    onClick={() => setSectors((cur) => toggleCapped(cur, s, LABEL_CAP))}
-                  >
-                    {s}
-                  </button>
-                ))}
+                {industryOptions.map((s) => {
+                  const selected = sectors.includes(s);
+                  const capped = !selected && sectors.length >= SECTOR_CAP;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      disabled={capped}
+                      className={"cvchip" + (selected ? " on" : "")}
+                      onClick={() => setSectors((cur) => toggleCapped(cur, s, SECTOR_CAP))}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
               </div>
               {/* Tail search: same fdrop-search/fdrop-list/checkbox pattern as the
                   headbar's searchable FilterChip dropdown (FilterChip.tsx), reused
@@ -301,17 +312,22 @@ export default function CvUnlockModal({
                   />
                   {sectorQuery.trim() && (
                     <div className="fdrop fdrop-list">
-                      {sectorSearchResults.map((o) => (
-                        <label key={o.value}>
-                          <input
-                            type="checkbox"
-                            checked={sectors.includes(o.value)}
-                            onChange={() => setSectors((cur) => toggleCapped(cur, o.value, LABEL_CAP))}
-                          />
-                          <span className="fdrop-lab">{o.label}</span>
-                          <span className="fdrop-n">{o.count}</span>
-                        </label>
-                      ))}
+                      {sectorSearchResults.map((o) => {
+                        const selected = sectors.includes(o.value);
+                        const capped = !selected && sectors.length >= SECTOR_CAP;
+                        return (
+                          <label key={o.value}>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              disabled={capped}
+                              onChange={() => setSectors((cur) => toggleCapped(cur, o.value, SECTOR_CAP))}
+                            />
+                            <span className="fdrop-lab">{o.label}</span>
+                            <span className="fdrop-n">{o.count}</span>
+                          </label>
+                        );
+                      })}
                       {sectorSearchResults.length === 0 && (
                         <div className="fdrop-empty">No matches</div>
                       )}

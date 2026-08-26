@@ -10,12 +10,12 @@ import {
   cvWordCount,
   formatUploadedDate,
   ROLE_FAMILY_OPTIONS,
-  LABEL_CAP,
+  ROLE_CAP,
+  SECTOR_CAP,
   TOP_SECTOR_CHIPS,
   visibleSectorChips,
   filterSectorSearch,
 } from "@/lib/labels";
-import { USER_DATA_TABLES } from "@/lib/account";
 import { parseConnectionsCsv, type ParsedConnection } from "@/lib/connections";
 import type { FilterOption } from "@/components/roles/FilterChip";
 import type { RoleJob } from "@/lib/roles";
@@ -84,7 +84,7 @@ function toggleCapped(list: string[], value: string, cap: number): string[] {
 // One chip idiom for both pickers: control type, hairline border, and a filled
 // ink "on" state (the literal class name "on" is part of the pinned contract).
 const CHIP_OFF =
-  "rounded-full border border-border px-3 py-1.5 text-control font-medium text-muted-foreground transition-colors hover:text-foreground";
+  "rounded-full border border-border px-3 py-1.5 text-control font-medium text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-muted-foreground";
 const CHIP_ON = "on rounded-full border border-foreground bg-foreground px-3 py-1.5 text-control font-medium text-background";
 
 export default function SettingsPanel({
@@ -121,6 +121,9 @@ export default function SettingsPanel({
   const [confirmWord, setConfirmWord] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
+  // "Not interested" (issue #156): collapsed by default so a long list doesn't
+  // dominate the page; the count sits in the header either way.
+  const [notInterestedOpen, setNotInterestedOpen] = useState(false);
 
   // Connections upload (issue #41): file is read + parsed HERE (pure lib), the
   // parent only persists rows — so the panel stays testable without a network.
@@ -242,6 +245,9 @@ export default function SettingsPanel({
             </Button>
           </>
         )}
+        <p className="mt-4 text-caption text-muted-foreground">
+          Changing this re-scores your roles over the next hours; you keep your current scores meanwhile.
+        </p>
       </section>
 
       {/* LinkedIn connections upload (issue #41). Optional, alongside the CV — the
@@ -320,10 +326,8 @@ export default function SettingsPanel({
         ) : (
           <>
             <p className="mt-3 text-body text-muted-foreground text-pretty">
-              <b className="text-foreground">Optional.</b> LinkedIn lets you download the list of people you're
-              connected with (a file called Connections.csv). Add it here and roles at companies where you already
-              know someone get a quiet "You know 2 people here", with the names waiting on the application page.
-              It never changes your match scores.
+              <b className="text-foreground">Optional.</b> Upload your LinkedIn Connections.csv and roles where you
+              know someone get a quiet marker.
             </p>
             <Button className="mt-4" onClick={() => connFileRef.current?.click()} disabled={connBusy}>
               {connBusy ? "Reading your file…" : "Add your connections"}
@@ -339,35 +343,45 @@ export default function SettingsPanel({
 
       <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
         <h2 className="font-display text-section text-foreground">Target roles</h2>
-        <p className="mt-1 text-caption text-muted-foreground">Pick up to {LABEL_CAP}.</p>
+        <p className="mt-1 text-caption text-muted-foreground">Pick up to {ROLE_CAP}.</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {ROLE_FAMILY_OPTIONS.map((r) => (
-            <button
-              key={r.value}
-              type="button"
-              className={roles.includes(r.value) ? CHIP_ON : CHIP_OFF}
-              onClick={() => setEditRoles(toggleCapped(roles, r.value, LABEL_CAP))}
-            >
-              {r.label}
-            </button>
-          ))}
+          {ROLE_FAMILY_OPTIONS.map((r) => {
+            const selected = roles.includes(r.value);
+            const capped = !selected && roles.length >= ROLE_CAP;
+            return (
+              <button
+                key={r.value}
+                type="button"
+                disabled={capped}
+                className={selected ? CHIP_ON : CHIP_OFF}
+                onClick={() => setEditRoles(toggleCapped(roles, r.value, ROLE_CAP))}
+              >
+                {r.label}
+              </button>
+            );
+          })}
         </div>
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
         <h2 className="font-display text-section text-foreground">Target industries</h2>
-        <p className="mt-1 text-caption text-muted-foreground">Pick up to {LABEL_CAP}.</p>
+        <p className="mt-1 text-caption text-muted-foreground">Pick up to {SECTOR_CAP}.</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {industryOptions.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={sectors.includes(s) ? CHIP_ON : CHIP_OFF}
-              onClick={() => setEditSectors(toggleCapped(sectors, s, LABEL_CAP))}
-            >
-              {s}
-            </button>
-          ))}
+          {industryOptions.map((s) => {
+            const selected = sectors.includes(s);
+            const capped = !selected && sectors.length >= SECTOR_CAP;
+            return (
+              <button
+                key={s}
+                type="button"
+                disabled={capped}
+                className={selected ? CHIP_ON : CHIP_OFF}
+                onClick={() => setEditSectors(toggleCapped(sectors, s, SECTOR_CAP))}
+              >
+                {s}
+              </button>
+            );
+          })}
         </div>
         {sectorOptions.length > TOP_SECTOR_CHIPS && (
           <div className="mt-4">
@@ -380,19 +394,24 @@ export default function SettingsPanel({
             />
             {sectorQuery.trim() && (
               <ul className="mt-2 max-h-56 overflow-y-auto rounded-[10px] border border-border">
-                {sectorSearchResults.map((o) => (
-                  <li key={o.value}>
-                    <label className="flex cursor-pointer items-center gap-3 px-3 py-2 text-body text-foreground transition-colors hover:bg-secondary">
-                      <input
-                        type="checkbox"
-                        checked={sectors.includes(o.value)}
-                        onChange={() => setEditSectors(toggleCapped(sectors, o.value, LABEL_CAP))}
-                      />
-                      <span className="min-w-0 flex-1 truncate">{o.label}</span>
-                      <span className="font-mono text-caption text-muted-foreground">{o.count}</span>
-                    </label>
-                  </li>
-                ))}
+                {sectorSearchResults.map((o) => {
+                  const selected = sectors.includes(o.value);
+                  const capped = !selected && sectors.length >= SECTOR_CAP;
+                  return (
+                    <li key={o.value}>
+                      <label className="flex cursor-pointer items-center gap-3 px-3 py-2 text-body text-foreground transition-colors hover:bg-secondary">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          disabled={capped}
+                          onChange={() => setEditSectors(toggleCapped(sectors, o.value, SECTOR_CAP))}
+                        />
+                        <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                        <span className="font-mono text-caption text-muted-foreground">{o.count}</span>
+                      </label>
+                    </li>
+                  );
+                })}
                 {sectorSearchResults.length === 0 && (
                   <li className="px-3 py-2 text-caption text-muted-foreground">No matches</li>
                 )}
@@ -402,44 +421,15 @@ export default function SettingsPanel({
         )}
       </section>
 
-      {/* Dismissed roles (issue #73 slice 4): saying no has to be undoable, or nobody
-          uses it. Same section idiom as the pickers above; absent when empty. */}
-      {dismissedJobs.length > 0 && (
-        <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
-          <h2 className="font-display text-section text-foreground">Not interested</h2>
-          <p className="mt-1 text-caption text-muted-foreground">
-            These roles stay out of your queue and off the map. Put one back any time.
-          </p>
-          <ul className="mt-4 flex flex-col gap-3">
-            {dismissedJobs.map((job) => (
-              <li key={job.id} className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="font-display text-micro uppercase text-muted-foreground">{job.company}</div>
-                  <a
-                    href={job.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block truncate font-display text-body text-foreground underline-offset-2 hover:underline"
-                  >
-                    {job.title}
-                  </a>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onRestoreDismissed?.(job)}
-                  className="shrink-0 text-control font-medium text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
-                >
-                  Undo
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
+      {/* Save targets sits directly under Target industries — it belongs to the
+          two pickers above, not to Not interested or the account section below
+          (issue #156). */}
+      <p className="text-caption text-muted-foreground">
+        Changing this re-scores your roles over the next hours; you keep your current scores meanwhile.
+      </p>
       <div className="flex items-center gap-4">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save changes"}
+          {saving ? "Saving…" : "Save targets"}
         </Button>
         {savedFlash && (
           <span className="inline-flex items-center gap-1.5 text-caption font-medium text-muted-foreground" role="status">
@@ -451,49 +441,102 @@ export default function SettingsPanel({
         )}
       </div>
 
-      {/* Account (issue #84). Both surfaces are obligations, not extras: the product
-          launches to European residents, who can ask for their data and ask us to
-          delete it. The list of what goes comes from USER_DATA_TABLES, the same list
-          the export reads, so the promise on screen and the code cannot drift. */}
+      {/* Dismissed roles (issue #73 slice 4): saying no has to be undoable, or nobody
+          uses it. Collapsible and collapsed by default (issue #156) so a long list
+          doesn't dominate the page; the count in the header says it's there —
+          same Fold idiom as CvEditor's per-section folds. */}
+      {dismissedJobs.length > 0 && (
+        <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
+          <button
+            type="button"
+            onClick={() => setNotInterestedOpen((o) => !o)}
+            aria-expanded={notInterestedOpen}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <h2 className="font-display text-section text-foreground">
+              Not interested{" "}
+              <span className="font-mono text-caption text-muted-foreground">{dismissedJobs.length}</span>
+            </h2>
+            <span className="font-mono text-caption text-muted-foreground">
+              {notInterestedOpen ? "Hide" : "Show"}
+            </span>
+          </button>
+          {notInterestedOpen && (
+            <>
+              <p className="mt-1 text-caption text-muted-foreground">
+                These roles stay out of your queue and off the map. Put one back any time.
+              </p>
+              <ul className="mt-4 flex flex-col gap-3">
+                {dismissedJobs.map((job) => (
+                  <li key={job.id} className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display text-micro uppercase text-muted-foreground">{job.company}</div>
+                      <a
+                        href={job.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block truncate font-display text-body text-foreground underline-offset-2 hover:underline"
+                      >
+                        {job.title}
+                      </a>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onRestoreDismissed?.(job)}
+                      className="shrink-0 text-control font-medium text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
+                    >
+                      Undo
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      )}
+
+      {/* Account (issue #84, restructured #156): download and delete, as two rows
+          of one "Your data" section rather than two sections. The full list of
+          what "everything" covers moved to the Privacy page, generated from the
+          same USER_DATA_TABLES the export reads, so the promise there and the
+          code cannot drift. */}
       <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
         <h2 className="font-display text-section text-foreground">Your data</h2>
-        <p className="mt-3 text-body text-muted-foreground text-pretty">
-          Download everything we hold about you in one file. It's plain text in JSON format, so you can open it in
-          any editor or load it into something else. The file is put together in your browser, from your own rows.
-        </p>
-        <Button variant="outline" className="mt-4" onClick={handleExport} disabled={exporting}>
-          {exporting ? "Preparing your file…" : "Download my data"}
-        </Button>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-body text-foreground">Download my data</p>
+            <p className="mt-1 text-caption text-muted-foreground text-pretty">
+              Everything we hold about you, in one file, put together in your browser.
+            </p>
+          </div>
+          <Button variant="outline" onClick={handleExport} disabled={exporting}>
+            {exporting ? "Preparing your file…" : "Download my data"}
+          </Button>
+        </div>
         {exportFailed && (
           <p className="mt-3 text-caption text-muted-foreground" role="alert">
             We couldn't put your file together just now. Give it another try in a moment.
           </p>
         )}
-      </section>
 
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
-        <h2 className="font-display text-section text-foreground">Delete your account</h2>
-        <p className="mt-3 text-body text-muted-foreground text-pretty">
-          This deletes your account and everything stored with it:
-        </p>
-        <ul className="mt-3 list-disc space-y-1 pl-5 text-body text-muted-foreground">
-          {/* Keyed by table AND column: a table can appear twice, once per user
-              column (referrals is read by referee_id and by referrer_id), and the
-              table alone then repeats a key and React drops one line silently. */}
-          {USER_DATA_TABLES.map((t) => (
-            <li key={`${t.table}.${t.column}`}>{t.label}</li>
-          ))}
-        </ul>
-        <p className="mt-3 text-body text-muted-foreground text-pretty">
-          It happens straight away, it covers every one of those, and there's no undo. If you want to keep a copy,
-          download your data first. You'll be signed out as soon as it's done.
-        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
+          <div>
+            <p className="text-body text-foreground">Delete my account</p>
+            <p className="mt-1 text-caption text-muted-foreground text-pretty">
+              Deletes your account and all data linked to it, straight away, no undo.
+              <br />
+              Download your data first if you want a copy.
+            </p>
+          </div>
+          {!confirmingDelete && (
+            <Button variant="destructive" onClick={() => setConfirmingDelete(true)}>
+              Delete my account
+            </Button>
+          )}
+        </div>
 
-        {!confirmingDelete ? (
-          <Button variant="destructive" className="mt-4" onClick={() => setConfirmingDelete(true)}>
-            Delete my account
-          </Button>
-        ) : (
+        {confirmingDelete && (
           <div className="mt-4 flex flex-col gap-3">
             <label htmlFor="delete-confirm" className="text-body text-foreground">
               Type <b>{DELETE_CONFIRM_WORD}</b> to confirm.

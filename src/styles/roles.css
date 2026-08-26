@@ -977,6 +977,10 @@
 .roles-theme .cvchip.on {
   color: var(--act-strong-ink); background: var(--act-strong); border-color: var(--act-strong);
 }
+/* At the pick cap (issue #156): the remaining chips go inert rather than
+ * silently swallowing the click — same idiom as the Settings pickers. */
+.roles-theme .cvchip:disabled { opacity: 0.4; cursor: not-allowed; }
+.roles-theme .cvchip:disabled:hover { color: var(--muted); border-color: var(--hair); }
 /* Industries tail search (issue #44) — the headbar FilterChip's .fdrop-search /
  * .fdrop / .fdrop-list / checkbox pattern reused verbatim (same tokens, same
  * row shape), but in-flow under the chip row instead of the flyout's absolute +
