@@ -131,6 +131,14 @@ export default defineConfig(({ mode }) => {
       hmr: {
         overlay: false,
       },
+      // Local review hits the PRODUCTION functions (score-kick, spend-alert…):
+      // Vite serves no /api, so without this a CV or target save on :8080 never
+      // kicks the worker and "still scoring" sits for the hourly cron. The
+      // functions verify the caller's own Supabase JWT, so this spends only what
+      // the signed-in user is entitled to. Dev-only; the built app is untouched.
+      proxy: {
+        "/api": { target: "https://northgoing.com", changeOrigin: true, secure: true },
+      },
     },
     plugins: [react(), geoPrerenderPlugin(env)],
     resolve: {

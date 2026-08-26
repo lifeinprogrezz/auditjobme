@@ -407,16 +407,16 @@
 .roles-theme.panel-hidden .panel-toggle svg { transform: rotate(180deg); }
 /* One header row: title left + the quiet scoring progress right (Rober 7-16). The
    scored gate moved from .ptitle to the row. */
-.roles-theme .phead { display: none; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.roles-theme .phead { display: none; flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 14px; }
 .roles-theme.scored .phead { display: flex; }
 .roles-theme .ptitle { font-family: var(--font-d); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.035em; color: #fff; margin: 0; }
 /* Scoring progress (#149): the old .pprog whisper was a bare "N to go" with no
    phase and no end. Same typography, now with a thin bar carrying a real
    fraction. Component: src/components/roles/ScoringProgress.tsx (variant="rail"). */
-.roles-theme .sprog { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.roles-theme .sprog-track { width: 54px; height: 3px; flex: none; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, 0.14); }
-.roles-theme .sprog-fill { height: 100%; border-radius: 999px; background: var(--muted); transition: width .5s ease; }
-.roles-theme .sprog-label { font-family: var(--font-m); font-size: 11px; color: var(--muted); text-align: right; }
+.roles-theme .sprog { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.roles-theme .sprog-track { width: 100%; height: 4px; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, 0.12); }
+.roles-theme .sprog-fill { height: 100%; border-radius: 999px; background: var(--jade, #3ecc8c); transition: width .5s ease; }
+.roles-theme .sprog-label { font-family: var(--font-m); font-size: 11px; color: var(--muted); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Map-selection chips (company + city, each independently removable). */
 .roles-theme .selhdr { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 11px; }
 .roles-theme .selchips { display: flex; flex-wrap: wrap; gap: 7px; }
