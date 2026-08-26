@@ -394,6 +394,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     users: active.length,
     processed: 0,
     skipped: 0,
+    done: 0, // already matched + notified today (or only the email retry left) — served, not skipped
     emailed: 0,
     capped: 0,
     matches: 0,
@@ -604,7 +605,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
 
       // Already matched AND already notified today → fully done, no cost.
       if (action === "skip") {
-        summary.skipped++;
+        summary.done++;
         continue;
       }
 
@@ -612,7 +613,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // notified_at NULL) → retry the send for the EXISTING batch. Do NOT
       // re-score / re-upsert — email is the only channel this slice.
       if (action === "retry-email") {
-        summary.skipped++; // the batch already exists; nothing re-processed
+        summary.done++; // the batch already exists; nothing re-processed, but the user was served
         if (resendKey) {
           const rankedRetry: RankedMatch[] = todaysRows
             .slice()
@@ -839,7 +840,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   // A run that failed for every user used to answer 200 {ok:true}, so the scheduled
   // Action went green through a total outage. Zero matches is still a fine night;
   // zero SURVIVING users is not. See nightlyRunVerdict + its tests.
-  const verdict = nightlyRunVerdict({ users: summary.users, processed: summary.processed, failed: summary.failed });
+  const verdict = nightlyRunVerdict({ users: summary.users, processed: summary.processed, failed: summary.failed, done: summary.done });
   if (!verdict.ok) console.error(`[nightly] ${verdict.reason}`);
   res.status(verdict.status).json({ ok: verdict.ok, date: today, ...summary, ...(verdict.reason ? { reason: verdict.reason } : {}) });
 }

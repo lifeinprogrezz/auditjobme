@@ -372,21 +372,29 @@ export function buildEmailBody(
  * before the loop starts, so it cannot be skipped by any path inside it.
  *
  * Zero active users remains a success: that is a genuinely quiet night, not an outage.
+ *
+ * `done` counts users the run found ALREADY served today (matched and notified, or
+ * only the email retry left) and deliberately left alone. The drain window ticks every
+ * 10 minutes; after the first tick serves everyone, every later tick is {processed:0,
+ * done:N} — the job finished, not an outage. Without this the guard answered 500 on
+ * every follow-up tick from 2026-08-20 to 08-26 and the Action went red 4-5 times a
+ * morning after a real success. Loud error-skips (history or batch read failed) are NOT
+ * counted here on purpose: a tick where every user hit one of those is still an outage.
  */
-export function nightlyRunVerdict(run: { users: number; processed: number; failed: number }): {
+export function nightlyRunVerdict(run: { users: number; processed: number; failed: number; done?: number }): {
   ok: boolean;
   status: 200 | 500;
   failed: number;
   reason?: string;
 } {
-  const { users, processed, failed } = run;
-  if (users > 0 && processed === 0) {
+  const { users, processed, failed, done = 0 } = run;
+  if (users > 0 && processed === 0 && done === 0) {
     return {
       ok: false,
       status: 500,
       failed,
       reason:
-        `no user completed: ${users} active, 0 processed, ${failed} recorded as failed — ` +
+        `no user completed: ${users} active, 0 processed, 0 already done today, ${failed} recorded as failed — ` +
         `treating as an outage, not a quiet night`,
     };
   }
