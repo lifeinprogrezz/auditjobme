@@ -6,7 +6,7 @@ import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, Point as GeoPoint } from "geojson";
 import { clusterTier, hueFor, scoreBucket, type RoleJob } from "@/lib/roles";
-import { logoUrl, faviconUrls } from "@/lib/logodev";
+import { logoUrl, faviconUrls, guessedFaviconUrl } from "@/lib/logodev";
 import { prefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 export type GlobeMapProps = {
@@ -136,7 +136,7 @@ function dur(ms: number): number {
   return prefersReducedMotion() ? 0 : ms;
 }
 
-type PinProps = {
+export type PinProps = {
   id: string;
   co: string;
   domain: string | null;
@@ -221,7 +221,7 @@ function pinSig(p: PinProps): string {
   return `${p.score ?? ""}|${p.bucket}`;
 }
 
-function buildPin(p: PinProps): HTMLDivElement {
+export function buildPin(p: PinProps): HTMLDivElement {
   // Wrapper = the maplibre Marker root: maplibre owns its inline transform
   // (translate), so the hover scale must live on the inner disc — a transform
   // on the root would fight the marker positioning.
@@ -237,7 +237,14 @@ function buildPin(p: PinProps): HTMLDivElement {
   // Chain: logo.dev (skipped for its 2 placeholder domains) → the site's real
   // favicon (DuckDuckGo, then Google) → colored initial. Falling through to the
   // favicon is what shows a correct TravelPerk mark, not logo.dev's pinwheel.
-  const chain = p.domain ? [logoUrl(p.domain, "light"), ...faviconUrls(p.domain)].filter(Boolean) as string[] : [];
+  // No domain on file at all (issue #153 item B1, same law as PaperLogo/RolesPanel):
+  // one last-resort guessed-domain favicon before the coloured initial — this is
+  // the map's own logo path, most ATS-hosted companies never reach the apply-URL
+  // fallback that fills logo_domain.
+  const chain = (p.domain
+    ? [logoUrl(p.domain, "light"), ...faviconUrls(p.domain)]
+    : [guessedFaviconUrl(p.co)]
+  ).filter(Boolean) as string[];
   if (chain.length) {
     const img = document.createElement("img");
     img.alt = "";

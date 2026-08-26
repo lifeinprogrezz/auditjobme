@@ -53,11 +53,44 @@ const GENERIC_HOST_SUFFIXES = [
   "hibob.com",
   "comeet.com",
   "myworkdaysite.com",
+  // Issue #153 fix round 2, blocker 3: projected over the 852 unlinked
+  // companies (297 derivable), these ATS/HR-platform hosts leaked into
+  // logo_domain/website the same way the round-1 list did -- emp.jobylon.com
+  // (Furhat), revolutpeople.com (Terra API), taleez.com (Enchanted Tools),
+  // builtin.com (FindMeCure), *.welcomekit.co (Wandercraft/Corma/Flynt),
+  // *.haileyhr.app, *.keka.com, *.viterbit.site, *.odoo.com.
+  "jobylon.com",
+  "revolutpeople.com",
+  "taleez.com",
+  "builtin.com",
+  "welcomekit.co",
+  "haileyhr.app",
+  "keka.com",
+  "viterbit.site",
+  "odoo.com",
 ];
 
 // A leading label that marks a careers SUBDOMAIN of the real domain
 // (careers.macadam.app -> macadam.app). Only ever strips ONE label.
-const STRIPPABLE_LABELS = new Set(["www", "careers", "jobs", "apply", "hire", "join", "work", "talent", "team", "boards"]);
+const STRIPPABLE_LABELS = new Set([
+  "www",
+  "careers",
+  "career", // singular -- issue #153 fix round 2, blocker 3: career.mynt.com and
+  // 16 others (flinn, anyfin, oneflow, stegra, na-kd, ...) kept the careers
+  // page as companies.website because only the plural was stripped.
+  "jobs",
+  "apply",
+  "hire",
+  "join",
+  "work",
+  "talent",
+  "talento", // Spanish "talent" -- same class of leak on Spanish-market careers pages.
+  "empleo", // Spanish "jobs".
+  "about",
+  "corporate",
+  "team",
+  "boards",
+]);
 
 function isGenericHost(host) {
   return GENERIC_HOST_SUFFIXES.some((s) => host === s || host.endsWith(`.${s}`));
@@ -112,6 +145,26 @@ export function resolveLogoDomain({ careersUrl, website, applyUrls } = {}) {
   return { domain: null, derivedWebsite: null };
 }
 
+// Second-level ccTLDs where the real registrable base is the last THREE
+// labels, not two -- otherwise registrableDomain() below would merge every
+// company on e.g. a .co.uk domain into one false aggregator bucket. Not a
+// full public-suffix list, just the handful actually seen among company
+// domains here (domainFromUrl already keeps acme.co.uk as a real domain).
+const SECOND_LEVEL_CCTLDS = new Set(["co.uk", "org.uk", "ac.uk", "co.jp", "co.nz", "com.au", "com.br"]);
+
+/** The base a shared-host count should group by -- issue #153 fix round 2,
+ *  blocker 3: three welcomekit.co companies (Wandercraft/Corma/Flynt) each
+ *  resolved to a DIFFERENT full host (wandercraft.welcomekit.co vs
+ *  corma.welcomekit.co vs flynt.welcomekit.co), so the exact-host count
+ *  below never saw 3 of the same string and the >=N guard never fired. Last
+ *  two labels, except a known second-level ccTLD where it's the last three. */
+function registrableDomain(host) {
+  const labels = String(host || "").split(".");
+  if (labels.length <= 2) return host;
+  const lastTwo = labels.slice(-2).join(".");
+  return SECOND_LEVEL_CCTLDS.has(lastTwo) ? labels.slice(-3).join(".") : lastTwo;
+}
+
 /**
  * Data-driven aggregator guard (issue #153 fix round 1, blocker 1). Even with
  * GENERIC_HOST_SUFFIXES covering every known aggregator/ATS host, a NEW one
@@ -119,15 +172,21 @@ export function resolveLogoDomain({ careersUrl, website, applyUrls } = {}) {
  * welcometothejungle.com resolved as 19 different companies' "own" domain,
  * ycombinator.com 10, before those hosts were added to the list above. The
  * tell: a real company's own domain is used by exactly ONE company; an
- * aggregator's is shared by many. Any derived domain shared by >= minCompanies
- * distinct companies IN ONE RUN is treated as an aggregator signature and
- * excluded -- never written as anyone's logo_domain/website.
+ * aggregator's is shared by many -- counted by registrableDomain, so a
+ * multi-tenant host that hands each company its OWN subdomain (welcomekit.co
+ * above) still gets caught, not just one that reuses one exact host. Any
+ * base domain shared by >= minCompanies distinct companies IN ONE RUN is
+ * treated as an aggregator signature and excluded -- never written as
+ * anyone's logo_domain/website.
  */
 export function partitionAggregatorDomains(fills, minCompanies = 3) {
   const counts = new Map();
-  for (const f of fills) counts.set(f.domain, (counts.get(f.domain) ?? 0) + 1);
+  for (const f of fills) {
+    const base = registrableDomain(f.domain);
+    counts.set(base, (counts.get(base) ?? 0) + 1);
+  }
   const aggregatorDomains = new Set([...counts].filter(([, n]) => n >= minCompanies).map(([d]) => d));
-  const safe = fills.filter((f) => !aggregatorDomains.has(f.domain));
-  const skipped = fills.filter((f) => aggregatorDomains.has(f.domain));
+  const safe = fills.filter((f) => !aggregatorDomains.has(registrableDomain(f.domain)));
+  const skipped = fills.filter((f) => aggregatorDomains.has(registrableDomain(f.domain)));
   return { safe, skipped, aggregatorDomains };
 }

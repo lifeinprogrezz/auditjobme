@@ -16,6 +16,7 @@ import {
   isMissingTableError,
   officeKey,
   shouldSkipExistingOffice,
+  isTrustworthyOffice,
 } from "../../scripts/geocode-lib.mjs";
 
 describe("haversineKm", () => {
@@ -86,6 +87,8 @@ describe("parseNominatimResult", () => {
       displayName: "Acme GmbH, Prinzessinnenstrasse, Kreuzberg, Berlin, Germany",
       city: "Berlin",
       precision: "street",
+      name: null,
+      class: null,
     });
   });
 
@@ -109,6 +112,8 @@ describe("parseNominatimResult", () => {
       displayName: null,
       city: null,
       precision: "approximate",
+      name: null,
+      class: null,
     });
   });
 
@@ -149,6 +154,8 @@ describe("parseMapboxResult", () => {
       displayName: "Acme, Prinzessinnenstrasse 19, 10969 Berlin, Germany",
       city: "Berlin",
       precision: "street",
+      name: null,
+      class: "address",
     });
   });
 
@@ -160,6 +167,8 @@ describe("parseMapboxResult", () => {
       displayName: "Berlin, Germany",
       city: "Berlin",
       precision: "locality",
+      name: "Berlin",
+      class: "place",
     });
   });
 
@@ -200,6 +209,89 @@ describe("isMissingTableError — the migration-not-applied-yet degrade path", (
   it("is false for any other error, or no error at all", () => {
     expect(isMissingTableError({ code: "23505", message: "duplicate key" })).toBe(false);
     expect(isMissingTableError(null)).toBe(false);
+  });
+});
+
+describe("isTrustworthyOffice — precision/name/class gate (issue #153 fix round 2, blocker 2)", () => {
+  // Both fixtures below are the ACTUAL shapes measured live against prod
+  // (same query, same lib) that fix round 1's distance-only check let through.
+
+  it("rejects a village centroid ('5U AI, Munich' -> Baierbrunn) even though it sits 0.0km from itself", () => {
+    // Nominatim's top hit for the company address query is an unrelated
+    // village -- an area centroid, not an address. addressdetails carries
+    // no road/house_number, so precision is "locality", not "street".
+    const baierbrunn = parseNominatimResult([
+      {
+        lat: "47.9928",
+        lon: "11.5116",
+        display_name: "Baierbrunn, Landkreis München, Bavaria, Germany",
+        name: "Baierbrunn",
+        class: "place",
+        address: { village: "Baierbrunn", county: "Landkreis München", country: "Germany" },
+      },
+    ]);
+    expect(baierbrunn?.precision).toBe("locality");
+    expect(isTrustworthyOffice(baierbrunn, "5U AI")).toBe(false);
+  });
+
+  it("rejects a same-word street ('Pigment, London' -> Pigment Square) despite street precision", () => {
+    // A real road hit -- house_number/road present so precision IS "street"
+    // -- but it's a highway, and its own name is the STREET's name, not the
+    // company's. Street precision alone must not be enough.
+    const pigmentSquare = parseNominatimResult([
+      {
+        lat: "51.505",
+        lon: "-0.09",
+        display_name: "Pigment Square, Shoreditch, London, England, United Kingdom",
+        name: "Pigment Square",
+        class: "highway",
+        address: { road: "Pigment Square", suburb: "Shoreditch", city: "London", country: "United Kingdom" },
+      },
+    ]);
+    expect(pigmentSquare?.precision).toBe("street");
+    expect(isTrustworthyOffice(pigmentSquare, "Pigment")).toBe(false);
+  });
+
+  it("accepts a real OSM POI named for the company at street precision (Doctolib)", () => {
+    const doctolib = parseNominatimResult([
+      {
+        lat: "48.8698",
+        lon: "2.3412",
+        display_name: "Doctolib, 87 Rue de Richelieu, Paris, France",
+        name: "Doctolib",
+        class: "office",
+        address: { house_number: "87", road: "Rue de Richelieu", city: "Paris", country: "France" },
+      },
+    ]);
+    expect(isTrustworthyOffice(doctolib, "Doctolib")).toBe(true);
+  });
+
+  it("accepts a real OSM POI named for the company at street precision (Adobe), name-matching case/punctuation-insensitively", () => {
+    const adobe = parseNominatimResult([
+      {
+        lat: "37.3299",
+        lon: "-121.8907",
+        display_name: "Adobe, 345 Park Avenue, San Jose, California, USA",
+        name: "Adobe",
+        class: "office",
+        address: { house_number: "345", road: "Park Avenue", city: "San Jose", country: "USA" },
+      },
+    ]);
+    // The DB's company name and OSM's own name differ only in case/punctuation
+    // -- normalizeForNameMatch folds both, so this still matches.
+    expect(isTrustworthyOffice(adobe, "ADOBE.")).toBe(true);
+  });
+
+  it("rejects when there is no result, no street precision, or no name at all", () => {
+    expect(isTrustworthyOffice(null, "Acme")).toBe(false);
+    expect(isTrustworthyOffice({ precision: "locality", class: null, name: "Acme" }, "Acme")).toBe(false);
+    expect(isTrustworthyOffice({ precision: "street", class: null, name: null, displayName: null }, "Acme")).toBe(false);
+  });
+
+  it("rejects a street-precision hit whose name is a different company entirely", () => {
+    expect(
+      isTrustworthyOffice({ precision: "street", class: "office", name: "Beta Corp", displayName: null }, "Acme"),
+    ).toBe(false);
   });
 });
 

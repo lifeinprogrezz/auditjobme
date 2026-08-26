@@ -21,9 +21,14 @@
  *   2. city    = geocode(address.city) — the SAME city name's centroid, a
  *      query hundreds of OTHER companies in the same city share, so after the
  *      first hit per city this step is almost always a free cache read.
- *   Within MAX_OFFICE_TO_CITY_KM (50km) of each other -> write company_offices.
- *   Else, or no address/no city resolved at all -> nothing (never a guess).
+ *   Within MAX_OFFICE_TO_CITY_KM (50km) of each other AND the address hit
+ *   passes isTrustworthyOffice (issue #153 fix round 2, blocker 2: street
+ *   precision, not an area/highway/boundary class, named for the company)
+ *   -> write company_offices. Else, or no address/no city resolved at all
+ *   -> nothing (never a guess). The distance check alone cannot catch a
+ *   village or a same-word street sitting near itself; the trust gate can.
  *
+
  * EXISTING OFFICES ARE NEVER OVERWRITTEN (issue #153 fix round 1, blocker 2):
  * every (company_slug, city_key) already in company_offices -- hand-curated
  * seed rows included -- is pre-loaded once before the loop; a resolved
@@ -65,6 +70,7 @@ import {
   isMissingTableError,
   officeKey,
   shouldSkipExistingOffice,
+  isTrustworthyOffice,
 } from "./geocode-lib.mjs";
 
 const arg = (name, def) => {
@@ -92,6 +98,7 @@ const counters = {
   cityUnresolved: 0,
   noCityInAddress: 0,
   tooFar: 0,
+  untrustworthy: 0,
   officesWritten: 0,
   alreadyHadOffice: 0,
   budgetExhausted: 0,
@@ -286,6 +293,20 @@ async function main() {
       counters.tooFar++;
       continue;
     }
+    // Precision/name/class gate (issue #153 fix round 2, blocker 2): the
+    // distance check alone passes an area centroid (a village, a same-word
+    // street) that just happens to sit near itself -- isTrustworthyOffice
+    // requires an actual street-precision POI named for the company.
+    if (!isTrustworthyOffice(address, name)) {
+      counters.untrustworthy++;
+      if (DRY) {
+        console.log(
+          `  x ${name} (${slug}) -> ${address.city} hit isn't a trustworthy company address ` +
+            `(precision=${address.precision}, class=${address.class || "?"}, name=${address.name || "?"}) — skipped`,
+        );
+      }
+      continue;
+    }
 
     const office = {
       company_slug: slug,
@@ -314,7 +335,7 @@ async function main() {
     `geocode-companies: done — ${counters.tuples} tuple(s) considered · ${counters.officesWritten} office(s) ${DRY ? "would be written" : "written"} · ${counters.alreadyHadOffice} already had an office (not overwritten) · ` +
       `address cache hits ${counters.addressCacheHits} · address network calls ${counters.addressNetworkCalls} · address no-result ${counters.addressNoResult} · no-city-in-address ${counters.noCityInAddress} · ` +
       `city cache hits ${counters.cityCacheHits} · city network calls ${counters.cityNetworkCalls} · city unresolved ${counters.cityUnresolved} · ` +
-      `too-far (>${MAX_OFFICE_TO_CITY_KM}km) ${counters.tooFar} · budget-exhausted skips ${counters.budgetExhausted} · network errors ${counters.networkErrors} · caching ${cacheDisabled ? "DISABLED (migration not applied)" : "on"}`,
+      `too-far (>${MAX_OFFICE_TO_CITY_KM}km) ${counters.tooFar} · untrustworthy hit (precision/name/class gate) ${counters.untrustworthy} · budget-exhausted skips ${counters.budgetExhausted} · network errors ${counters.networkErrors} · caching ${cacheDisabled ? "DISABLED (migration not applied)" : "on"}`,
   );
 }
 

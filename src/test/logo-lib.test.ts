@@ -53,6 +53,29 @@ describe("domainFromUrl", () => {
     expect(domainFromUrl("https://comeet.com/jobs/acme/1")).toBeNull();
     expect(domainFromUrl("https://acme.myworkdaysite.com/en-US/careers/job/1")).toBeNull();
   });
+
+  it("more ATS/HR-platform hosts are NEVER a company domain (issue #153 fix round 2, blocker 3: measured on the 852 unlinked companies)", () => {
+    expect(domainFromUrl("https://emp.jobylon.com/acme/jobs/1")).toBeNull(); // Furhat
+    expect(domainFromUrl("https://revolutpeople.com/careers/1")).toBeNull(); // Terra API
+    expect(domainFromUrl("https://taleez.com/offre/1/acme")).toBeNull(); // Enchanted Tools
+    expect(domainFromUrl("https://builtin.com/company/acme/jobs/1")).toBeNull(); // FindMeCure
+    expect(domainFromUrl("https://wandercraft.welcomekit.co/jobs/1")).toBeNull();
+    expect(domainFromUrl("https://corma.welcomekit.co/jobs/1")).toBeNull();
+    expect(domainFromUrl("https://flynt.welcomekit.co/jobs/1")).toBeNull();
+    expect(domainFromUrl("https://worldfavor.careers.haileyhr.app/jobs/1")).toBeNull();
+    expect(domainFromUrl("https://unboxrobotics.keka.com/careers/1")).toBeNull();
+    expect(domainFromUrl("https://remuner.viterbit.site/es/oferta/1")).toBeNull();
+    expect(domainFromUrl("https://wonka-ai.odoo.com/jobs/1")).toBeNull();
+  });
+
+  it("strips a singular 'career' label and the Spanish/generic variants, not just the plural (issue #153 fix round 2, blocker 3: 17 companies kept the careers page as their website)", () => {
+    expect(domainFromUrl("https://career.mynt.com/jobs/1")).toBe("mynt.com");
+    expect(domainFromUrl("https://career.flinn.com")).toBe("flinn.com");
+    expect(domainFromUrl("https://talento.acme.com/ofertas")).toBe("acme.com");
+    expect(domainFromUrl("https://empleo.acme.es/vacantes")).toBe("acme.es");
+    expect(domainFromUrl("https://about.acme.com/careers")).toBe("acme.com");
+    expect(domainFromUrl("https://corporate.acme.com/jobs")).toBe("acme.com");
+  });
 });
 
 describe("deriveLogoDomain", () => {
@@ -171,5 +194,35 @@ describe("partitionAggregatorDomains — data-driven guard (issue #153 fix round
 
   it("is a no-op on an empty fills list", () => {
     expect(partitionAggregatorDomains([])).toEqual({ safe: [], skipped: [], aggregatorDomains: new Set() });
+  });
+
+  it("catches an aggregator that hands each company its OWN subdomain, not just a shared exact host (issue #153 fix round 2, blocker 3: welcomekit.co)", () => {
+    // The bug this pins: wandercraft/corma/flynt each resolved a DIFFERENT
+    // full host, so counting by f.domain never saw the same string 3 times
+    // and the >=3 guard never fired -- even though all three sit on the same
+    // multi-tenant welcomekit.co platform.
+    const fills = [
+      { slug: "wandercraft", name: "Wandercraft", domain: "wandercraft.welcomekit.co", website: "https://wandercraft.welcomekit.co" },
+      { slug: "corma", name: "Corma", domain: "corma.welcomekit.co", website: "https://corma.welcomekit.co" },
+      { slug: "flynt", name: "Flynt", domain: "flynt.welcomekit.co", website: "https://flynt.welcomekit.co" },
+      { slug: "acme", name: "Acme", domain: "acme.io", website: "https://acme.io" },
+    ];
+    const { safe, skipped, aggregatorDomains } = partitionAggregatorDomains(fills);
+    expect(safe).toEqual([fills[3]]);
+    expect(skipped).toEqual([fills[0], fills[1], fills[2]]);
+    expect(aggregatorDomains).toEqual(new Set(["welcomekit.co"]));
+  });
+
+  it("does not merge distinct companies on a second-level ccTLD (acme.co.uk) into a false aggregator bucket", () => {
+    // registrableDomain's last-two-labels heuristic would wrongly read "co.uk"
+    // as the shared base for every .co.uk domain without this exception.
+    const fills = [
+      { slug: "a", name: "A", domain: "a.co.uk", website: "https://a.co.uk" },
+      { slug: "b", name: "B", domain: "b.co.uk", website: "https://b.co.uk" },
+      { slug: "c", name: "C", domain: "c.co.uk", website: "https://c.co.uk" },
+    ];
+    const { safe, skipped } = partitionAggregatorDomains(fills);
+    expect(safe).toEqual(fills);
+    expect(skipped).toEqual([]);
   });
 });
