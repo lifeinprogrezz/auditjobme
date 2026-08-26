@@ -16,6 +16,9 @@
     "api/score-backlog.ts": {
       "maxDuration": 60
     },
+    "api/score-kick.ts": {
+      "maxDuration": 60
+    },
     "api/inbound-email.ts": {
       "maxDuration": 30
     },

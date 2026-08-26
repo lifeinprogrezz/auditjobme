@@ -9,6 +9,11 @@
 // row at the current rubric version", and every landed score upserts).
 // Spec: planning repo docs/specs/2026-07-10-server-side-scoring-backlog-design.md
 //
+// #149: the drain itself is `runBacklog`, exported so api/score-kick.ts can run it
+// for ONE user on demand. GitHub throttles the free-plan schedule to roughly
+// hourly, so a new user used to wait an hour for a first score. The cron path
+// below is unchanged: same auth, same budget, same body.
+//
 // Env: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / RESEND_API_KEY / CRON_SECRET
 // (same contract as api/nightly.ts).
 import { createClient } from "@supabase/supabase-js";
@@ -181,34 +186,50 @@ async function sendEmail(
   }
 }
 
-async function handler(req: Req, res: Res): Promise<void> {
+/** What the caller sends back to its client: an HTTP status and the body. */
+export type BacklogRunResult = { status: number; body: Record<string, unknown> };
+
+/**
+ * One invocation's drain (issue #149). Everything the cron handler used to do
+ * after the CRON_SECRET check, lifted out unchanged so a second caller can reuse
+ * it: api/score-kick.ts fires it for ONE user the moment they save a CV or their
+ * targets, because the GitHub schedule behind the cron path actually runs about
+ * once an hour on the free plan.
+ *
+ * `onlyUserId` narrows the profiles read to that user and changes nothing else.
+ * Undefined is the cron path: every user with a CV, in the same order, with the
+ * same budget, the same phases and the same response body as before.
+ *
+ * The live catalog read is per invocation either way. Narrowing it for one user
+ * is not possible: the prefilter picks that user's slice OUT of the whole
+ * catalog, so the whole catalog is the input.
+ */
+export async function runBacklog(
+  opts: { onlyUserId?: string } = {},
+): Promise<BacklogRunResult> {
   const startedMs = Date.now();
   const deadlineMs = startedMs + RUN_BUDGET_MS;
 
-  const authError = cronAuthResult(process.env.CRON_SECRET, req.headers["authorization"]);
-  if (authError) {
-    res.status(authError.status).json({ error: authError.error });
-    return;
-  }
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const resendKey = process.env.RESEND_API_KEY;
   if (!supabaseUrl || !serviceKey) {
-    res.status(500).json({ error: "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY" });
-    return;
+    return { status: 500, body: { error: "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY" } };
   }
   const proxyUrl = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/anthropic-proxy`;
   const admin = createClient(supabaseUrl, serviceKey);
 
   // ── Users with a CV (their pass covers the prefiltered slice, #114) ────────
-  const { data: profiles, error: pErr } = await admin
+  const profilesQuery = admin
     .from("profiles")
     .select(
       "id, cv_text, cv_hash, cv_changed_at, stale_refreshed_at, target_roles, target_sectors, target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages, scores_ready_notified_at",
     );
+  const { data: profiles, error: pErr } = await (opts.onlyUserId
+    ? profilesQuery.eq("id", opts.onlyUserId)
+    : profilesQuery);
   if (pErr) {
-    res.status(500).json({ error: `profiles read failed: ${pErr.message}` });
-    return;
+    return { status: 500, body: { error: `profiles read failed: ${pErr.message}` } };
   }
   const active = (profiles ?? []).filter(
     (p) => typeof p.cv_text === "string" && p.cv_text.trim().length > 0,
@@ -227,8 +248,7 @@ async function handler(req: Req, res: Res): Promise<void> {
       .eq("is_live", true)
       .range(from, from + PAGE - 1);
     if (error) {
-      res.status(500).json({ error: `jobs read failed: ${error.message}` });
-      return;
+      return { status: 500, body: { error: `jobs read failed: ${error.message}` } };
     }
     // The FK embed is an object at runtime (to-one), but the generated types
     // call it an array — tolerate both shapes rather than trusting either.
@@ -603,7 +623,20 @@ async function handler(req: Req, res: Res): Promise<void> {
   }
 
   setRunSummary(summary);
-  res.status(200).json({ ok: true, ms: Date.now() - startedMs, ...summary });
+  return { status: 200, body: { ok: true, ms: Date.now() - startedMs, ...summary } };
+}
+
+/** The cron path: .github/workflows/score-backlog.yml, CRON_SECRET-protected.
+ *  The secret gates THIS entry point only; the kick path proves identity with the
+ *  caller's own Supabase JWT and never sees the secret (api/score-kick.ts). */
+async function handler(req: Req, res: Res): Promise<void> {
+  const authError = cronAuthResult(process.env.CRON_SECRET, req.headers["authorization"]);
+  if (authError) {
+    res.status(authError.status).json({ error: authError.error });
+    return;
+  }
+  const { status, body } = await runBacklog();
+  res.status(status).json(body);
 }
 
 export default withSentry("score-backlog", handler);

@@ -23,6 +23,7 @@ import {
 } from "@/lib/roles";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { hasReadableJd, pendingLabelOf, scoreStatusOf } from "@/lib/scorePrefilter";
+import { ScoringProgress } from "@/components/roles/ScoringProgress";
 import { useTheme } from "@/lib/theme";
 import { track } from "@/lib/analytics";
 import ScoreBreakdown from "./ScoreBreakdown";
@@ -42,6 +43,10 @@ export type RolesPanelProps = {
   loading: boolean;
   scoring: boolean;
   remaining: number;
+  /** Size of the paid slice — the progress bar's denominator (#149). */
+  eligibleCount: number;
+  /** Work sitting in an open Anthropic batch: the "Collecting the rest" phase (#149). */
+  batchPending: boolean;
   /** Roles the paid scoring pass covers (#114). An unscored role outside this
    *  set will never score, so it must not claim to be scoring. */
   eligibleIds: Set<string>;
@@ -115,6 +120,8 @@ export default function RolesPanel({
   loading,
   scoring,
   remaining,
+  eligibleCount,
+  batchPending,
   eligibleIds,
   detailJob,
   applied,
@@ -234,14 +241,18 @@ export default function RolesPanel({
   const renderCards = () => (
     <>
       {/* One compact header row: title left, the scoring progress as a quiet mono
-          whisper right — no separate banner bar (Rober 7-16). */}
+          whisper right — no separate banner bar (Rober 7-16). The whisper is now a
+          thin bar with a phase and a real count (#149); it hides itself. */}
       <div className="phead">
         <h1 className="ptitle">{defaultView ? (scored ? "Best fit" : "Hot right now") : "Your matches"}</h1>
-        {scoring && (
-          <span className="pprog num" role="status" aria-live="polite">
-            {remaining} to go
-          </span>
-        )}
+        <ScoringProgress
+          variant="rail"
+          hasCv={signedIn && scored}
+          ready={!loading}
+          total={eligibleCount}
+          scored={eligibleCount - remaining}
+          batchPending={batchPending}
+        />
       </div>
       {activeChips.length > 0 && (
         <div className="selhdr">

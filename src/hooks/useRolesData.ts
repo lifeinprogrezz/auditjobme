@@ -245,6 +245,10 @@ export function useRolesData() {
   // NEVER fed into scoring (deliberate divergence from the personal engine).
   const [connections, setConnections] = useState<WarmContact[]>([]);
   const [connectionsUpdatedAt, setConnectionsUpdatedAt] = useState<string | null>(null);
+  // Work sitting in an open Anthropic batch (#96), read from the user's own
+  // score_batches rows. Drives the progress bar's "Collecting the rest" phase
+  // (#149) — the one state the score count alone cannot tell you about.
+  const [batchPending, setBatchPending] = useState(false);
   // Per-run cancellation: each effect run gets its own id; async loops compare
   // against the current id (a shared boolean would be re-armed by the next run,
   // resurrecting a cancelled loop and leaking user A's scores into user B's view).
@@ -295,6 +299,52 @@ export function useRolesData() {
       }),
     );
     if (landed.size > 0) scoreBufferRef.current?.push(landed);
+  }
+
+  /** Does this user still have work sitting in an Anthropic batch (#96)? One
+   *  own-row read, gated by the "Users read own score batches" RLS policy on
+   *  score_batches (migration 20260726103000). It is what tells the progress bar
+   *  "collecting the rest" from "still scoring": batch work is bought and waiting
+   *  on the provider, which gives no latency guarantee. Any error (the table is
+   *  applied by hand, so it can legitimately be absent) reads as "no batch", and
+   *  the bar falls back to the scoring phase. */
+  async function refreshBatchPending(userId: string, runId: number) {
+    const { data, error } = await supabase
+      .from("score_batches")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("status", "submitted")
+      .limit(1);
+    if (runRef.current !== runId) return;
+    setBatchPending(!error && (data ?? []).length > 0);
+  }
+
+  /**
+   * Ask the backlog worker to drain THIS user's slice now (issue #149).
+   *
+   * The cron behind api/score-backlog.ts is declared every 10 minutes and
+   * throttled by GitHub to roughly hourly, so a saved CV used to sit for an hour
+   * before its first score. Fire-and-forget on purpose: the caller's job is done
+   * whether or not this lands, and the 20 s score poll surfaces whatever it
+   * produces. Any failure is silent by design (offline, dev server with no
+   * functions, rate-limited) because the cron tick is still the safety net.
+   *
+   * The browser never holds CRON_SECRET: api/score-kick.ts takes the user's own
+   * Supabase access token, verifies it server-side, and drains for that id only.
+   */
+  async function kickScoringWorker() {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return; // signed out, or the dev fixture user, which has no JWT
+      await fetch("/api/score-kick", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        keepalive: true,
+      });
+    } catch {
+      // Best effort. The scheduled worker still owns the backlog.
+    }
   }
 
   /**
@@ -396,6 +446,10 @@ export function useRolesData() {
     // Profile view (issue #43): reflect the write we just made, no re-fetch
     // needed — we already know exactly what landed.
     setProfileMeta({ targetRoles: payload.target_roles, targetSectors: payload.target_sectors, cvUpdatedAt: nowIso });
+    // #149: the CV is stored, so the worker has something to score. Ask for the
+    // drain now rather than waiting on the schedule. Never awaited: the reveal
+    // above is what this function promises.
+    void kickScoringWorker();
     return true;
   }
 
@@ -482,6 +536,7 @@ export function useRolesData() {
         setDismissedJobsRaw([]);
         setConnections([]);
         setConnectionsUpdatedAt(null);
+        setBatchPending(false);
         setLoading(false);
         return;
       }
@@ -727,7 +782,13 @@ export function useRolesData() {
   useEffect(() => {
     if (!user || !hasCv || !hasUnscored || loading) return;
     const runId = runRef.current;
-    const t = setInterval(() => void refreshScores(user.id, runId), SCORE_POLL_MS);
+    // #149: the batch state is read once up front so the progress bar has the
+    // right phase without waiting a poll cycle, then on the same cadence.
+    void refreshBatchPending(user.id, runId);
+    const t = setInterval(() => {
+      void refreshScores(user.id, runId);
+      void refreshBatchPending(user.id, runId);
+    }, SCORE_POLL_MS);
     return () => clearInterval(t);
   }, [user, hasCv, hasUnscored, loading]);
 
@@ -851,6 +912,9 @@ export function useRolesData() {
     }
     setProfile((p) => (p ? { ...p, target_roles: roles, target_sectors: sectors } : p));
     setProfileMeta((m) => (m ? { ...m, targetRoles: roles, targetSectors: sectors } : m));
+    // #149: new targets widen or move the paid slice, so there is fresh backlog
+    // the moment this write lands. Same fire-and-forget as the CV path.
+    void kickScoringWorker();
     return true;
   };
 
@@ -992,6 +1056,12 @@ export function useRolesData() {
     // (the worker runs regardless; this drives the panel's progress bar).
     scoring: Boolean(user) && hasCv && hasUnscored && !loading,
     remaining: eligibleJobs.filter((j) => j.score == null).length,
+    /** Size of the paid slice (#114). The denominator of the progress bar (#149):
+     *  "N to go" alone never said what it was counting down from. */
+    eligibleCount: eligibleJobs.length,
+    /** This user has work in an open Anthropic batch — the progress bar's
+     *  "Collecting the rest" phase (#149). */
+    batchPending,
     /** Ids of the roles this user's paid pass covers (#114). Surfaces that render
      *  a pending state need it: an unscored role OUTSIDE this set never scores,
      *  so "Scoring this role…" would be a permanent lie (see scoreStatusOf). */

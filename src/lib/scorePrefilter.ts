@@ -55,12 +55,22 @@ export type PrefilterJob = {
  *  owner's rule: only roles we can read get a score; the rest wait.
  *
  *  jd_text wins when present (null or blank = unreadable); otherwise the has_jd
- *  flag. Neither known = fail OPEN: that is a dataplane artifact built before the
- *  column existed, and missing knowledge is not a missing description. */
+ *  flag. Neither known = fail CLOSED (issue #149, item A8).
+ *
+ *  Failing OPEN is what made the counter unreachable. On 2026-08-26 the worker
+ *  bought 236 scores and the rail said 367: the client was reading a dataplane
+ *  artifact built before the has_jd column existed, so every row was "unknown",
+ *  fail-open counted the 131 rows with no description, and the rail waited on
+ *  roles the worker would never buy. The worker's rows always carry the column,
+ *  so the two callers only agree if unknown counts as unreadable.
+ *
+ *  The artifact is held to that: src/lib/dataplane.ts refuses one whose jobs lack
+ *  has_jd, and the client falls back to live reads, which select it. So "unknown"
+ *  reaches this function only for a caller that fetched neither field, and for
+ *  that caller the honest answer is that we cannot read the description. */
 export function hasReadableJd(job: { jd_text?: string | null; has_jd?: boolean | null }): boolean {
   if (job.jd_text !== undefined) return typeof job.jd_text === "string" && job.jd_text.trim().length > 0;
-  if (typeof job.has_jd === "boolean") return job.has_jd;
-  return true;
+  return job.has_jd === true;
 }
 
 /** When this row appeared, epoch ms: first_seen_at → posted_at → 0 (unknown

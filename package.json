@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "schema:drift": "node scripts/schema-drift-check.mjs"
+    "schema:drift": "node scripts/schema-drift-check.mjs",
+    "dataplane:build": "node scripts/build-dataplane.mjs"
   },
   "dependencies": {
     "@fingerprintjs/fingerprintjs": "^4",

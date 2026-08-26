@@ -4,9 +4,13 @@
 import { describe, expect, it } from "vitest";
 import { applyLandedScores, type RoleJob } from "@/lib/roles";
 
+// has_jd true by default: since #149 the readability gate fails CLOSED, so a row
+// that says nothing about its description is a role we cannot read and its landed
+// score is never applied. The #130 block below overrides the flag on purpose.
 function job(id: string, company: string, score: number | null = null): RoleJob {
   return {
     id,
+    has_jd: true,
     company,
     title: `${company} PM`,
     url: `https://example.com/${id}`,
