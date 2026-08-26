@@ -154,13 +154,42 @@ const CO_DISC_DEG_MAX = 0.03;
 export function discRadiusFor(n: number): number {
   return Math.min(CO_DISC_DEG_MAX, CO_DISC_DEG * Math.sqrt(n / 10));
 }
-function centroidPlace(centroid: [number, number], idx: number, n: number): [number, number] {
-  const a = idx * 2.399963; // golden angle; idx is the company's stable rank among office-less peers in the city
+/** Deterministic 32-bit hash of a string (FNV-1a), for seeded placement. */
+function hash32(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/**
+ * Where an office-less company sits around its city centroid. Deterministic
+ * per company (seeded by its group key), NOT a regular pattern: the previous
+ * golden-angle sunflower read as an artificial grid ("perfectly distributed",
+ * Rober, 2026-08-26); real maps (startupmap's street-level pins) look organic
+ * because addresses cluster and gap at random. Angle uniform on the circle;
+ * radius pulled toward the centre (sqrt for area-uniform, then a soft power so
+ * more companies sit near the core like a real centre of town); plus a small
+ * per-company jitter so two seeds never share a ring. The disc radius still
+ * grows with the number of office-less peers (discRadiusFor). Pure — pinned by
+ * src/test/roles-natural-scatter.test.ts.
+ */
+export function naturalPlace(
+  centroid: [number, number],
+  seedKey: string,
+  n: number,
+): [number, number] {
+  const h1 = hash32(seedKey);
+  const h2 = hash32(seedKey + "|r");
+  const angle = (h1 / 0xffffffff) * Math.PI * 2;
+  const u = h2 / 0xffffffff; // 0..1
   const radius = discRadiusFor(n);
-  const r = radius * Math.sqrt((idx + 0.5) / Math.max(n, 1));
+  const r = radius * Math.pow(u, 0.65); // area-ish uniform with a denser core
   return [
-    centroid[0] + (r * Math.cos(a)) / Math.cos((centroid[1] * Math.PI) / 180),
-    centroid[1] + r * Math.sin(a),
+    centroid[0] + (r * Math.cos(angle)) / Math.cos((centroid[1] * Math.PI) / 180),
+    centroid[1] + r * Math.sin(angle),
   ];
 }
 
@@ -212,7 +241,7 @@ function enrichAll(
     const centroid = coordsOf(city);
     const n = queue.length;
     queue.forEach((gk, idx) => {
-      posByGroup.set(gk, centroid ? centroidPlace(centroid, idx, n) : null);
+      posByGroup.set(gk, centroid ? naturalPlace(centroid, gk, n) : null);
     });
   }
   const posFor = (city: string | null, r: JobsRow): [number, number] | null => {
@@ -275,6 +304,9 @@ function toJobsRow(job: RoleJob): JobsRow {
 // scorer now; the page POLLS landed scores at this cadence while any visible
 // role is unscored, so the map fills in live without the page doing the paying.
 const SCORE_POLL_MS = 20_000;
+/** Re-kick cadence while a batch is pending: above api/score-kick's 2-minute
+ *  per-user cooldown so every re-kick actually runs. Pure timing constant. */
+export const BATCH_REKICK_MS = 150_000;
 
 /**
  * Data plane for the /roles page. The reads live in the TanStack Query cache
@@ -768,6 +800,26 @@ export function useRolesData() {
     }, SCORE_POLL_MS);
     return () => clearInterval(t);
   }, [userId, hasCv, hasUnscored, loading]);
+
+  // "Collecting the rest" used to wait for the hourly worker: a batch submitted
+  // by the kick is only RETRIEVED by the next runBacklog for that user, and the
+  // kick fired only on save (Rober, 2026-08-26: "2 of 326, not progressing").
+  // While a batch is pending, re-kick on a cadence above the server's own
+  // cooldown so the batch is collected minutes after Anthropic finishes it.
+  const lastRekickAtRef = useRef(0);
+  useEffect(() => {
+    if (!userId || !batchPending) return;
+    const tick = () => {
+      const now = Date.now();
+      if (now - lastRekickAtRef.current < BATCH_REKICK_MS) return;
+      lastRekickAtRef.current = now;
+      void kickScoringWorker();
+    };
+    tick();
+    const t = setInterval(tick, BATCH_REKICK_MS);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, batchPending]);
 
   const markApplied = async (job: RoleJob) => {
     if (!userId) return;
