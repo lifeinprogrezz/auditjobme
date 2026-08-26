@@ -6,6 +6,14 @@
 //   upsert daily_matches (idempotent) → one Resend "N roles ready" email.
 // Slice 1 = SCORING ONLY. No CV/cover/audit generation, no in-app /matches view.
 //
+// SHARED LEDGER (#135): `scores` is the one record of what has been bought, for
+// this worker AND api/score-backlog.ts. Before buying, the nightly reads its
+// candidates' `scores` rows at the current RUBRIC_VERSION and reuses any fresh
+// one (same CV, see src/lib/scoreLedger.ts) instead of calling the model. Every
+// score it does buy — synchronous or batch-retrieved — is written through to
+// `scores` in the backlog's exact row shape, so the backlog never re-buys it.
+// daily_matches stays the digest's own table (rank, batch_date, notified_at).
+//
 // DURABLE EXECUTION (F6): the outer user loop is TIME-BUDGETED. A many-user night
 // can't fit in one 60s function, so the loop stops starting new users once
 // NIGHTLY_RUN_BUDGET_MS is spent and the repeat trigger resumes on the next tick.
@@ -22,7 +30,8 @@
 //   GitHub Action sends it as `Authorization: Bearer <CRON_SECRET>`).
 import { createClient } from "@supabase/supabase-js";
 import { pickScoringSlice } from "../src/lib/labels.js";
-import { buildScoreSystem, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION } from "../src/lib/scorePrompt.js";
+import { buildScoreSystem, SCORE_MAX_TOKENS, buildScoreUserMessage, parseScoreResponse, RUBRIC_VERSION, type ParsedScore } from "../src/lib/scorePrompt.js";
+import { splitByLedger, toScoresRow, SCORES_ON_CONFLICT, type LedgerRow } from "../src/lib/scoreLedger.js";
 import {
   NIGHTLY_TOP_N,
   NIGHTLY_RUN_BUDGET_MS,
@@ -82,17 +91,21 @@ type MatchRow = {
 /** Discriminated result: a parsed score, a cap (429 → stop the user gracefully),
  *  or a skip (transient failure → drop just this job). */
 type ScoreResult =
-  | { kind: "ok"; score: number; reason: string; fitBullets: string[] }
+  | { kind: "ok"; parsed: ParsedScore }
   | { kind: "capped" }
   | { kind: "skip" };
 
-/** Score one job for one user through the edge fn's service-role path. */
+/** Score one job for one user through the edge fn's service-role path. `sources`
+ *  grounds the evidence quotes exactly as the backlog does — the parsed score is
+ *  now persisted into `scores.signals` (#135), so a hallucinated quote must be
+ *  blanked before it lands. */
 async function scoreViaProxy(
   proxyUrl: string,
   serviceKey: string,
   targetUserId: string,
   system: string,
   userMsg: string,
+  sources: { cvText: string | null; jdText: string | null },
 ): Promise<ScoreResult> {
   let res: Response;
   try {
@@ -130,10 +143,10 @@ async function scoreViaProxy(
   const textBlock = Array.isArray(data?.content)
     ? (data.content.find((b) => b?.type === "text") ?? data.content[0])
     : null;
-  const parsed = parseScoreResponse(textBlock?.text ?? "");
+  const parsed = parseScoreResponse(textBlock?.text ?? "", sources);
   // Observability: a 200 that doesn't parse is a SILENT zero-match otherwise.
   if (!parsed) console.warn("[nightly] unparseable score response — skipping job");
-  return parsed ? { kind: "ok", ...parsed } : { kind: "skip" };
+  return parsed ? { kind: "ok", parsed } : { kind: "skip" };
 }
 
 /** Call one of the proxy's service-role batch operations (issue #96, lever 2).
@@ -262,6 +275,38 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     return attachWarmCounts(ranked, data.map((r) => r.company_key as string));
   };
 
+  // ── Shared ledger (#135) ──────────────────────────────────────────────────
+  // What this user already holds in `scores` for a candidate set, at the CURRENT
+  // rubric only — a stale-rubric row must never be reused. Bounded by the ids
+  // list (≤ NIGHTLY_TOP_N). Fail-soft: a read error returns an empty ledger,
+  // which degrades to "buy everything" (the pre-#135 behaviour), never to a
+  // dropped user.
+  const readLedger = async (userId: string, jobIds: string[]): Promise<LedgerRow[]> => {
+    if (jobIds.length === 0) return [];
+    const { data, error } = await admin
+      .from("scores")
+      .select("job_id, score, cv_hash, signals")
+      .eq("user_id", userId)
+      .eq("rubric_version", RUBRIC_VERSION)
+      .in("job_id", jobIds);
+    if (error) {
+      console.warn(`[nightly] scores ledger read failed for ${userId}: ${error.message} — buying without reuse`);
+      return [];
+    }
+    return (data ?? []) as LedgerRow[];
+  };
+  // Write bought scores through to `scores` in the backlog's exact row shape, so
+  // the backlog predicate ("no scores row at RUBRIC_VERSION") sees them as done.
+  // Fail-soft: the digest still lands in daily_matches; the only cost of a failed
+  // write-through is the pre-#135 double purchase for those rows.
+  const writeThrough = async (userId: string, bought: { jobId: string; parsed: ParsedScore }[], cvHash: string | null) => {
+    if (bought.length === 0) return;
+    const { error } = await admin
+      .from("scores")
+      .upsert(bought.map((b) => toScoresRow(userId, b.jobId, b.parsed, cvHash)), { onConflict: SCORES_ON_CONFLICT });
+    if (error) console.warn(`[nightly] scores write-through failed for ${userId}: ${error.message}`);
+  };
+
   const sendBatchEmail = async (
     key: string,
     userId: string,
@@ -286,7 +331,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
   const { data: profiles, error: pErr } = await admin
     .from("profiles")
     .select(
-      "id, cv_text, target_roles, target_sectors, target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages",
+      "id, cv_text, cv_hash, target_roles, target_sectors, target_seniority, target_cities, open_to_remote, citizenship, eu_work_authorized, languages",
     );
   if (pErr) {
     res.status(500).json({ error: `profiles read failed: ${pErr.message}` });
@@ -352,6 +397,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
     emailed: 0,
     capped: 0,
     matches: 0,
+    reused: 0, // #135: candidates served from the shared `scores` ledger, not bought
     submitted: 0,
     inFlight: 0,
     deadlineHit: false,
@@ -377,6 +423,9 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       break;
     }
     const userId = p.id as string;
+    // Which CV any score bought tonight was judged from (#123); also the freshness
+    // key for ledger reuse (#135).
+    const cvHash = (p.cv_hash as string | null) ?? null;
     try {
       // Every prior daily_matches row for this user (small: ≤ NIGHTLY_TOP_N per
       // night). Drives three decisions: today's batch state (B3 notified-split),
@@ -460,17 +509,19 @@ export default async function handler(req: Req, res: Res): Promise<void> {
             const jobById = new Map(jobs.map((j) => [j.id, j]));
             const batchDate = (open.batch_date as string | null) ?? today;
             const scored: ScoredMatch[] = [];
+            const bought: { jobId: string; parsed: ParsedScore }[] = [];
             for (const r of parseBatchResults(jsonl)) {
               if (r.kind !== "succeeded") continue;
               const j = jobById.get(r.customId);
               if (!j) continue; // role went dead between submit and retrieve
-              // Same validator as the synchronous path, sources omitted exactly as
-              // scoreViaProxy omits them — a batch result is the same model output.
-              const parsed = parseScoreResponse(r.text);
+              // Same validator + grounding as the synchronous path — a batch
+              // result is the same model output, arriving later.
+              const parsed = parseScoreResponse(r.text, { cvText: p.cv_text as string | null, jdText: j.jd_text ?? null });
               if (!parsed) {
                 console.warn("[nightly] unparseable batch score — skipping job");
                 continue;
               }
+              bought.push({ jobId: j.id, parsed });
               scored.push({
                 url: j.url,
                 company: j.company,
@@ -479,6 +530,29 @@ export default async function handler(req: Req, res: Res): Promise<void> {
                 score: parsed.score,
                 reason: parsed.reason,
                 fitBullets: parsed.fitBullets,
+              });
+            }
+            // #135: the ledger gets every bought score, THEN fills the slice's
+            // gaps — the candidates that were never submitted because a fresh row
+            // already existed at submit time (score_batches.job_ids records the
+            // whole slice, the provider batch only the bought part).
+            await writeThrough(userId, bought, cvHash);
+            const boughtIds = new Set(bought.map((b) => b.jobId));
+            const gaps = ((open.job_ids as string[] | null) ?? [])
+              .filter((id) => !boughtIds.has(id))
+              .map((id) => jobById.get(id))
+              .filter((j): j is NightlyJob => Boolean(j));
+            const { reuse } = splitByLedger(gaps, await readLedger(userId, gaps.map((j) => j.id)), cvHash);
+            summary.reused += reuse.length;
+            for (const r of reuse) {
+              scored.push({
+                url: r.job.url,
+                company: r.job.company,
+                title: r.job.title,
+                location: r.job.location ?? null,
+                score: r.score,
+                reason: r.reason,
+                fitBullets: r.fitBullets,
               });
             }
             await admin
@@ -603,12 +677,31 @@ export default async function handler(req: Req, res: Res): Promise<void> {
         cv_text: (p.cv_text as string | null) ?? null,
       };
 
+      // ── Shared ledger (#135): reuse before buying. A candidate that already
+      // holds a fresh `scores` row (current rubric, same CV) is rendered from it;
+      // only the rest go to the model, by batch or synchronously. ──────────────
+      const { reuse, buy } = splitByLedger(candidates, await readLedger(userId, candidates.map((j) => j.id)), cvHash);
+      summary.reused += reuse.length;
+      const reused: ScoredMatch[] = reuse.map((r) => ({
+        url: r.job.url,
+        company: r.job.company,
+        title: r.job.title,
+        location: r.job.location ?? null,
+        score: r.score,
+        reason: r.reason,
+        fitBullets: r.fitBullets,
+      }));
+
       // ── Batch phase 2: submit, don't score. Nobody is waiting on the nightly
       // slice — the deliverable is one email — so it goes to the discounted batch
-      // path and a later tick in the drain window retrieves, ranks, and sends. ──
-      if (batchAvailable) {
+      // path and a later tick in the drain window retrieves, ranks, and sends.
+      // Only the BOUGHT part is submitted; score_batches.job_ids records the whole
+      // slice so the retrieval tick fills the reused part from the ledger. With
+      // nothing to buy, fall through: the synchronous path lands the reused rows
+      // tonight with zero model calls. ──────────────────────────────────────────
+      if (batchAvailable && buy.length > 0) {
         const requests = buildBatchRequests(
-          candidates.map((j) => ({
+          buy.map((j) => ({
             id: j.id,
             // Byte-identical to the synchronous prompt below: same rubric (incl.
             // the row's role-family fit block, #34), same shaping, same grounding
@@ -642,7 +735,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
             batch_date: today,
           });
           if (insErr) console.warn(`[nightly] score_batches insert failed for ${providerBatchId}:`, insErr.message);
-          else summary.submitted += candidates.length;
+          else summary.submitted += buy.length;
         }
         continue;
       }
@@ -653,7 +746,7 @@ export default async function handler(req: Req, res: Res): Promise<void> {
       // (0 rows persisted despite paid-for scores; the 504 we just hit). Parallel keeps
       // wall-time ≈ one call. scoreViaProxy never throws, so Promise.all can't reject.
       const results = await Promise.all(
-        candidates.map((j) =>
+        buy.map((j) =>
           scoreViaProxy(
             proxyUrl,
             serviceKey,
@@ -670,26 +763,31 @@ export default async function handler(req: Req, res: Res): Promise<void> {
               yoe_min: j.yoe_min ?? null,
               geo_eligibility: j.geo_eligibility ?? null,
             }),
+            { cvText: profile.cv_text, jdText: j.jd_text ?? null },
           ).then((r) => ({ j, r })),
         ),
       );
-      const scored: ScoredMatch[] = [];
+      const scored: ScoredMatch[] = [...reused];
+      const bought: { jobId: string; parsed: ParsedScore }[] = [];
       for (const { j, r } of results) {
         if (r.kind === "capped") {
           summary.capped++;
           continue;
         }
         if (r.kind !== "ok") continue;
+        bought.push({ jobId: j.id, parsed: r.parsed });
         scored.push({
           url: j.url,
           company: j.company,
           title: j.title,
           location: j.location ?? null,
-          score: r.score,
-          reason: r.reason,
-          fitBullets: r.fitBullets,
+          score: r.parsed.score,
+          reason: r.parsed.reason,
+          fitBullets: r.parsed.fitBullets,
         });
       }
+      // #135: paid-for judgments go to the shared ledger before anything else.
+      await writeThrough(userId, bought, cvHash);
 
       summary.processed++;
       if (scored.length === 0) continue;
