@@ -41,8 +41,12 @@ export function nominatimSearchUrl(query) {
 /** Nominatim's top result -> { lat, lng, displayName, city, precision, name,
  *  class }, or null for an empty/malformed response (a legitimate "nothing
  *  found"). `name` and `class` are the OSM feature's own name and primary tag
- *  namespace (jsonv2 top-level fields) -- isTrustworthyOffice below is what
- *  actually gates on them; this function just carries them through. */
+ *  namespace -- isTrustworthyOffice below is what actually gates on them;
+ *  this function just carries them through. `class` reads jsonv2's top-level
+ *  `category` field (verified live: format=jsonv2 -- the format this script
+ *  requests -- never sends a top-level `class` key; that was Nominatim's
+ *  legacy non-jsonv2 shape). `hit.class` stays as a fallback in case a caller
+ *  ever points this at that legacy shape instead. */
 export function parseNominatimResult(json) {
   const hit = Array.isArray(json) ? json[0] : null;
   if (!hit) return null;
@@ -59,7 +63,7 @@ export function parseNominatimResult(json) {
     city,
     precision,
     name: hit.name || null,
-    class: hit.class || null,
+    class: hit.category ?? hit.class ?? null,
   };
 }
 

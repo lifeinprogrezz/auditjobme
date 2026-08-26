@@ -67,13 +67,24 @@ for (let from = 0; ; from += 1000) {
   if (!data || data.length < 1000) break;
 }
 
-const { data: companies, error } = await supabase
-  .from("companies")
-  .select("slug, name, careers_url, website")
-  .is("logo_domain", null);
-if (error) {
-  console.error("logo-backfill: companies select failed:", error.message);
-  process.exit(1);
+// Paged (issue #153 fix round 3, blocker 2): scripts/company-records.mjs
+// now grows this table well past PostgREST's 1000-row un-ranged cap within
+// a few runs, and this null-logo_domain read is the load-bearing scan for
+// every row it creates -- an un-paged read here would silently stop
+// backfilling logos once `companies` crossed 1000 rows.
+const companies = [];
+for (let from = 0; ; from += 1000) {
+  const { data, error } = await supabase
+    .from("companies")
+    .select("slug, name, careers_url, website")
+    .is("logo_domain", null)
+    .range(from, from + 999);
+  if (error) {
+    console.error("logo-backfill: companies select failed:", error.message);
+    process.exit(1);
+  }
+  companies.push(...(data || []));
+  if (!data || data.length < 1000) break;
 }
 
 const candidates = (companies || []).filter((c) => liveCompanyIds.has(c.slug));

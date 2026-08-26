@@ -67,12 +67,13 @@ async function main() {
     `company-records: ${rows.length} live job(s) with no company_id · ${groups.size} distinct company name(s)`,
   );
 
-  const { data: existing, error: exErr } = await db.from("companies").select("slug");
-  if (exErr) {
-    console.error("company-records: companies fetch failed —", exErr.message);
-    process.exit(1);
-  }
-  const existingSlugs = new Set((existing || []).map((c) => c.slug));
+  // Paged (fix round 3, blocker 2): this script alone has grown `companies`
+  // from ~598 to ~1,450 rows in three runs, well past PostgREST's 1000-row
+  // un-ranged cap -- an un-paged read here truncated existingSlugs, so
+  // uniqueSlug() could hand out a slug that already existed and the
+  // ignoreDuplicates upsert below silently dropped that company forever.
+  const existing = await fetchAllPages(db, (c) => c.from("companies").select("slug"));
+  const existingSlugs = new Set(existing.map((c) => c.slug));
 
   // Alphabetical so a bounded run is reproducible day to day, not dependent on
   // whatever order Postgres happened to return rows in.

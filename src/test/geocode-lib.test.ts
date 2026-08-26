@@ -220,13 +220,17 @@ describe("isTrustworthyOffice — precision/name/class gate (issue #153 fix roun
     // Nominatim's top hit for the company address query is an unrelated
     // village -- an area centroid, not an address. addressdetails carries
     // no road/house_number, so precision is "locality", not "street".
+    // jsonv2 -- the format this script requests -- carries this as a
+    // top-level `category`, never `class` (verified live; fix round 3
+    // blocker 1: the round-2 fixture used the legacy `class` key, so this
+    // gate never actually fired against a real jsonv2 response).
     const baierbrunn = parseNominatimResult([
       {
         lat: "47.9928",
         lon: "11.5116",
         display_name: "Baierbrunn, Landkreis München, Bavaria, Germany",
         name: "Baierbrunn",
-        class: "place",
+        category: "place",
         address: { village: "Baierbrunn", county: "Landkreis München", country: "Germany" },
       },
     ]);
@@ -237,19 +241,43 @@ describe("isTrustworthyOffice — precision/name/class gate (issue #153 fix roun
   it("rejects a same-word street ('Pigment, London' -> Pigment Square) despite street precision", () => {
     // A real road hit -- house_number/road present so precision IS "street"
     // -- but it's a highway, and its own name is the STREET's name, not the
-    // company's. Street precision alone must not be enough.
+    // company's. Street precision alone must not be enough. jsonv2 shape:
+    // `category`, not `class` (see the Baierbrunn fixture above).
     const pigmentSquare = parseNominatimResult([
       {
         lat: "51.505",
         lon: "-0.09",
         display_name: "Pigment Square, Shoreditch, London, England, United Kingdom",
         name: "Pigment Square",
-        class: "highway",
+        category: "highway",
         address: { road: "Pigment Square", suburb: "Shoreditch", city: "London", country: "United Kingdom" },
       },
     ]);
     expect(pigmentSquare?.precision).toBe("street");
     expect(isTrustworthyOffice(pigmentSquare, "Pigment")).toBe(false);
+  });
+
+  it("reads OSM class from jsonv2's top-level `category` field, and the class gate alone rejects on it", () => {
+    // Isolates the REJECT_OFFICE_CLASSES branch from the precision/name
+    // checks above it: street precision (road present) AND a name that
+    // exactly matches the company -- the ONLY thing standing between this
+    // hit and acceptance is `category: "highway"`, carried into `.class`
+    // from jsonv2's own field (no legacy `class` key present at all, matching
+    // the real API response). If parseNominatimResult still read `hit.class`
+    // here it would see `undefined` and this hit would wrongly pass.
+    const jsonv2Shaped = parseNominatimResult([
+      {
+        lat: "51.505",
+        lon: "-0.09",
+        display_name: "Pigment Square, Shoreditch, London, United Kingdom",
+        name: "Pigment Square",
+        category: "highway",
+        address: { road: "Pigment Square", city: "London" },
+      },
+    ]);
+    expect(jsonv2Shaped?.precision).toBe("street");
+    expect(jsonv2Shaped?.class).toBe("highway");
+    expect(isTrustworthyOffice(jsonv2Shaped, "Pigment Square")).toBe(false);
   });
 
   it("accepts a real OSM POI named for the company at street precision (Doctolib)", () => {
