@@ -79,6 +79,36 @@ jobs:
           eval "$(supabase status -o env)"
           psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/assert_rls.sql
 
+      # Issue #132: the schema these migrations build must equal the committed
+      # snapshot of PRODUCTION's schema (supabase/schema-snapshot.json). A '+'
+      # line means production has an object no migration describes; a '-' line
+      # means a migration was never applied there. Either way the RLS check
+      # above was asserting against a schema that is not the live one.
+      - name: Schema drift — migrations vs production snapshot
+        run: |
+          eval "$(supabase status -o env)"
+          DATABASE_URL="$DB_URL" node scripts/schema-drift-check.mjs
+
       - name: Stop local Supabase stack
         if: always()
         run: supabase stop
+
+  schema-drift-prod:
+    # The other half of #132: production itself vs the committed snapshot, read
+    # through public.schema_snapshot() with the service role. Catches an object
+    # applied through the dashboard or MCP that nobody mirrored into the repo.
+    # Secrets are absent on pull requests from forks, so the step skips there.
+    name: schema drift (production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Compare production schema with supabase/schema-snapshot.json
+        if: ${{ env.SUPABASE_SERVICE_ROLE_KEY != '' }}
+        run: node scripts/schema-drift-check.mjs

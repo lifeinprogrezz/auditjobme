@@ -29,6 +29,7 @@ declare
   --     DELETE and TRUNCATE.
   deny_all_allowlist text[] := array[
     'whitelisted_emails',
+    'headcount_bucket_backup_20260726',
     'companies_sector_backup_20260819',
     'profiles_targets_backup_20260819'
   ];
