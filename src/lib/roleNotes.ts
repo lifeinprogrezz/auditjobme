@@ -25,3 +25,49 @@ export function latestRoleContext(rows: ArtifactContextRow[]): string {
   const latest = rows.reduce((a, b) => (new Date(b.updated_at).getTime() > new Date(a.updated_at).getTime() ? b : a));
   return latest.context ?? "";
 }
+
+// ── WRITE side (issue #151 fix round 1, D4 blockers 1+2) ────────────────────
+//
+// The Save button / autosave-on-blur used to `upsert(..., { onConflict:
+// "user_id,job_id,kind" })`. The only (user_id, job_id, kind) unique index is
+// PARTIAL (`artifacts_user_job_kind_idx ... where job_id is not null`) — Postgres
+// will not infer a partial index as an ON CONFLICT arbiter without a matching
+// WHERE clause, which PostgREST cannot send, so the write always failed with
+// 42P10. `saveArtifact` (same PR that added the index) already does delete+insert
+// for exactly this reason; the notes write now mirrors it.
+//
+// delete+insert also fixes the READ side: `artifacts.updated_at` has a default
+// but no trigger, so a plain upsert never bumped it and a stale notes row could
+// outlast a newer cv/letter/answers row in `latestRoleContext` above. An insert
+// gets a fresh `updated_at` — stamped explicitly here (not left to the DB
+// default) so the round trip is provable without a live database.
+
+export type NotesWriteRow = {
+  user_id: string;
+  job_id: string;
+  kind: string;
+  content: Record<string, never>;
+  context: string | null;
+  updated_at: string;
+};
+
+// content is always `{}` for a notes row — the note itself lives in `context`
+// (issue #76). `Record<string, never>` types that literal precisely and is
+// structurally assignable to the generated `Json` type on the artifacts table.
+
+/** The delete filter — scoped to this user, this job, and the `notes` kind
+ *  only, so a save never touches the cv/letter/answers rows for the same role. */
+export function buildNotesDeleteMatch(userId: string, jobId: string): { user_id: string; job_id: string; kind: string } {
+  return { user_id: userId, job_id: jobId, kind: NOTES_KIND };
+}
+
+/** The row to insert right after the delete above. `now` is injectable so the
+ *  round trip is testable without faking the system clock. */
+export function buildNotesInsertRow(
+  userId: string,
+  jobId: string,
+  context: string,
+  now: () => string = () => new Date().toISOString(),
+): NotesWriteRow {
+  return { user_id: userId, job_id: jobId, kind: NOTES_KIND, content: {}, context: context.trim() || null, updated_at: now() };
+}

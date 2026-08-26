@@ -34,7 +34,7 @@ import {
 import { downloadCvPdf, downloadCoverPdf } from "@/lib/pdf";
 import { ensureCvStructured } from "@/lib/cvParse";
 import type { CvStructured } from "@/lib/cvStructured";
-import { NOTES_KIND, latestRoleContext } from "@/lib/roleNotes";
+import { latestRoleContext, buildNotesDeleteMatch, buildNotesInsertRow } from "@/lib/roleNotes";
 import {
   DEV_FIXTURE,
   DEV_FIXTURE_CV_TEXT,
@@ -305,12 +305,12 @@ export default function Apply() {
   async function saveRoleNotes() {
     if (!user || !job) return;
     setNotesSaving(true);
-    const { error } = await supabase
-      .from("artifacts")
-      .upsert(
-        { user_id: user.id, job_id: job.id, kind: NOTES_KIND, content: {}, context: roleContext.trim() || null },
-        { onConflict: "user_id,job_id,kind" },
-      );
+    // delete+insert, not upsert (issue #151 fix round 1): the only
+    // (user_id, job_id, kind) unique index is PARTIAL, so an upsert's
+    // onConflict can never find an arbiter and 42P10s every time. See
+    // roleNotes.ts for the full rationale — same fix saveArtifact already uses.
+    await supabase.from("artifacts").delete().match(buildNotesDeleteMatch(user.id, job.id));
+    const { error } = await supabase.from("artifacts").insert(buildNotesInsertRow(user.id, job.id, roleContext));
     setNotesSaving(false);
     if (error) {
       toast.error("Couldn't save your note. Please try again.");
@@ -437,7 +437,10 @@ export default function Apply() {
    *  MAX_ANSWERS was raised 8 -> 12 so Step 4's manual flow keeps its full 8
    *  after this runs once. */
   async function genCommonPack() {
-    if (!job || !cvText || busy !== null || commonPackDone) return;
+    // The 4 common-pack answers count toward MAX_ANSWERS same as 4 manual drafts
+    // would (issue #151 fix round 1, blocker 3) — without this a role with 9-12
+    // manual answers already drafted could jump to 13-16 on one click.
+    if (!job || !cvText || busy !== null || commonPackDone || qas.length + COMMON_PACK_QUESTIONS.length > MAX_ANSWERS) return;
     setBusy("commonPack");
     setError("");
     setErrStep(null);
@@ -532,6 +535,9 @@ export default function Apply() {
   // labels already sits in qas — covers both a fresh generation and a reload
   // from a saved "answers" artifact, with nothing to keep in sync.
   const commonPackDone = COMMON_PACK_QUESTIONS.every((q) => qas.some((qa) => qa.q === q.label));
+  // Same cap check as genCommonPack itself (issue #151 fix round 1, blocker 3) —
+  // the button disables before the click, not just inside the handler.
+  const commonPackWouldExceed = qas.length + COMMON_PACK_QUESTIONS.length > MAX_ANSWERS;
 
   return (
     <AppShell>
@@ -779,10 +785,15 @@ export default function Apply() {
                 size="sm"
                 className={`mt-4 ${SECONDARY_CTA}`}
                 onClick={genCommonPack}
-                disabled={busy !== null || commonPackDone}
+                disabled={busy !== null || commonPackDone || commonPackWouldExceed}
               >
                 {busy === "commonPack" ? "Answering the usual four…" : commonPackDone ? "Answered the usual four" : "Answer the usual four"}
               </Button>
+              {!commonPackDone && commonPackWouldExceed && (
+                <span className="text-caption text-muted-foreground">
+                  That's the limit for this role ({MAX_ANSWERS} answers).
+                </span>
+              )}
             </div>
             <p className="mt-2 text-caption text-muted-foreground text-pretty">
               Why this company, why you're a fit, a product you shipped, how you measure success. The four

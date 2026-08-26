@@ -94,10 +94,18 @@ export function buildCoverPrompt(
   { role, company, jdText, cvText, context }: TailorInput,
   candidateName: string,
   retryWordCount?: number,
+  flagUnbackedAvailability?: boolean,
 ): string {
   const contextBlock = buildContextBlock(context);
   const retryBlock = retryWordCount
     ? `\nYour previous draft was ${retryWordCount} words across the three body paragraphs. Rewrite it to land strictly between 120 and 180 words total across p1, p2 and p3 combined, keeping every fact exactly as it was.\n`
+    : "";
+  // issue #151 fix round 1, blocker 4: rule 3 below was prompt-only — nothing
+  // ever checked the output against it. coverStatesUnbackedFacts catches a miss
+  // and this retry block names it explicitly so the one retry the letter gets
+  // (tailorCover) can actually fix it, not just re-roll blind.
+  const unbackedBlock = flagUnbackedAvailability
+    ? `\nYour previous draft stated relocation, a visa, sponsorship, or a dated availability that does not appear verbatim in the CV or in what the candidate told us. Rewrite it to remove that statement entirely, unless it appears verbatim in the CV or candidate context below.\n`
     : "";
   return `You are writing a cover letter for a job application. Produce a warm, honest cover letter body.
 
@@ -114,7 +122,7 @@ STRICT RULES:
 
 ROLE: ${role} at ${company}
 JD EXCERPT: ${(jdText || "").slice(0, 800)}
-${contextBlock}${retryBlock}
+${contextBlock}${retryBlock}${unbackedBlock}
 CV TEXT (key facts):
 ${cvText.slice(0, 4500)}
 
@@ -226,6 +234,29 @@ export function isCoverLengthOk(cover: Pick<CoverJson, "p1" | "p2" | "p3">): boo
   return n >= COVER_MIN_WORDS && n <= COVER_MAX_WORDS;
 }
 
+// ── Relocation / availability guard (issue #151 fix round 1, blocker 4) ─────
+//
+// buildCoverPrompt's rule 3 tells the model never to state relocation, a visa,
+// or a dated availability unless it appears verbatim in the CV or the
+// candidate's own note — but nothing ever checked the output against it.
+// This is the code-side check: it never blocks generation itself, it only
+// tells tailorCover's existing single retry slot when to fire.
+const AVAILABILITY_RE = /relocat\w*|\bvisa\b|\bsponsorship\b|available from|start(?:ing)? on/i;
+
+/** True when the cover letter's body states relocation/visa/sponsorship/dated
+ *  availability language that is NOT backed by the CV or the candidate's own
+ *  context — i.e. the model invented it. */
+export function coverStatesUnbackedFacts(
+  cover: Pick<CoverJson, "p1" | "p2" | "p3">,
+  cvText: string,
+  context?: string | null,
+): boolean {
+  const body = `${cover.p1} ${cover.p2} ${cover.p3}`;
+  if (!AVAILABILITY_RE.test(body)) return false;
+  const backing = `${cvText || ""} ${context || ""}`;
+  return !AVAILABILITY_RE.test(backing);
+}
+
 // ── JSON parsing + validation (pure, unit-tested) ────────────────────────────
 
 function firstJsonObject(raw: string): Record<string, unknown> {
@@ -277,13 +308,18 @@ export async function answerQuestion(input: TailorInput, question: string): Prom
   return noEmDash(text);
 }
 
-/** One retry when the draft lands outside 120-180 words (issue #151 / D2), then
- *  accepts whatever comes back — never loops. The prompt itself already asks
- *  for the range; the retry only fires when the model missed it. */
+/** One retry when the draft lands outside 120-180 words (issue #151 / D2) OR
+ *  states an unbacked relocation/visa/availability claim (issue #151 fix round
+ *  1, blocker 4), then accepts whatever comes back — never loops. Both checks
+ *  share the same single retry slot, so this still ever calls the model at
+ *  most twice. The prompt itself already asks for both; the retry only fires
+ *  when the model missed one. */
 export async function tailorCover(input: TailorInput, candidateName: string): Promise<CoverJson> {
   const first = parseCoverJson(await callProxy([{ role: "user", content: buildCoverPrompt(input, candidateName) }], 800, "letter"));
-  if (isCoverLengthOk(first)) return first;
-  const retryPrompt = buildCoverPrompt(input, candidateName, coverBodyWordCount(first));
+  const lengthOk = isCoverLengthOk(first);
+  const unbacked = coverStatesUnbackedFacts(first, input.cvText, input.context);
+  if (lengthOk && !unbacked) return first;
+  const retryPrompt = buildCoverPrompt(input, candidateName, lengthOk ? undefined : coverBodyWordCount(first), unbacked);
   return parseCoverJson(await callProxy([{ role: "user", content: retryPrompt }], 800, "letter"));
 }
 

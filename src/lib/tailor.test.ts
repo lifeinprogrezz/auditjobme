@@ -12,6 +12,7 @@ import {
   wordCount,
   coverBodyWordCount,
   isCoverLengthOk,
+  coverStatesUnbackedFacts,
   parseCoverJson,
   parseCommonPackJson,
   tailorCover,
@@ -70,6 +71,13 @@ describe("tailor prompts", () => {
     expect(base).not.toContain("Your previous draft was");
     expect(retry).toContain("Your previous draft was 95 words");
     expect(retry).toContain("120 and 180 words");
+  });
+
+  it("cover prompt appends the unbacked-availability hint only when flagged (issue #151 fix round 1, blocker 4)", () => {
+    const base = buildCoverPrompt({ role: "PM", company: "Acme", jdText: "", cvText: CV }, "John Doe");
+    const retry = buildCoverPrompt({ role: "PM", company: "Acme", jdText: "", cvText: CV }, "John Doe", undefined, true);
+    expect(base).not.toContain("stated relocation, a visa, sponsorship");
+    expect(retry).toContain("stated relocation, a visa, sponsorship, or a dated availability");
   });
 
   it("answer prompt carries the question, CV facts, and the grounding rules", () => {
@@ -206,6 +214,31 @@ describe("cover length gate (issue #151 / D2) — the word-count check in code",
   });
 });
 
+describe("coverStatesUnbackedFacts — the relocation/availability guard (issue #151 fix round 1, blocker 4)", () => {
+  const cover = (p1: string) => ({ p1, p2: "Some other paragraph.", p3: "A closing paragraph." });
+
+  it("false when the cover never mentions relocation, a visa, sponsorship, or a dated availability", () => {
+    expect(coverStatesUnbackedFacts(cover("I led a team of five and grew activation 40%."), CV)).toBe(false);
+  });
+
+  it("true when the cover states relocation and neither the CV nor the context backs it up", () => {
+    expect(coverStatesUnbackedFacts(cover("I'm relocating to Austria for this role."), CV)).toBe(true);
+  });
+
+  it("false when the CV itself says relocation, visa, or availability — the JD-side rule stays: only invented claims are flagged", () => {
+    const cvWithVisa = `${CV}\n\nAlready holds a valid visa for Austria.`;
+    expect(coverStatesUnbackedFacts(cover("I'm relocating to Austria for this role."), cvWithVisa)).toBe(false);
+  });
+
+  it("false when the candidate's own context backs the claim", () => {
+    expect(coverStatesUnbackedFacts(cover("I'm available from next month."), CV, "I'm available from next month")).toBe(false);
+  });
+
+  it("catches visa and sponsorship wording too, not just \"relocat\"", () => {
+    expect(coverStatesUnbackedFacts(cover("I would need visa sponsorship for this role."), CV)).toBe(true);
+  });
+});
+
 describe("parseCoverJson — all five fields required, output ATS-cleaned (issue #151 / D2)", () => {
   const okJson = () => JSON.stringify({ greeting: "Hi,", p1: "one", p2: "two", p3: "three", sign: "Warmly, Jane" });
 
@@ -304,6 +337,35 @@ describe("tailorCover — one retry when the draft misses the word-count range (
     const cover = await tailorCover(input, "John Doe");
     expect(callProxyMock).toHaveBeenCalledTimes(2);
     expect(coverBodyWordCount(cover)).toBe(120);
+  });
+
+  // issue #151 fix round 1, blocker 4: a fixture letter that states relocation
+  // must trigger the same single retry slot the word-count check uses.
+  it("retries exactly once when the first draft states unbacked relocation, carrying the hint in the retry prompt", async () => {
+    const relocatingCover = () =>
+      JSON.stringify({
+        greeting: "Hi,",
+        p1: `I'm relocating to Austria for this role. ${words(35)}`,
+        p2: words(40),
+        p3: words(40),
+        sign: "Warmly, John Doe",
+      }); // 120+ words, in range — only the relocation claim should trip the retry
+    callProxyMock.mockResolvedValueOnce(relocatingCover()).mockResolvedValueOnce(okCover());
+    const cover = await tailorCover(input, "John Doe");
+    expect(callProxyMock).toHaveBeenCalledTimes(2);
+    const retryMessages = callProxyMock.mock.calls[1][0] as { content: string }[];
+    expect(retryMessages[0].content).toContain("stated relocation, a visa, sponsorship, or a dated availability");
+    // Retry didn't ALSO carry a word-count hint — the first draft was in range.
+    expect(retryMessages[0].content).not.toContain("Your previous draft was");
+    expect(coverBodyWordCount(cover)).toBe(120);
+  });
+
+  it("never fires the retry when relocation is backed by the CV or the candidate's own context", async () => {
+    callProxyMock.mockResolvedValue(
+      JSON.stringify({ greeting: "Hi,", p1: `I'm relocating to Austria for this role. ${words(35)}`, p2: words(40), p3: words(40), sign: "Warmly, John Doe" }),
+    );
+    await tailorCover({ ...input, context: "I'm relocating to Austria" }, "John Doe");
+    expect(callProxyMock).toHaveBeenCalledTimes(1);
   });
 });
 
