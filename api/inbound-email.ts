@@ -30,6 +30,7 @@ import {
   extractForwardingToken,
   extractGmailConfirmationCode,
   extractGmailConfirmationLink,
+  googleLinkHosts,
   isConfirmUrl,
   isGmailConfirmSuccess,
   isGmailForwardingConfirmation,
@@ -335,7 +336,13 @@ async function handler(req: Req, res: Res): Promise<void> {
       }
     }
 
-    const detail = link ? (confirmed ? "link stored; auto-confirmed" : "link stored") : code ? "code stored" : "no code or link found";
+    const detail = link
+      ? confirmed
+        ? "link stored; auto-confirmed"
+        : "link stored"
+      : code
+        ? "code stored"
+        : `no code or link found; google hosts seen: ${googleLinkHosts(text).join(",") || "none"}`;
     await log({ classification: "gmail_confirmation", action: "gmail_confirmation", detail });
     res.status(200).json({ ok: true, action: "gmail_confirmation", stored: Boolean(code || link), confirmed });
     return;

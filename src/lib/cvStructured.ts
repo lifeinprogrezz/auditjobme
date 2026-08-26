@@ -68,7 +68,7 @@ export const CV_LIMITS = {
 } as const;
 
 /** Output budget for the one parse call. A long CV fits inside this comfortably. */
-export const CV_PARSE_MAX_TOKENS = 4000;
+export const CV_PARSE_MAX_TOKENS = 8000; // a 3-page CV with ~40 bullets overflowed 4000 and lost the tail of its skills section (2026-08-26)
 
 /** How much of cv_text the parse call reads. Bounds cost; longer CVs are rare. */
 export const CV_PARSE_INPUT_CHARS = 14000;

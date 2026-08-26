@@ -129,7 +129,11 @@ export function extractGmailConfirmationCode(subject: string | undefined | null)
 export function extractGmailConfirmationLink(body: string | undefined | null): string | null {
   // Stops at whitespace, quotes and angle brackets, so it reads the same out of
   // plain text and out of an href in html mail.
-  const m = (body ?? "").match(/https:\/\/mail\.google\.com\/mail\/vf-[^\s"'<>]+/i);
+  // Google sends the forwarding confirmation from either mail.google.com (older
+  // accounts) or mail-settings.google.com (current). Both real (2026-08-26: two
+  // live mails carried only the mail-settings host and were logged as "no code
+  // or link found"). Same /mail/vf- path on both; uf- (cancel) is never matched.
+  const m = (body ?? "").match(/https:\/\/mail(?:-settings)?\.google\.com\/mail\/vf-[^\s"'<>]+/i);
   return m ? m[0] : null;
 }
 
@@ -150,7 +154,12 @@ export function isConfirmUrl(url: string | undefined | null): boolean {
   } catch {
     return false;
   }
-  return parsed.protocol === "https:" && parsed.hostname === "mail.google.com" && parsed.pathname.startsWith("/mail/vf-");
+  const host = parsed.hostname;
+  return (
+    parsed.protocol === "https:" &&
+    (host === "mail.google.com" || host === "mail-settings.google.com") &&
+    parsed.pathname.startsWith("/mail/vf-")
+  );
 }
 
 /**
@@ -516,4 +525,13 @@ export function parseResendInboundEvent(event: unknown): ResendInboundMeta | nul
     // against when the mail was SENT, and an outer delivery time drifts from it.
     date: typeof d.created_at === "string" ? d.created_at : null,
   };
+}
+
+
+/** Hostnames of every google.com link in a body, for the inbound log line when no
+ *  confirmation link matched. Hosts only: never a path, never a token. */
+export function googleLinkHosts(body: string | undefined | null): string[] {
+  const hosts = new Set<string>();
+  for (const m of (body ?? "").matchAll(/https:\/\/([a-z0-9.-]*google\.com)\//gi)) hosts.add(m[1].toLowerCase());
+  return [...hosts].sort();
 }
