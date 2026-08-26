@@ -175,19 +175,34 @@ export type ForwardingStatus = "none" | "created" | "received" | "confirmed";
  * "received" covers either shape the confirmation mail leaves behind (the
  * modern link or the legacy numeric code); "confirmed" is set only once the
  * server actually followed the link (gmail_confirmed_at, issue #157).
+ *
+ * "confirmed" also requires gmail_confirmed_at to be no older than
+ * gmail_confirmation_at (the stale-confirmed hole, issue #157 round 3): remove
+ * and re-add the forwarding address and Gmail mails a fresh confirmation,
+ * which api/inbound-email.ts stamps onto gmail_confirmation_at right away. If
+ * that cycle's auto-confirm fetch then fails, the OLD gmail_confirmed_at is
+ * left in place and would otherwise still read "confirmed" forever, hiding
+ * the manual fallback button (gated on status === "received") with no way to
+ * recover. Comparing the two timestamps drops the status back to "received"
+ * the moment a newer confirmation mail arrives, so the fallback can surface
+ * again after MANUAL_FALLBACK_DELAY_MS. Both columns are ISO 8601 strings
+ * from the same `new Date().toISOString()` call shape, so lexicographic
+ * comparison is chronological comparison.
  */
 export function forwardingStatus(
   row:
     | {
         gmail_confirmation_url?: string | null;
         gmail_confirmation_code?: string | null;
+        gmail_confirmation_at?: string | null;
         gmail_confirmed_at?: string | null;
       }
     | null
     | undefined,
 ): ForwardingStatus {
   if (!row) return "none";
-  if (row.gmail_confirmed_at) return "confirmed";
+  if (row.gmail_confirmed_at && (!row.gmail_confirmation_at || row.gmail_confirmed_at >= row.gmail_confirmation_at))
+    return "confirmed";
   if (row.gmail_confirmation_url || row.gmail_confirmation_code) return "received";
   return "created";
 }

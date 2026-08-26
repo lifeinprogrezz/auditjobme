@@ -591,8 +591,35 @@ describe("forwardingStatus (the Settings live status line, 4 states)", () => {
       forwardingStatus({
         gmail_confirmation_url: "https://mail.google.com/mail/vf-x",
         gmail_confirmation_code: null,
+        gmail_confirmation_at: "2026-08-27T09:00:00Z",
         gmail_confirmed_at: "2026-08-27T10:00:00Z",
       }),
     ).toBe("confirmed");
+  });
+
+  it("stays confirmed when gmail_confirmation_at is missing (older rows, before that column existed)", () => {
+    expect(
+      forwardingStatus({
+        gmail_confirmation_url: "https://mail.google.com/mail/vf-x",
+        gmail_confirmation_code: null,
+        gmail_confirmed_at: "2026-08-27T10:00:00Z",
+      }),
+    ).toBe("confirmed");
+  });
+
+  it("falls back to received when a NEWER confirmation mail arrived after the last auto-confirm (the stale-confirmed hole)", () => {
+    // User removed and re-added the forwarding address: Gmail sent a fresh
+    // confirmation mail (bumping gmail_confirmation_at) but this cycle's
+    // auto-confirm fetch hasn't landed yet — the old gmail_confirmed_at must
+    // not still read "confirmed", or the manual fallback button can never
+    // reappear if the fetch ultimately fails.
+    expect(
+      forwardingStatus({
+        gmail_confirmation_url: "https://mail.google.com/mail/vf-y",
+        gmail_confirmation_code: null,
+        gmail_confirmation_at: "2026-08-28T09:00:00Z",
+        gmail_confirmed_at: "2026-08-27T10:00:00Z",
+      }),
+    ).toBe("received");
   });
 });
