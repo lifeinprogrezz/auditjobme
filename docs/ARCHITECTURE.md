@@ -114,8 +114,9 @@ Three steps close the gap between "a name on a job listing" and a real map pin, 
   already on file; extended so a company with NEITHER (the job-derived rows above) falls to the
   host of its own apply URL (`resolveLogoDomain`, `logo-lib.mjs`) — never a hosted-ATS/platform
   host, so a resolved domain is always the company's own site. Client-side, `src/lib/logodev.ts`
-  tries one guessed `{slug}.com` favicon as the LAST resort before the coloured initial, when no
-  domain is known at all.
+  never guesses a domain from the name: a company with no domain on file renders the coloured
+  initial (a speculative favicon request 404s and the browser logs every failed image load to
+  the console, which no `onError` handler can silence).
 - **`scripts/geocode-companies.mjs`** — real street coordinates per company × city. Two Nominatim
   queries per candidate: the company + its job location, then the resolved city name alone (a
   query hundreds of other companies in the same city share, so it is almost always a free cache

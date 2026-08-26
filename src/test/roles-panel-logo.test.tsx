@@ -1,38 +1,40 @@
-// Pins RolesPanel's card Logo — issue #153 blocker 1, round 2. Same last-resort
-// law as PaperLogo (D-class pages) and GlobeMap's buildPin: a company with no
-// domain on file gets ONE guessed-domain favicon attempt before the coloured
-// initial. Real prod companies this reaches: Adobe (Workday), 1Password/Adaptyv
-// (Ashby), 5U AI (Dover) — generic ATS hosts the apply-URL fallback never derives
-// a logo_domain from. Rule + code move together.
+// Pins RolesPanel's card Logo — issue #153 / PR #164 live-verify rounds 1+2.
+// A company with NO domain on file renders the coloured initial straight away:
+// the same hue helper (hueFor) and `fallback` class as the map pin in
+// GlobeMap's buildPin, so every rail card shows either a logo or an initial.
+// There is NO name-based favicon guess in the chain: a speculative request 404s
+// and the browser logs every failed <img> load to the console (143 in one
+// walk), which no onError handler can silence. Rule + code move together.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent, act, cleanup } from "@testing-library/react";
 import { Logo } from "@/components/roles/RolesPanel";
+import { hueFor } from "@/lib/roles";
 import { setTheme } from "@/lib/theme";
 
 vi.mock("@/lib/logodev", () => ({
   logoUrl: (domain: string, theme: "dark" | "light") => `https://logo.test/${domain}?theme=${theme}`,
   faviconUrls: (domain: string) => [`https://fav.test/1/${domain}`, `https://fav.test/2/${domain}`],
-  guessedFaviconUrl: (company: string) => (company ? `https://guess.test/${company}` : null),
 }));
 
-describe("RolesPanel Logo — guessed-domain fallback (issue #153 blocker 1)", () => {
+// jsdom serialises a hex background as rgb(); compare through the same setter.
+function cssColor(hex: string): string {
+  const el = document.createElement("div");
+  el.style.background = hex;
+  return el.style.background;
+}
+
+describe("RolesPanel Logo — initial fallback, no favicon guess (issue #153)", () => {
   beforeEach(() => act(() => setTheme("light")));
   afterEach(cleanup);
 
-  it("tries one guessed-domain favicon before the coloured initial when there is no domain", () => {
+  it("renders the coloured initial straight away when there is no domain — no <img>, no guess", () => {
     const { container } = render(<Logo domain={null} company="Adobe" />);
-    const img = container.querySelector("img") as HTMLImageElement;
-    expect(img).not.toBeNull();
-    expect(img.getAttribute("src")).toBe("https://guess.test/Adobe");
-  });
-
-  it("falls through to the coloured initial when the guess 404s", () => {
-    const { container } = render(<Logo domain={null} company="Adobe" />);
-    const img = container.querySelector("img") as HTMLImageElement;
-    fireEvent.error(img);
     expect(container.querySelector("img")).toBeNull();
-    const span = container.querySelector(".fb") as HTMLElement;
+    const span = container.querySelector("span.fallback") as HTMLElement;
+    expect(span).not.toBeNull();
+    expect(span.classList.contains("fb")).toBe(true);
     expect(span.textContent).toBe("A");
+    expect(span.style.background).toBe(cssColor(hueFor("Adobe")));
   });
 
   it("still prefers logo.dev + the real favicons when a domain is on file", () => {
@@ -41,9 +43,19 @@ describe("RolesPanel Logo — guessed-domain fallback (issue #153 blocker 1)", (
     expect(img.getAttribute("src")).toBe("https://logo.test/adobe.com?theme=light");
   });
 
-  it("goes straight to the initial when even the guess has nothing to work with", () => {
+  it("falls through to the initial once every known-domain service has failed", () => {
+    const { container } = render(<Logo domain="adobe.com" company="Adobe" />);
+    const img = container.querySelector("img") as HTMLImageElement;
+    fireEvent.error(img);
+    fireEvent.error(container.querySelector("img") as HTMLImageElement);
+    fireEvent.error(container.querySelector("img") as HTMLImageElement);
+    expect(container.querySelector("img")).toBeNull();
+    expect((container.querySelector("span.fallback") as HTMLElement).textContent).toBe("A");
+  });
+
+  it("shows a placeholder glyph, never an empty box, for an empty company name", () => {
     const { container } = render(<Logo domain={null} company="" />);
     expect(container.querySelector("img")).toBeNull();
-    expect(container.querySelector(".fb")).not.toBeNull();
+    expect((container.querySelector("span.fallback") as HTMLElement).textContent).toBe("?");
   });
 });

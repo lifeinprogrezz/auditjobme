@@ -21,7 +21,7 @@ import {
   type RoleJob,
   type RolesFilters,
 } from "@/lib/roles";
-import { logoUrl, faviconUrls, guessedFaviconUrl } from "@/lib/logodev";
+import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { hasReadableJd, pendingLabelOf, scoreStatusOf } from "@/lib/scorePrefilter";
 import { ScoringProgress } from "@/components/roles/ScoringProgress";
 import { useTheme } from "@/lib/theme";
@@ -81,13 +81,14 @@ export type RolesPanelProps = {
  *  theme follows the ACTIVE app theme (design direction §5.5 / skill Logo.dev rule):
  *  dark card → theme=dark (light marks), light card → theme=light (dark marks) — a
  *  hardcoded param breaks on theme switch (the broken-logos bug, both directions).
- *  No domain on file at all (issue #153 item B1, same law as PaperLogo): one
- *  last-resort guessed-domain favicon before the coloured initial. */
+ *  No domain on file at all → straight to the coloured initial (same hue helper
+ *  and `fallback` class as the map pin in GlobeMap's buildPin): a name-based
+ *  favicon guess is never made here — see the note at the end of lib/logodev.ts. */
 export function Logo({ domain, company }: { domain: string | null; company: string }) {
   const { theme } = useTheme();
   const chain = domain
     ? [logoUrl(domain, theme === "dark" ? "dark" : "light"), ...faviconUrls(domain)].filter(Boolean)
-    : [guessedFaviconUrl(company)].filter(Boolean);
+    : [];
   const [stage, setStage] = useState(0);
   // Rewind the fallback chain on a theme flip so the new theme's logo is retried
   // (banked D3 nit 5a): a themed logo that 404'd once must get another shot at its
@@ -96,8 +97,8 @@ export function Logo({ domain, company }: { domain: string | null; company: stri
   const src = chain[stage] ?? null;
   if (!src) {
     return (
-      <span className="fb" style={{ background: hueFor(company) }}>
-        {company.charAt(0)}
+      <span className="fb fallback" style={{ background: hueFor(company) }}>
+        {company.charAt(0) || "?"}
       </span>
     );
   }

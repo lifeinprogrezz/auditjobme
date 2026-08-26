@@ -6,7 +6,7 @@ import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, Point as GeoPoint } from "geojson";
 import { clusterTier, hueFor, scoreBucket, type RoleJob } from "@/lib/roles";
-import { logoUrl, faviconUrls, guessedFaviconUrl } from "@/lib/logodev";
+import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { prefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 export type GlobeMapProps = {
@@ -237,14 +237,12 @@ export function buildPin(p: PinProps): HTMLDivElement {
   // Chain: logo.dev (skipped for its 2 placeholder domains) → the site's real
   // favicon (icon.horse, then Google) → colored initial. Falling through to the
   // favicon is what shows a correct TravelPerk mark, not logo.dev's pinwheel.
-  // No domain on file at all (issue #153 item B1, same law as PaperLogo/RolesPanel):
-  // one last-resort guessed-domain favicon before the coloured initial — this is
-  // the map's own logo path, most ATS-hosted companies never reach the apply-URL
-  // fallback that fills logo_domain.
-  const chain = (p.domain
-    ? [logoUrl(p.domain, "light"), ...faviconUrls(p.domain)]
-    : [guessedFaviconUrl(p.co)]
-  ).filter(Boolean) as string[];
+  // No domain on file at all → straight to the coloured initial. No name-based
+  // favicon guess (see the note at the end of lib/logodev.ts); coverage comes
+  // from the server-side company-records + logo-backfill scripts.
+  const chain = (p.domain ? [logoUrl(p.domain, "light"), ...faviconUrls(p.domain)] : []).filter(
+    Boolean,
+  ) as string[];
   if (chain.length) {
     const img = document.createElement("img");
     img.alt = "";

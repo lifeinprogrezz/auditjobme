@@ -175,49 +175,12 @@ export function faviconUrls(domain: string): string[] {
   ];
 }
 
-/**
- * Issue #153 item B1: the LAST resort, for a company with no domain known at
- * all (no companies.logo_domain, no KNOWN_DOMAINS match) — a plain slug of the
- * company name plus ".com". Not domainFor(): domainFor() is a certain-mappings
- * lookup and must never guess (pinned by domainFor's own tests); this is
- * deliberately the opposite — a guess, used ONLY as a single favicon attempt
- * behind onError, never stored anywhere and never used for a "visit website"
- * link. A wrong guess just 404s (or DuckDuckGo's default icon 404s) and falls
- * through to the coloured initial, same as today.
- */
-export function guessedDomain(company: string): string {
-  const slug = company
-    .trim()
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "");
-  return slug ? `${slug}.com` : "";
-}
-
-/** DuckDuckGo favicon for the guessed domain — ONE attempt, nothing chained
- *  after it (no logo.dev, no icon.horse): those would spend a paid token or a
- *  network round trip on a name that might not even be a real domain. Null for
- *  a company name with no alphanumeric content at all (nothing to guess).
- *
- *  DEV-ONLY (PR #164 live-verify round 1): a wrong guess 404s, and Chromium logs
- *  "Failed to load resource: 404" for that failed <img> load straight from its
- *  own resource loader — the onError handler below redirects the UI to the
- *  coloured initial, but it can't suppress the browser's OWN console entry for a
- *  real failed network request. No pure client-side fix exists either: verified
- *  icons.duckduckgo.com sends no Access-Control-Allow-Origin header on ANY
- *  response (200 or 404, with or without an Origin header), so a fetch()
- *  pre-check would itself log an unsuppressable cross-origin error instead of
- *  the resource-load one. `import.meta.env.DEV` is a literal `false` in a
- *  production `vite build` (src/lib/devFixture.ts sets the precedent), so this
- *  branch — and the request it would 404 on — tree-shakes out of the shipped
- *  bundle: a company with no domain on file goes straight to the coloured
- *  initial for real users, console-silent. Still exercised in dev/tests so the
- *  fallback stays visible and covered; a company genuinely worth a guessed logo
- *  needs a real KNOWN_DOMAINS/companies.logo_domain entry, not a guess shipped
- *  to production. */
-export function guessedFaviconUrl(company: string): string | null {
-  if (!import.meta.env.DEV) return null;
-  const domain = guessedDomain(company);
-  return domain ? `https://icons.duckduckgo.com/ip3/${domain}.ico` : null;
-}
+// No name-based favicon guess lives here (PR #164 live-verify rounds 1+2): a
+// speculative `{slug}.com` request 404s for most companies, and Chromium logs
+// every failed <img> load to the console straight from its resource loader —
+// onError can redirect the UI but cannot silence that entry (143 errors in one
+// walk). Coverage for companies with no domain on file comes from the
+// server-side `scripts/company-records.mjs` + `scripts/logo-backfill.mjs`
+// (companies.logo_domain), never from guessing in the browser. The chain ends:
+// companies.logo_domain → KNOWN_DOMAINS → favicon services for a KNOWN domain →
+// coloured initial.
