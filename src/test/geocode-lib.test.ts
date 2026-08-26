@@ -14,6 +14,8 @@ import {
   waitMsFor,
   MIN_REQUEST_INTERVAL_MS,
   isMissingTableError,
+  officeKey,
+  shouldSkipExistingOffice,
 } from "../../scripts/geocode-lib.mjs";
 
 describe("haversineKm", () => {
@@ -198,5 +200,28 @@ describe("isMissingTableError — the migration-not-applied-yet degrade path", (
   it("is false for any other error, or no error at all", () => {
     expect(isMissingTableError({ code: "23505", message: "duplicate key" })).toBe(false);
     expect(isMissingTableError(null)).toBe(false);
+  });
+});
+
+describe("shouldSkipExistingOffice — never overwrite a hand-curated office (issue #153 fix round 1, blocker 2)", () => {
+  it("skips a (company_slug, city_key) pair already in the pre-loaded set", () => {
+    const existing = new Set([officeKey("acme", "berlin")]);
+    expect(shouldSkipExistingOffice(existing, "acme", "berlin")).toBe(true);
+  });
+
+  it("does not skip a pair that is not in the set", () => {
+    const existing = new Set([officeKey("acme", "berlin")]);
+    expect(shouldSkipExistingOffice(existing, "acme", "london")).toBe(false);
+    expect(shouldSkipExistingOffice(existing, "other", "berlin")).toBe(false);
+  });
+
+  it("an empty set skips nothing", () => {
+    expect(shouldSkipExistingOffice(new Set(), "acme", "berlin")).toBe(false);
+  });
+
+  it("officeKey is stable and distinguishes both the company and the city", () => {
+    expect(officeKey("acme", "berlin")).toBe(officeKey("acme", "berlin"));
+    expect(officeKey("acme", "berlin")).not.toBe(officeKey("acme", "london"));
+    expect(officeKey("acme", "berlin")).not.toBe(officeKey("beta", "berlin"));
   });
 });

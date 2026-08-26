@@ -36,6 +36,23 @@ const GENERIC_HOST_SUFFIXES = [
   "webflow.io",
   "vercel.app",
   "netlify.app",
+  // Job-board / aggregator hosts an apply URL (item B1 fallback) can point
+  // at instead of the company's own site (issue #153 fix round 1: measured
+  // live on prod, these produced 43+ wrong logo_domain/website guesses --
+  // welcometothejungle.com alone on 19 companies, ycombinator.com on 10).
+  "welcometothejungle.com",
+  "ycombinator.com",
+  "workatastartup.com",
+  "gem.com",
+  "dover.com",
+  "wellfound.com",
+  "thehub.io",
+  "employmenthero.com",
+  "screenloop.com",
+  "rippling.com",
+  "hibob.com",
+  "comeet.com",
+  "myworkdaysite.com",
 ];
 
 // A leading label that marks a careers SUBDOMAIN of the real domain
@@ -93,4 +110,24 @@ export function resolveLogoDomain({ careersUrl, website, applyUrls } = {}) {
     if (domain) return { domain, derivedWebsite: `https://${domain}` };
   }
   return { domain: null, derivedWebsite: null };
+}
+
+/**
+ * Data-driven aggregator guard (issue #153 fix round 1, blocker 1). Even with
+ * GENERIC_HOST_SUFFIXES covering every known aggregator/ATS host, a NEW one
+ * can still slip through the apply-URL fallback (item B1) -- on prod,
+ * welcometothejungle.com resolved as 19 different companies' "own" domain,
+ * ycombinator.com 10, before those hosts were added to the list above. The
+ * tell: a real company's own domain is used by exactly ONE company; an
+ * aggregator's is shared by many. Any derived domain shared by >= minCompanies
+ * distinct companies IN ONE RUN is treated as an aggregator signature and
+ * excluded -- never written as anyone's logo_domain/website.
+ */
+export function partitionAggregatorDomains(fills, minCompanies = 3) {
+  const counts = new Map();
+  for (const f of fills) counts.set(f.domain, (counts.get(f.domain) ?? 0) + 1);
+  const aggregatorDomains = new Set([...counts].filter(([, n]) => n >= minCompanies).map(([d]) => d));
+  const safe = fills.filter((f) => !aggregatorDomains.has(f.domain));
+  const skipped = fills.filter((f) => aggregatorDomains.has(f.domain));
+  return { safe, skipped, aggregatorDomains };
 }

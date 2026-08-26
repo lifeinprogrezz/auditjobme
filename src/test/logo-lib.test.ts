@@ -2,7 +2,7 @@
 // Contract: derive ONLY from URLs the company owns (careers_url, then website);
 // hosted-ATS/platform hosts yield null — a wrong domain renders a WRONG logo.
 import { describe, expect, it } from "vitest";
-import { deriveLogoDomain, domainFromUrl, resolveLogoDomain } from "../../scripts/logo-lib.mjs";
+import { deriveLogoDomain, domainFromUrl, resolveLogoDomain, partitionAggregatorDomains } from "../../scripts/logo-lib.mjs";
 
 describe("domainFromUrl", () => {
   it("derives the Macadam class: careers.macadam.app -> macadam.app", () => {
@@ -36,6 +36,22 @@ describe("domainFromUrl", () => {
     expect(domainFromUrl("")).toBeNull();
     expect(domainFromUrl(null)).toBeNull();
     expect(domainFromUrl("localhost")).toBeNull();
+  });
+
+  it("job-board / aggregator hosts are NEVER a company domain (issue #153 fix round 1: measured on prod, 43+ wrong logo/website guesses via these hosts)", () => {
+    expect(domainFromUrl("https://www.welcometothejungle.com/en/companies/acme/jobs/pm")).toBeNull();
+    expect(domainFromUrl("https://www.ycombinator.com/companies/acme/jobs/1")).toBeNull();
+    expect(domainFromUrl("https://www.workatastartup.com/jobs/1")).toBeNull();
+    expect(domainFromUrl("https://jobs.gem.com/acme/1")).toBeNull();
+    expect(domainFromUrl("https://app.dover.com/apply/acme/1")).toBeNull();
+    expect(domainFromUrl("https://wellfound.com/jobs/1")).toBeNull();
+    expect(domainFromUrl("https://app.thehub.io/jobs/1")).toBeNull();
+    expect(domainFromUrl("https://employmenthero.com/jobs/1")).toBeNull();
+    expect(domainFromUrl("https://app.screenloop.com/acme/jobs/1")).toBeNull();
+    expect(domainFromUrl("https://ats.rippling.com/acme/jobs/1")).toBeNull();
+    expect(domainFromUrl("https://hibob.com/careers/1")).toBeNull();
+    expect(domainFromUrl("https://comeet.com/jobs/acme/1")).toBeNull();
+    expect(domainFromUrl("https://acme.myworkdaysite.com/en-US/careers/job/1")).toBeNull();
   });
 });
 
@@ -105,5 +121,55 @@ describe("resolveLogoDomain — the full fallback order (issue #153 item B1)", (
       derivedWebsite: null,
     });
     expect(resolveLogoDomain({})).toEqual({ domain: null, derivedWebsite: null });
+  });
+});
+
+describe("partitionAggregatorDomains — data-driven guard (issue #153 fix round 1, blocker 1)", () => {
+  it("leaves every fill alone when no domain repeats", () => {
+    const fills = [
+      { slug: "acme", name: "Acme", domain: "acme.io", website: "https://acme.io" },
+      { slug: "beta", name: "Beta", domain: "beta.io", website: "https://beta.io" },
+    ];
+    const { safe, skipped, aggregatorDomains } = partitionAggregatorDomains(fills);
+    expect(safe).toEqual(fills);
+    expect(skipped).toEqual([]);
+    expect(aggregatorDomains.size).toBe(0);
+  });
+
+  it("excludes a domain shared by >=3 companies -- an aggregator that slipped past the static host list", () => {
+    const fills = [
+      { slug: "a", name: "A", domain: "welcometothejungle.com", website: "https://welcometothejungle.com" },
+      { slug: "b", name: "B", domain: "welcometothejungle.com", website: "https://welcometothejungle.com" },
+      { slug: "c", name: "C", domain: "welcometothejungle.com", website: "https://welcometothejungle.com" },
+      { slug: "d", name: "D", domain: "acme.io", website: "https://acme.io" },
+    ];
+    const { safe, skipped, aggregatorDomains } = partitionAggregatorDomains(fills);
+    expect(safe).toEqual([fills[3]]);
+    expect(skipped).toEqual([fills[0], fills[1], fills[2]]);
+    expect(aggregatorDomains).toEqual(new Set(["welcometothejungle.com"]));
+  });
+
+  it("2 companies sharing a domain stays under the default threshold and is not flagged", () => {
+    const fills = [
+      { slug: "a", name: "A", domain: "shared.io", website: "https://shared.io" },
+      { slug: "b", name: "B", domain: "shared.io", website: "https://shared.io" },
+    ];
+    const { safe, skipped } = partitionAggregatorDomains(fills);
+    expect(safe).toEqual(fills);
+    expect(skipped).toEqual([]);
+  });
+
+  it("minCompanies is configurable", () => {
+    const fills = [
+      { slug: "a", name: "A", domain: "shared.io", website: "https://shared.io" },
+      { slug: "b", name: "B", domain: "shared.io", website: "https://shared.io" },
+    ];
+    const { safe, skipped } = partitionAggregatorDomains(fills, 2);
+    expect(safe).toEqual([]);
+    expect(skipped).toEqual(fills);
+  });
+
+  it("is a no-op on an empty fills list", () => {
+    expect(partitionAggregatorDomains([])).toEqual({ safe: [], skipped: [], aggregatorDomains: new Set() });
   });
 });

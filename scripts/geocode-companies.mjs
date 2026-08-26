@@ -24,6 +24,14 @@
  *   Within MAX_OFFICE_TO_CITY_KM (50km) of each other -> write company_offices.
  *   Else, or no address/no city resolved at all -> nothing (never a guess).
  *
+ * EXISTING OFFICES ARE NEVER OVERWRITTEN (issue #153 fix round 1, blocker 2):
+ * every (company_slug, city_key) already in company_offices -- hand-curated
+ * seed rows included -- is pre-loaded once before the loop; a resolved
+ * candidate matching one of those pairs is skipped (alreadyHadOffice), never
+ * upserted. The address/city geocode still runs and still caches (so a later
+ * run, once the curated row is gone, does not have to re-query the provider),
+ * only the final company_offices write is gated.
+ *
  * CACHE: `geocode_cache` (migration 20260827110000), keyed on the exact query
  * text, forever -- a repeat run never re-asks a question it already has the
  * answer to. A cache row is written ONLY at a tuple's terminal state (full
@@ -55,6 +63,8 @@ import {
   parseMapboxResult,
   waitMsFor,
   isMissingTableError,
+  officeKey,
+  shouldSkipExistingOffice,
 } from "./geocode-lib.mjs";
 
 const arg = (name, def) => {
@@ -83,6 +93,7 @@ const counters = {
   noCityInAddress: 0,
   tooFar: 0,
   officesWritten: 0,
+  alreadyHadOffice: 0,
   budgetExhausted: 0,
   networkErrors: 0,
 };
@@ -169,6 +180,20 @@ async function main() {
   if (!db) {
     console.log("geocode-companies: no SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY -> nothing to do.");
     return;
+  }
+
+  // Every (company_slug, city_key) pair that already has a company_offices
+  // row -- hand-curated seed data, or a prior run's own write -- so this run
+  // never overwrites one (issue #153 fix round 1, blocker 2). Paged.
+  const existingOfficeKeys = new Set();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.from("company_offices").select("company_slug, city_key").range(from, from + 999);
+    if (error) {
+      console.error("geocode-companies: company_offices fetch failed —", error.message);
+      process.exit(1);
+    }
+    for (const r of data || []) existingOfficeKeys.add(officeKey(r.company_slug, r.city_key));
+    if (!data || data.length < 1000) break;
   }
 
   // Every (company, distinct live-job location) pair, via the jobs->companies
@@ -270,6 +295,11 @@ async function main() {
       lat: address.lat,
       lng: address.lng,
     };
+    if (shouldSkipExistingOffice(existingOfficeKeys, office.company_slug, office.city_key)) {
+      counters.alreadyHadOffice++;
+      if (DRY) console.log(`  = ${name} (${slug}) -> ${office.city} already has an office on file, not overwriting`);
+      continue;
+    }
     if (DRY) {
       counters.officesWritten++;
       console.log(`  + ${name} (${slug}) -> ${office.city} @ ${office.lat},${office.lng} (${distanceKm.toFixed(1)}km from centroid)`);
@@ -281,7 +311,7 @@ async function main() {
   }
 
   console.log(
-    `geocode-companies: done — ${counters.tuples} tuple(s) considered · ${counters.officesWritten} office(s) ${DRY ? "would be written" : "written"} · ` +
+    `geocode-companies: done — ${counters.tuples} tuple(s) considered · ${counters.officesWritten} office(s) ${DRY ? "would be written" : "written"} · ${counters.alreadyHadOffice} already had an office (not overwritten) · ` +
       `address cache hits ${counters.addressCacheHits} · address network calls ${counters.addressNetworkCalls} · address no-result ${counters.addressNoResult} · no-city-in-address ${counters.noCityInAddress} · ` +
       `city cache hits ${counters.cityCacheHits} · city network calls ${counters.cityNetworkCalls} · city unresolved ${counters.cityUnresolved} · ` +
       `too-far (>${MAX_OFFICE_TO_CITY_KM}km) ${counters.tooFar} · budget-exhausted skips ${counters.budgetExhausted} · network errors ${counters.networkErrors} · caching ${cacheDisabled ? "DISABLED (migration not applied)" : "on"}`,

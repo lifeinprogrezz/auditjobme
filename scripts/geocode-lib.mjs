@@ -91,3 +91,21 @@ export function isMissingTableError(error) {
   if (!error) return false;
   return error.code === "42P01" || /relation .* does not exist/i.test(error.message || "");
 }
+
+/** Composite key for a (company_slug, city_key) pair -- how a pre-loaded Set
+ *  of existing company_offices rows is checked against a resolved candidate
+ *  (issue #153 fix round 1, blocker 2): the geocode-companies.mjs upsert
+ *  previously had no existence check, so a first run silently replaced
+ *  street-precision hand-curated coordinates with unverified Nominatim
+ *  answers for the same (company, city) pair. */
+export function officeKey(companySlug, cityKey) {
+  return `${companySlug} ${cityKey}`;
+}
+
+/** Whether a resolved (company_slug, city_key) candidate must be skipped
+ *  because a company_offices row -- hand-curated seed data, or written by an
+ *  earlier run -- already exists for that exact pair. Pure: existingKeys is
+ *  the Set pre-loaded once from the DB before the geocode loop runs. */
+export function shouldSkipExistingOffice(existingKeys, companySlug, cityKey) {
+  return existingKeys.has(officeKey(companySlug, cityKey));
+}
