@@ -22,7 +22,7 @@ import {
   type RolesFilters,
 } from "@/lib/roles";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
-import { scoreStatusOf } from "@/lib/scorePrefilter";
+import { hasReadableJd, pendingLabelOf, scoreStatusOf } from "@/lib/scorePrefilter";
 import { useTheme } from "@/lib/theme";
 import { track } from "@/lib/analytics";
 import ScoreBreakdown from "./ScoreBreakdown";
@@ -369,9 +369,9 @@ export default function RolesPanel({
                   score={job.score}
                   size="md"
                   reveal={scored}
-                  pendingLabel={
-                    scoreStatusOf(job.score, eligibleIds.has(job.id)) === "scoring" ? "Scoring" : "Not scored"
-                  }
+                  pendingLabel={pendingLabelOf(
+                    scoreStatusOf(job.score, eligibleIds.has(job.id), hasReadableJd(job)),
+                  )}
                 />
                 {scored && job.reason && <div className="why">{job.reason}</div>}
                 {scored && (
@@ -461,6 +461,8 @@ export default function RolesPanel({
     // Fall back to the first fit bullet only when the model left reason empty, so a
     // scored role never renders with no fit text at all.
     const summary = job.reason?.trim() || job.fitBullets?.[0]?.trim() || null;
+    // The one status decision for the hero (scoreStatusOf); #130 adds no-description.
+    const detailStatus = scoreStatusOf(job.score, eligibleIds.has(job.id), hasReadableJd(job));
 
     return (
       <div className="detail" ref={detailRef}>
@@ -560,14 +562,14 @@ export default function RolesPanel({
         </div>
         {hasCv && (
           <div className="dhero">
-            {job.score != null ? (
+            {detailStatus === "scored" && job.score != null ? (
               <>
                 <FitChip score={job.score} size="lg" />
                 <div className="dhl">
                   <div className="hlt">{fitLabel(job.score)}</div>
                 </div>
               </>
-            ) : scoreStatusOf(job.score, eligibleIds.has(job.id)) === "scoring" ? (
+            ) : detailStatus === "scoring" ? (
               <>
                 <FitChip score={null} size="lg" />
                 <div className="dhl">
@@ -575,15 +577,25 @@ export default function RolesPanel({
                   <div className="hls">Your fit lands in a moment.</div>
                 </div>
               </>
+            ) : detailStatus === "no-description" ? (
+              // No readable description (#130): the scorer never reads this role,
+              // and any score it held before the rule is not shown.
+              <>
+                <FitChip score={null} size="lg" pendingLabel="No description yet" />
+                <div className="dhl">
+                  <div className="hlt">No description yet</div>
+                  <div className="hls">We'll score this role once the source publishes one.</div>
+                </div>
+              </>
             ) : (
               // Outside the paid slice (#114): it matches no target you picked, or
               // sits past the freshest-first cut. Saying "scoring" here would never
               // come true, so name the real state and point at the one control.
               <>
-                <FitChip score={null} size="lg" pendingLabel="Not scored" />
+                <FitChip score={null} size="lg" pendingLabel="Not scored yet" />
                 <div className="dhl">
-                  <div className="hlt">Not scored</div>
-                  <div className="hls">We score your newest matching roles first. Widen your targets in Settings to include this one.</div>
+                  <div className="hlt">Not scored yet</div>
+                  <div className="hls">Outside your targets. Widen them in Settings to score this role.</div>
                 </div>
               </>
             )}

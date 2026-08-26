@@ -15,6 +15,7 @@
 import { AUTH_BYPASSED } from "@/components/AuthProvider";
 import type { DailyMatchRow } from "@/lib/product";
 import type { ScoreableProfile } from "@/lib/score";
+import { hasReadableJd } from "@/lib/scorePrefilter";
 
 /** Single gate, borrowed from AuthProvider so the two can never drift. */
 export const DEV_FIXTURE = AUTH_BYPASSED;
@@ -45,12 +46,15 @@ export function devFixtureScore(jobId: string): number {
   return Math.round((4 + (h % 5501) / 1000) * 10) / 10;
 }
 
-/** Fill ONLY the unscored rows, so a real signed-in score always wins. */
-export function devFixtureScores<T extends { id: string; score: number | null; reason: string | null }>(
-  jobs: T[],
-): T[] {
+/** Fill ONLY the unscored rows, so a real signed-in score always wins. A row with
+ *  no readable description stays unscored, as the real paths leave it (#130). */
+export function devFixtureScores<
+  T extends { id: string; score: number | null; reason: string | null; has_jd?: boolean | null },
+>(jobs: T[]): T[] {
   return jobs.map((j) =>
-    j.score == null ? { ...j, score: devFixtureScore(j.id), reason: DEV_FIXTURE_REASON } : j,
+    j.score == null && hasReadableJd(j)
+      ? { ...j, score: devFixtureScore(j.id), reason: DEV_FIXTURE_REASON }
+      : j,
   );
 }
 

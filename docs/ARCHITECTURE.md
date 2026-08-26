@@ -121,6 +121,19 @@ The client does **not** score. `useRolesData.ts` polls the `scores` table every 
 while unscored roles remain. One scoring path means no double-spend and no work lost when a
 tab closes.
 
+**No description, no score (issue #130).** A role whose `jd_text` is null or blank is never
+sent to the scorer, by any path: the per-user prefilter (`src/lib/scorePrefilter.ts`
+`hasReadableJd`, applied inside `prefilterWithTier` before the caps), the nightly candidate
+list, and the interactive `scoreJob`. The backlog worker and the dataplane artifact do not
+fetch the multi-KB body, so they read the generated column `jobs.has_jd` instead; `jd_text`
+wins when a caller has it. Measured on production (12,623 scores): JD-less roles scored
+>= 4.0 at 6.0% versus 1.8% for roles with a JD, because an empty JD holds nothing that can
+disqualify a CV. 3,934 of those 12,623 scores were bought for JD-less roles, so the rule
+removes about 31% of score purchases. Scores already stored for JD-less roles are kept but
+not applied at display time (`applyLandedScores`, the initial merge in `useRolesData.ts`):
+the role renders as "No description yet" and cannot rank on a stale score. The client
+prefilter shares the predicate, so "still scoring" and "what gets paid for" keep agreeing.
+
 **A cached score is forever** — the null-score filter never revisits a row. So never write a
 degraded score: scoring is gated on `cv_text` being present, and a failed job-description
 fetch must not produce a description-blind score.

@@ -23,6 +23,8 @@ export interface DataplaneJob {
   extraction: Record<string, unknown> | null;
   role_family: string | null;
   workplace: string | null;
+  /** jobs.has_jd (#130): optional, an artifact built before the column omits it. */
+  has_jd?: boolean | null;
 }
 
 export interface DataplaneCompany {

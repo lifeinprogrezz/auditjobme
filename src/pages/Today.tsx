@@ -28,7 +28,7 @@ import { warmContactsFor, warmMarkerLabel } from "@/lib/connections";
 import { RUBRIC_VERSION } from "@/lib/score";
 import { DEV_FIXTURE, devFixtureBatch } from "@/lib/devFixture";
 import FitChip from "@/components/roles/FitChip";
-import { scoreStatusOf } from "@/lib/scorePrefilter";
+import { hasReadableJd, pendingLabelOf, scoreStatusOf } from "@/lib/scorePrefilter";
 
 // §3.3 secondary CTA — the ONE idiom for every list-row action on this page (there is
 // no second primary): control type (13/600), radius 10, a hairline ink/20 border that
@@ -268,9 +268,9 @@ export default function Today() {
           <FitChip
             score={job.score}
             size="sm"
-            pendingLabel={
-              scoreStatusOf(job.score, eligibleIds.has(job.id)) === "scoring" ? "Scoring" : "Not scored"
-            }
+            pendingLabel={pendingLabelOf(
+              scoreStatusOf(job.score, eligibleIds.has(job.id), hasReadableJd(job)),
+            )}
           />
         </div>
         {/* Footer: exactly ONE secondary CTA ("Prepare application") plus meta-weight
