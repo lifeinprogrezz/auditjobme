@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { DEV_FIXTURE, DEV_FIXTURE_REFERRAL_TOKEN } from "@/lib/devFixture";
 import { inviteLink } from "@/lib/referral";
 
 // get_or_create_referral_token is not in the generated types until the migration is
@@ -24,6 +25,14 @@ export default function ReferralSection() {
 
   useEffect(() => {
     let cancelled = false;
+    // Dev-only (lib/devFixture.ts): the E2E-bypass mock user carries no JWT, so the
+    // RLS-guarded mint answers 401 and this section shows its failed state on every
+    // walk of /settings. Show a synthetic link instead. `import.meta.env.DEV` is a
+    // literal false in a production build, so this branch folds away there.
+    if (DEV_FIXTURE) {
+      setLink(inviteLink(DEV_FIXTURE_REFERRAL_TOKEN));
+      return;
+    }
     void db.rpc("get_or_create_referral_token").then(({ data, error }) => {
       if (cancelled) return;
       if (error || typeof data !== "string" || data.length === 0) {

@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ensureCvStructured, parseAndSaveCv, saveCvStructured } from "@/lib/cvParse";
 import type { CvStructured } from "@/lib/cvStructured";
+import { DEV_FIXTURE, DEV_FIXTURE_CV_STRUCTURED } from "@/lib/devFixture";
 
 type Props = {
   userId: string;
@@ -82,6 +83,16 @@ export default function CvEditor({ userId, cvText }: Props) {
       setLoading(false);
       return;
     }
+    // Dev-only (lib/devFixture.ts): the E2E-bypass mock user has no profiles row and
+    // no JWT, so the read comes back failed and this panel can only ever show its
+    // "not read yet" state — the fielded editor was unwalkable. Seed the synthetic
+    // structure instead: no database read, no parse call. The gate folds out of a
+    // production build.
+    if (DEV_FIXTURE) {
+      setCv(structuredClone(DEV_FIXTURE_CV_STRUCTURED));
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     void ensureCvStructured(userId, cvText).then((parsed) => {
       if (!active) return;
@@ -107,7 +118,9 @@ export default function CvEditor({ userId, cvText }: Props) {
   const handleSave = async () => {
     if (!cv || busy) return;
     setBusy("save");
-    const ok = await saveCvStructured(userId, cv);
+    // Under the dev fixture there is no row to write to, so the write is skipped and
+    // the edit stays on screen — the Save step is walkable without a database write.
+    const ok = DEV_FIXTURE ? true : await saveCvStructured(userId, cv);
     setStatus(ok ? "Saved. Your next tailored CV uses this." : "We couldn't save that. Give it another try in a moment.");
     setBusy(null);
   };
@@ -116,7 +129,9 @@ export default function CvEditor({ userId, cvText }: Props) {
     if (!cvText?.trim() || busy) return;
     setBusy("reparse");
     setStatus("");
-    const parsed = await parseAndSaveCv(userId, cvText);
+    // Same dev-fixture gate as the load: re-reading is the fixture again, never a
+    // paid parse call the mock user has no session to make.
+    const parsed = DEV_FIXTURE ? structuredClone(DEV_FIXTURE_CV_STRUCTURED) : await parseAndSaveCv(userId, cvText);
     if (parsed) {
       setCv(parsed);
       setStatus("Read again from your CV.");

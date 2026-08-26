@@ -25,6 +25,12 @@ import { tailorSummary, tailorCover, answerQuestion, HAIKU, MAX_ANSWERS, type Co
 import { downloadCvPdf, downloadCoverPdf } from "@/lib/pdf";
 import { ensureCvStructured } from "@/lib/cvParse";
 import type { CvStructured } from "@/lib/cvStructured";
+import {
+  DEV_FIXTURE,
+  DEV_FIXTURE_CV_TEXT,
+  DEV_FIXTURE_CV_STRUCTURED,
+  DEV_FIXTURE_TAILORED_SUMMARY,
+} from "@/lib/devFixture";
 import { domainFor } from "@/lib/logodev";
 import { cityOf } from "@/lib/geo";
 import { auditHref } from "@/lib/auditLink";
@@ -175,7 +181,11 @@ export default function Apply() {
       ]);
       if (!active) return;
       setJob((jobData as Job) ?? null);
-      setCvText(profile?.cv_text ?? null);
+      // The E2E-bypass mock user has no profiles row, so this page could only ever
+      // show "add your CV first" and the tailored-CV step was unwalkable. Dev-only
+      // (lib/devFixture.ts); the gate folds out of a production build.
+      const cvOnFile = profile?.cv_text ?? (DEV_FIXTURE ? DEV_FIXTURE_CV_TEXT : null);
+      setCvText(cvOnFile);
       setName(profile?.display_name ?? "");
       if (jobData) {
         // The fit score + applied state both key on job_id — fetch them together so
@@ -213,7 +223,11 @@ export default function Apply() {
       // Lazy migration (issue #150): a CV uploaded before the structured parse
       // shipped is parsed once, here, and stored. It runs after the page is
       // usable and never blocks it: a failure just leaves the old render.
-      if (profile?.cv_text?.trim()) {
+      if (DEV_FIXTURE) {
+        // The fixture CV, already structured: the mock user has no row to store a
+        // parse in and no session to buy one with.
+        if (active) setCvStructured(DEV_FIXTURE_CV_STRUCTURED);
+      } else if (profile?.cv_text?.trim()) {
         const cv = await ensureCvStructured(user.id, profile.cv_text);
         if (active && cv) setCvStructured(cv);
       }
@@ -265,17 +279,29 @@ export default function Apply() {
     setError("");
     setErrStep(null);
     try {
-      const s = await tailorSummary({
-        role: job.title,
-        company: job.company,
-        jdText: job.jd_text,
-        cvText,
-        context: roleContext.trim() || undefined,
-      });
+      // Dev-only: the proxy needs a session and the mock user has none, so the real
+      // call answers "Not authenticated" and this download can never be walked. The
+      // RENDER below is the thing under test, and it is the same code either way.
+      // Written as an if, not a ternary: a ternary kept the fixture string in the
+      // shipped chunk, an `if (false)` block is dropped whole.
+      let s: string;
+      if (DEV_FIXTURE) {
+        s = DEV_FIXTURE_TAILORED_SUMMARY;
+      } else {
+        s = await tailorSummary({
+          role: job.title,
+          company: job.company,
+          jdText: job.jd_text,
+          cvText,
+          context: roleContext.trim() || undefined,
+        });
+      }
       setSummary(s);
       track("cv_tailored");
       await downloadCvPdf({ name, summary: s, cvText, company: job.company, structured: cvStructured });
-      const saved = await saveArtifact("cv", { summary: s });
+      // Same gate: there is no profiles row to hang an artifact off, and the write
+      // would only fail and report a save problem that is not one.
+      const saved = DEV_FIXTURE ? true : await saveArtifact("cv", { summary: s });
       if (!saved) {
         toast.error("Your CV downloaded, but we couldn't save a copy to your bundle.");
       }
