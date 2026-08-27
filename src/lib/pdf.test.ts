@@ -16,7 +16,7 @@ import {
   pdfFilename,
 } from "./pdf";
 import { stripLeadingSummary } from "./cvHtml";
-import { validateCvStructured, type CvStructured } from "./cvStructured";
+import { coerceCvStructured, validateCvStructured, type CvStructured } from "./cvStructured";
 
 const CV = `Jane Doe
 jane@example.com
@@ -727,6 +727,38 @@ Bachelor in Business Administration
         "Built the scoring engine end to end",
       ]);
     });
+  });
+
+  // A lifted entry must go through the SAME applicant-tracking-system normalisation a job
+  // gets. His own two project entries are the ones that move, and issue #186 landed because
+  // a stray character rode a bullet onto the page, so a Projects section that skipped the
+  // normalisation would print the very characters that fix removes. Fixture carries an
+  // em-dash, curly quotes, an ellipsis and a non-breaking space in the company, the role,
+  // the dates and a bullet.
+  it("normalises a lifted entry's name, title, dates and lines exactly as a job's", () => {
+    const source = "North\u2014going \u201CFounder\u201D 03/2026 \u2013 Present Built the\u00A0engine\u2026 end to end";
+    const cv = coerceCvStructured({
+      contact: { name: "Jane Doe", links: [] },
+      experience: [
+        { company: "Acme Corp", role: "Product Manager", start: "2021", end: "2024", bullets: ["Ran the weekly pricing review"] },
+        {
+          company: "North\u2014going",
+          role: "\u201CFounder\u201D",
+          start: "03/2026",
+          end: "Present",
+          bullets: ["Built the\u00A0engine\u2026 end to end"],
+          isProject: true,
+        },
+      ],
+      education: [],
+    });
+    expect(source).toContain("North\u2014going");
+    const block = blocksUnder(buildStructuredCvDoc({ name: "", summary: "", cv }), "PROJECTS")[0];
+    const stack = block.stack as ContentItem[];
+    expect(stack[0].text).toBe("North-going");
+    expect(stack[1].text).toBe('"Founder"');
+    expect(bulletsOf(block)).toEqual(["Built the engine... end to end"]);
+    expect(JSON.stringify(block)).not.toMatch(/[\u2014\u2013\u201C\u201D\u2026\u00A0]/);
   });
 });
 
