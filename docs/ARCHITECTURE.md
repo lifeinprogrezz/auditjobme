@@ -202,7 +202,32 @@ surface a future cap will read. That is a settled decision, not an oversight (is
 missing `x-region` entry once passed preflight and silently blocked every POST, killing CV
 generation in browsers.
 
-### The spend alert — signal, not a cap
+### The schedule lives in the database, not in GitHub Actions
+
+GitHub Actions cron is best effort. On 2026-08-27 not one scheduled run fired
+between 03:00 and 11:00 UTC (no 05:00 scrape, no 06:00-09:50 nightly window, one
+backlog tick all morning) while GitHub reported no incident, and every manual
+trigger of the same workflows ran green. The workers were fine; the scheduler was
+not.
+
+The three HTTP workers are therefore scheduled by `pg_cron` inside Supabase
+(migration `20260827170000_pg_cron_scheduler.sql`): `northgoing-nightly` every ten
+minutes across 06:00-09:50 UTC, `northgoing-score-backlog` every ten minutes, and
+`northgoing-spend-alert` at 10:00 UTC. Each job calls `public.tick_worker(name)`,
+which reads the cron secret from Supabase Vault (secret name `cron_secret`) and
+posts to `https://northgoing.com/api/<name>` with it. While that Vault secret is
+absent the function does nothing at all, so the schedule is safe to install before
+the secret exists.
+
+The GitHub workflows stay as a second belt. Both callers are idempotent (the shared
+scores ledger, issue #135), so a doubled tick costs one read, never a double
+purchase. Work that runs ON a runner rather than behind an endpoint — the scrape,
+the JD backfill, the company-data catch-up — still depends on GitHub cron; if that
+starves again, trigger it from the Actions tab or move it behind an endpoint too.
+
+To rotate the secret: update it in Vault; nothing in the repo changes.
+
+## The spend alert — signal, not a cap
 
 `api/spend-alert.ts` runs once a day (`.github/workflows/spend-alert.yml`, 10:00 UTC, after
 the morning drain window). It calls the `spend_alert_snapshot()` RPC, which sums
