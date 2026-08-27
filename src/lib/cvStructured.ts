@@ -94,7 +94,17 @@ export function normalizeForAts(text: string): string {
     .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
     .replace(/\u2026/g, "...")
     .replace(/\u200B|\u200C|\u200D|\u2060|\uFEFF/g, "")
-    .replace(/\u00A0/g, " ");
+    .replace(/\u00A0/g, " ")
+    // A PDF carries no spaces — the extractor infers them from glyph positions, so a
+    // bold run, a kerned pair or a line wrap can leave one sitting before the
+    // punctuation instead of after it. Rober's own CV came back with "in under a
+    // week ; led" and "platform revenue ." (2026-08-27). Cite-or-refuse keeps every
+    // bullet verbatim, so the stray space survives all the way onto the page unless
+    // it is tightened HERE, at render. That is safe: grounding validates the stored
+    // text, never this output — normalizeForAts is only ever called by the renderer
+    // and by tailor.ts, and it already rewrites characters (em-dash, curly quotes).
+    // Words are never touched, only the whitespace between a word and its punctuation.
+    .replace(/[ \t]+([,;:.!?])/g, "$1");
 }
 
 function str(value: unknown, max: number): string {

@@ -234,6 +234,31 @@ describe("normalizeForAts", () => {
     expect(normalizeForAts("no\u200Bzero\uFEFFwidth")).toBe("nozerowidth");
     expect(normalizeForAts("hard\u00A0space")).toBe("hard space");
   });
+
+  // Both of these are the literal strings Rober's own CV produced on 2026-08-27,
+  // extracted from the PDF he uploaded. A PDF stores glyph positions, not spaces,
+  // so the extractor can place one before the punctuation instead of after it.
+  it("tightens a space the PDF extractor left before punctuation", () => {
+    expect(normalizeForAts("Shipped the first production product in under a week ; led a 4-person team")).toBe(
+      "Shipped the first production product in under a week; led a 4-person team",
+    );
+    expect(normalizeForAts("generated $60,000 in platform revenue .")).toBe(
+      "generated $60,000 in platform revenue.",
+    );
+  });
+
+  it("covers each punctuation mark, and more than one space", () => {
+    expect(normalizeForAts("a , b ; c : d . e ! f ?")).toBe("a, b; c: d. e! f?");
+    expect(normalizeForAts("two  ,  spaces")).toBe("two,  spaces");
+    expect(normalizeForAts("tab\t. after")).toBe("tab. after");
+  });
+
+  it("changes no words, and never eats the space AFTER the punctuation", () => {
+    expect(normalizeForAts("Product, engineering, and growth.")).toBe("Product, engineering, and growth.");
+    expect(normalizeForAts("Vigo, Spain")).toBe("Vigo, Spain");
+    expect(normalizeForAts("northgoing.com : a free job board")).toBe("northgoing.com: a free job board");
+    expect(normalizeForAts("")).toBe("");
+  });
 });
 
 describe("the parse prompt", () => {
