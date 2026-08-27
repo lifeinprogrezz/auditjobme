@@ -26,6 +26,7 @@ import {
   SCORE_CONCURRENCY,
   STRONG_SCORE,
   selectBacklog,
+  prioritizeUsers,
   runPool,
   shouldSendReadyEmail,
   buildReadySubject,
@@ -231,9 +232,25 @@ export async function runBacklog(
   if (pErr) {
     return { status: 500, body: { error: `profiles read failed: ${pErr.message}` } };
   }
-  const active = (profiles ?? []).filter(
+  const activeUnordered = (profiles ?? []).filter(
     (p) => typeof p.cv_text === "string" && p.cv_text.trim().length > 0,
   );
+
+  // Issue #160 perk: "people you invite get scored first" — a stable reorder, not
+  // a filter (nobody is skipped, no cap). Bounded to this tick's active users, not
+  // the whole referrals table. A read failure here must not cost the tick its
+  // actual scoring work, so it degrades to "no priority this tick" rather than
+  // throwing.
+  const referredIds = new Set<string>();
+  if (activeUnordered.length > 0) {
+    const { data: referralRows, error: refErr } = await admin
+      .from("referrals")
+      .select("referee_id")
+      .in("referee_id", activeUnordered.map((p) => p.id as string));
+    if (refErr) console.warn("[score-backlog] referrals read failed:", refErr.message);
+    for (const r of referralRows ?? []) referredIds.add(r.referee_id as string);
+  }
+  const active = prioritizeUsers(activeUnordered, referredIds);
 
   // ── Live catalog, WITHOUT jd_text (multi-KB; fetched per scoring batch) ────
   let liveJobs: LiveJob[] = [];

@@ -172,6 +172,11 @@ export const DEV_FIXTURE_COMMON_PACK: CommonPackJson = {
  */
 export const DEV_FIXTURE_REFERRAL_TOKEN = "deadbeefdeadbeefdeadbeefdeadbeef";
 
+/** Issue #160: my_referral_count() is likewise server-side and RLS-guarded, so the
+ *  mock's 401 needs a synthetic stand-in — a small positive number so the "N
+ *  people joined through you" line renders on every dev walk of /settings. */
+export const DEV_FIXTURE_REFERRAL_COUNT = 3;
+
 /** Deterministic 4.0–9.5 from the job id (FNV-1a): the same walk twice ranks the
  *  same way, so a screenshot diff means a real change, not a reshuffle. */
 export function devFixtureScore(jobId: string): number {

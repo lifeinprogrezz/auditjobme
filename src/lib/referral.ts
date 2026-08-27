@@ -1,5 +1,6 @@
-// Issue #78 — referral ATTRIBUTION only (the reward half is blocked on #35; nothing
-// here grants anything). Pure logic for the client half of the loop:
+// Issue #78 — referral ATTRIBUTION, plus the issue #160 perk (queue priority in
+// score-backlog, at zero cost — the money reward half stays blocked on #35).
+// Pure logic for the client half of the loop:
 //
 //   1. Landing capture: `northgoing.com/?ref={token}` stashes the token in localStorage,
 //      because Google OAuth redirects back to the bare origin — the query string does
@@ -10,6 +11,8 @@
 //      account) and refuses non-fresh accounts, self-referrals and repeat claims —
 //      the client can only ever hand over the token it saw, never write the table
 //      (see supabase/migrations/20260812007800_referral_attribution.sql).
+//   3. Settings attribution: "N people joined through you", read via the
+//      my_referral_count() RPC (supabase/migrations/20260827140000_referral_count_rpc.sql).
 //
 // No React, no supabase imports — storage and the RPC arrive as arguments, pinned by
 // src/test/referral.test.ts. Rule + code move together.
@@ -102,4 +105,31 @@ export async function claimStoredReferral(
   } catch {
     return "retry";
   }
+}
+
+/**
+ * Render the Settings attribution line, or null when the count is not available
+ * (RPC missing, fetch failed, not yet loaded) — the section omits the line
+ * rather than showing a broken "null people joined through you".
+ */
+export function formatReferralCount(count: number | null): string | null {
+  if (count === null) return null;
+  const noun = count === 1 ? "person" : "people";
+  return `${count} ${noun} joined through you.`;
+}
+
+/**
+ * Is an RPC failure "my_referral_count doesn't exist yet" (the migration hasn't
+ * landed on this environment) rather than a real error? Same degrade shape as
+ * isMissingBatchTable in scoreBatch.ts: a missing function must not read as a
+ * broken feature, and Settings simply hides the count.
+ */
+export function isMissingReferralCountFn(
+  err: { code?: string | null; message?: string | null } | null | undefined,
+): boolean {
+  if (!err) return false;
+  const msg = err.message ?? "";
+  // 42883 = undefined_function (Postgres); PGRST202 = function not found (PostgREST cache).
+  if (err.code === "42883" || err.code === "PGRST202") return true;
+  return msg.includes("my_referral_count") && /(does not exist|not find|unknown)/i.test(msg);
 }
