@@ -36,6 +36,20 @@
  * requests. Nothing is guessed in the browser: the client-side name guess was
  * removed on purpose in PR #164 (unsuppressable Chromium 404 console noise).
  *
+ * Fix round 5 (this issue, the adversarial review of round 4): that guess is
+ * wrong about 1 time in 10, and no amount of validation can bring the rate down,
+ * because a parked domain is BUILT from the handle — so it always carries the
+ * company name and always passes a name gate. Replaying 60 random companies on
+ * 2026-08-27 gave 39 writes and 4 of them were another company's mark
+ * (finto.com, nevis.com, neuralconcept.ai, lime.ai). The board the apply URL
+ * names already PUBLISHES the company's website, and 95% of the Ashby+Workable
+ * pool carries one, so a pass that READS it now runs FIRST (pass 3,
+ * scripts/logo-board-lib.mjs) and the handle guess is the last resort (pass 4).
+ * Every write records HOW it was obtained in companies.logo_domain_source
+ * (migration 20260827190000), and a row whose source is 'guess' is REVISITED
+ * when a board website later appears — without that column a wrong value was
+ * permanent, because this sweep only ever scanned logo_domain IS NULL.
+ *
  * SAFETY: dry-run is the DEFAULT — reports what it would set, writes nothing.
  * Pass --apply to write (the nightly workflow does; manual runs must opt in).
  * --dry-run is accepted as an explicit "never write", and wins over --apply.
@@ -44,6 +58,7 @@
  *   node scripts/logo-backfill.mjs            # dry-run (default)
  *   node scripts/logo-backfill.mjs --apply    # write derived logo domains
  *   node scripts/logo-backfill.mjs --apply --max-probes=1000   # bigger catch-up run
+ *   node scripts/logo-backfill.mjs --max-board-fetches=50      # bound the board pass
  */
 import { createClient } from "@supabase/supabase-js";
 import { resolveLogoDomain, partitionAggregatorDomains, domainFromUrl } from "./logo-lib.mjs";
@@ -62,6 +77,21 @@ import {
   newHandleTally,
   handleSummaryLine,
 } from "./logo-handle-lib.mjs";
+import {
+  LOGO_SOURCE_BOARD,
+  LOGO_SOURCE_COMPANY_URL,
+  LOGO_SOURCE_GUESS,
+  boardWebsiteRequest,
+  boardPublishesWebsite,
+  boardCompanyFromResponse,
+  boardOwnershipOk,
+  logoDomainFromWebsite,
+  isRevisitableSource,
+  isMissingLogoSourceColumnError,
+  preferLogoDomain,
+  newBoardTally,
+  boardSummaryLine,
+} from "./logo-board-lib.mjs";
 
 const argValue = (name, def) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -78,6 +108,10 @@ const APPLY = process.argv.includes("--apply") && !DRY;
 // are cached, so each run spends its budget on ground the last one did not cover.
 const MAX_COMPANIES = Number(argValue("max-companies", "1000")) || 1000;
 const MAX_PROBES = Number(argValue("max-probes", "800")) || 800;
+// The board pass costs exactly ONE request per company, at the ATS the apply URL
+// already names, so its bound is generous where the guess pass's is tight.
+const MAX_BOARD_FETCHES = Number(argValue("max-board-fetches", "800")) || 800;
+const BOARD_CONCURRENCY = 6;
 const PROBE_CONCURRENCY = 6;
 const PROBE_TIMEOUT_MS = 8000;
 const PROBE_USER_AGENT = "northgoing-logo-probe (hello@lifeinprogrezz.com)";
@@ -119,25 +153,65 @@ for (let from = 0; ; from += 1000) {
 // a few runs, and this null-logo_domain read is the load-bearing scan for
 // every row it creates -- an un-paged read here would silently stop
 // backfilling logos once `companies` crossed 1000 rows.
-const companies = [];
-for (let from = 0; ; from += 1000) {
-  const { data, error } = await supabase
-    .from("companies")
-    .select("slug, name, careers_url, website")
-    .is("logo_domain", null)
-    .range(from, from + 999);
-  if (error) {
-    console.error("logo-backfill: companies select failed:", error.message);
-    process.exit(1);
-  }
-  companies.push(...(data || []));
-  if (!data || data.length < 1000) break;
+
+// ── provenance (migration 20260827190000). Absent column = no provenance. ──
+// companies.logo_domain used to say nothing about HOW it was obtained, so a
+// wrong value dropped out of every future run (the scan below is null-only) and
+// could not be told from a good one. With the column present, a row written by
+// the handle GUESS is revisited here — that is what makes today's wrong values
+// correctable instead of permanent.
+let hasSourceColumn = true;
+function warnSourceColumnMissing(where) {
+  if (!hasSourceColumn) return;
+  hasSourceColumn = false;
+  console.error(
+    `logo-backfill: companies.logo_domain_source not found at ${where} — provenance disabled and guessed rows are NOT revisited for the rest of this run (apply migration 20260827190000_logo_domain_source.sql to enable it).`,
+  );
 }
 
-const candidates = (companies || []).filter((c) => liveCompanyIds.has(c.slug));
+const COMPANY_COLS = "slug, name, careers_url, website, logo_domain";
+
+/** Page one filtered read of `companies`, retrying without the provenance
+ *  column the first time the database says it is not there. */
+async function readCompanies(applyFilter, { needsSource = false } = {}) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const cols = hasSourceColumn ? `${COMPANY_COLS}, logo_domain_source` : COMPANY_COLS;
+    const { data, error } = await applyFilter(supabase.from("companies").select(cols)).range(from, from + 999);
+    if (error) {
+      if (isMissingLogoSourceColumnError(error)) {
+        warnSourceColumnMissing("read");
+        return needsSource ? [] : readCompanies(applyFilter, { needsSource });
+      }
+      console.error("logo-backfill: companies select failed:", error.message);
+      process.exit(1);
+    }
+    out.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
+const companies = await readCompanies((q) => q.is("logo_domain", null));
+// Rows a previous run GUESSED. They already have a logo_domain, so the null-only
+// scan above never sees them again; the board pass below is the only thing that
+// can replace one, and only when a board publishes a website for that company.
+const revisitable = hasSourceColumn
+  ? await readCompanies((q) => q.eq("logo_domain_source", LOGO_SOURCE_GUESS).not("logo_domain", "is", null), {
+      needsSource: true,
+    })
+  : [];
+
+const bySlug = new Map();
+for (const c of [...companies, ...revisitable]) if (!bySlug.has(c.slug)) bySlug.set(c.slug, c);
+const candidates = [...bySlug.values()].filter((c) => liveCompanyIds.has(c.slug));
+if (revisitable.length) {
+  console.error(`logo-backfill: ${revisitable.length} previously GUESSED logo domain(s) up for revisiting from the board.`);
+}
 const fills = [];
 let viaApplyUrl = 0;
 for (const c of candidates) {
+  if (c.logo_domain) continue; // a revisit row already has one; only the board pass may replace it
   const { domain, derivedWebsite } = resolveLogoDomain({
     careersUrl: c.careers_url,
     website: c.website,
@@ -164,15 +238,142 @@ if (aggregatorDomains.size) {
   for (const f of skippedFills) console.error(`  SKIPPED ${f.name} (${f.slug}) -> ${f.domain}`);
 }
 
-// ── Pass 3 (fix round 4): ATS-handle candidates, validated before any write ──
-// Only companies the two URL-derived sources could not resolve AND that name no
-// site of their own at all. A company WITH a website on file is left to the
-// existing sources: its domain is a fact, not a guess.
+// Companies the two URL-derived sources could not resolve AND that name no site
+// of their own at all. A company WITH a website on file is left to the existing
+// sources: its domain is a fact, not a guess.
 const resolvedSlugs = new Set(safeFills.map((f) => f.slug));
-const handleTargets = candidates
+const unresolved = candidates
   .filter((c) => !resolvedSlugs.has(c.slug) && !c.website && !c.careers_url)
   .sort((a, b) => String(a.slug).localeCompare(String(b.slug))) // reproducible day to day
   .slice(0, MAX_COMPANIES);
+
+// ── Pass 3 (fix round 5): the website the ATS board already PUBLISHES ────────
+// Read, not guessed. A handle can only ever produce a domain that CONTAINS the
+// company name, which is exactly what a parked domain built from that name is —
+// so finto.com, nevis.com, neuralconcept.ai and lime.ai all passed the guess
+// pass's gates on 2026-08-27 while the company sat at gofinto.com,
+// neviswealth.com, neuralconcept.com and li.me. The board knows all four.
+// One request per company, at the ATS its own apply URL names.
+const boardTally = newBoardTally();
+const boardRequests = [];
+for (const c of unresolved) {
+  const hit = handleFromApplyUrls(urlsByCompany.get(c.slug) ?? []);
+  if (!hit) continue;
+  if (!boardPublishesWebsite(hit.ats)) {
+    boardTally.unsupportedAts++;
+    continue;
+  }
+  const req = boardWebsiteRequest(hit.ats, hit.handle);
+  if (req) boardRequests.push({ company: c, hit, req });
+}
+
+const BOARD_USER_AGENT = PROBE_USER_AGENT;
+let boardFetches = 0;
+const boardFills = [];
+
+/** Ask ONE board what website it publishes for this tenant. */
+async function readBoard({ company, hit, req }) {
+  if (boardFetches >= MAX_BOARD_FETCHES) {
+    boardTally.budgetExhausted++;
+    return;
+  }
+  boardFetches++;
+  boardTally.asked++;
+  let res;
+  try {
+    res = await fetch(req.url, {
+      headers: { "User-Agent": BOARD_USER_AGENT, Accept: req.kind === "json" ? "application/json" : "text/html" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+  } catch {
+    boardTally.unreachable++;
+    return;
+  }
+  if (!res.ok) {
+    try {
+      await res.body?.cancel();
+    } catch {
+      /* nothing to release */
+    }
+    boardTally.unreachable++;
+    return;
+  }
+  const raw = await res.text();
+  let payload = raw;
+  if (req.kind === "json") {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      boardTally.noWebsite++;
+      return;
+    }
+  }
+  const published = boardCompanyFromResponse(hit.ats, payload);
+  if (!published) {
+    boardTally.noWebsite++;
+    return;
+  }
+  boardTally.published++;
+  // The tenant has to be THIS company's, or its published website is somebody
+  // else's site — the same failure the handle pass's name gate exists for.
+  if (!boardOwnershipOk({ boardName: published.name, handle: hit.handle, companyName: company.name })) {
+    boardTally.notOwned++;
+    console.error(
+      `  NOT OWNED ${company.name} (${company.slug}) -> ${hit.ats} tenant "${hit.handle}" publishes "${published.name ?? "?"}" (${published.website}) — nothing written`,
+    );
+    return;
+  }
+  // domainFromUrl refuses every hosted-ATS/aggregator host, so a board that
+  // links back at itself, or at LinkedIn, resolves to nothing here.
+  const domain = logoDomainFromWebsite(published.website);
+  if (!domain) {
+    boardTally.unusableHost++;
+    return;
+  }
+  if (company.logo_domain && isRevisitableSource(company.logo_domain_source)) boardTally.revisited++;
+  boardTally.resolved++;
+  boardFills.push({
+    slug: company.slug,
+    name: company.name,
+    domain,
+    ats: hit.ats,
+    handle: hit.handle,
+    website: published.website,
+    replaces: company.logo_domain || null,
+  });
+}
+
+let nextBoard = 0;
+await Promise.all(
+  Array.from({ length: Math.min(BOARD_CONCURRENCY, boardRequests.length) }, async () => {
+    while (nextBoard < boardRequests.length) await readBoard(boardRequests[nextBoard++]);
+  }),
+);
+
+// Same aggregator guard as the other passes: one real company owns one domain.
+const {
+  safe: safeBoardFills,
+  skipped: skippedBoardFills,
+  aggregatorDomains: boardAggregators,
+} = partitionAggregatorDomains(boardFills);
+for (const f of safeBoardFills) {
+  console.error(
+    `  ${f.name} (${f.slug}) -> ${f.domain} [published by ${f.ats} tenant ${f.handle} as ${f.website}]${f.replaces ? ` — REPLACES guessed ${f.replaces}` : ""}`,
+  );
+}
+if (boardAggregators.size) {
+  console.error(
+    `logo-backfill(board): skipped ${skippedBoardFills.length} company(ies) across ${boardAggregators.size} suspected shared domain(s): ${[...boardAggregators].join(", ")}`,
+  );
+}
+if (!APPLY) console.error(boardSummaryLine(boardTally, { apply: false }));
+
+// ── Pass 4 (fix round 4): the ATS-handle guess — LAST RESORT ─────────────────
+// Only for a company no board published a website for, and only for a row that
+// has no logo_domain at all: a guess never replaces a value already on file.
+const boardSlugs = new Set(safeBoardFills.map((f) => f.slug));
+const handleTargets = unresolved.filter((c) => !boardSlugs.has(c.slug) && !c.logo_domain);
 
 const tally = newHandleTally();
 const plans = [];
@@ -418,30 +619,69 @@ if (handleAggregators.size) {
   );
 }
 
+// ── One decision per company, in one place ──────────────────────────────────
+// preferLogoDomain (scripts/logo-board-lib.mjs) states the order this whole
+// change exists for: what the board PUBLISHED wins, the handle guess is the
+// last resort. The guess pass above already skips a company the board resolved,
+// so it saves the probes; this is where the rule is applied, and it is applied
+// even if some future edit stops the passes from excluding each other.
+const boardBySlug = new Map(safeBoardFills.map((f) => [f.slug, f]));
+const guessBySlug = new Map(safeHandleFills.map((f) => [f.slug, f]));
+const derived = [];
+for (const c of unresolved) {
+  const choice = preferLogoDomain({
+    boardDomain: boardBySlug.get(c.slug)?.domain,
+    guessDomain: guessBySlug.get(c.slug)?.domain,
+  });
+  if (!choice) continue;
+  // A guess NEVER replaces a value already on file; only a board reading may.
+  if (c.logo_domain && choice.source !== LOGO_SOURCE_BOARD) continue;
+  if (c.logo_domain === choice.domain) continue; // already correct, nothing to write
+  derived.push({ slug: c.slug, name: c.name, ...choice });
+}
+
 if (!APPLY) {
   console.error(handleSummaryLine(tally, { apply: false }));
-  console.error("logo-backfill: DRY RUN — no writes.");
+  console.error(
+    `logo-backfill: DRY RUN — no writes. Would set ${safeFills.length + derived.length} logo domain(s): ` +
+      `${safeFills.length} from a company URL on file · ${derived.filter((d) => d.source === LOGO_SOURCE_BOARD).length} from a board · ` +
+      `${derived.filter((d) => d.source === LOGO_SOURCE_GUESS).length} from a handle guess.`,
+  );
   process.exit(0);
+}
+
+/** One company update, carrying its provenance when the column is there.
+ *  A database without migration 20260827190000 still gets the domain. */
+async function writeCompany(slug, update, source) {
+  const withSource = hasSourceColumn ? { ...update, logo_domain_source: source } : update;
+  const { error } = await supabase.from("companies").update(withSource).eq("slug", slug);
+  if (!error) return null;
+  if (!isMissingLogoSourceColumnError(error)) return error;
+  warnSourceColumnMissing("write");
+  const { error: retry } = await supabase.from("companies").update(update).eq("slug", slug);
+  return retry || null;
 }
 
 let written = 0;
 for (const f of safeFills) {
   const update = { logo_domain: f.domain };
   if (f.website) update.website = f.website;
-  const { error: e } = await supabase.from("companies").update(update).eq("slug", f.slug);
+  const e = await writeCompany(f.slug, update, LOGO_SOURCE_COMPANY_URL);
   if (e) console.error(`logo-backfill: update failed for ${f.slug}: ${e.message}`);
   else written++;
 }
 console.error(`logo-backfill: wrote ${written} logo domain(s).`);
 
-// A handle-derived domain fills logo_domain ONLY. It is validated, but it is
-// still derived, and `website` is read by the company-enrichment pass as a fact
-// about the company — leaving it null keeps that pass free to find the real one.
-for (const f of safeHandleFills) {
-  const { error: e } = await supabase.from("companies").update({ logo_domain: f.domain }).eq("slug", f.slug);
-  if (e) console.error(`logo-backfill: handle update failed for ${f.slug}: ${e.message}`);
+// A board-read or handle-derived domain fills logo_domain ONLY. `website` is
+// read by the company-enrichment pass as a fact about the company — leaving it
+// null keeps that pass free to find the real one.
+for (const d of derived) {
+  const e = await writeCompany(d.slug, { logo_domain: d.domain }, d.source);
+  if (e) console.error(`logo-backfill: ${d.source} update failed for ${d.slug}: ${e.message}`);
+  else if (d.source === LOGO_SOURCE_BOARD) boardTally.written++;
   else tally.written++;
 }
+console.error(boardSummaryLine(boardTally, { apply: true }));
 for (let i = 0; i < cacheWrites.length && !cacheDisabled; i += 300) {
   const { error: e } = await supabase
     .from("logo_probe_cache")
