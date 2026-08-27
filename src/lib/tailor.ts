@@ -31,6 +31,52 @@ export function noEmDash(s: string): string {
   return (s || "").replace(/\s*—\s*/g, ", ").replace(/—/g, ", ");
 }
 
+// ── Company-name casing (the summary is the only place a name can drift) ─────
+//
+// The CV body prints the company exactly as the CV writes it, GLIQUID. The summary
+// is the one model-written line, and a real download came back saying "Gliquid" on
+// top of a body that said "GLIQUID": one document, two spellings of the person's own
+// company. A prompt rule alone cannot be tested, so the correction is done in code.
+
+/** Escape a company name for use inside a RegExp (unicode mode: specials only). */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Put the CV's own spelling of a company name back into model-written text.
+ *
+ * Narrow on purpose. A run of text is replaced only when it matches one of the
+ * candidate's own company names as a WHOLE word, ignoring case; the replacement is
+ * that name, character for character. So the text keeps its length, its wording and
+ * its punctuation, and a word that is not a company name is never touched ("liquid"
+ * and "Gliquidate" both stay as they are). A name the CV itself spells two different
+ * ways is left alone: there is no way to tell which spelling was meant.
+ */
+export function fixCompanyCasing(text: string, companies: readonly string[]): string {
+  if (!text) return text;
+  // lower-cased name -> the CV's spelling, or null once two spellings disagree.
+  const canonical = new Map<string, string | null>();
+  for (const raw of companies) {
+    const name = (raw || "").trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    const seen = canonical.get(key);
+    if (seen === undefined) canonical.set(key, name);
+    else if (seen !== null && seen !== name) canonical.set(key, null);
+  }
+  // Longest first, so "Tierra Labs Ltd" is matched before a bare "Tierra Labs".
+  const keys = [...canonical.keys()].filter((k) => canonical.get(k) !== null).sort((a, b) => b.length - a.length);
+  if (keys.length === 0) return text;
+  // The leading boundary is captured rather than a lookbehind: same effect, and it
+  // runs on the older mobile browsers that ship no lookbehind support.
+  const re = new RegExp(`(^|[^\\p{L}\\p{N}])(${keys.map(escapeRegExp).join("|")})(?![\\p{L}\\p{N}])`, "giu");
+  return text.replace(re, (whole, before: string, name: string) => {
+    const fixed = canonical.get(name.toLowerCase());
+    return fixed ? `${before}${fixed}` : whole;
+  });
+}
+
 /** Cover-letter output guardrail (issue #151 / D2): the brand no-em-dash rule,
  *  then the same applicant-tracking-system normalisation the structured CV uses
  *  (smart quotes, en-dashes, ellipsis, zero-width chars) — so a pasted cover
@@ -64,6 +110,7 @@ Write a summary that:
 HARD RULES — do not break (this protects the candidate's credibility):
 - Use ONLY facts, responsibilities, and numbers that literally appear in the CV below. Do NOT invent or imply responsibilities the CV does not state.
 - Do NOT re-label or re-attribute any number. Keep every number's exact meaning and wording from the CV.
+- Spell every company name exactly as the CV spells it, capital for capital (if the CV writes GLIQUID, write GLIQUID).
 - No fabrication of any kind. When unsure, stay closer to the CV's own wording.
 - Write in the FIRST PERSON ("I", or implied first person with no pronoun). NEVER refer to the candidate in the third person.
 - 3 to 5 sentences (about 80-120 words). Specific, substantive, tight. No buzzwords, no boilerplate that could describe any candidate.
@@ -356,15 +403,23 @@ export function isUsableSummary(text: string | null | undefined): boolean {
  * produce one. One retry with an explicit correction, then the fallback — the CV
  * always prints a real summary, never model prose about the candidate.
  * `fallbackSummary` is the person's own stored summary (cv_structured.summary).
+ * `companies` are the company names as the CV writes them (cv_structured.experience):
+ * model output gets their casing put back, the person's own fallback text is left
+ * exactly as they wrote it.
  */
-export async function tailorSummary(input: TailorInput, fallbackSummary?: string | null): Promise<string> {
-  const first = noEmDash(await callProxy([{ role: "user", content: buildSummaryPrompt(input) }], 500, "cv"));
+export async function tailorSummary(
+  input: TailorInput,
+  fallbackSummary?: string | null,
+  companies: readonly string[] = [],
+): Promise<string> {
+  const clean = (s: string) => fixCompanyCasing(noEmDash(s), companies);
+  const first = clean(await callProxy([{ role: "user", content: buildSummaryPrompt(input) }], 500, "cv"));
   if (isUsableSummary(first)) return first;
 
   const corrective = `${buildSummaryPrompt(input)}
 
 Your previous answer was not a summary: it discussed the candidate or declined the task. Write ONLY the first-person Professional Summary paragraph now, using the candidate's real experience, whatever the fit.`;
-  const second = noEmDash(await callProxy([{ role: "user", content: corrective }], 500, "cv"));
+  const second = clean(await callProxy([{ role: "user", content: corrective }], 500, "cv"));
   if (isUsableSummary(second)) return second;
 
   const fallback = (fallbackSummary ?? "").trim();

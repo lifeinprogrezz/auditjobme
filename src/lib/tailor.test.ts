@@ -16,6 +16,8 @@ import {
   parseCoverJson,
   parseCommonPackJson,
   tailorCover,
+  tailorSummary,
+  fixCompanyCasing,
   answerCommonPack,
 } from "./tailor";
 import { stripLeadingSummary } from "./cvHtml";
@@ -147,7 +149,7 @@ describe("tailor prompts", () => {
     // pinned golden — the exact prompt as it read before issue #76 shipped; an empty
     // box must reproduce this precisely, not merely "close enough"
     expect(withoutField).toBe(
-      "You are writing the Professional Summary for ONE specific job application — the only part of the CV that changes per role. Make it concrete to THIS role; it should be impossible to reuse verbatim for a different job.\n\nWrite a summary that:\n- Leads with the angle THIS role cares about most, citing the 2-3 SPECIFIC achievements from the CV that best fit it (real employers, real numbers). Pick ONLY what genuinely fits the role.\n- Draws a clear line from the candidate's real, stated experience to what this role does.\n\nHARD RULES — do not break (this protects the candidate's credibility):\n- Use ONLY facts, responsibilities, and numbers that literally appear in the CV below. Do NOT invent or imply responsibilities the CV does not state.\n- Do NOT re-label or re-attribute any number. Keep every number's exact meaning and wording from the CV.\n- No fabrication of any kind. When unsure, stay closer to the CV's own wording.\n- Write in the FIRST PERSON (\"I\", or implied first person with no pronoun). NEVER refer to the candidate in the third person.\n- 3 to 5 sentences (about 80-120 words). Specific, substantive, tight. No buzzwords, no boilerplate that could describe any candidate.\n- Warm, honest. NO em-dashes at all (use commas or short sentences). Write in English.\n- You may bold 2-4 key figures with ** **.\n\nNEVER REFUSE, NEVER ADVISE (this text is printed straight onto the candidate's CV):\n- If the role is a weak or partial fit, still write the summary. Lead with the closest real experience and say plainly what the person has done. A summary can be honest about a background without arguing for or against the fit.\n- Do NOT judge the candidate, do NOT recommend a different role, do NOT explain what you can or cannot write, do NOT address the reader, do NOT mention the CV, the job description or yourself.\n\nOUTPUT: the summary paragraph ONLY. No preamble, no analysis, no heading, no separators. Just the paragraph.\n\nROLE: Senior PM at Acme\n\nJOB DESCRIPTION:\nOwn the roadmap\n\nCANDIDATE CV (canonical facts; select the most relevant real proof from anywhere in it):\nJohn Doe\njohn@example.com\n\nProfessional Experience\n\nAcme Corp — Product Manager — 2021-2024\n- Grew activation 40% by shipping onboarding redesign\n- Led a team of 5\n\nEducation\nBSc Computer Science, MIT\n\nProfessional Summary:",
+      "You are writing the Professional Summary for ONE specific job application — the only part of the CV that changes per role. Make it concrete to THIS role; it should be impossible to reuse verbatim for a different job.\n\nWrite a summary that:\n- Leads with the angle THIS role cares about most, citing the 2-3 SPECIFIC achievements from the CV that best fit it (real employers, real numbers). Pick ONLY what genuinely fits the role.\n- Draws a clear line from the candidate's real, stated experience to what this role does.\n\nHARD RULES — do not break (this protects the candidate's credibility):\n- Use ONLY facts, responsibilities, and numbers that literally appear in the CV below. Do NOT invent or imply responsibilities the CV does not state.\n- Do NOT re-label or re-attribute any number. Keep every number's exact meaning and wording from the CV.\n- Spell every company name exactly as the CV spells it, capital for capital (if the CV writes GLIQUID, write GLIQUID).\n- No fabrication of any kind. When unsure, stay closer to the CV's own wording.\n- Write in the FIRST PERSON (\"I\", or implied first person with no pronoun). NEVER refer to the candidate in the third person.\n- 3 to 5 sentences (about 80-120 words). Specific, substantive, tight. No buzzwords, no boilerplate that could describe any candidate.\n- Warm, honest. NO em-dashes at all (use commas or short sentences). Write in English.\n- You may bold 2-4 key figures with ** **.\n\nNEVER REFUSE, NEVER ADVISE (this text is printed straight onto the candidate's CV):\n- If the role is a weak or partial fit, still write the summary. Lead with the closest real experience and say plainly what the person has done. A summary can be honest about a background without arguing for or against the fit.\n- Do NOT judge the candidate, do NOT recommend a different role, do NOT explain what you can or cannot write, do NOT address the reader, do NOT mention the CV, the job description or yourself.\n\nOUTPUT: the summary paragraph ONLY. No preamble, no analysis, no heading, no separators. Just the paragraph.\n\nROLE: Senior PM at Acme\n\nJOB DESCRIPTION:\nOwn the roadmap\n\nCANDIDATE CV (canonical facts; select the most relevant real proof from anywhere in it):\nJohn Doe\njohn@example.com\n\nProfessional Experience\n\nAcme Corp — Product Manager — 2021-2024\n- Grew activation 40% by shipping onboarding redesign\n- Led a team of 5\n\nEducation\nBSc Computer Science, MIT\n\nProfessional Summary:",
     );
   });
 
@@ -381,6 +383,113 @@ describe("answerCommonPack — one call, four answers (issue #151 / D4)", () => 
     const pack = await answerCommonPack({ role: "PM", company: "Acme", jdText: "", cvText: CV });
     expect(pack).toEqual({ whyCompany: "a", whyFit: "b", productShipped: "c", measureSuccess: "d" });
     expect(callProxyMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The CV body prints GLIQUID, because that is how his CV writes it. The summary is
+// the one model-written line, and a real download came back saying "Gliquid" on top
+// of a body saying "GLIQUID": one page, two spellings of his own company. A prompt
+// rule cannot be tested, so the correction is in code.
+describe("fixCompanyCasing — the summary spells a company the way the CV does", () => {
+  const COMPANIES = ["GLIQUID", "Tierra Labs Ltd", "Equilibre Labs"];
+
+  it("puts the CV's capitals back on a name the model re-cased", () => {
+    const summary = "I shipped $375M in trading volume at Gliquid and $330K at equilibre labs.";
+    expect(fixCompanyCasing(summary, COMPANIES)).toBe(
+      "I shipped $375M in trading volume at GLIQUID and $330K at Equilibre Labs.",
+    );
+  });
+
+  it("changes nothing but the letters' case: same length, same words, same punctuation", () => {
+    const summary = "At gliquid, I led 4 people; at TIERRA LABS LTD I raised $150,000 (a grant).";
+    const fixed = fixCompanyCasing(summary, COMPANIES);
+    expect(fixed).toHaveLength(summary.length);
+    expect(fixed.toLowerCase()).toBe(summary.toLowerCase());
+    expect(fixed).toBe("At GLIQUID, I led 4 people; at Tierra Labs Ltd I raised $150,000 (a grant).");
+  });
+
+  it("only ever replaces a WHOLE word: a word that merely contains the name is left alone", () => {
+    const summary = "Gliquidate is a verb, gliquid-like is a hyphenation, and liquid is a liquid.";
+    // "gliquid-like" IS a whole match followed by a hyphen, which is not a letter:
+    // the name ends there. "Gliquidate" and "liquid" are not the name at all.
+    expect(fixCompanyCasing(summary, COMPANIES)).toBe(
+      "Gliquidate is a verb, GLIQUID-like is a hyphenation, and liquid is a liquid.",
+    );
+  });
+
+  it("handles the shapes a summary actually uses: possessive, bold markers, start of line", () => {
+    expect(fixCompanyCasing("Gliquid's first release shipped in a week.", COMPANIES)).toBe(
+      "GLIQUID's first release shipped in a week.",
+    );
+    expect(fixCompanyCasing("I ran **Gliquid** and **tierra labs ltd**.", COMPANIES)).toBe(
+      "I ran **GLIQUID** and **Tierra Labs Ltd**.",
+    );
+    expect(fixCompanyCasing("gliquid gliquid gliquid", COMPANIES)).toBe("GLIQUID GLIQUID GLIQUID");
+  });
+
+  it("prefers the longer name when one company's name starts with another's", () => {
+    expect(fixCompanyCasing("I was at tierra labs ltd.", ["Tierra Labs", "Tierra Labs Ltd"])).toBe(
+      "I was at Tierra Labs Ltd.",
+    );
+  });
+
+  it("leaves a name the CV itself spells two ways alone — there is no right answer to pick", () => {
+    const summary = "I worked at gliquid twice.";
+    expect(fixCompanyCasing(summary, ["GLIQUID", "Gliquid"])).toBe(summary);
+  });
+
+  it("treats a name's punctuation as literal text, never as a pattern", () => {
+    // A regular expression built from these would match "AxB Inc" and blow up on "C++".
+    expect(fixCompanyCasing("I was at a.b. inc and c++ labs.", ["A.B. Inc", "C++ Labs"])).toBe(
+      "I was at A.B. Inc and C++ Labs.",
+    );
+    expect(fixCompanyCasing("I was at axb inc.", ["A.B. Inc"])).toBe("I was at axb inc.");
+  });
+
+  it("is a no-op with nothing to do: right casing, no companies, empty strings, blank names", () => {
+    const right = "I shipped $375M at GLIQUID.";
+    expect(fixCompanyCasing(right, COMPANIES)).toBe(right);
+    expect(fixCompanyCasing(right, [])).toBe(right);
+    expect(fixCompanyCasing(right, ["", "   "])).toBe(right);
+    expect(fixCompanyCasing("", COMPANIES)).toBe("");
+  });
+});
+
+describe("tailorSummary — the casing correction runs on what the model wrote", () => {
+  const input = { role: "PM", company: "Acme", jdText: "", cvText: CV };
+  const COMPANIES = ["GLIQUID"];
+  const modelSummary = (name: string) =>
+    `I shipped a consumer exchange at ${name}, processing $375M in user trading volume, and I led a team of 4 people across product and engineering.`;
+
+  beforeEach(() => {
+    callProxyMock.mockReset();
+  });
+
+  it("corrects the company name in an accepted first draft", async () => {
+    callProxyMock.mockResolvedValue(modelSummary("Gliquid"));
+    expect(await tailorSummary(input, "my own summary", COMPANIES)).toBe(modelSummary("GLIQUID"));
+    expect(callProxyMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("corrects it in the retry draft too, when the first answer was not a summary", async () => {
+    callProxyMock.mockResolvedValueOnce("I cannot write this summary.").mockResolvedValueOnce(modelSummary("gliquid"));
+    expect(await tailorSummary(input, "my own summary", COMPANIES)).toBe(modelSummary("GLIQUID"));
+    expect(callProxyMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves the person's OWN summary exactly as they wrote it — it is not model output", async () => {
+    callProxyMock.mockResolvedValue("I cannot write this summary.");
+    const own = "I spell my own company Gliquid, thanks.";
+    expect(await tailorSummary(input, own, COMPANIES)).toBe(own);
+  });
+
+  it("still works when no company list is passed at all", async () => {
+    callProxyMock.mockResolvedValue(modelSummary("Gliquid"));
+    expect(await tailorSummary(input, "my own summary")).toBe(modelSummary("Gliquid"));
+  });
+
+  it("asks the model for the CV's own capitalisation as well, so the fix rarely has to fire", () => {
+    expect(buildSummaryPrompt(input)).toContain("Spell every company name exactly as the CV spells it");
   });
 });
 

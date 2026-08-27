@@ -403,6 +403,9 @@ export default function Apply() {
           // The person's own summary, printed when the model returns anything
           // that is not a summary (issue: a refusal reached a real CV download).
           cvStructured?.summary,
+          // The company names as the CV writes them, so the summary spells them
+          // the way the body does (the body said GLIQUID, the summary "Gliquid").
+          (cvStructured?.experience ?? []).map((job) => job.company),
         );
       }
       setSummary(s);
