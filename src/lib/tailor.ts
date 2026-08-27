@@ -70,6 +70,10 @@ HARD RULES — do not break (this protects the candidate's credibility):
 - Warm, honest. NO em-dashes at all (use commas or short sentences). Write in English.
 - You may bold 2-4 key figures with ** **.
 
+NEVER REFUSE, NEVER ADVISE (this text is printed straight onto the candidate's CV):
+- If the role is a weak or partial fit, still write the summary. Lead with the closest real experience and say plainly what the person has done. A summary can be honest about a background without arguing for or against the fit.
+- Do NOT judge the candidate, do NOT recommend a different role, do NOT explain what you can or cannot write, do NOT address the reader, do NOT mention the CV, the job description or yourself.
+
 OUTPUT: the summary paragraph ONLY. No preamble, no analysis, no heading, no separators. Just the paragraph.
 
 ROLE: ${role} at ${company}
@@ -298,9 +302,73 @@ export function parseCommonPackJson(raw: string): CommonPackJson {
 
 // ── LLM calls ─────────────────────────────────────────────────────────────────
 
-export async function tailorSummary(input: TailorInput): Promise<string> {
-  const text = await callProxy([{ role: "user", content: buildSummaryPrompt(input) }], 500, "cv");
-  return noEmDash(text);
+/** Phrases that mean the model answered the OPERATOR instead of writing the CV
+ *  line: a refusal, a recommendation, a critique of the fit, or anything that
+ *  talks about "the candidate" or "the CV". Lowercase, matched as substrings. */
+const SUMMARY_META_MARKERS = [
+  "i cannot",
+  "i can't",
+  "i can not",
+  "i need to be direct",
+  "i must be direct",
+  "unable to write",
+  "without fabricating",
+  "would require me to",
+  "my recommendation",
+  "i recommend",
+  "would you like me to",
+  "the cv shows",
+  "this candidate",
+  "the candidate's",
+  "the candidate is",
+  "as an ai",
+  "language model",
+  "does not align",
+  "is not a fit",
+  "poor fit for",
+  "before reapplying",
+];
+
+/**
+ * Is this text actually a Professional Summary, or is it the model talking to us?
+ *
+ * 2026-08-27: a real download carried the model's refusal ("I need to be direct:
+ * this candidate's professional background does not align ... I cannot ethically
+ * write this summary ... Would you like me to help write a summary for a different
+ * role?") printed under PROFESSIONAL SUMMARY on the candidate's own CV. Nothing
+ * checked what came back. A summary is first person and short; anything that
+ * refuses, advises, or discusses the candidate in the third person is not one.
+ */
+export function isUsableSummary(text: string | null | undefined): boolean {
+  const t = (text ?? "").trim();
+  if (t.length < 40) return false;
+  const lower = t.toLowerCase();
+  if (SUMMARY_META_MARKERS.some((m) => lower.includes(m))) return false;
+  // A summary is written as the person. Accept "I ", "I'm", "I've", "My ".
+  if (!/(^|\s)(i|i'm|i've|my)(\s|')/i.test(t)) return false;
+  const words = t.split(/\s+/).filter(Boolean).length;
+  if (words > 220) return false; // 80-120 asked for; a lecture is not a summary
+  return true;
+}
+
+/**
+ * The tailored summary, or the candidate's own summary when the model does not
+ * produce one. One retry with an explicit correction, then the fallback — the CV
+ * always prints a real summary, never model prose about the candidate.
+ * `fallbackSummary` is the person's own stored summary (cv_structured.summary).
+ */
+export async function tailorSummary(input: TailorInput, fallbackSummary?: string | null): Promise<string> {
+  const first = noEmDash(await callProxy([{ role: "user", content: buildSummaryPrompt(input) }], 500, "cv"));
+  if (isUsableSummary(first)) return first;
+
+  const corrective = `${buildSummaryPrompt(input)}
+
+Your previous answer was not a summary: it discussed the candidate or declined the task. Write ONLY the first-person Professional Summary paragraph now, using the candidate's real experience, whatever the fit.`;
+  const second = noEmDash(await callProxy([{ role: "user", content: corrective }], 500, "cv"));
+  if (isUsableSummary(second)) return second;
+
+  const fallback = (fallbackSummary ?? "").trim();
+  return fallback.length > 0 ? noEmDash(fallback) : "";
 }
 
 export async function answerQuestion(input: TailorInput, question: string): Promise<string> {

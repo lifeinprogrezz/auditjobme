@@ -392,13 +392,18 @@ export default function Apply() {
       if (DEV_FIXTURE) {
         s = DEV_FIXTURE_TAILORED_SUMMARY;
       } else {
-        s = await tailorSummary({
-          role: job.title,
-          company: job.company,
-          jdText: job.jd_text,
-          cvText,
-          context: roleContext.trim() || undefined,
-        });
+        s = await tailorSummary(
+          {
+            role: job.title,
+            company: job.company,
+            jdText: job.jd_text,
+            cvText,
+            context: roleContext.trim() || undefined,
+          },
+          // The person's own summary, printed when the model returns anything
+          // that is not a summary (issue: a refusal reached a real CV download).
+          cvStructured?.summary,
+        );
       }
       setSummary(s);
       track("cv_tailored");
