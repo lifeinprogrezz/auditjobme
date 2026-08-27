@@ -16,6 +16,13 @@
 // The fail-safe direction lives in src/lib/scrapeWatchdog.ts: when the check
 // cannot tell, it ALERTS. See the comment there.
 //
+// That rule is enforced HERE, in the reads and the calls, and it is pinned here
+// too: src/test/scrape-watchdog-wiring.test.ts holds the storage read, the
+// dispatch guard and the cron guard against the mutations that would each make
+// this watchdog silent. Rule and code move together. The seam it uses is the
+// deps argument on the handler, plus the fetchImpl argument on the three calls
+// that leave the machine, all defaulting to the real thing.
+//
 // Scheduled by pg_cron at 08:00 UTC, three hours after the scrape workflow's
 // 05:00 schedule (supabase/migrations/20260827200000_scrape_watchdog.sql).
 //
@@ -51,9 +58,15 @@ const escapeHtml = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** Fire one Resend notification. Fail-soft: logs and returns false, never throws. */
-async function sendEmail(apiKey: string, to: string, subject: string, text: string): Promise<boolean> {
+async function sendEmail(
+  apiKey: string,
+  to: string,
+  subject: string,
+  text: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await fetchImpl("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -82,7 +95,12 @@ async function sendEmail(apiKey: string, to: string, subject: string, text: stri
   }
 }
 
-type StorageClient = {
+/**
+ * The one Storage call this endpoint makes, narrowed to what it reads. Exported
+ * so a test can hand probeDataplane a fake bucket instead of a live project:
+ * the fail-safe rule below is only worth anything if a test can watch it hold.
+ */
+export type StorageClient = {
   storage: {
     from: (bucket: string) => {
       list: (
@@ -98,7 +116,7 @@ type StorageClient = {
  * returns a `problem`, never a throw and never a guessed timestamp, because the
  * verdict for "cannot tell" is an alert.
  */
-async function probeDataplane(db: StorageClient): Promise<DataplaneProbe> {
+export async function probeDataplane(db: StorageClient): Promise<DataplaneProbe> {
   try {
     const { data, error } = await db.storage.from(BUCKET).list("", { limit: 100, search: ARTIFACT });
     if (error) return { updatedAt: null, problem: `Supabase Storage said: ${error.message}` };
@@ -128,10 +146,11 @@ const githubHeaders = (token: string) => ({
 async function lastDispatchedRun(
   repo: string,
   token: string,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<{ readable: boolean; lastDispatchAt: string | null }> {
   try {
     const url = `https://api.github.com/repos/${repo}/actions/workflows/${WORKFLOW_FILE}/runs?event=workflow_dispatch&per_page=1`;
-    const res = await fetch(url, { headers: githubHeaders(token) });
+    const res = await fetchImpl(url, { headers: githubHeaders(token) });
     if (!res.ok) {
       console.warn(`[scrape-watchdog] GitHub runs ${res.status}:`, await res.text().catch(() => ""));
       return { readable: false, lastDispatchAt: null };
@@ -146,10 +165,10 @@ async function lastDispatchedRun(
 }
 
 /** Start the scrape workflow. Fail-soft: logs and returns false, never throws. */
-async function dispatchWorkflow(repo: string, token: string): Promise<boolean> {
+async function dispatchWorkflow(repo: string, token: string, fetchImpl: typeof fetch = fetch): Promise<boolean> {
   try {
     const url = `https://api.github.com/repos/${repo}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
-    const res = await fetch(url, {
+    const res = await fetchImpl(url, {
       method: "POST",
       headers: { ...githubHeaders(token), "Content-Type": "application/json" },
       body: JSON.stringify({ ref: WORKFLOW_REF }),
@@ -169,7 +188,21 @@ async function dispatchWorkflow(repo: string, token: string): Promise<boolean> {
   }
 }
 
-async function handler(req: Req, res: Res): Promise<void> {
+/**
+ * The two things this endpoint reaches the outside world with. Both default to
+ * the real ones, so production behaviour is untouched and Vercel still calls the
+ * handler with two arguments. A test passes fakes and can then watch the wiring
+ * itself: that a refused request never reads Storage, and that the workflow is
+ * started only when the decision said to start it. Same injection shape as
+ * confirmGmailForwarding in api/inbound-email.ts.
+ */
+export type WatchdogDeps = {
+  createStorageClient?: (url: string, key: string) => StorageClient;
+  fetchImpl?: typeof fetch;
+};
+
+export async function handler(req: Req, res: Res, deps: WatchdogDeps = {}): Promise<void> {
+  const doFetch = deps.fetchImpl ?? fetch;
   const authError = cronAuthResult(
     [process.env.CRON_SECRET, process.env.CRON_SECRET_DB],
     req.headers["authorization"],
@@ -199,12 +232,15 @@ async function handler(req: Req, res: Res): Promise<void> {
           "Its Supabase settings are missing: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set on the deployment.",
           "Until that is fixed, check the Scrape jobs workflow in the Actions tab by hand.",
         ].join("\n"),
+        doFetch,
       );
     }
     res.status(500).json({ error: "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY" });
     return;
   }
-  const admin: StorageClient = createClient(supabaseUrl, serviceKey);
+  const admin: StorageClient = deps.createStorageClient
+    ? deps.createStorageClient(supabaseUrl, serviceKey)
+    : createClient(supabaseUrl, serviceKey);
 
   const now = new Date();
   const probe = await probeDataplane(admin);
@@ -214,7 +250,7 @@ async function handler(req: Req, res: Res): Promise<void> {
   // to act with. A healthy morning costs one storage read and nothing else.
   const history =
     verdict.alert && dispatchToken.length > 0
-      ? await lastDispatchedRun(repo, dispatchToken)
+      ? await lastDispatchedRun(repo, dispatchToken, doFetch)
       : { readable: false, lastDispatchAt: null };
 
   const decision = decideDispatch({
@@ -228,7 +264,7 @@ async function handler(req: Req, res: Res): Promise<void> {
   // The restart is attempted BEFORE the email is composed, so the email can say
   // what actually happened. `null` means no restart was attempted at all.
   let dispatched: boolean | null = null;
-  if (decision.dispatch) dispatched = await dispatchWorkflow(repo, dispatchToken);
+  if (decision.dispatch) dispatched = await dispatchWorkflow(repo, dispatchToken, doFetch);
 
   let emailed = false;
   if (verdict.alert) {
@@ -243,6 +279,7 @@ async function handler(req: Req, res: Res): Promise<void> {
         ownerEmail,
         buildWatchdogSubject(verdict, decision, dispatched),
         buildWatchdogBody(verdict, decision, now.toISOString(), dispatched),
+        doFetch,
       );
     }
   }
