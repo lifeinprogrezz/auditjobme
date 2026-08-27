@@ -3,9 +3,16 @@
 // is only the arithmetic and the copy: the Apply page and the standalone
 // generator now read the same numbers instead of each keeping their own.
 //
-// Enforcement is NOT here. This is what the button renders; the edge function and
-// the database are what actually hold the line (this repo is public).
-// Pinned by src/test/audit-limit.test.ts.
+// WHERE THIS IS ENFORCED: here, and only here. There is no per-user audit cap
+// behind it — supabase/functions/anthropic-proxy/cap.ts holds ONE global monthly
+// spend cap and allowlists kinds ("NO per-user caps at launch"), and the audits
+// table has no insert limit, only count_audits_by_fingerprint to read. So this
+// gate is client-side, the repo is public, and anyone who wants a third audit can
+// have one; the global cap is what bounds the bill. Treat it as a courtesy limit,
+// not a control. The one thing it must do is hold for an ordinary user: the Apply
+// button stays disabled and generateAudit returns while the allowance is still
+// loading, or a click in that window buys an audit the gate would have refused.
+// Pinned by src/test/audit-limit.test.ts and src/test/audit-apply-step.test.ts.
 
 /** Free audits per person, and per device. */
 export const FREE_AUDIT_LIMIT = 2;

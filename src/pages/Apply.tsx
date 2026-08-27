@@ -184,7 +184,9 @@ export default function Apply() {
   const [auditStages, setAuditStages] = useState<AuditStageStatus[]>([]);
   const [auditData, setAuditData] = useState<AuditData | null>(null);
   // How many free audits are left for this account and this device. Null while we
-  // are still asking; the real limit is enforced server-side, never here.
+  // are still asking, and the button is disabled for exactly that window: this gate
+  // is the only one there is (auditLimit.ts), so a click before it lands would run
+  // a paid audit for somebody already at the limit.
   const [auditAllowance, setAuditAllowance] = useState<AuditAllowance | null>(null);
 
   useEffect(() => {
@@ -457,15 +459,28 @@ export default function Apply() {
    *  publish step here and no second page: publishing stays an explicit choice on
    *  the generator, so nothing this button makes is ever readable by anyone else.
    *
+   *  The PDF is NOT fired from the async continuation. A run takes minutes, so by
+   *  the time it lands the click's transient user activation is long gone and every
+   *  mainstream browser blocks window.open. The run finishes into a ready state
+   *  instead, and the button — now "Download PDF" — opens it on a real gesture.
+   *
    *  A second click after a finished run re-downloads what it already built. It
    *  never buys a second audit by accident. */
   async function generateAudit() {
     if (!job || !cvText || busy !== null) return;
     if (auditData) {
-      downloadPDF(auditData);
+      // A click IS user activation, so the popup is allowed. If the browser blocks
+      // popups for the site outright, say so in a toast, not a native alert.
+      if (!downloadPDF(auditData, { silent: true })) {
+        toast.error("Your browser blocked the download window. Allow popups for this site, then press Download PDF.");
+      }
       return;
     }
-    if (auditAllowance && atAuditLimit(auditAllowance)) return;
+    // The gate is client-side and nothing behind it re-checks (see auditLimit.ts),
+    // so a click while the allowance is still loading would buy a real audit for
+    // somebody already at the limit. Refuse until we know; the button is disabled
+    // over the same window.
+    if (auditAllowance == null || atAuditLimit(auditAllowance)) return;
     setBusy("audit");
     setError("");
     setErrStep(null);
@@ -485,9 +500,9 @@ export default function Apply() {
       });
       setAuditData(data);
       track("audit_generated");
-      // The popup can be blocked after a run this long, so the button stays on
-      // screen as "Download again" either way and one click gets the PDF.
-      downloadPDF(data);
+      // No download here on purpose: minutes have passed, the user activation from
+      // the click that started this is spent, and window.open would return null.
+      // The step flips to its ready state and the button does it on the next click.
       if (user && !DEV_FIXTURE) {
         const saved = await saveAuditPrivate({
           userId: user.id,
@@ -941,18 +956,18 @@ export default function Apply() {
                 size="sm"
                 className={SECONDARY_CTA}
                 onClick={generateAudit}
-                disabled={busy !== null || (auditAtLimit && auditData == null)}
+                disabled={busy !== null || auditAllowance == null || (auditAtLimit && auditData == null)}
               >
                 {busy === "audit"
                   ? "Building your audit…"
                   : auditData != null
-                    ? "Download again"
+                    ? "Download PDF"
                     : "Prepare company audit"}
               </Button>
               {auditData != null && busy !== "audit" && (
                 <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground">
                   <CheckIcon />
-                  Downloaded
+                  Your audit is ready
                 </span>
               )}
               {auditData == null && auditAtLimit && (

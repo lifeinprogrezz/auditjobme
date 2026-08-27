@@ -10,15 +10,27 @@ import type { AuditAllowanceInput } from "./auditLimit";
 export type AuditAllowance = AuditAllowanceInput & { fingerprint: string | null };
 
 /** What this account and this device have already used. Every failure reads as
- *  zero used: the real limit is enforced server-side, and a network hiccup must
- *  not lock somebody out of a free audit. */
+ *  zero used, deliberately: nothing behind this re-checks (auditLimit.ts says where
+ *  the line really is), so the choice is between locking somebody out of a free
+ *  audit and handing out one extra, and the global spend cap makes the extra cheap.
+ *
+ *  It always RESOLVES. The Apply button is disabled until it does, so a rejection
+ *  here would be a dead button, not an open door. */
 export async function loadAuditAllowance(user: { id: string; email?: string | null }): Promise<AuditAllowance> {
-  const [{ count }, { data: whitelisted }] = await Promise.all([
-    supabase.from("audits").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-    user.email
-      ? supabase.from("whitelisted_emails").select("id").eq("email", user.email).maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  let auditCount = 0;
+  let isWhitelisted = false;
+  try {
+    const [{ count }, { data: whitelisted }] = await Promise.all([
+      supabase.from("audits").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+      user.email
+        ? supabase.from("whitelisted_emails").select("id").eq("email", user.email).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    auditCount = count || 0;
+    isWhitelisted = !!whitelisted;
+  } catch (err) {
+    console.warn("Audit allowance read failed:", err);
+  }
 
   let fingerprint: string | null = null;
   let deviceAuditCount = 0;
@@ -34,9 +46,9 @@ export async function loadAuditAllowance(user: { id: string; email?: string | nu
   }
 
   return {
-    auditCount: count || 0,
+    auditCount,
     deviceAuditCount,
-    isWhitelisted: !!whitelisted,
+    isWhitelisted,
     fingerprint,
   };
 }

@@ -11,6 +11,9 @@ import { join } from "node:path";
 import { generatePDFHTML } from "@/components/audit/pdfHtml.js";
 
 const applySrc = readFileSync(join(process.cwd(), "src", "pages", "Apply.tsx"), "utf8");
+const pdfSrc = readFileSync(join(process.cwd(), "src", "components", "audit", "pdfHtml.js"), "utf8");
+const limitSrc = readFileSync(join(process.cwd(), "src", "lib", "audit", "auditLimit.ts"), "utf8");
+const allowanceSrc = readFileSync(join(process.cwd(), "src", "lib", "audit", "auditAllowance.ts"), "utf8");
 
 const auditFixture = {
   cv: { name: "A Candidate" },
@@ -42,6 +45,54 @@ describe("Apply audit step (issue #159)", () => {
   it("shows the generator's own free-limit wording when they are gone", () => {
     expect(applySrc).toContain("AUDIT_LIMIT_REACHED");
     expect(applySrc).toContain("atAuditLimit");
+  });
+
+  // Fix round 1, blocker 2. The gate is client-only — the proxy holds one global
+  // spend cap and no per-user audit cap — so the loading window is a real hole:
+  // a click before the allowance lands runs a paid Sonnet plus web-search audit
+  // for somebody already at the limit. Both the button and the handler close it.
+  it("refuses to spend while the allowance is still loading", () => {
+    expect(applySrc).toContain(
+      "disabled={busy !== null || auditAllowance == null || (auditAtLimit && auditData == null)}",
+    );
+    expect(applySrc).toContain("if (auditAllowance == null || atAuditLimit(auditAllowance)) return;");
+    // The old handler read `if (auditAllowance && atAuditLimit(...))`, which let a
+    // null allowance straight through.
+    expect(applySrc).not.toContain("if (auditAllowance && atAuditLimit(auditAllowance)) return;");
+  });
+
+  // Fix round 1, blocker 1. A run takes minutes. Firing window.open from that async
+  // continuation is outside transient user activation, so every mainstream browser
+  // returns null and the user got a native alert plus a second click anyway.
+  it("never fires the download from the async continuation", () => {
+    const calls = applySrc.match(/downloadPDF\(/g) ?? [];
+    expect(calls).toHaveLength(1);
+    expect(applySrc).toContain("downloadPDF(auditData, { silent: true })");
+  });
+
+  it("flips to a ready state whose button is the user gesture that downloads", () => {
+    expect(applySrc).toContain("Your audit is ready");
+    expect(applySrc).toContain('"Download PDF"');
+  });
+
+  it("reports a blocked popup in the design system, never in a native alert", () => {
+    expect(applySrc).not.toMatch(/\balert\(/);
+    expect(applySrc).toContain("Your browser blocked the download window.");
+    // The silent option is what makes that possible; the generator page keeps the
+    // alert, so it stays the default.
+    expect(pdfSrc).toContain("export function downloadPDF(data, { silent = false } = {})");
+    expect(pdfSrc).toContain("if (!silent) alert(");
+  });
+
+  // The comments these two files carried said the edge function and the database
+  // held the line. They do not: cap.ts says "NO per-user caps at launch" and the
+  // audits table has no insert limit. A false comment is why the hole above was
+  // written in the first place.
+  it("does not claim a server-side audit limit that does not exist", () => {
+    expect(limitSrc).not.toContain("the database are what actually hold the line");
+    expect(limitSrc).toContain("NO per-user caps at launch");
+    expect(allowanceSrc).not.toContain("the real limit is enforced server-side");
+    expect(applySrc).not.toContain("the real limit is enforced server-side, never here");
   });
 
   it("runs the shared pipeline and never grows a second copy of it", () => {

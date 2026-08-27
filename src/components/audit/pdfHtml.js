@@ -272,14 +272,18 @@ ${contactsHTML}
   return html;
 }
 
-export function downloadPDF(data) {
+export function downloadPDF(data, { silent = false } = {}) {
   const html = generatePDFHTML(data);
   const printWindow = window.open("", "_blank");
   // Returns false rather than throwing when the browser blocks the popup, so a
   // caller that finished a long run (the Apply page, issue #159) can leave its
   // own download button on screen instead of losing the audit.
+  //
+  // `silent` suppresses the native alert for callers that report the failure in
+  // their own design system (the Apply page uses a toast). The generator page
+  // keeps the alert: it is the default.
   if (!printWindow) {
-    alert("Please allow popups to download the PDF.");
+    if (!silent) alert("Please allow popups to download the PDF.");
     return false;
   }
   printWindow.document.open();
