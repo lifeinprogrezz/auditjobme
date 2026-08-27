@@ -178,10 +178,35 @@ export function isConfirmUrl(url: string | undefined | null): boolean {
  * in the page text, so a plain HTTP-ok check would report success on a link that
  * silently did nothing. False on any non-200 too, so a network hiccup or an
  * anti-bot block never gets recorded as a confirmation.
+ *
+ * Success needs POSITIVE evidence, not merely the absence of reject words. The
+ * link's own GET returns Gmail's "Please confirm forwarding mail of X to Y"
+ * page — a 200 that says nothing about error, invalid or expired — so the old
+ * absence test read the UN-clicked page as a confirmation and stamped
+ * gmail_confirmed_at while Gmail still showed "Verify" in Settings (found on
+ * Rober's live account, 2026-08-27). Fixture: src/test/fixtures/
+ * gmail-confirm-page.html (the real page) vs gmail-confirm-success.html.
  */
 export function isGmailConfirmSuccess(status: number, bodyText: string): boolean {
   if (status !== 200) return false;
-  return !/\b(error|invalid|expired)\b/i.test(bodyText);
+  if (/\b(error|invalid|expired)\b/i.test(bodyText)) return false;
+  return /confirmation success|may now forward mail|forwarding (?:is )?confirmed/i.test(bodyText);
+}
+
+/**
+ * True when the body is Gmail's confirm page — the one with the Confirm button
+ * that nobody has pressed yet. That page is a `<form action="" method="post">`
+ * carrying a single submit input and NO hidden fields: the vf- token in the URL
+ * is the whole credential, so re-POSTing the same URL is what pressing Confirm
+ * does. api/inbound-email.ts uses this to finish the job instead of reporting
+ * success on a page that only ASKED for confirmation.
+ */
+export function isGmailConfirmPage(bodyText: string): boolean {
+  if (/please confirm forwarding/i.test(bodyText)) return true;
+  return (
+    /<form[^>]*method=["']?post["']?/i.test(bodyText) &&
+    /<input[^>]*type=["']?submit["']?[^>]*value=["']?Confirm/i.test(bodyText)
+  );
 }
 
 /** The Settings live status line ("Address created · Confirmation received ·

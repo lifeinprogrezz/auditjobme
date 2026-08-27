@@ -25,6 +25,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   atsFromSender,
   CONFIRM_HOSTS,
+  isGmailConfirmPage,
   classifyInboundEmail,
   decideTransition,
   extractCompanyRole,
@@ -130,7 +131,33 @@ export async function confirmGmailForwarding(url: string, fetchImpl: typeof fetc
     }
     if (!landedOnGmail) return false;
     const text = await res.text();
-    return isGmailConfirmSuccess(res.status, text);
+    if (isGmailConfirmSuccess(res.status, text)) return true;
+    // The GET does NOT confirm anything. Gmail answers it with a page that asks
+    // "Please confirm forwarding mail of X to Y" and a Confirm button, and that
+    // page is a 200 with no error words in it — which the old success check read
+    // as a confirmation, so Settings said "Confirmed" while Gmail still showed
+    // "Verify" (Rober's live account, 2026-08-27). Pressing that button is a
+    // POST to the same url: the form is `action="" method="post"` with a single
+    // submit input and no hidden fields, so the vf- token in the url is the
+    // entire credential. Only ever POSTed to a url that passed isConfirmUrl AND
+    // landed on a CONFIRM_HOST AND came back as that form.
+    if (!isGmailConfirmPage(text)) return false;
+    const postSignal = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(10_000) : undefined;
+    const posted = await fetchImpl(res.url || url, {
+      method: "POST",
+      redirect: "follow",
+      signal: postSignal,
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "",
+    });
+    let postedOnGmail = false;
+    try {
+      postedOnGmail = CONFIRM_HOSTS.has(new URL(posted.url).hostname);
+    } catch {
+      postedOnGmail = false;
+    }
+    if (!postedOnGmail) return false;
+    return isGmailConfirmSuccess(posted.status, await posted.text());
   } catch {
     return false;
   }
