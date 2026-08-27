@@ -3678,7 +3678,7 @@
   },
   {
    "args": "worker text",
-   "body_md5": "0f3086703aec709851002c9f844f0f54",
+   "body_md5": "c25e70864248071305bbf81559c30fa9",
    "config": [
     "search_path=\"\""
    ],
