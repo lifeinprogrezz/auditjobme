@@ -14,11 +14,13 @@
 //    the personal engine's layout — letterhead, section headers, one block per job
 //    with real bullets and dates. Every bullet and date in it was checked against
 //    cv_text before it was stored, and the render is a pure function of the stored
-//    structure, so the same profile prints the same document every time.
+//    structure, so the same profile prints the same document every time. The one
+//    layout choice the owner gets is groupedIntoPrevious: an entry marked in the
+//    editor prints its bullets under the entry above it (foldGroupedExperience).
 //  - TEXT (fallback, unchanged): cv_text printed verbatim, whitespace preserved, for
 //    a profile that has not been parsed yet.
 import { stripLeadingSummary } from "./cvHtml";
-import { isCvStructuredUsable, normalizeForAts, type CvStructured } from "./cvStructured";
+import { isCvStructuredUsable, normalizeForAts, type CvExperience, type CvStructured } from "./cvStructured";
 import type { CoverJson } from "./tailor";
 
 /** pdfmake text run: **markers** become bold runs, everything else stays plain. */
@@ -175,6 +177,32 @@ function bulletList(items: DocDef[]): DocDef {
   return { ul: items.map((item) => ({ ...item, margin: BULLET_MARGIN })) };
 }
 
+/** One printed experience block: the entry that carries the heading, plus every bullet under it. */
+export type CvExperienceBlock = { head: CvExperience; bullets: string[] };
+
+/**
+ * Fold the entries the owner marked into the entry above them.
+ *
+ * A CV can give a side project its own title and dates, so the parse reads it as a
+ * job. That is correct: the parse mirrors the CV. Only the owner can say the entry
+ * really belongs under the one above, and they say it in the editor. The flag moves
+ * BULLETS and nothing else: the marked entry's bullets join the parent's list, in
+ * order, verbatim, and its own company, role and dates are not printed. No text is
+ * written, merged or reworded. Two marked entries in a row both land in the nearest
+ * unmarked entry above them. An unmarked profile comes through untouched, so it
+ * builds exactly the document it built before this existed.
+ */
+export function foldGroupedExperience(experience: CvExperience[]): CvExperienceBlock[] {
+  const blocks: CvExperienceBlock[] = [];
+  for (const job of experience) {
+    const parent = blocks.at(-1);
+    // The first entry always opens a block: there is nothing above it to join.
+    if (parent && job.groupedIntoPrevious === true) parent.bullets.push(...job.bullets);
+    else blocks.push({ head: job, bullets: [...job.bullets] });
+  }
+  return blocks;
+}
+
 /**
  * The deterministic CV: the personal engine's layout, built from the parsed profile.
  * Pure — same structure in, byte-identical document definition out (pinned in
@@ -195,9 +223,11 @@ export function buildStructuredCvDoc({ name, summary, cv }: { name: string; summ
     content.push({ text: boldRuns(summaryText) });
   }
 
-  if (cv.experience.length > 0) {
+  // Blocks, not entries: an entry the owner marked prints inside the one above it.
+  const experienceBlocks = foldGroupedExperience(cv.experience);
+  if (experienceBlocks.length > 0) {
     content.push({ text: "PROFESSIONAL EXPERIENCE", ...CV_SECTION_HEADER });
-    cv.experience.forEach((job, i) => {
+    experienceBlocks.forEach(({ head: job, bullets: raw }, i) => {
       const stack: DocDef[] = [];
       if (job.company) stack.push({ text: ats(job.company), ...COMPANY_STYLE });
       if (job.role) stack.push({ text: ats(job.role), ...ROLE_STYLE });
@@ -205,7 +235,7 @@ export function buildStructuredCvDoc({ name, summary, cv }: { name: string; summ
       if (meta) stack.push({ text: meta, ...JOB_META_STYLE });
       // Bullets stay VERBATIM: no ** promotion, unlike the summary. The user's own
       // asterisks print as asterisks.
-      const bullets = job.bullets.map(ats).filter(Boolean);
+      const bullets = raw.map(ats).filter(Boolean);
       if (bullets.length > 0) stack.push(bulletList(bullets.map((text) => ({ text }))));
       content.push({ stack, unbreakable: true, margin: blockMargin(i) });
     });

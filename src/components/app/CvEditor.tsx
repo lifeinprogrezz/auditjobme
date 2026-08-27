@@ -8,6 +8,13 @@
 //
 // Nothing here calls a language model except "Read my CV again", which re-runs the
 // same one parse. Saving is a plain write of the fields below.
+//
+// The order and the grouping controls are the owner-only half of that (#150 follow-up).
+// The parse stays faithful to the CV: a project written up with its own dates and
+// title parses as a job, and it should. Only the owner knows it is really part of the
+// entry above, so only the owner can say so, with the tick box on that entry
+// (groupedIntoPrevious). Nothing here rewrites a word: it moves entries and it moves
+// bullets. Removing is not final either, "Read my CV again" brings the upload back.
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +33,13 @@ const FIELD = "h-9 rounded-[10px] border-border bg-background text-control";
 const AREA = "min-h-[60px] rounded-[10px] border-border bg-background text-control";
 const LABEL = "text-caption text-muted-foreground";
 const GHOST_BUTTON =
-  "text-control font-medium text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground";
+  "text-control font-medium text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground " +
+  "disabled:cursor-not-allowed disabled:no-underline disabled:opacity-40 disabled:hover:text-muted-foreground";
+
+/** What a control calls one entry when there are several of them on screen. */
+function entryName(job: { company: string; role: string }, index: number): string {
+  return job.company || job.role || `entry ${index + 1}`;
+}
 
 /** One labelled field. Plain input, label above, no floating-label cleverness. */
 function Field({
@@ -114,6 +127,38 @@ export default function CvEditor({ userId, cvText }: Props) {
       return next;
     });
   }, []);
+
+  /**
+   * Nothing sits above the first entry, so a grouping flag there has nothing to join.
+   * coerceCvStructured drops it on the way in and out; this keeps the screen in step
+   * after a move or a removal changes which entry is first.
+   */
+  const clearFirstGroupFlag = (draft: CvStructured) => {
+    if (draft.experience[0]) delete draft.experience[0].groupedIntoPrevious;
+  };
+
+  /** Move one job up or down the list. Out-of-range asks are no-ops, not errors. */
+  const moveJob = (index: number, by: -1 | 1) =>
+    edit((draft) => {
+      const to = index + by;
+      if (to < 0 || to >= draft.experience.length) return;
+      const [moved] = draft.experience.splice(index, 1);
+      draft.experience.splice(to, 0, moved);
+      clearFirstGroupFlag(draft);
+    });
+
+  const removeJob = (index: number) =>
+    edit((draft) => {
+      draft.experience.splice(index, 1);
+      clearFirstGroupFlag(draft);
+    });
+
+  /** The owner's grouping call. An absent flag is the plain render, so `false` is a delete. */
+  const setJobGrouped = (index: number, grouped: boolean) =>
+    edit((draft) => {
+      if (grouped) draft.experience[index].groupedIntoPrevious = true;
+      else delete draft.experience[index].groupedIntoPrevious;
+    });
 
   const handleSave = async () => {
     if (!cv || busy) return;
@@ -204,6 +249,11 @@ export default function CvEditor({ userId, cvText }: Props) {
       </Fold>
 
       <Fold title="Experience" count={cv.experience.length}>
+        <p className={`${LABEL} text-pretty`}>
+          Put these in the order you want them read. If one of them is really part of the entry above it, a project
+          or a short stint, tick its box and its lines print there instead. Nothing here is final: "Read my CV again"
+          brings the whole thing back from your upload.
+        </p>
         {cv.experience.map((job, i) => (
           <div key={i} className="rounded-[12px] border border-border p-3">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -236,14 +286,57 @@ export default function CvEditor({ userId, cvText }: Props) {
                   </button>
                 </div>
               ))}
-              <div className="flex items-center gap-4">
-                <button type="button" className={GHOST_BUTTON} onClick={() => edit((d) => void d.experience[i].bullets.push(""))}>
-                  Add a bullet
-                </button>
-                <button type="button" className={GHOST_BUTTON} onClick={() => edit((d) => void d.experience.splice(i, 1))}>
-                  Remove this job
-                </button>
-              </div>
+              <button
+                type="button"
+                className={`${GHOST_BUTTON} self-start`}
+                onClick={() => edit((d) => void d.experience[i].bullets.push(""))}
+              >
+                Add a bullet
+              </button>
+            </div>
+            <label className="mt-3 flex items-start gap-2">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={job.groupedIntoPrevious === true}
+                disabled={i === 0}
+                aria-label={`Show ${entryName(job, i)} as part of the entry above`}
+                onChange={(e) => setJobGrouped(i, e.target.checked)}
+              />
+              <span className={`${LABEL} text-pretty`}>
+                Show as part of the entry above.{" "}
+                {i === 0
+                  ? "This one is at the top, so there is nothing above it to join."
+                  : "Its lines print under that entry, and its own title and dates stay off the page."}
+              </span>
+            </label>
+            <div className="mt-3 flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                className={GHOST_BUTTON}
+                disabled={i === 0}
+                aria-label={`Move ${entryName(job, i)} up`}
+                onClick={() => moveJob(i, -1)}
+              >
+                Move up
+              </button>
+              <button
+                type="button"
+                className={GHOST_BUTTON}
+                disabled={i === cv.experience.length - 1}
+                aria-label={`Move ${entryName(job, i)} down`}
+                onClick={() => moveJob(i, 1)}
+              >
+                Move down
+              </button>
+              <button
+                type="button"
+                className={GHOST_BUTTON}
+                aria-label={`Remove ${entryName(job, i)}`}
+                onClick={() => removeJob(i)}
+              >
+                Remove this job
+              </button>
             </div>
           </div>
         ))}
