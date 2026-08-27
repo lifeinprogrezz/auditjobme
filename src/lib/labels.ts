@@ -70,6 +70,29 @@ export function isRoleFamily(value: unknown): value is RoleFamily {
   return typeof value === "string" && (ROLE_FAMILIES as readonly string[]).includes(value);
 }
 
+/** The picker's sixth chip and the unlabelled-family bucket (issue #158): a
+ *  role the catalog left with no `role_family` — the SAME thing the map's Role
+ *  facet counts as "Other" (roleFamily's fallback in roles.ts, `ROLE_FAMILY_OTHER`).
+ *  Duplicated here as a literal rather than imported: roles.ts pulls in
+ *  browser-only modules and this file must stay reachable from api/ (see the
+ *  module comment above) — importing it would also cycle back through
+ *  scorePrefilter.ts, which imports THIS file. Pinned equal by
+ *  src/test/labels-role-other.test.ts. */
+export const ROLE_OTHER = "other";
+
+/**
+ * The role chips BOTH pickers render: the five families plus Other, matching the
+ * map filter. One list on purpose (issue #158): when onboarding could offer Other
+ * and Settings could not, a user who picked it saw a selected-but-invisible chip,
+ * hit the cap with one visible pick, and had no way to unpick it — their targets
+ * were frozen forever. Any future chip or cap change now moves in both surfaces
+ * at once. Pinned by src/test/settings-panel.test.tsx and cv-unlock-modal tests.
+ */
+export const ROLE_PICKER_OPTIONS: { value: RoleFamily | typeof ROLE_OTHER; label: string }[] = [
+  ...ROLE_FAMILY_OPTIONS,
+  { value: ROLE_OTHER, label: "Other" },
+];
+
 /**
  * Any stored target-role value → a family, or null when it maps to none.
  *
@@ -92,10 +115,20 @@ export function archetypeToFamily(value: string | null | undefined): RoleFamily 
  * therefore as "everything is eligible". That is the non-stranding answer: a user
  * whose only pick was the retired "Design" gets the whole catalog back, not an
  * empty scoring slice and a permanently "Not scored" map.
+ *
+ * ROLE_OTHER passes through verbatim (issue #158): it is not a family and maps
+ * to none, but it is not unmappable either — it is the picker's own name for
+ * "no family", so dropping it would silently un-pick a chip the user chose.
  */
-export function normalizeTargetRoles(stored: readonly string[] | null | undefined): RoleFamily[] {
-  const out: RoleFamily[] = [];
+export function normalizeTargetRoles(
+  stored: readonly string[] | null | undefined,
+): (RoleFamily | typeof ROLE_OTHER)[] {
+  const out: (RoleFamily | typeof ROLE_OTHER)[] = [];
   for (const v of stored ?? []) {
+    if (v === ROLE_OTHER) {
+      if (!out.includes(ROLE_OTHER)) out.push(ROLE_OTHER);
+      continue;
+    }
     const f = archetypeToFamily(v);
     if (f && !out.includes(f)) out.push(f);
   }
@@ -120,6 +153,10 @@ export function roleMatchesTargets(
   if (roles.length === 0) return true;
   const families = normalizeTargetRoles(roles);
   if (job.role_family != null && families.includes(job.role_family as RoleFamily)) return true;
+  // "Other" targets the same unlabelled bucket the map's Other facet counts
+  // (roleFamily's fallback in roles.ts is "other" for a null role_family) — a
+  // missing family, not a title guess, so it skips the archetype fallback below.
+  if (job.role_family == null && families.includes(ROLE_OTHER)) return true;
   const archetype = roleArchetypeOf(job.title);
   if (archetype == null) return false;
   if (roles.includes(archetype)) return true; // a legacy archetype, matched by title

@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   cvWordCount,
   formatUploadedDate,
-  ROLE_FAMILY_OPTIONS,
+  ROLE_PICKER_OPTIONS,
   ROLE_CAP,
   SECTOR_CAP,
   TOP_SECTOR_CHIPS,
@@ -345,7 +345,7 @@ export default function SettingsPanel({
         <h2 className="font-display text-section text-foreground">Target roles</h2>
         <p className="mt-1 text-caption text-muted-foreground">Pick up to {ROLE_CAP}.</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {ROLE_FAMILY_OPTIONS.map((r) => {
+          {ROLE_PICKER_OPTIONS.map((r) => {
             const selected = roles.includes(r.value);
             const capped = !selected && roles.length >= ROLE_CAP;
             return (

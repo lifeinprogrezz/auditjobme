@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  ROLE_FAMILY_OPTIONS,
+  ROLE_PICKER_OPTIONS,
   ROLE_CAP,
   SECTOR_CAP,
   TOP_SECTOR_CHIPS,
@@ -17,9 +17,9 @@ import {
   hashCv,
   writeCvStash,
 } from "@/lib/labels";
-import { hasSeenSession } from "@/lib/deviceSession";
 import { track } from "@/lib/analytics";
 import type { FilterOption } from "./FilterChip";
+
 
 type Stage = "idle" | "reading" | "parsed";
 
@@ -176,9 +176,12 @@ export default function CvUnlockModal({
     // On success the browser redirects away — no further work here.
   };
 
-  // Only a device that has held a session before earns the sign-in line; a
-  // brand-new visitor keeps the pure single-purpose CV modal.
-  const offerSignIn = !signedIn && hasSeenSession();
+  // Always offered to a signed-out visitor (issue #158 / A1): a first-time
+  // visitor who already has a profile on another device — or just recognizes
+  // the flow — needs the same door as a returning one. Used to gate on
+  // hasSeenSession() (device memory, still used elsewhere in deviceSession.ts)
+  // and hid the line from every brand-new visitor, which is most of them.
+  const offerSignIn = !signedIn;
 
   const wordCount = cvWordCount(cvText);
 
@@ -258,7 +261,7 @@ export default function CvUnlockModal({
                 Target roles <span className="cvcap">pick up to {ROLE_CAP}</span>
               </div>
               <div className="cvchips">
-                {ROLE_FAMILY_OPTIONS.map((r) => {
+                {ROLE_PICKER_OPTIONS.map((r) => {
                   const selected = roles.includes(r.value);
                   const capped = !selected && roles.length >= ROLE_CAP;
                   return (
@@ -297,6 +300,11 @@ export default function CvUnlockModal({
                   );
                 })}
               </div>
+              {/* The industries picker is gated on liquidity (>=3 employers, >=20
+                  live roles) unlike the map's sector filter, which shows every
+                  sector present with no gate — say so, so the divergence reads
+                  as deliberate rather than a shorter list (issue #158 / A4). */}
+              <p className="cvhint">Showing the {TOP_SECTOR_CHIPS} industries with the most open roles.</p>
               {/* Tail search: same fdrop-search/fdrop-list/checkbox pattern as the
                   headbar's searchable FilterChip dropdown (FilterChip.tsx), reused
                   in-flow here rather than as a flyout — only shows once the live

@@ -578,6 +578,7 @@ export default function RolesMap() {
         <RolesPanel
           jobs={panelJobs}
           onAddCv={() => setCvModalOpen(true)}
+          onSignIn={signInWithGoogle}
           // The detail's "More roles at this company" list reads allJobs — feed it the
           // dismissed-free pool so a role you said no to can't reappear there.
           allJobs={pool}

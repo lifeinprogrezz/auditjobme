@@ -13,6 +13,7 @@ import {
   filterSectorSearch,
   ROLE_FAMILIES,
   ROLE_FAMILY_OPTIONS,
+  ROLE_OTHER,
   archetypeToFamily,
   isRoleFamily,
   normalizeTargetRoles,
@@ -200,6 +201,13 @@ describe("normalizeTargetRoles", () => {
     expect(normalizeTargetRoles(["Design"])).toEqual([]);
     expect(normalizeTargetRoles(null)).toEqual([]);
   });
+
+  it("passes ROLE_OTHER through instead of dropping it (issue #158 / A4)", () => {
+    // "other" is not a family and maps to none, but it is the picker's own
+    // name for that — a pick, not an unmappable value.
+    expect(normalizeTargetRoles(["product", ROLE_OTHER])).toEqual(["product", ROLE_OTHER]);
+    expect(normalizeTargetRoles([ROLE_OTHER, ROLE_OTHER])).toEqual([ROLE_OTHER]); // deduped
+  });
 });
 
 describe("roleMatchesTargets", () => {
@@ -242,6 +250,19 @@ describe("roleMatchesTargets", () => {
 
   it("an empty selection matches everything", () => {
     expect(roleMatchesTargets({ title: "anything", role_family: null }, [])).toBe(true);
+  });
+
+  it("ROLE_OTHER matches the same unlabelled bucket the map's Other facet counts (issue #158 / A4)", () => {
+    // A null role_family, not a title guess — matches regardless of what the
+    // title says, mirroring roleFamily(job) === ROLE_FAMILY_OTHER in roles.ts.
+    expect(roleMatchesTargets({ title: "UX Researcher", role_family: null }, [ROLE_OTHER])).toBe(true);
+    expect(roleMatchesTargets({ title: "anything", role_family: null }, [ROLE_OTHER])).toBe(true);
+  });
+
+  it("ROLE_OTHER does not match a labelled row", () => {
+    expect(roleMatchesTargets({ title: "Product Manager", role_family: "product" }, [ROLE_OTHER])).toBe(
+      false,
+    );
   });
 });
 
