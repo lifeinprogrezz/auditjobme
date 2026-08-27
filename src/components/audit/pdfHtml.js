@@ -3,7 +3,7 @@ import { BRAND_NAME } from "@/lib/brandName";
 
 /* ═══════════════════ PDF HTML GENERATOR ═══════════════════ */
 export function generatePDFHTML(data) {
-  const { company, pains, diagnosis, proposals, about, cv, accent, roleCtx } = data;
+  const { company, pains, diagnosis, proposals, about, contacts, cv, accent, roleCtx } = data;
   const ac = safeAccent(accent) || "#8a9a8a";
   const auditLabel = (roleCtx?.audit_label || "Product Audit").toUpperCase();
   const e = s => (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -72,6 +72,26 @@ export function generatePDFHTML(data) {
         </div>
       </div>
     </div>` : '';
+
+  // People to reach out to (issue #159, LOCKED decision 4): the two or three public
+  // decision-makers the audit found are a NAMED section of the document, not a panel
+  // hidden in the app. This is what the PDF is for: you read it, then you write to
+  // one of them.
+  const contactsHTML = (Array.isArray(contacts) && contacts.length > 0) ? `
+    <section class="section no-break">
+      <div class="sec-label">05 \u2014 PEOPLE TO REACH OUT TO</div>
+      <div class="sec-h2">Who to write to.</div>
+      <p class="sec-intro">Public profiles at ${e(company?.company)} who look close to this hire. A short, specific note to one of them travels further than another form.</p>
+      <div class="contacts-grid">
+        ${contacts.slice(0,3).map(c => `
+          <div class="contact-card">
+            <div class="contact-name hd">${e(c.name)}</div>
+            <div class="contact-title">${e(c.title)}</div>
+            ${c.why ? `<p class="contact-why">${e(c.why)}</p>` : ''}
+            ${c.url ? `<a class="contact-link" href="${e(c.url)}">${e(c.url)}</a>` : ''}
+          </div>`).join("")}
+      </div>
+    </section>` : '';
 
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${e(company?.company)} ${auditLabel}</title>
@@ -162,6 +182,14 @@ export function generatePDFHTML(data) {
   .about-col p{font-size:.75rem;line-height:1.7;color:#8a8780}
   .about-link{font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${ac};text-decoration:none;display:inline-block;margin-top:1.5rem}
 
+  /* PEOPLE */
+  .contacts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1.5rem}
+  .contact-card{border:1px solid #2a2825;border-radius:8px;padding:1rem 1.2rem}
+  .contact-name{font-size:.85rem;color:#f0ede8;margin-bottom:.25rem}
+  .contact-title{font-size:.66rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:${ac};margin-bottom:.5rem}
+  .contact-why{font-size:.72rem;line-height:1.55;color:#8a8780}
+  .contact-link{font-size:.6rem;color:#8a8780;text-decoration:underline dotted;text-underline-offset:3px;display:inline-block;margin-top:.5rem;word-break:break-all}
+
   /* FOOTER */
   .footer{padding:2rem 3rem;text-align:center;font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8a8780;border-top:1px solid #2a2825}
   .footer a{color:${ac};text-decoration:none}
@@ -178,6 +206,7 @@ export function generatePDFHTML(data) {
     .page-break{page-break-before:always;break-before:always}
     .finding-card{page-break-inside:avoid;break-inside:avoid}
     .prop-card{page-break-inside:avoid;break-inside:avoid}
+    .contact-card{page-break-inside:avoid;break-inside:avoid}
     .about-section{page-break-inside:avoid;break-inside:avoid}
     .quote-block{page-break-inside:avoid;break-inside:avoid}
     .stats-grid{page-break-inside:avoid;break-inside:avoid;overflow:visible}
@@ -231,6 +260,9 @@ export function generatePDFHTML(data) {
 <!-- ABOUT -->
 ${aboutHTML}
 
+<!-- PEOPLE -->
+${contactsHTML}
+
 <!-- FOOTER -->
 <div class="footer">
   BUILT FOR ${e(company?.company).toUpperCase()} \u2014 APPLYING FOR <a href="${company?.role_url||''}">${e(company?.role).toUpperCase()}</a>
@@ -240,12 +272,19 @@ ${aboutHTML}
   return html;
 }
 
-export function downloadPDF(data) {
+export function downloadPDF(data, { silent = false } = {}) {
   const html = generatePDFHTML(data);
   const printWindow = window.open("", "_blank");
+  // Returns false rather than throwing when the browser blocks the popup, so a
+  // caller that finished a long run (the Apply page, issue #159) can leave its
+  // own download button on screen instead of losing the audit.
+  //
+  // `silent` suppresses the native alert for callers that report the failure in
+  // their own design system (the Apply page uses a toast). The generator page
+  // keeps the alert: it is the default.
   if (!printWindow) {
-    alert("Please allow popups to download the PDF.");
-    return;
+    if (!silent) alert("Please allow popups to download the PDF.");
+    return false;
   }
   printWindow.document.open();
   printWindow.document.write(html);
@@ -257,4 +296,5 @@ export function downloadPDF(data) {
       printWindow.print();
     }, 600);
   };
+  return true;
 }
