@@ -193,6 +193,76 @@ export function naturalPlace(
   ];
 }
 
+// Two companies can hold the SAME street coordinate — a shared building, a
+// coworking floor, or one enrichment row copied across a group. On the map that
+// reads as a single pin with everything but the topmost logo hidden (issue #153:
+// sweep_fr, cogna_gb and fyxer all at 51.5174844,-0.1126829; parloa_de,
+// taktile_de and forto all at 52.5300343,13.4110442). This is the startupmap
+// weakness the owner named as the one not to reproduce ("raw-coordinate logo
+// piles", planning repo docs/specs/2026-07-09-startupmap-ui-ux-reference.md), so
+// exact duplicates fan onto a tiny ring instead. The ring is tens of metres, not
+// hundreds: at street zoom the logos separate, and at any zoom that shows a whole
+// city the pins still sit on the right address.
+const DESTACK_RADIUS_M = 30;
+const DESTACK_RADIUS_MAX_M = 60;
+const M_PER_DEG_LAT = 111_320;
+/** Ring radius (metres) for n pins sharing one coordinate. Same shape as
+ *  discRadiusFor: 30m at the reference stack of 3, growing with the crowd,
+ *  capped at 60m so a moved pin never leaves its own block. */
+export function deStackRadiusM(n: number): number {
+  return Math.min(DESTACK_RADIUS_MAX_M, DESTACK_RADIUS_M * Math.sqrt(n / 3));
+}
+/** Six decimals is about 11cm: enough to call two coordinates the same point. */
+const coordKey = (p: [number, number]) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`;
+
+/**
+ * Separate pins that share one exact coordinate. Groups the placed points by
+ * their rounded coordinate; for every group of two or more, the first key in
+ * sort order keeps the true point and the rest go onto a deterministic ring
+ * around it, evenly spaced with a hash-seeded rotation and jitter (the same
+ * hash32 machinery naturalPlace uses, seeded by the group key) so the fan is
+ * stable across reloads and never reads as a machine-drawn ring. Pure: the
+ * input map is not touched. Pinned by src/test/roles-destack.test.ts.
+ */
+export function deStack(
+  posByGroup: Map<string, [number, number] | null>,
+): Map<string, [number, number] | null> {
+  const out = new Map(posByGroup);
+  const stacks = new Map<string, string[]>(); // coordinate -> group keys on it
+  for (const [gk, pos] of posByGroup) {
+    if (!pos) continue;
+    const ck = coordKey(pos);
+    const at = stacks.get(ck);
+    if (at) at.push(gk);
+    else stacks.set(ck, [gk]);
+  }
+  for (const keys of stacks.values()) {
+    if (keys.length < 2) continue;
+    const stacked = [...keys].sort();
+    const anchor = posByGroup.get(stacked[0]);
+    if (!anchor) continue;
+    const moved = stacked.slice(1);
+    const radius = deStackRadiusM(stacked.length);
+    const step = (Math.PI * 2) / moved.length;
+    // Rotate the whole ring off a hash of the anchor so neighbouring stacks
+    // don't all fan out in the same direction.
+    const rot = (hash32(stacked[0] + "|ring") / 0xffffffff) * Math.PI * 2;
+    const cosLat = Math.cos((anchor[1] * Math.PI) / 180);
+    moved.forEach((gk, i) => {
+      const h = hash32(gk + "|destack");
+      const jitter = (((h & 0xffff) / 0xffff) - 0.5) * 0.6 * step; // stays in its slot
+      const angle = rot + i * step + jitter;
+      // Pull inward only, never outward, so the cap above is a real ceiling.
+      const r = radius * (0.72 + 0.28 * ((h >>> 16) / 0xffff));
+      out.set(gk, [
+        anchor[0] + (r * Math.cos(angle)) / (M_PER_DEG_LAT * cosLat),
+        anchor[1] + (r * Math.sin(angle)) / M_PER_DEG_LAT,
+      ]);
+    });
+  }
+  return out;
+}
+
 function enrichAll(
   rows: JobsRow[],
   dims: Map<string, CompanyDim>,
@@ -244,9 +314,12 @@ function enrichAll(
       posByGroup.set(gk, centroid ? naturalPlace(centroid, gk, n) : null);
     });
   }
+  // Pass 3: fan out companies that landed on the exact same coordinate, so a
+  // shared building shows every logo instead of hiding all but the top one.
+  const placed = deStack(posByGroup);
   const posFor = (city: string | null, r: JobsRow): [number, number] | null => {
     if (!city) return null;
-    return posByGroup.get(`${city}|${normName(r.company)}`) ?? null;
+    return placed.get(`${city}|${normName(r.company)}`) ?? null;
   };
   return rows.map((r) => {
     const city = cityById.get(r.id) ?? null;
