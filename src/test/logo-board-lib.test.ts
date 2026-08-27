@@ -21,6 +21,7 @@ import {
   preferLogoDomain,
   isRevisitableSource,
   isMissingLogoSourceColumnError,
+  isWritableWithoutProvenance,
   newBoardTally,
   boardSummaryLine,
 } from "../../scripts/logo-board-lib.mjs";
@@ -58,12 +59,24 @@ const WORKABLE_ANNA = {
   logo: "https://workablehr.s3.amazonaws.com/uploads/account/logo/665349/logo",
 };
 
-// jobs.lever.co/intropic — the board footer
-const LEVER_INTROPIC =
+// jobs.lever.co/intropic — the WHOLE shape, not just the footer. Lever inlines
+// its stylesheet into every board, and that stylesheet names `.main-footer-text`
+// about 400 KB BEFORE the footer element does (at byte 294,779 of the live page
+// on 2026-08-27; the footer is at 718,246). A reader scoped to the bare string
+// therefore reads CSS, finds no anchor and returns null on every real Lever
+// board — which is what it did until this fixture carried the preamble. Both
+// halves below are verbatim substrings of the live response.
+const LEVER_CSS_PREAMBLE =
+  "<style>.main-footer-text {background: #edeef1;text-align: center;padding: 40px 30px;}" +
+  ".main-footer-text p {display: block;max-width: 500px;margin: 0px auto;}" +
+  ".posting-header h2 {margin-top: 0px;}</style>";
+const LEVER_FOOTER =
   '<div class="main-footer page-full-width"><div class="main-footer-text"><p>' +
   '<a href="http://intropic.io">Intropic Home Page</a></p>' +
   '<a href="https://www.lever.co/job-seeker-support/" class="image-link"><span>Jobs powered by </span>' +
   '<img alt="Lever logo" src="/img/lever-logo-refresh.svg" class="footer-logo"></a></div></div>';
+const LEVER_INTROPIC = `<!doctype html><html><head>${LEVER_CSS_PREAMBLE}</head><body>` +
+  `<div class="postings-wrapper">${"x".repeat(400)}</div>${LEVER_FOOTER}</body></html>`;
 
 // job-boards.greenhouse.io/cabify — the board logo links the company's own site
 const GREENHOUSE_CABIFY =
@@ -142,6 +155,17 @@ describe("boardCompanyFromResponse", () => {
       name: "Intropic",
       website: "http://intropic.io",
     });
+  });
+
+  it("reads past Lever's inlined stylesheet, which names main-footer-text first", () => {
+    // The guard for the defect above: the page must still resolve when the
+    // string appears in CSS before it appears as an element. Drop the
+    // preamble and the assertion still passes, so it is the preamble that
+    // carries the test — keep it.
+    expect(LEVER_INTROPIC.indexOf("main-footer-text")).toBeLessThan(LEVER_INTROPIC.indexOf("<div class=\"main-footer"));
+    expect(boardCompanyFromResponse("lever", LEVER_INTROPIC)?.website).toBe("http://intropic.io");
+    // A stylesheet on its own publishes nothing.
+    expect(boardCompanyFromResponse("lever", LEVER_CSS_PREAMBLE)).toBeNull();
   });
 
   it("reads Greenhouse's board logo link and Workable-style board title", () => {
@@ -272,6 +296,17 @@ describe("the four known-wrong writes", () => {
 });
 
 describe("provenance", () => {
+  it("refuses to write a guess into a database with no provenance column", () => {
+    // The nightly workflows run this script with --apply. Merging before
+    // migration 20260827190000 is applied would write a fresh batch of guesses
+    // that no later run could ever tell from a good value and replace —
+    // exactly the permanence this change exists to end. Facts still go in.
+    expect(isWritableWithoutProvenance(LOGO_SOURCE_GUESS)).toBe(false);
+    expect(isWritableWithoutProvenance(LOGO_SOURCE_BOARD)).toBe(true);
+    expect(isWritableWithoutProvenance(LOGO_SOURCE_COMPANY_URL)).toBe(true);
+    expect(isWritableWithoutProvenance(LOGO_SOURCE_MANUAL)).toBe(true);
+  });
+
   it("lets the backfill replace only a guess", () => {
     expect(isRevisitableSource(LOGO_SOURCE_GUESS)).toBe(true);
     expect(isRevisitableSource(LOGO_SOURCE_BOARD)).toBe(false);

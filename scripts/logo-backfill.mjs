@@ -89,6 +89,7 @@ import {
   isRevisitableSource,
   isMissingLogoSourceColumnError,
   preferLogoDomain,
+  isWritableWithoutProvenance,
   newBoardTally,
   boardSummaryLine,
 } from "./logo-board-lib.mjs";
@@ -628,16 +629,31 @@ if (handleAggregators.size) {
 const boardBySlug = new Map(safeBoardFills.map((f) => [f.slug, f]));
 const guessBySlug = new Map(safeHandleFills.map((f) => [f.slug, f]));
 const derived = [];
+let heldForProvenance = 0;
 for (const c of unresolved) {
   const choice = preferLogoDomain({
     boardDomain: boardBySlug.get(c.slug)?.domain,
     guessDomain: guessBySlug.get(c.slug)?.domain,
   });
   if (!choice) continue;
+  // Without companies.logo_domain_source a guess would be written with no
+  // provenance, so no later run could ever tell it from a good value and
+  // replace it. Hold it back until migration 20260827190000 is applied; the
+  // board and company-URL routes are facts and go in either way.
+  if (!hasSourceColumn && !isWritableWithoutProvenance(choice.source)) {
+    heldForProvenance++;
+    continue;
+  }
   // A guess NEVER replaces a value already on file; only a board reading may.
   if (c.logo_domain && choice.source !== LOGO_SOURCE_BOARD) continue;
   if (c.logo_domain === choice.domain) continue; // already correct, nothing to write
   derived.push({ slug: c.slug, name: c.name, ...choice });
+}
+
+if (heldForProvenance) {
+  console.error(
+    `logo-backfill: held back ${heldForProvenance} handle-guess domain(s) — companies.logo_domain_source is missing, so they could never be revisited. Apply migration 20260827190000_logo_domain_source.sql and re-run.`,
+  );
 }
 
 if (!APPLY) {

@@ -170,9 +170,19 @@ const EXTRACTORS = {
   /** The board footer: <div class="main-footer-text"><p><a href="…">X Home
    *  Page</a></p>. Lever's own links (job-seeker-support, lever.co) are dropped
    *  by domainFromUrl later, but the block is scoped first so a stray link
-   *  elsewhere on the page can never be read as the company's site. */
+   *  elsewhere on the page can never be read as the company's site.
+   *
+   *  The scope is the DIV, never the bare string: Lever inlines its stylesheet
+   *  into every board, and that stylesheet names `.main-footer-text` about
+   *  400 KB before the footer itself. A bare-string window landed in the CSS
+   *  and found no anchor, so this reader returned null on EVERY live Lever
+   *  board (verified 2026-08-27 against jobs.lever.co/intropic and
+   *  /matillion, whose first three `main-footer-text` hits are all selectors).
+   *  LEVER_BOARD in src/test/logo-board-lib.test.ts keeps that preamble. */
   lever(html) {
-    const block = String(html || "").match(/main-footer-text[\s\S]{0,600}/i);
+    const block = String(html || "").match(
+      /<div[^>]+class=["'][^"']*\bmain-footer-text\b[^"']*["'][^>]*>[\s\S]{0,600}/i,
+    );
     if (!block) return null;
     for (const m of block[0].matchAll(/<a[^>]+href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
       if (/(^|\/\/|\.)lever\.co\b/i.test(m[1])) continue;
@@ -280,6 +290,22 @@ export function preferLogoDomain({ boardDomain, guessDomain } = {}) {
   if (boardDomain) return { domain: boardDomain, source: LOGO_SOURCE_BOARD };
   if (guessDomain) return { domain: guessDomain, source: LOGO_SOURCE_GUESS };
   return null;
+}
+
+/**
+ * May this choice be written into a database whose logo_domain_source column is
+ * not there yet? A board reading and a company-URL derivation are facts, so yes.
+ * A GUESS is not: without the column the row carries no provenance, so no later
+ * run can ever tell it from a good one and replace it — which is the exact
+ * permanence this change exists to end. The nightly workflows run this script
+ * with --apply (.github/workflows/scrape.yml, company-data.yml), so a merge that
+ * lands before migration 20260827190000 is applied would otherwise bake in a new
+ * batch of uncorrectable guesses. Hold them back one run instead; they cost
+ * nothing to redo, and a missing logo is a coloured initial while a wrong one is
+ * another company's mark.
+ */
+export function isWritableWithoutProvenance(source) {
+  return source !== LOGO_SOURCE_GUESS;
 }
 
 // ── Degrading gracefully when the column is not there yet ────────────────────
