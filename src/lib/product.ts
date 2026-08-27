@@ -273,6 +273,42 @@ export function dailyTopTen(
   return { day: todayKey, jobIds, entries, doneCount, total: jobIds.length, isNew: !isFresh };
 }
 
+/**
+ * Whether /today may freeze today's top ten yet (issue #155 fix-round-1, blockers 1 +
+ * 3). The candidate ten (`top` on /today) is built from applied/saved/dismissed/
+ * inFlightCompanies/newIds, which resolve on separate own-row reads (applicationsQ/
+ * savedQ/dismissedQ, useDailyMatches) that useDailyTopSet's own `loading` knows
+ * nothing about — `profileChecked` covers the first four (useRolesData.ts:764),
+ * `!loading` covers the live pool+scores, and `!batchLoading` covers newIds' own
+ * source. Freezing before all three land risks locking an already-applied/dismissed/
+ * saved/tonight's-batch role into the day's row, which cannot self-heal (no
+ * UPDATE/DELETE policy on daily_top_sets). `!scoring || candidateCount >= 10`
+ * additionally holds off a freeze during a scoring drain until either scoring
+ * finishes or the ten is actually full, so the drain's first 1-3 scored roles don't
+ * freeze as the whole day's set. Pure: same inputs, same output.
+ */
+export function dailyTopSetReady(
+  profileChecked: boolean,
+  loading: boolean,
+  batchLoading: boolean,
+  scoring: boolean,
+  candidateCount: number,
+): boolean {
+  return profileChecked && !loading && !batchLoading && (!scoring || candidateCount >= 10);
+}
+
+/**
+ * Which saved roles the Saved section should render (issue #155 fix-round-1 blocker
+ * 2). A saved role that also sits in the frozen top ten already renders there — its
+ * footer's "Saved" state is the one place that says so — so Saved drops it rather
+ * than showing the same role twice on the page (the "keep them out of the action
+ * queue so nothing renders twice" rule, Rober 7-15 review, extended to this second
+ * duplication path). Pure: same inputs, same output.
+ */
+export function visibleSavedJobs(savedJobs: RoleJob[], frozenIds: ReadonlySet<string>): RoleJob[] {
+  return savedJobs.filter((j) => !frozenIds.has(j.id));
+}
+
 /** "N of 10 done today" — the Today header line (issue #155). Uses the frozen set's
  *  own size rather than a hardcoded 10, so a thin day (fewer than 10 scored roles)
  *  still reads honestly. */

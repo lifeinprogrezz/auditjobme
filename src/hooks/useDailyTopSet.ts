@@ -33,8 +33,16 @@ const UNIQUE_VIOLATION = "23505";
  * `candidateIds` completely: dailyTopTen() replays the frozen ids, so an apply or
  * dismiss elsewhere in the app can change `candidateIds` all it wants without ever
  * re-freezing the same day.
+ *
+ * `ready` gates the freeze itself (issue #155 fix-round-1 blockers 1 + 3) — the
+ * caller computes it with `dailyTopSetReady` in lib/product.ts (see its doc comment
+ * for the full rationale: this hook's own `loading` above does NOT cover the other
+ * own-row reads `candidateIds` is built from, and a wrong freeze cannot self-heal —
+ * no UPDATE/DELETE policy on daily_top_sets). While `ready` is false the freeze
+ * effect below is a no-op every render; the page keeps rendering the LIVE top from
+ * `candidateIds`, exactly as it does today.
  */
-export function useDailyTopSet(candidateIds: string[]): DailyTopSetState {
+export function useDailyTopSet(candidateIds: string[], ready: boolean): DailyTopSetState {
   const { user } = useAuth();
   const today = utcDayKey();
   const [state, setState] = useState<DailyTopSetState>({ today, loading: true, snapshot: null });
@@ -76,9 +84,11 @@ export function useDailyTopSet(candidateIds: string[]): DailyTopSetState {
   }, [user, today]);
 
   // Freeze once: only once signed in, the load above finished, no snapshot exists
-  // yet, and a real ranked ten is ready — never freeze an empty/still-loading queue.
+  // yet, the caller says `ready` (every own-row read `candidateIds` depends on has
+  // landed, and scoring is either done or the ten is full), and a real ranked ten
+  // is ready — never freeze an empty/still-loading queue.
   useEffect(() => {
-    if (!user || state.loading || state.snapshot || freezing.current) return;
+    if (!ready || !user || state.loading || state.snapshot || freezing.current) return;
     if (candidateIds.length === 0) return;
     freezing.current = true;
     const snapshot: DailyTopSetSnapshot = { day: today, jobIds: candidateIds };
@@ -115,7 +125,7 @@ export function useDailyTopSet(candidateIds: string[]): DailyTopSetState {
       writeLocalDailyTopSet(user.id, snapshot);
       setState({ today, loading: false, snapshot });
     })();
-  }, [user, today, state.loading, state.snapshot, candidateIds]);
+  }, [ready, user, today, state.loading, state.snapshot, candidateIds]);
 
   return state;
 }

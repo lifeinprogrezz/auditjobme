@@ -20,11 +20,13 @@ import { useDailyTopSet } from "@/hooks/useDailyTopSet";
 import {
   buildActionQueue,
   coverageSummary,
+  dailyTopSetReady,
   dailyTopTen,
   dailyTopTenCompleteLine,
   dailyTopTenHeaderLine,
   newSectionHeading,
   resolveBatchJobs,
+  visibleSavedJobs,
   type QueueEntry,
 } from "@/lib/product";
 import { geoVerdict, postedAgo, type RoleJob } from "@/lib/roles";
@@ -73,6 +75,7 @@ export default function Today() {
     eligibleCount,
     batchPending,
     eligibleIds,
+    profileChecked,
     applied,
     markApplied,
     saved,
@@ -137,7 +140,10 @@ export default function Today() {
   // `dailyTop`, which replays the frozen ids once one exists.
   const top = queue.slice(0, 10);
   const topIds = useMemo(() => top.map((e) => e.job.id), [top]);
-  const dailySet = useDailyTopSet(topIds);
+  // Gate the freeze itself (issue #155 fix-round-1 blockers 1 + 3) — see
+  // dailyTopSetReady's own doc comment for why each input is needed.
+  const ready = dailyTopSetReady(profileChecked, loading, daily.loading, scoring, topIds.length);
+  const dailySet = useDailyTopSet(topIds, ready);
   // Lookup pool for resolving the frozen ids back to job data even once applying or
   // dismissing has dropped a role out of `queue` (and, for a dismissal, out of the
   // action queue's source jobs too) — savedJobs/dismissedJobs are the same
@@ -158,6 +164,10 @@ export default function Today() {
   // grouping, not part of what's frozen.
   const queueByJobId = useMemo(() => new Map(queue.map((e) => [e.job.id, e])), [queue]);
   const frozenIds = useMemo(() => new Set(dailyTop.jobIds), [dailyTop.jobIds]);
+  // Issue #155 fix-round-1 blocker 2: a saved role that's ALSO in the frozen ten
+  // already renders there (its footer shows "Saved") — drop it from this section so
+  // it doesn't render twice on the page.
+  const visibleSaved = useMemo(() => visibleSavedJobs(savedJobs, frozenIds), [savedJobs, frozenIds]);
   const doneHeaderLine = dailyTopTenHeaderLine(dailyTop.doneCount, dailyTop.total);
   const doneCompleteLine = dailyTopTenCompleteLine(dailyTop.doneCount, dailyTop.total);
   // Rule 3 (issue #155): "More matches" is the live remainder, excluding whatever
@@ -416,7 +426,7 @@ export default function Today() {
         </section>
       )}
 
-      {savedJobs.length > 0 && (
+      {visibleSaved.length > 0 && (
         <section className="mt-8">
           {/* Section headings carry the page's wayfinding — full display size in ink,
               not micro-caps whispers (Rober 7-16: they were too hard to find). */}
@@ -424,7 +434,7 @@ export default function Today() {
           <ul className="mt-3 flex flex-col gap-3">
             {/* The CARD opens the prep page (Rober 7-16); only the role title itself
                 links out to the posting. The inner link/button opt out via closest(). */}
-            {savedJobs.map((job) => (
+            {visibleSaved.map((job) => (
               <li
                 key={job.id}
                 role="button"

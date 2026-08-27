@@ -6,6 +6,7 @@ import {
   buildActionQueue,
   companyKey,
   coverageSummary,
+  dailyTopSetReady,
   dailyTopTen,
   dailyTopTenCompleteLine,
   dailyTopTenHeaderLine,
@@ -14,6 +15,7 @@ import {
   resolveBatchJobs,
   selectLatestBatch,
   utcDayKey,
+  visibleSavedJobs,
   WORTH_APPLYING_MIN,
   type DailyTopSetSnapshot,
   type QueueEntry,
@@ -382,6 +384,48 @@ describe("dailyTopTen (issue #155, LOCKED decision 2 — a fixed daily set of 10
     expect(result.jobIds).toEqual(["j1", "gone", "j2"]);
     expect(result.entries.map((e) => e.job.id)).toEqual(["j1", "j2"]);
     expect(result.total).toBe(3);
+  });
+});
+
+describe("dailyTopSetReady (issue #155 fix-round-1, blockers 1 + 3)", () => {
+  it("is not ready before every own-row read has landed", () => {
+    // profileChecked false: applied/saved/dismissed haven't loaded yet.
+    expect(dailyTopSetReady(false, false, false, false, 10)).toBe(false);
+    // the live pool+scores are still loading.
+    expect(dailyTopSetReady(true, true, false, false, 10)).toBe(false);
+    // tonight's batch (newIds) hasn't landed yet.
+    expect(dailyTopSetReady(true, false, true, false, 10)).toBe(false);
+  });
+
+  it("is ready once every read has landed and scoring is done", () => {
+    expect(dailyTopSetReady(true, false, false, false, 3)).toBe(true);
+  });
+
+  it("does not freeze a short queue while scoring is still draining", () => {
+    // Only 3 scored roles so far, and scoring is still active — wait.
+    expect(dailyTopSetReady(true, false, false, true, 3)).toBe(false);
+  });
+
+  it("freezes a full ten even while scoring continues in the background", () => {
+    expect(dailyTopSetReady(true, false, false, true, 10)).toBe(true);
+  });
+
+  it("freezes a genuinely thin day once scoring actually finishes", () => {
+    // A real thin day: fewer than 10 roles ever, but scoring has completed.
+    expect(dailyTopSetReady(true, false, false, false, 2)).toBe(true);
+  });
+});
+
+describe("visibleSavedJobs (issue #155 fix-round-1, blocker 2)", () => {
+  it("drops a saved role that's also in the frozen ten — it already renders there", () => {
+    const saved = [job("j1"), job("j2")];
+    const frozen = new Set(["j1"]);
+    expect(visibleSavedJobs(saved, frozen).map((j) => j.id)).toEqual(["j2"]);
+  });
+
+  it("keeps every saved role when none of them are frozen", () => {
+    const saved = [job("j1"), job("j2")];
+    expect(visibleSavedJobs(saved, new Set())).toHaveLength(2);
   });
 });
 
