@@ -92,6 +92,11 @@
   },
   {
    "kind": "r",
+   "name": "logo_probe_cache",
+   "rls": true
+  },
+  {
+   "kind": "r",
    "name": "profiles",
    "rls": true
   },
@@ -1559,6 +1564,51 @@
   {
    "default": null,
    "generated": null,
+   "name": "domain",
+   "nullable": false,
+   "table": "logo_probe_cache",
+   "type": "text",
+   "udt": "text"
+  },
+  {
+   "default": null,
+   "generated": null,
+   "name": "ok",
+   "nullable": false,
+   "table": "logo_probe_cache",
+   "type": "boolean",
+   "udt": "bool"
+  },
+  {
+   "default": "now()",
+   "generated": null,
+   "name": "probed_at",
+   "nullable": false,
+   "table": "logo_probe_cache",
+   "type": "timestamp with time zone",
+   "udt": "timestamptz"
+  },
+  {
+   "default": null,
+   "generated": null,
+   "name": "reason",
+   "nullable": true,
+   "table": "logo_probe_cache",
+   "type": "text",
+   "udt": "text"
+  },
+  {
+   "default": null,
+   "generated": null,
+   "name": "status",
+   "nullable": true,
+   "table": "logo_probe_cache",
+   "type": "integer",
+   "udt": "int4"
+  },
+  {
+   "default": null,
+   "generated": null,
    "name": "id",
    "nullable": true,
    "table": "profiles_targets_backup_20260819",
@@ -2560,6 +2610,11 @@
    "table": "jobs"
   },
   {
+   "def": "PRIMARY KEY (domain)",
+   "name": "logo_probe_cache_pkey",
+   "table": "logo_probe_cache"
+  },
+  {
    "def": "FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE",
    "name": "profiles_id_fkey",
    "table": "profiles"
@@ -2970,6 +3025,11 @@
    "def": "CREATE UNIQUE INDEX jobs_url_key ON public.jobs USING btree (url)",
    "name": "jobs_url_key",
    "table": "jobs"
+  },
+  {
+   "def": "CREATE UNIQUE INDEX logo_probe_cache_pkey ON public.logo_probe_cache USING btree (domain)",
+   "name": "logo_probe_cache_pkey",
+   "table": "logo_probe_cache"
   },
   {
    "def": "CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)",
