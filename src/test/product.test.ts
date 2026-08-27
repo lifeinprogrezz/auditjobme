@@ -15,6 +15,7 @@ import {
   resolveBatchJobs,
   selectLatestBatch,
   utcDayKey,
+  visibleNewJobs,
   visibleSavedJobs,
   WORTH_APPLYING_MIN,
   type DailyTopSetSnapshot,
@@ -378,12 +379,15 @@ describe("dailyTopTen (issue #155, LOCKED decision 2 — a fixed daily set of 10
     expect(result.jobIds).toEqual(["j3", "j2"]);
   });
 
-  it("skips a frozen id with no resolvable job row instead of rendering a stub", () => {
+  it("skips a frozen id with no resolvable job row instead of rendering a stub, and counts it done", () => {
+    // issue #155 fix-round-2 blocker 4: an unresolvable id can never be applied to
+    // or dismissed, so it must count itself done or completion is unreachable.
     const snapshot: DailyTopSetSnapshot = { day: today, jobIds: ["j1", "gone", "j2"] };
     const result = dailyTopTen([], jobs, today, snapshot, noOne, noOne);
     expect(result.jobIds).toEqual(["j1", "gone", "j2"]);
     expect(result.entries.map((e) => e.job.id)).toEqual(["j1", "j2"]);
     expect(result.total).toBe(3);
+    expect(result.doneCount).toBe(1);
   });
 });
 
@@ -426,6 +430,19 @@ describe("visibleSavedJobs (issue #155 fix-round-1, blocker 2)", () => {
   it("keeps every saved role when none of them are frozen", () => {
     const saved = [job("j1"), job("j2")];
     expect(visibleSavedJobs(saved, new Set())).toHaveLength(2);
+  });
+});
+
+describe("visibleNewJobs (issue #155 fix-round-2, blocker 3)", () => {
+  it("drops a New-section role that's also in the frozen ten — a 00:00-06:00 UTC freeze can catch it first", () => {
+    const fresh = [job("j1"), job("j2")];
+    const frozen = new Set(["j1"]);
+    expect(visibleNewJobs(fresh, frozen).map((j) => j.id)).toEqual(["j2"]);
+  });
+
+  it("keeps every New-section role when none of them are frozen", () => {
+    const fresh = [job("j1"), job("j2")];
+    expect(visibleNewJobs(fresh, new Set())).toHaveLength(2);
   });
 });
 

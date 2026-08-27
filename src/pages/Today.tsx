@@ -26,6 +26,7 @@ import {
   dailyTopTenHeaderLine,
   newSectionHeading,
   resolveBatchJobs,
+  visibleNewJobs,
   visibleSavedJobs,
   type QueueEntry,
 } from "@/lib/product";
@@ -168,6 +169,10 @@ export default function Today() {
   // already renders there (its footer shows "Saved") — drop it from this section so
   // it doesn't render twice on the page.
   const visibleSaved = useMemo(() => visibleSavedJobs(savedJobs, frozenIds), [savedJobs, frozenIds]);
+  // Issue #155 fix-round-2 blocker 3: a 00:00-06:00 UTC visit can freeze today's ten
+  // from roles the nightly batch hasn't posted yet — once the 06:00 batch lands they
+  // ALSO show in New, doubling the row. Drop anything already frozen before render.
+  const visibleNew = useMemo(() => visibleNewJobs(newJobs, frozenIds), [newJobs, frozenIds]);
   const doneHeaderLine = dailyTopTenHeaderLine(dailyTop.doneCount, dailyTop.total);
   const doneCompleteLine = dailyTopTenCompleteLine(dailyTop.doneCount, dailyTop.total);
   // Rule 3 (issue #155): "More matches" is the live remainder, excluding whatever
@@ -414,14 +419,14 @@ export default function Today() {
 
       {/* New (issue #72 slice 1): the exact roles the nightly email just sent, in the
           same rank order, still actionable. */}
-      {newJobs.length > 0 && (
+      {visibleNew.length > 0 && (
         <section className="mt-8">
           <h2 className="font-display text-section text-foreground">{newHeading}</h2>
           <p className="mt-1 text-caption text-muted-foreground">
             The roles we emailed you, new since your last batch.
           </p>
           <ol className="mt-3 flex flex-col gap-4">
-            {newJobs.map((job, i) => renderRow(job, { rank: i + 1, showReason: true }))}
+            {visibleNew.map((job, i) => renderRow(job, { rank: i + 1, showReason: true }))}
           </ol>
         </section>
       )}
@@ -479,7 +484,7 @@ export default function Today() {
       )}
 
       {dailyTop.total === 0 && more.length === 0 ? (
-        newJobs.length === 0 && (
+        visibleNew.length === 0 && (
           <div className="mt-8 rounded-2xl border border-border bg-card p-6 text-body text-muted-foreground shadow-page text-pretty">
             Nothing left in your queue right now. Everything scored is either applied or below your bar. Fresh roles
             arrive with tomorrow's scan.

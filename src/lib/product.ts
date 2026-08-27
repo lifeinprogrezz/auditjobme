@@ -265,7 +265,13 @@ export function dailyTopTen(
   let doneCount = 0;
   for (const id of jobIds) {
     const job = byId.get(id);
-    const done = appliedIds.has(id) || dismissedIds.has(id);
+    // A frozen id that no longer resolves to any job row (dropped from the pool
+    // entirely — went is_live=false, or its posting died) can never be applied to
+    // or dismissed, so it can never flip `done` on its own. Count it done the
+    // moment it stops resolving, or completion is unreachable (issue #155
+    // fix-round-2 blocker 4): the header sticks at "9 of 10" forever with every
+    // other slot struck through.
+    const done = !job || appliedIds.has(id) || dismissedIds.has(id);
     if (done) doneCount++;
     if (job) entries.push({ job, done });
   }
@@ -307,6 +313,20 @@ export function dailyTopSetReady(
  */
 export function visibleSavedJobs(savedJobs: RoleJob[], frozenIds: ReadonlySet<string>): RoleJob[] {
   return savedJobs.filter((j) => !frozenIds.has(j.id));
+}
+
+/**
+ * Which of tonight's batch the New section should render (issue #155 fix-round-2
+ * blocker 3). The nightly cron lands at 06:00 UTC; a visit between 00:00 and 06:00
+ * UTC can freeze today's top ten from roles that are already scored and in the pool
+ * but not yet in `daily_matches` — `queue`'s own exclusion of "new" only knows about
+ * YESTERDAY's batch at that hour. Once the 06:00 batch lands, resolveBatchJobs puts
+ * those same roles in New while the earlier freeze already holds them, so a role
+ * renders twice for the rest of the day. New drops anything already frozen, the
+ * same rule visibleSavedJobs applies to Saved. Pure: same inputs, same output.
+ */
+export function visibleNewJobs(newJobs: RoleJob[], frozenIds: ReadonlySet<string>): RoleJob[] {
+  return newJobs.filter((j) => !frozenIds.has(j.id));
 }
 
 /** "N of 10 done today" — the Today header line (issue #155). Uses the frozen set's
