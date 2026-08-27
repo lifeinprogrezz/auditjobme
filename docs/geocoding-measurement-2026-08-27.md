@@ -4,13 +4,19 @@
 stored. Storing them needs *permanent* geocoding at $5.00 per 1,000 requests, about $8 one-off for
 our live-job companies (1,210 of them today). The owner pays that only if the free route measurably falls short.
 
-**The answer, in one line.** The free route gets a correct office coordinate for **7 of 70 sampled
-companies (10.0%)**. With a company website for every company, the same routes *project* to
-about **20%** (arithmetic on measured rates, marked as a projection below). The free route does not
+**The answer, in one line.** The free route gets a correct office coordinate for **9 of 70 sampled
+companies (12.9%)**. With a company website for every company, the same routes *project* to
+about **26%** (arithmetic on measured rates, marked as a projection below). The free route does not
 close the gap.
 
 Every number below was measured on 2026-08-27 against live production data and live public
 endpoints. Nothing here is estimated unless the line says *projection*.
+
+> **Corrected after an independent verification pass, same day.** The first version of this report
+> said 7 of 70 (10.0%). An adversarial re-run reproduced the population, the sample and every other
+> figure exactly, and found that the address extractor was still missing two address shapes its own
+> sample prints, which cost two real hits (Akamas, Reel). The extractor is fixed and pinned by
+> fixtures (`selftest`); the numbers below are from the re-run. The decision does not change.
 
 ---
 
@@ -36,10 +42,17 @@ The pool is the population that matters: these are the companies the map current
 The 41.4% website figure is not a sampling artifact. Across the whole 944, production holds a
 website for 400 (42.4%).
 
-**Acceptance rule, identical for every hypothesis** (it is what `scripts/geocode-lib.mjs` already
-enforces in production): the coordinate must sit within **50 km** of the city centroid the map
-would otherwise use, and must be street-level or better. A coarse or far-away point is rejected,
-never written as a guess.
+**Acceptance rule, identical for every hypothesis**: the coordinate must sit within **50 km** of the
+city centroid the map would otherwise use, and must be street-level or better. A coarse or far-away
+point is rejected, never written as a guess. Both halves come from production
+(`MAX_OFFICE_TO_CITY_KM = 50`; `precision === "street"` means `house_number || road`).
+
+**One way this rule is looser than production, and it matters for H2.** Production also runs
+`isTrustworthyOffice`, which requires the geocoder's own result name to equal the company name.
+That gate exists because production queries by *company name*. Every H2 hit below is a *postal
+address* query, so its result is named for the building or the street, and **all nine would fail
+`isTrustworthyOffice` as written**. Adopting H2 therefore means changing that gate, not just adding
+a source. The gate is doing real work on the name route (see H1) and must not simply be deleted.
 
 ---
 
@@ -49,13 +62,15 @@ never written as a guess.
 |---|---|---|---|---|---|
 | H1a — OSM POI by name (Photon) | 70 | n/a | 5 | 7.1% | **1 of 5 correct**, 1 ambiguous, 3 wrong |
 | H1b — OSM POI by name (Overpass) | 46 answered of 70 | n/a | 1 | 2.2% | 1 of 1 ambiguous (same feature as H1a) |
-| H2 — company website → postal address → Nominatim | 70 | 11 (of the 29 with a website) | 7 | 10.0% | **6 of 7 correct** |
+| H2 — company website → postal address → Nominatim | 70 | 13 (of the 29 with a website) | 9 | 12.9% | **8 of 9 correct** |
 | H3 — ATS board structured address (Ashby) | 14 on an Ashby board | 3 street-level | 0 | 0.0% | n/a |
-| **Union of all free routes** | 70 | — | 11 | 15.7% | **7 correct → 10.0%** |
+| **Union of all free routes** | 70 | — | 13 | 18.6% | **9 correct → 12.9%** |
 
-Requests made: Photon 70, Overpass 154, Nominatim 52, company websites 208, ATS board APIs 49,
-dataplane 2. **535 in total.** Pacing: 1.1 s between Nominatim calls, 1.1 s between Photon calls,
-5 s between Overpass calls, one thread throughout.
+Requests made, first run: Photon 70, Overpass 154, Nominatim 52, company websites 208, ATS board
+APIs 49, dataplane 2. **535 in total.** Requests made by the verification pass that corrected H2:
+Photon 70, Nominatim 30, company websites 137 plus about 130 probe fetches, ATS board APIs 25,
+dataplane 2. **394 in total.** Pacing: 1.1 s between Nominatim calls, 1.1 s between Photon calls,
+5 s between Overpass calls, one thread throughout, both runs.
 
 ### H1 — OpenStreetMap points of interest, searched by company name
 
@@ -76,8 +91,12 @@ comparing:
 | Rival (GDevelop) | `shop=sports` "Rival Boxing Gear", Boulevard Ney, Paris | a game-engine company, not a boxing shop | **wrong** |
 
 The failures are name collisions, and the accept gate is what let them through: it accepted a
-prefix match. Re-scored offline under exact name equality, **1 of 70** survives (Tapio, the
-ambiguous one). Tightening the gate does not rescue H1. It only makes the near-zero yield explicit.
+prefix match. Re-scored offline under exact name equality, the answer depends on which normaliser
+you use, and both were re-measured: under this script's `norm()` (which strips corporate suffixes)
+**2 of 70** survive, Tapio and Veo, so the one *correct* hit is kept and all three wrong ones are
+dropped; under production's `normalizeForNameMatch` (which does not strip suffixes) **1 of 70**
+survives, Tapio. Either way H1 is near zero. Tightening the gate does not rescue it. It only makes
+the near-zero yield explicit.
 
 Overpass returned the same single Tapio feature and nothing else. It also refused the sweep: the
 public instance answered 46 of 70 companies and returned HTTP 429 for the rest across six resumed
@@ -95,7 +114,7 @@ This is the route that works, and it is limited by input, not by method.
   their footer with JavaScript.
 - Addresses were extracted from schema.org `PostalAddress` JSON-LD and from three postcode-anchored
   text patterns (continental, UK, Dutch).
-- 11 of the 29 yielded a usable postal address. 7 of those geocoded to a coordinate that passed
+- 13 of the 29 yielded a usable postal address. 9 of those geocoded to a coordinate that passed
   the 50 km + street-level gate.
 
 Hand-check of all 7 accepted coordinates. Method: the address string came from the company's own
@@ -110,9 +129,11 @@ For five of them I confirmed the company's presence at that address in an indepe
 | Qargo | Gaston Crommenlaan 4, 9050 Ghent | same street + number, 1.9 km | Belgian register, Qargo Tech SRL BE0772640434 | correct |
 | Doccla | 184 Shepherds Bush Road, London W6 7NL | "WeWork, 184 Shepherds Bush Road", 6.7 km | the company's own contact page | correct |
 | Rankscale | Untere Viaduktgasse 10/6, 1030 Vienna | street level, 1.4 km | the company's own Austrian Impressum (a legal obligation) | correct |
+| Akamas | Via Schiaffino 11, 20158 Milano | same street + number, 5.5 km | the company's own contact page, Akamas S.p.A. with an Italian landline | correct |
+| Reel | Frederiksholms Kanal 4, 1220 Copenhagen | same street + number, 0.6 km | the company's own legal notice at `/legal/imprint` | correct |
 | Tapio | Frankrijklei 5, 2000 Antwerpen | correct building in Antwerp, 41.2 km from Brussels | registered office is Avenue Louise 231, Brussels | **wrong city** |
 
-**Precision 6 of 7 (86%).** When this route hits, the coordinate can be trusted.
+**Precision 8 of 9 (89%).** When this route hits, the coordinate can be trusted.
 
 **The structural limit, and it is not fixable by a better parser.** A website gives you *one*
 address — the registered head office. The map needs the office in the city the *role* is in. Three
@@ -127,11 +148,30 @@ exactly as designed:
 
 A paid geocoder does not fix this either. The address is right. It is the wrong city.
 
-**A note on what was measured.** The first version of the address extractor found 4 hits, not 7. It
-was missing UK addresses printed inside a single HTML element — Doccla's "184 Shepherds Bush Road,
-London W6 7NL" among them. That was measuring the regex, not the hypothesis. The extractor was
-rewritten, fed that exact page, and watched go from empty to correct before the run was repeated.
-The 7 is from the rewritten run. `probe --url=…` reproduces the check.
+**A note on what was measured, and on how it was wrong twice.** The first version of the address
+extractor found 4 hits. It was missing UK addresses printed inside a single HTML element — Doccla's
+"184 Shepherds Bush Road, London W6 7NL" among them. It was rewritten, fed that exact page, and
+watched go from empty to correct. That produced 7, which is what the first version of this report
+published. It was still wrong: an independent verification pass re-read the sites of all 18
+companies the run had marked "website but no address" and found two more addresses printed in
+plain sight, in two more shapes the regex did not cover — a comma between street and number with a
+dash before the postcode (`Via Schiaffino, 11 – 20158 Milan`) and a floor token between the number
+and the postcode (`Vesterbrogade 26, 1. th 1620 København V`). Both geocode inside the gate. Fixing
+one page shape had not fixed the class.
+
+The lesson is procedural, and it is now enforced in the script: `node scripts/…​ selftest` holds
+nine fixtures, seven positive shapes taken from this sample's own sites and two negatives that a
+looser regex would swallow. Each was mutation-tested — the pre-fix regex turns two fixtures red,
+and removing the `DENY` guard turns a third red — so the fixtures fail for the reason they exist.
+`probe --url=…` still reproduces any single page by hand.
+
+**One hit is measured but not counted, on purpose.** Propane's address
+(`Vesterbrogade 26, 1620 København V`, 1.1 km from the Copenhagen centroid, verified by hand) is
+printed only on `/privacy` and `/terms`. The crawler ranks four candidate pages and guesses only
+Impressum / imprint / contact / legal-notice, and Propane's home page renders its footer in
+JavaScript, so no link is ever seen. That is a crawler-coverage limit, not an extractor limit, and
+it is left unfixed and stated rather than silently absorbed. The honest reading of H2 on this
+sample is therefore **9 counted, 10 reachable**.
 
 ### H3 — the ATS board's own structured address
 
@@ -169,23 +209,31 @@ raised H2's denominator by one company.
   might be subject of change in the future." No stated rate limit, no availability guarantee.
 - **Overpass** public instance: no published quota. It rate-limited this 70-company sweep in
   practice.
+- **The two clauses that constrain a product, not a measurement.** The Nominatim policy also
+  forbids "Reselling of geocoding results", and ODbL's share-alike means a stored, published
+  database of OSM-derived coordinates is a Derivative Database with an ODbL obligation attached.
+  Neither blocks showing a dot on the map with attribution. Both are reasons the free route is not
+  simply "free". And the "4 requests per minute" ceiling on scripts "run at regular intervals" is
+  the binding limit on the nightly crawl suggested at the end of this document: at 4 per minute a
+  pass over the 810-company pool is about 3.4 hours of continuous requests against a donated
+  server, so a real nightly job must be incremental and cached, never a full re-sweep.
 
 ---
 
 ## What this means for the $8
 
-**Measured, today:** the free routes together give a correct coordinate for **7 of 70 (10.0%)** of
-the office-less pool. Applied to the pool of 810, that is roughly 80 companies. 730 stay on the
+**Measured, today:** the free routes together give a correct coordinate for **9 of 70 (12.9%)** of
+the office-less pool. Applied to the pool of 810, that is roughly 105 companies. 705 stay on the
 sunflower disc.
 
 **Projection, clearly labelled as such:** the binding constraint on H2 is website coverage (41.4%),
-not the method. H2 accepted 7 of the 29 companies that had a website and 6 of those were correct —
-20.7% correct, conditional on having a website. If the other track lifts website coverage to 95%,
-the arithmetic gives 0.95 × 20.7% ≈ **20%** of the pool. This is arithmetic on two measured rates,
+not the method. H2 accepted 9 of the 29 companies that had a website and 8 of those were correct —
+27.6% correct, conditional on having a website. If the other track lifts website coverage to 95%,
+the arithmetic gives 0.95 × 27.6% ≈ **26%** of the pool. This is arithmetic on two measured rates,
 not a measurement.
 
-**The free route does not reach a coverage worth calling the problem solved.** At 10% today, or a
-projected 20% later, four office-less companies in five still land on the disc. If the goal is "most
+**The free route does not reach a coverage worth calling the problem solved.** At 13% today, or a
+projected 26% later, three office-less companies in four still land on the disc. If the goal is "most
 companies get a real dot", $8 is the better buy, and it is cheap enough that the analysis cost more
 than the purchase.
 
@@ -206,9 +254,12 @@ the hits. That measurement is free, it takes 70 requests, and it turns the $8 fr
 priced decision. `scripts/measure-geocoding-2026-08-27.mjs` already holds the sample and the
 acceptance rule. `scripts/geocode-lib.mjs` already holds `mapboxSearchUrl` and `parseMapboxResult`.
 
-**Worth doing regardless of the $8:** H2 is precise (6 of 7), its data is storable under any
-reading, and it depends on nothing but a company website. If website coverage lands, it is roughly
-160 companies' worth of real coordinates for the cost of a nightly crawl.
+**Worth doing regardless of the $8:** H2 is precise (8 of 9) and it depends on nothing but a
+company website. If website coverage lands, it is roughly 210 companies' worth of real coordinates
+for the cost of an incremental nightly crawl. Two conditions attach, and both are in this document
+rather than in a footnote: production's `isTrustworthyOffice` gate rejects address-shaped hits and
+would have to change, and the Nominatim terms above (4 requests per minute on a scheduled script,
+attribution, no reselling, ODbL share-alike) apply to the stored result, not just to the run.
 
 ---
 
@@ -225,6 +276,7 @@ node scripts/measure-geocoding-2026-08-27.mjs h1photon
 node scripts/measure-geocoding-2026-08-27.mjs h1overpass   # resumable, expect 429s
 node scripts/measure-geocoding-2026-08-27.mjs h2
 node scripts/measure-geocoding-2026-08-27.mjs h3board
+node scripts/measure-geocoding-2026-08-27.mjs selftest    # extractor fixtures, exits non-zero on a miss
 node scripts/measure-geocoding-2026-08-27.mjs report
 node scripts/measure-geocoding-2026-08-27.mjs probe --url=https://doccla.com/contact
 ```

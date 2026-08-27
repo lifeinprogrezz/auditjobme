@@ -189,7 +189,10 @@ async function stageSites() {
     try {
       // Ashby's public posting-api carries no company website (verified live
       // 2026-08-27: the response has only `jobs` + `apiVersion`), so there is
-      // nothing to recover there. Workable's widget account endpoint does.
+      // nothing to recover there. Workable's widget account endpoint does not
+      // either (re-verified 2026-08-27 on the sample's four Workable boards:
+      // the response holds only `name`, `description`, `jobs`). This stage
+      // therefore recovers zero websites; it is kept so that is on the record.
       const workable = /apply\.workable\.com\/([^/?#]+)/.exec(j.url);
       if (workable) {
         const res = await req("board", `https://apply.workable.com/api/v1/widget/accounts/${encodeURIComponent(workable[1])}`);
@@ -400,13 +403,18 @@ function textAddress(text) {
   const flat = text.replace(/\s*\n\s*/g, ", ").replace(/,\s*,/g, ",").replace(/\s+/g, " ");
   const out = [];
   const push = (v) => {
-    const t = v.replace(/\s+/g, " ").replace(/^[,\s]+|[,\s]+$/g, "");
+    const t = v.replace(/\s+/g, " ").replace(/\s+,/g, ",").replace(/^[,\s]+|[,\s]+$/g, "");
     if (t.length >= 10 && t.length <= 120 && !DENY.test(t) && !out.includes(t)) out.push(t);
   };
 
   // A. continental: street + house number, then a 4-5 digit postcode + city.
+  // The number may be separated from the street by a comma ("Via Schiaffino, 11"),
+  // the postcode by an en/em dash ("11 - 20158 Milan"), and a floor/door token may
+  // sit between them ("Vesterbrogade 26, 1. th 1620 Kobenhavn V"). All three shapes
+  // were MEASURED on this sample's own sites (akamas.io, usepropane.ai) after the
+  // first version of this regex missed both -- see stage `selftest`.
   const contRe =
-    /\b([\p{Lu}][\p{L}.'\-\u2019]{2,30}(?:[ -][\p{L}][\p{L}.'\-\u2019]{1,30}){0,3}\s\d{1,4}\s?[a-zA-Z]?)\s*,?\s*((?:[A-Z]{1,2}-)?\d{4,5})\s+([\p{Lu}][\p{L}\-. '\u2019]{2,40})/gu;
+    /\b([\p{Lu}][\p{L}.'\-\u2019]{2,30}(?:[ -][\p{L}][\p{L}.'\-\u2019]{1,30}){0,3},?\s\d{1,4}\s?[a-zA-Z]?)\s*(?:[,\u2013\u2014-]\s*)?(?:\d{1,2}\s?\.\s?[\p{L}]{0,3}\s*)?(?:[,\u2013\u2014-]\s*)?((?:[A-Z]{1,2}-)?\d{4,5})\s+([\p{Lu}][\p{L}\-. '\u2019]{2,40})/gu;
   // C. Dutch: "1234 AB City" postcode form.
   const nlRe =
     /\b([\p{Lu}][\p{L}.'\-\u2019]{2,30}(?:[ -][\p{L}][\p{L}.'\-\u2019]{1,30}){0,3}\s\d{1,4}\s?[a-zA-Z]?)\s*,?\s*(\d{4}\s?[A-Z]{2})\s+([\p{Lu}][\p{L}\-. '\u2019]{2,40})/gu;
@@ -627,6 +635,39 @@ async function stageProbe() {
   console.log("text  :", JSON.stringify(textAddress(strip(html))));
 }
 
+// -------------------------------------------------------------- stage: selftest
+/** Fixtures for textAddress, each one a string this sample's own websites
+ *  actually print. Two of them (akamas.io, usepropane.ai) are shapes the FIRST
+ *  version of the regex silently missed, which cost the measurement two real
+ *  hits; the rest are the shapes it already handled and must not lose.
+ *  `selftest` exits non-zero on any miss, so breaking the regex is loud. */
+const SELFTEST = [
+  // [page text, a substring every accepted address must contain, must-match?]
+  ["Akamas S.p.A. All rights reserved. \u2013 Via Schiaffino, 11 \u2013 20158 Milan, Italy", "Via Schiaffino", true],
+  ["Propane ApS Vesterbrogade 26, 1. th 1620 K\u00f8benhavn V Denmark", "Vesterbrogade 26", true],
+  ["c/o Impact Hub Munich GmbH, Gotzinger Stra\u00dfe 8, 81371 M\u00fcnchen", "Gotzinger", true],
+  ["Registered office: 184 Shepherds Bush Road, London W6 7NL", "Shepherds Bush Road", true],
+  ["Gaston Crommenlaan 4, 9050 Ghent, Belgium", "Gaston Crommenlaan", true],
+  ["Fred. Roeskestraat 115, 1076 EE Amsterdam", "Roeskestraat", true],
+  // Negatives: certification and registration numbers look like postcodes.
+  ["We are ISO 27001 certified and SOC 2 Type II audited.", null, false],
+  ["Company no 10267904 registered in England and Wales.", null, false],
+  // This one is guarded by DENY, not by the regex shape: without DENY the
+  // pattern matches it happily. It is here so removing DENY goes red.
+  ["Mailing address: Suite 402, 10115 Berlin", null, false],
+];
+function stageSelftest() {
+  let bad = 0;
+  for (const [text, want, shouldMatch] of SELFTEST) {
+    const got = textAddress(text);
+    const ok = shouldMatch ? got.some((a) => a.includes(want)) : got.length === 0;
+    if (!ok) bad += 1;
+    console.log(`${ok ? "ok  " : "FAIL"} ${JSON.stringify(text.slice(0, 52))} -> ${JSON.stringify(got)}`);
+  }
+  console.log(bad ? `${bad} of ${SELFTEST.length} fixtures FAILED` : `all ${SELFTEST.length} fixtures pass`);
+  if (bad) process.exitCode = 1;
+}
+
 // ---------------------------------------------------------------- stage: report
 function stageReport() {
   const { sample, pool_size } = readJson("sample.json");
@@ -668,7 +709,7 @@ function stageReport() {
 }
 
 const stage = process.argv[2];
-const stages = { sample: stageSample, sites: stageSites, h3board: stageH3Board, h1photon: stageH1Photon, h1overpass: stageH1Overpass, h2: stageH2, probe: stageProbe, report: stageReport };
+const stages = { sample: stageSample, sites: stageSites, h3board: stageH3Board, h1photon: stageH1Photon, h1overpass: stageH1Overpass, h2: stageH2, probe: stageProbe, selftest: stageSelftest, report: stageReport };
 if (!stages[stage]) {
   console.error(`usage: node ${path.basename(process.argv[1])} <${Object.keys(stages).join("|")}>`);
   process.exit(2);
