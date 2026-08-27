@@ -3468,6 +3468,17 @@
   },
   {
    "args": "",
+   "body_md5": "b37e8fd6fe7fba59d85a943522716efa",
+   "config": [
+    "search_path=\"\""
+   ],
+   "language": "sql",
+   "name": "my_referral_count",
+   "returns": "integer",
+   "security_definer": true
+  },
+  {
+   "args": "",
    "body_md5": "7e865e46f6dd56d78cb2d3e2dde7e8d8",
    "config": [
     "search_path=\"\""
