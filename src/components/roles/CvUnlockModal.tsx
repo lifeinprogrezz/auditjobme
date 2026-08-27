@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  ROLE_FAMILY_OPTIONS,
+  ROLE_PICKER_OPTIONS,
   ROLE_CAP,
   SECTOR_CAP,
   TOP_SECTOR_CHIPS,
@@ -17,16 +17,9 @@ import {
   hashCv,
   writeCvStash,
 } from "@/lib/labels";
-import { ROLE_FAMILY_OTHER } from "@/lib/roles";
 import { track } from "@/lib/analytics";
 import type { FilterOption } from "./FilterChip";
 
-// The picker's own list PLUS "Other" (issue #158 / A4): the map's Role facet
-// shows the five families plus an Other chip for unlabelled rows, so the
-// onboarding picker offers the identical set — a stray CvUnlockModal-only
-// array here, not folded into ROLE_FAMILY_OPTIONS, because SettingsPanel.tsx
-// reuses that same constant for its own roles picker and stays five-wide.
-const ROLE_PICKER_OPTIONS = [...ROLE_FAMILY_OPTIONS, { value: ROLE_FAMILY_OTHER, label: "Other" }];
 
 type Stage = "idle" | "reading" | "parsed";
 

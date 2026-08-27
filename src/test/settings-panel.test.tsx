@@ -342,3 +342,22 @@ describe("SettingsPanel — LinkedIn connections (issue #41, copy cut #156)", ()
     await waitFor(() => expect(onRemoveConnections).toHaveBeenCalledTimes(1));
   });
 });
+
+// Issue #158: onboarding can store "other", so Settings must render it as a chip
+// the owner can unpick — otherwise the pick is invisible, the cap is already met
+// by one visible chip, and every later save re-persists it (the trap the reviewer
+// caught before merge). One shared ROLE_PICKER_OPTIONS now feeds both pickers.
+describe("Other role chip in Settings (issue #158)", () => {
+  it("renders Other as selected and lets it be unpicked", () => {
+    const { onSaveTargets } = renderPanel({
+      cvText: "a CV",
+      targetRoles: ["product", "other"],
+      targetSectors: [],
+    });
+    const other = screen.getByRole("button", { name: "Other" });
+    expect(other.classList.contains("on")).toBe(true);
+    fireEvent.click(other);
+    fireEvent.click(screen.getByRole("button", { name: /Save targets/i }));
+    expect(onSaveTargets).toHaveBeenCalledWith(["product"], []);
+  });
+});

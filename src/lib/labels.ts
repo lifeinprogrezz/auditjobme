@@ -81,6 +81,19 @@ export function isRoleFamily(value: unknown): value is RoleFamily {
 export const ROLE_OTHER = "other";
 
 /**
+ * The role chips BOTH pickers render: the five families plus Other, matching the
+ * map filter. One list on purpose (issue #158): when onboarding could offer Other
+ * and Settings could not, a user who picked it saw a selected-but-invisible chip,
+ * hit the cap with one visible pick, and had no way to unpick it — their targets
+ * were frozen forever. Any future chip or cap change now moves in both surfaces
+ * at once. Pinned by src/test/settings-panel.test.tsx and cv-unlock-modal tests.
+ */
+export const ROLE_PICKER_OPTIONS: { value: RoleFamily | typeof ROLE_OTHER; label: string }[] = [
+  ...ROLE_FAMILY_OPTIONS,
+  { value: ROLE_OTHER, label: "Other" },
+];
+
+/**
  * Any stored target-role value → a family, or null when it maps to none.
  *
  * Accepts a family (already current), a retired archetype, and "Product Manager"
