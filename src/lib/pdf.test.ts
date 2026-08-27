@@ -6,6 +6,7 @@ import {
   buildCoverDoc,
   buildStructuredCvDoc,
   contactLines,
+  foldGroupedExperience,
   coverDateLine,
   formatDateEN,
   jobMetaLine,
@@ -385,6 +386,117 @@ describe("structured CV doc (#150)", () => {
     expect(linkHref("github.com/jane")).toBe("https://github.com/jane");
     expect(linkHref("http://jane.dev/")).toBe("http://jane.dev/");
     expect(linkHref(" mailto:j@x.com ")).toBe("mailto:j@x.com");
+  });
+});
+
+// The owner's grouping flag (#150 follow-up): his CV lists Northgoing and DistroNow as
+// entries of their own, so the parse read them as jobs, correctly. He is the only one
+// who can say they belong under "Independent Builds & Advisory". The flag moves his
+// bullets and never writes a word.
+describe("grouped experience entries", () => {
+  /** Three entries: a parent, then two the owner marked as part of it. */
+  const GROUPED_SOURCE = `Jane Doe
+
+Independent Builds
+Founder
+2023 - Present
+- Shipped a job search product end to end
+
+Northgoing
+Founder
+2025
+- Built the scoring engine
+
+DistroNow
+Founder
+2024
+- Built the stockist map`;
+
+  const threeEntries = (flags: [boolean, boolean]): CvStructured =>
+    validateCvStructured(
+      {
+        contact: { name: "Jane Doe", links: [] },
+        experience: [
+          { company: "Independent Builds", role: "Founder", start: "2023", end: "Present", bullets: ["Shipped a job search product end to end"] },
+          { company: "Northgoing", role: "Founder", start: "2025", end: "", bullets: ["Built the scoring engine"], groupedIntoPrevious: flags[0] },
+          { company: "DistroNow", role: "Founder", start: "2024", end: "", bullets: ["Built the stockist map"], groupedIntoPrevious: flags[1] },
+        ],
+      },
+      GROUPED_SOURCE,
+    ).cv;
+
+  const blocksOf = (doc: Record<string, unknown>) =>
+    (doc.content as ContentItem[]).filter((c) => Array.isArray(c.stack)) as { stack: ContentItem[]; margin?: unknown }[];
+
+  it("folds ONE marked entry into the one above it: its bullets join, its heading goes", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: threeEntries([true, false]) });
+    const blocks = blocksOf(doc);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].stack[0]).toMatchObject({ text: "Independent Builds" });
+    // The marked entry's own company, role and dates are not printed anywhere.
+    const flat = JSON.stringify(doc);
+    expect(flat).not.toContain("Northgoing");
+    expect(flat).not.toContain("2025");
+    // Its bullet is there, verbatim, after the parent's own.
+    expect((blocks[0].stack.at(-1)?.ul as ContentItem[]).map((b) => b.text)).toEqual([
+      "Shipped a job search product end to end",
+      "Built the scoring engine",
+    ]);
+    // The entry that was not marked still prints as its own job.
+    expect(blocks[1].stack[0]).toMatchObject({ text: "DistroNow" });
+  });
+
+  it("folds TWO marked entries in a row into the nearest unmarked entry above them", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: threeEntries([true, true]) });
+    const blocks = blocksOf(doc);
+    expect(blocks).toHaveLength(1);
+    expect((blocks[0].stack.at(-1)?.ul as ContentItem[]).map((b) => b.text)).toEqual([
+      "Shipped a job search product end to end",
+      "Built the scoring engine",
+      "Built the stockist map",
+    ]);
+    const flat = JSON.stringify(doc);
+    expect(flat).not.toContain("Northgoing");
+    expect(flat).not.toContain("DistroNow");
+  });
+
+  it("keeps the engine's block spacing on the blocks that remain, first one collapsed", () => {
+    expect(blocksOf(buildStructuredCvDoc({ name: "", summary: "", cv: threeEntries([true, false]) })).map((b) => b.margin))
+      .toEqual([
+        [0, 3, 0, 0],
+        [0, 9.75, 0, 0],
+      ]);
+  });
+
+  it("an UNMARKED structure builds the same document it built before the flag existed", () => {
+    const plain = threeEntries([false, false]);
+    const before = buildStructuredCvDoc({ name: "", summary: "Tailored.", cv: plain });
+    // Same profile with the field written out as false: still the plain render.
+    const withFalse = structuredClone(plain);
+    for (const job of withFalse.experience) job.groupedIntoPrevious = false;
+    expect(JSON.stringify(buildStructuredCvDoc({ name: "", summary: "Tailored.", cv: withFalse }))).toBe(
+      JSON.stringify(before),
+    );
+    expect(blocksOf(before)).toHaveLength(3);
+  });
+
+  it("foldGroupedExperience never drops a bullet, and never invents one", () => {
+    const jobs = threeEntries([true, true]).experience;
+    const folded = foldGroupedExperience(jobs);
+    expect(folded).toHaveLength(1);
+    expect(folded[0].head.company).toBe("Independent Builds");
+    expect(folded[0].bullets).toEqual(jobs.flatMap((j) => j.bullets));
+    // Nothing was mutated: the marked entries keep their own bullets on the structure.
+    expect(jobs[1].bullets).toEqual(["Built the scoring engine"]);
+    expect(foldGroupedExperience([])).toEqual([]);
+  });
+
+  it("a flag on the FIRST entry is inert here too: it opens its own block", () => {
+    const first = [
+      { company: "Acme", role: "PM", start: "", end: "", bullets: ["Shipped it"], groupedIntoPrevious: true },
+    ];
+    expect(foldGroupedExperience(first)).toHaveLength(1);
+    expect(foldGroupedExperience(first)[0].head.company).toBe("Acme");
   });
 });
 

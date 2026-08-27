@@ -140,6 +140,62 @@ describe("validateCvStructured — cite or refuse", () => {
   });
 });
 
+// The owner's one layout choice (#150 follow-up). The parse must keep mirroring the
+// CV, so this flag is never set by the parser: it only ever comes back from the editor.
+describe("groupedIntoPrevious — the owner's grouping flag", () => {
+  /** Two entries, both real in the CV above, so grounding never gets in the way. */
+  const twoJobs = (grouped?: boolean) => ({
+    ...HONEST,
+    experience: [
+      HONEST.experience[0],
+      {
+        company: "Acme Corp",
+        role: "Product Manager",
+        start: "",
+        end: "",
+        bullets: ["Led a team of 5 engineers"],
+        ...(grouped === undefined ? {} : { groupedIntoPrevious: grouped }),
+      },
+    ],
+  });
+
+  it("round-trips a flagged entry through validate, storage and the read back", () => {
+    const validated = validateCvStructured(twoJobs(true), CV).cv;
+    expect(validated.experience[1].groupedIntoPrevious).toBe(true);
+    const read = readCvStructured(JSON.parse(JSON.stringify(validated)));
+    expect(read?.experience[1].groupedIntoPrevious).toBe(true);
+  });
+
+  it("leaves an unflagged structure exactly as it was: the field is absent, not false", () => {
+    const validated = validateCvStructured(twoJobs(), CV).cv;
+    expect("groupedIntoPrevious" in validated.experience[1]).toBe(false);
+    // An explicit false is the same thing as no flag at all, and is stored as no flag.
+    const explicitlyFalse = validateCvStructured(twoJobs(false), CV).cv;
+    expect(JSON.stringify(explicitlyFalse)).toBe(JSON.stringify(validated));
+  });
+
+  it("IGNORES the flag on the first entry: there is nothing above it to join", () => {
+    const first = { ...HONEST, experience: [{ ...HONEST.experience[0], groupedIntoPrevious: true }] };
+    const validated = validateCvStructured(first, CV).cv;
+    expect(validated.experience[0].groupedIntoPrevious).toBeUndefined();
+    // Same on the way back out of the database, so a stale row cannot revive it.
+    const stored = readCvStructured({ ...validated, experience: [{ ...validated.experience[0], groupedIntoPrevious: true }] });
+    expect(stored?.experience[0].groupedIntoPrevious).toBeUndefined();
+  });
+
+  it("takes only a real true, never a truthy string or a number", () => {
+    const junk = {
+      ...HONEST,
+      experience: [HONEST.experience[0], { ...twoJobs(true).experience[1], groupedIntoPrevious: "yes" }],
+    };
+    expect(coerceCvStructured(junk).experience[1].groupedIntoPrevious).toBeUndefined();
+  });
+
+  it("never asks the model for it: the parse prompt has no grouping field", () => {
+    expect(buildCvParsePrompt(CV)).not.toContain("groupedIntoPrevious");
+  });
+});
+
 describe("reading a stored structure", () => {
   it("keeps dates on the way back out (they were grounded before they were written)", () => {
     const stored = validateCvStructured(HONEST, CV).cv;

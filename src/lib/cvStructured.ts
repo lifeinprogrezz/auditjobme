@@ -30,6 +30,15 @@ export type CvExperience = {
   end: string;
   location?: string;
   bullets: string[];
+  /**
+   * The owner's own call, made in the editor: print these bullets under the entry
+   * ABOVE instead of as a job of its own. A CV that gives a side project its own
+   * title and dates parses as a job, because that is what the CV says, and the parse
+   * must keep mirroring the CV. So the parser NEVER sets this. Absent or false is
+   * exactly the render as it was. A flag on the first entry is dropped: nothing sits
+   * above it to join.
+   */
+  groupedIntoPrevious?: boolean;
 };
 
 export type CvEducation = {
@@ -138,14 +147,18 @@ export function coerceCvStructured(raw: unknown): CvStructured {
     const company = str(e.company, CV_LIMITS.shortField);
     const role = str(e.role, CV_LIMITS.shortField);
     if (!company && !role) continue;
-    cv.experience.push({
+    const entry: CvExperience = {
       company,
       role,
       start: str(e.start, CV_LIMITS.dateField),
       end: str(e.end, CV_LIMITS.dateField),
       location: str(e.location, CV_LIMITS.shortField) || undefined,
       bullets: strList(e.bullets, CV_LIMITS.longField, CV_LIMITS.bulletsPerRole),
-    });
+    };
+    // Only a real `true` is carried, and never on the first kept entry. An absent
+    // flag leaves the stored shape identical to what it was before the flag existed.
+    if (e.groupedIntoPrevious === true && cv.experience.length > 0) entry.groupedIntoPrevious = true;
+    cv.experience.push(entry);
   }
 
   const rawEdu = Array.isArray(obj.education) ? obj.education : [];
@@ -186,6 +199,10 @@ export function coerceCvStructured(raw: unknown): CvStructured {
  * Company names, school names and skill labels are NOT grounded. A CV writes them
  * in a layout the text extraction can split, and they carry no claim about what the
  * person did. Bullets and dates are where a fabricated claim would live.
+ *
+ * groupedIntoPrevious is not grounded either, and never can be: it is a layout choice
+ * the owner makes in the editor, not a claim the CV makes. coerceCvStructured has
+ * already dropped it from the first entry by the time this returns.
  */
 export function validateCvStructured(raw: unknown, cvText: string): CvValidation {
   const cv = coerceCvStructured(raw);
