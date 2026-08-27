@@ -159,6 +159,27 @@ describe("cronAuthResult (B1 — fail closed)", () => {
   it("returns null (authorized) for the exact Bearer <secret> header", () => {
     expect(cronAuthResult("s3cret", "Bearer s3cret")).toBeNull();
   });
+
+  // 2026-08-27: the pg_cron scheduler needs a secret the database can hold in
+  // Vault, and Vercel's Secret-type env vars are write-only, so CRON_SECRET
+  // cannot be copied there. The endpoints accept a LIST instead: GitHub keeps
+  // its secret, the database gets its own, nothing is rotated.
+  it("accepts any of several configured secrets", () => {
+    expect(cronAuthResult(["gh-secret", "db-secret"], "Bearer gh-secret")).toBeNull();
+    expect(cronAuthResult(["gh-secret", "db-secret"], "Bearer db-secret")).toBeNull();
+    expect(cronAuthResult(["gh-secret", "db-secret"], "Bearer nope")).toMatchObject({ status: 401 });
+  });
+
+  it("ignores blank and missing entries, so an unset second secret authorizes nothing", () => {
+    expect(cronAuthResult(["gh-secret", undefined], "Bearer gh-secret")).toBeNull();
+    expect(cronAuthResult(["gh-secret", "  "], "Bearer   ")).toMatchObject({ status: 401 });
+    expect(cronAuthResult(["gh-secret", ""], "Bearer ")).toMatchObject({ status: 401 });
+  });
+
+  it("still fails CLOSED with 500 when every entry is empty", () => {
+    expect(cronAuthResult([undefined, ""], "Bearer whatever")).toMatchObject({ status: 500 });
+    expect(cronAuthResult([], "Bearer whatever")).toMatchObject({ status: 500 });
+  });
 });
 
 describe("rankMatches", () => {

@@ -647,7 +647,7 @@ export async function runBacklog(
  *  The secret gates THIS entry point only; the kick path proves identity with the
  *  caller's own Supabase JWT and never sees the secret (api/score-kick.ts). */
 async function handler(req: Req, res: Res): Promise<void> {
-  const authError = cronAuthResult(process.env.CRON_SECRET, req.headers["authorization"]);
+  const authError = cronAuthResult([process.env.CRON_SECRET, process.env.CRON_SECRET_DB], req.headers["authorization"]);
   if (authError) {
     res.status(authError.status).json({ error: authError.error });
     return;

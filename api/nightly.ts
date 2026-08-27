@@ -226,7 +226,7 @@ async function handler(req: Req, res: Res): Promise<void> {
   // <CRON_SECRET>`. A MISSING CRON_SECRET is a misconfiguration (500), NOT a
   // bypass — otherwise the worker would be publicly triggerable. Method is not
   // part of the auth check: do NOT restrict to POST or the cron GET breaks.
-  const authError = cronAuthResult(env("CRON_SECRET"), req.headers["authorization"]);
+  const authError = cronAuthResult([env("CRON_SECRET"), env("CRON_SECRET_DB")], req.headers["authorization"]);
   if (authError) {
     res.status(authError.status).json({ error: authError.error });
     return;

@@ -214,8 +214,14 @@ The three HTTP workers are therefore scheduled by `pg_cron` inside Supabase
 (migration `20260827170000_pg_cron_scheduler.sql`): `northgoing-nightly` every ten
 minutes across 06:00-09:50 UTC, `northgoing-score-backlog` every ten minutes, and
 `northgoing-spend-alert` at 10:00 UTC. Each job calls `public.tick_worker(name)`,
-which reads the cron secret from Supabase Vault (secret name `cron_secret`) and
-posts to `https://northgoing.com/api/<name>` with it. While that Vault secret is
+which reads the cron secret from Supabase Vault (secret name `cron_secret_db`,
+falling back to `cron_secret`) and posts to `https://northgoing.com/api/<name>`
+with it. That secret is the database's OWN: Vercel env vars of type Secret are
+write-only, so the existing `CRON_SECRET` cannot be copied into Vault, and
+rotating it would take Vercel, the GitHub repo secret and Vault down together.
+The endpoints accept either secret (`cronAuthResult` takes a list), so the GitHub
+workflows keep running on the untouched `CRON_SECRET` while the database uses
+`CRON_SECRET_DB`. While that Vault secret is
 absent the function does nothing at all, so the schedule is safe to install before
 the secret exists.
 
@@ -225,7 +231,8 @@ purchase. Work that runs ON a runner rather than behind an endpoint — the scra
 the JD backfill, the company-data catch-up — still depends on GitHub cron; if that
 starves again, trigger it from the Actions tab or move it behind an endpoint too.
 
-To rotate the secret: update it in Vault; nothing in the repo changes.
+To rotate the database's secret: set a new value in Vercel (`CRON_SECRET_DB`) and
+the same value in Vault (`cron_secret_db`); nothing in the repo changes.
 
 ## The spend alert — signal, not a cap
 

@@ -81,7 +81,7 @@ async function sendEmail(apiKey: string, to: string, subject: string, text: stri
 }
 
 async function handler(req: Req, res: Res): Promise<void> {
-  const authError = cronAuthResult(process.env.CRON_SECRET, req.headers["authorization"]);
+  const authError = cronAuthResult([process.env.CRON_SECRET, process.env.CRON_SECRET_DB], req.headers["authorization"]);
   if (authError) {
     res.status(authError.status).json({ error: authError.error });
     return;

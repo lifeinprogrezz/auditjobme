@@ -44,11 +44,25 @@ export function nightlyBudgetExhausted(
  * of the auth decision.
  */
 export function cronAuthResult(
-  cronSecret: string | undefined | null,
+  cronSecret: string | undefined | null | (string | undefined | null)[],
   authHeader: string | string[] | undefined | null,
 ): { status: number; error: string } | null {
-  if (!cronSecret) return { status: 500, error: "CRON_SECRET not configured" };
-  if (authHeader !== `Bearer ${cronSecret}`) return { status: 401, error: "Unauthorized" };
+  // More than one secret may be accepted at once (2026-08-27). The pg_cron
+  // scheduler in Supabase needs a secret the database can hold in Vault, and a
+  // Vercel env var of type Secret is write-only: the existing CRON_SECRET cannot
+  // be read back to copy it there, and rotating it would mean updating Vercel,
+  // the GitHub repo secret and Vault together, with every caller failing closed
+  // in between. So the database gets its OWN secret (CRON_SECRET_DB) and the
+  // GitHub workflows keep theirs, untouched. Empty and missing values are
+  // discarded, so a blank env var can never authorize anything.
+  const accepted = (Array.isArray(cronSecret) ? cronSecret : [cronSecret])
+    .map((s) => (typeof s === "string" ? s.trim() : ""))
+    .filter((s) => s.length > 0);
+  if (accepted.length === 0) return { status: 500, error: "CRON_SECRET not configured" };
+  if (typeof authHeader !== "string") return { status: 401, error: "Unauthorized" };
+  if (!accepted.some((secret) => authHeader === `Bearer ${secret}`)) {
+    return { status: 401, error: "Unauthorized" };
+  }
   return null;
 }
 
