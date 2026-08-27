@@ -30,12 +30,16 @@ declare
   --   geocode_cache               -- internal geocoder cache (issue #153); the
   --     client reads company_offices, the result this cache feeds, never the
   --     cache itself.
+  --   logo_probe_cache            -- internal logo-domain probe results (issue
+  --     #153); the client reads companies.logo_domain, the result this cache
+  --     feeds, never the cache itself.
   deny_all_allowlist text[] := array[
     'whitelisted_emails',
     'headcount_bucket_backup_20260726',
     'companies_sector_backup_20260819',
     'profiles_targets_backup_20260819',
-    'geocode_cache'
+    'geocode_cache',
+    'logo_probe_cache'
   ];
 begin
   select string_agg(c.relname, ', ' order by c.relname)

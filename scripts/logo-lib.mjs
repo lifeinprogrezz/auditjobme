@@ -157,8 +157,11 @@ const SECOND_LEVEL_CCTLDS = new Set(["co.uk", "org.uk", "ac.uk", "co.jp", "co.nz
  *  resolved to a DIFFERENT full host (wandercraft.welcomekit.co vs
  *  corma.welcomekit.co vs flynt.welcomekit.co), so the exact-host count
  *  below never saw 3 of the same string and the >=N guard never fired. Last
- *  two labels, except a known second-level ccTLD where it's the last three. */
-function registrableDomain(host) {
+ *  two labels, except a known second-level ccTLD where it's the last three.
+ *  Exported so scripts/logo-handle-lib.mjs judges a redirect against the SAME
+ *  notion of "the same domain" this guard groups by -- one definition, two
+ *  callers. */
+export function registrableDomain(host) {
   const labels = String(host || "").split(".");
   if (labels.length <= 2) return host;
   const lastTwo = labels.slice(-2).join(".");
