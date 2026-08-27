@@ -86,9 +86,9 @@ const JOB_META_STYLE = { fontSize: 11, margin: [0, 0, 0, px(5)] as number[] };
 const BULLET_MARGIN = [0, 0, 0, px(3)] as number[];
 
 /**
- * One job or one degree, kept off a page seam so a heading never strands its bullets.
- * The engine's h3 carries margin-top 13px; CSS collapses it with the h2's 9px bottom
- * margin for the FIRST block of a section, so that one only adds the difference.
+ * The gap above one job or one degree. The engine's h3 carries margin-top 13px; CSS
+ * collapses it with the h2's 9px bottom margin for the FIRST block of a section, so
+ * that one only adds the difference.
  */
 function blockMargin(index: number): number[] {
   return [0, index === 0 ? px(13) - px(9) : px(13), 0, 0];
@@ -270,7 +270,23 @@ export function buildStructuredCvDoc({ name, summary, cv }: { name: string; summ
   // Blocks, not entries: an entry the owner marked prints inside the one above it.
   // Then the blocks he marked as projects lift out into their own section below.
   const sections = splitProjectBlocks(cv.experience);
-  /** One headed run of experience blocks. Empty run, no header: never an empty section. */
+  /**
+   * One headed run of experience blocks. Empty run, no header: never an empty section.
+   *
+   * WHAT TRAVELS TOGETHER (measured, 2026-08-27). Every job used to print as ONE
+   * unbreakable node, so a job that missed the foot of the page moved whole. On a real
+   * download the third job measured 126.09 pt against 124.62 pt of room left: it missed
+   * by 1.47 pt, moved entire, and left a 136.62 pt blank band, 18.4% of the usable
+   * column, at the bottom of page 1. The band read as a formatting error on a document
+   * that goes to employers.
+   *
+   * What unbreakable was protecting is a heading with nothing under it: a company name,
+   * its role and its dates stranded at the foot of a page, away from the work they
+   * introduce. That much still travels as one node, WITH the first bullet, so the
+   * heading always has a line of the job under it. The remaining bullets are their own
+   * list and flow over the seam like any other prose. Same 78.24 pt block in the
+   * measurement above, and the blank band goes to 0.78 pt.
+   */
   const pushBlocks = (header: string, blocks: CvExperienceBlock[]) => {
     if (blocks.length === 0) return;
     content.push({ text: header, ...CV_SECTION_HEADER });
@@ -283,8 +299,11 @@ export function buildStructuredCvDoc({ name, summary, cv }: { name: string; summ
       // Bullets stay VERBATIM: no ** promotion, unlike the summary. The user's own
       // asterisks print as asterisks.
       const bullets = raw.map(ats).filter(Boolean);
-      if (bullets.length > 0) stack.push(bulletList(bullets.map((text) => ({ text }))));
+      // Only the heading lines and the FIRST bullet are kept together; the rest flow.
+      const [firstBullet, ...restBullets] = bullets;
+      if (firstBullet) stack.push(bulletList([{ text: firstBullet }]));
       content.push({ stack, unbreakable: true, margin: blockMargin(i) });
+      if (restBullets.length > 0) content.push(bulletList(restBullets.map((text) => ({ text }))));
     });
   };
   pushBlocks("PROFESSIONAL EXPERIENCE", sections.experience);

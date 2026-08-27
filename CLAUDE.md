@@ -43,7 +43,9 @@ resurrect it into v1.
    that is not verbatim in `cv_text` before it is stored (`src/lib/cvStructured.ts`). The
    owner edits that structure in Settings, `buildStructuredCvDoc` renders it
    deterministically (`src/lib/pdf.ts`), and a profile with no structure falls back to the
-   verbatim `cv_text` render. Per-role LLM output = professional summary + cover letter only.
+   verbatim `cv_text` render. Per-role LLM output = professional summary + cover letter only,
+   and a company name in that summary is put back to the CV's own spelling in code
+   (`fixCompanyCasing`, `src/lib/tailor.ts`) — casing only, never a word.
 2. **RLS is the security model.** Every table gets row-level-security policies, tested in
    CI. Assume every reader of this code is hostile.
 3. **No secrets in this repo, ever.** `VITE_`-prefixed Supabase publishable values in

@@ -71,6 +71,30 @@ function textsOf(doc: Record<string, unknown>): unknown[] {
   return (doc.content as ContentItem[]).map((c) => c.text);
 }
 
+/**
+ * One printed job as the reader sees it: its heading, and every bullet under it in
+ * order. A job prints as TWO nodes — the heading kept with its first bullet, then the
+ * bullets that are free to flow over a page seam — so a test that reads only the first
+ * node would read half a job. A section header (a bare text node) closes the run.
+ */
+function printedJobs(doc: Record<string, unknown>): { head: string; bullets: unknown[] }[] {
+  const jobs: { head: string; bullets: unknown[] }[] = [];
+  let open: { head: string; bullets: unknown[] } | null = null;
+  for (const node of doc.content as ContentItem[]) {
+    if (Array.isArray(node.stack) && node.unbreakable === true) {
+      const stack = node.stack as ContentItem[];
+      const inBlock = (stack.at(-1)?.ul as ContentItem[] | undefined) ?? [];
+      open = { head: String((stack[0] as ContentItem | undefined)?.text ?? ""), bullets: inBlock.map((b) => b.text) };
+      jobs.push(open);
+    } else if (Array.isArray(node.ul) && open) {
+      open.bullets.push(...(node.ul as ContentItem[]).map((b) => b.text));
+    } else if (node.text !== undefined) {
+      open = null;
+    }
+  }
+  return jobs;
+}
+
 describe("pdf doc builders", () => {
   it("boldRuns promotes **markers** to bold runs and keeps the rest plain", () => {
     expect(boldRuns("grew **40%** fast")).toEqual([
@@ -259,7 +283,7 @@ describe("structured CV doc (#150)", () => {
     });
   });
 
-  it("prints each job as one unbreakable block: company, role, dates with location, then real bullets", () => {
+  it("prints each job as a heading kept with its first bullet, then real bullets", () => {
     const doc = buildStructuredCvDoc({ name: "", summary: "s", cv: STRUCTURED });
     const block = (doc.content as ContentItem[]).find((c) => c.unbreakable === true) as {
       stack: ContentItem[];
@@ -271,12 +295,12 @@ describe("structured CV doc (#150)", () => {
     // The meta line is 11pt regular, black (no colour), with the engine's 5px below.
     expect(block.stack[2]).toEqual({ text: "09/2021 - Present | Barcelona, Spain", fontSize: 11, margin: [0, 0, 0, 3.75] });
     // A real list, not a paragraph of run-together text, 3px between items.
-    const bullets = block.stack[3].ul as ContentItem[];
-    expect(bullets.map((b) => b.text)).toEqual([
+    expect(printedJobs(doc)[0].bullets).toEqual([
       "Grew activation 40% by shipping an onboarding redesign",
       "Led a team of 5 engineers",
     ]);
-    for (const b of bullets) expect(b.margin).toEqual([0, 0, 0, 2.25]);
+    const lists = (doc.content as ContentItem[]).filter((c) => Array.isArray(c.ul));
+    for (const list of lists) for (const b of list.ul as ContentItem[]) expect(b.margin).toEqual([0, 0, 0, 2.25]);
   });
 
   it("spaces blocks like the engine's h3 (13px above), collapsed against the section header for the first", () => {
@@ -390,6 +414,142 @@ describe("structured CV doc (#150)", () => {
   });
 });
 
+// A page seam. Every job used to print as ONE unbreakable node, so a job that missed
+// the foot of the page moved whole. Measured on a real download: the third job needed
+// 126.09 pt and had 124.62 pt of room, missed by 1.47 pt, and left 136.62 pt blank at
+// the bottom of page 1 — 18.4% of the usable column. What must never split is a
+// heading with nothing under it, so the heading now travels with its FIRST bullet and
+// the remaining bullets flow. Same document when nothing breaks; no blank band when
+// something does.
+describe("a job's heading travels with its first bullet, the rest flow", () => {
+  const SEAM_SOURCE = `Jane Doe
+
+Acme Corp
+Product Manager
+09/2021 - 12/2024
+- Grew activation 40% by shipping an onboarding redesign
+- Led a team of 5 engineers
+- Ran the weekly pricing review
+
+Globex
+Analyst
+2019 - 2021
+- Built the stockist map
+- Shipped the scoring engine
+
+Solo Ltd
+Founder
+2018 - 2019
+- Did the one thing
+
+Quiet Co
+Adviser
+2017 - 2018
+
+University of Vigo
+Bachelor in Business Administration
+09/2015 - 06/2020`;
+
+  const seamCv = (): CvStructured =>
+    validateCvStructured(
+      {
+        contact: { name: "Jane Doe", links: [] },
+        experience: [
+          {
+            company: "Acme Corp",
+            role: "Product Manager",
+            start: "09/2021",
+            end: "12/2024",
+            bullets: [
+              "Grew activation 40% by shipping an onboarding redesign",
+              "Led a team of 5 engineers",
+              "Ran the weekly pricing review",
+            ],
+          },
+          { company: "Globex", role: "Analyst", start: "2019", end: "2021", bullets: ["Built the stockist map", "Shipped the scoring engine"] },
+          { company: "Solo Ltd", role: "Founder", start: "2018", end: "2019", bullets: ["Did the one thing"] },
+          { company: "Quiet Co", role: "Adviser", start: "2017", end: "2018", bullets: [] },
+        ],
+        education: [
+          { school: "University of Vigo", degree: "Bachelor in Business Administration", start: "09/2015", end: "06/2020" },
+        ],
+      },
+      SEAM_SOURCE,
+    ).cv;
+
+  /** The content nodes of the experience section, in order, blocks and lists alike. */
+  const nodesUnder = (doc: Record<string, unknown>, header: string): ContentItem[] => {
+    const content = doc.content as ContentItem[];
+    const start = content.findIndex((c) => c.text === header);
+    const rest = content.slice(start + 1);
+    const end = rest.findIndex((c) => typeof c.text === "string");
+    return end < 0 ? rest : rest.slice(0, end);
+  };
+
+  it("keeps company, role, dates and the FIRST bullet in the unbreakable block", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: seamCv() });
+    const block = nodesUnder(doc, "PROFESSIONAL EXPERIENCE")[0];
+    expect(block.unbreakable).toBe(true);
+    const stack = block.stack as ContentItem[];
+    expect(stack.map((s) => s.text)).toEqual(["Acme Corp", "Product Manager", "09/2021 - 12/2024", undefined]);
+    // Exactly one bullet rides with the heading: enough that the heading is never
+    // stranded, few enough that a long job no longer moves whole.
+    expect((stack.at(-1)?.ul as ContentItem[]).map((b) => b.text)).toEqual([
+      "Grew activation 40% by shipping an onboarding redesign",
+    ]);
+  });
+
+  it("lets the remaining bullets flow: their own list, breakable, same spacing", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: seamCv() });
+    const flowed = nodesUnder(doc, "PROFESSIONAL EXPERIENCE")[1];
+    expect((flowed.ul as ContentItem[]).map((b) => b.text)).toEqual([
+      "Led a team of 5 engineers",
+      "Ran the weekly pricing review",
+    ]);
+    // Breakable is the whole point: this node is what may split across the seam.
+    expect(flowed.unbreakable).toBeUndefined();
+    // And it carries no extra gap, so the split is invisible when nothing breaks.
+    expect(flowed.margin).toBeUndefined();
+    for (const b of flowed.ul as ContentItem[]) expect(b.margin).toEqual([0, 0, 0, 2.25]);
+  });
+
+  it("emits no second list when a job has one bullet, and none at all when it has none", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: seamCv() });
+    const nodes = nodesUnder(doc, "PROFESSIONAL EXPERIENCE");
+    const heads = nodes.map((n) => (Array.isArray(n.stack) ? (n.stack as ContentItem[])[0].text : "(flowed bullets)"));
+    expect(heads).toEqual(["Acme Corp", "(flowed bullets)", "Globex", "(flowed bullets)", "Solo Ltd", "Quiet Co"]);
+    // The one-bullet job keeps its bullet with the heading and adds nothing after it.
+    const solo = nodes[4].stack as ContentItem[];
+    expect((solo.at(-1)?.ul as ContentItem[]).map((b) => b.text)).toEqual(["Did the one thing"]);
+    // The job with no bullets is a heading and nothing else — no empty list.
+    expect((nodes[5].stack as ContentItem[]).map((s) => s.text)).toEqual(["Quiet Co", "Adviser", "2017 - 2018"]);
+  });
+
+  it("prints every bullet exactly once, in the CV's order, verbatim", () => {
+    const cv = seamCv();
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv });
+    expect(printedJobs(doc).map((j) => ({ head: j.head, bullets: j.bullets }))).toEqual([
+      { head: "Acme Corp", bullets: cv.experience[0].bullets },
+      { head: "Globex", bullets: cv.experience[1].bullets },
+      { head: "Solo Ltd", bullets: cv.experience[2].bullets },
+      { head: "Quiet Co", bullets: [] },
+      { head: "University of Vigo", bullets: [] },
+    ]);
+  });
+
+  it("keeps a degree whole: it is a heading with no bullets, so nothing flows out of it", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: seamCv() });
+    const nodes = nodesUnder(doc, "EDUCATION");
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].unbreakable).toBe(true);
+    expect((nodes[0].stack as ContentItem[]).map((s) => s.text)).toEqual([
+      "University of Vigo",
+      "Bachelor in Business Administration",
+      "09/2015 - 06/2020",
+    ]);
+  });
+});
+
 // The owner's grouping flag (#150 follow-up): his CV lists Northgoing and DistroNow as
 // entries of their own, so the parse read them as jobs, correctly. He is the only one
 // who can say they belong under "Independent Builds & Advisory". The flag moves his
@@ -439,7 +599,7 @@ Founder
     expect(flat).not.toContain("Northgoing");
     expect(flat).not.toContain("2025");
     // Its bullet is there, verbatim, after the parent's own.
-    expect((blocks[0].stack.at(-1)?.ul as ContentItem[]).map((b) => b.text)).toEqual([
+    expect(printedJobs(doc)[0].bullets).toEqual([
       "Shipped a job search product end to end",
       "Built the scoring engine",
     ]);
@@ -451,7 +611,7 @@ Founder
     const doc = buildStructuredCvDoc({ name: "", summary: "", cv: threeEntries([true, true]) });
     const blocks = blocksOf(doc);
     expect(blocks).toHaveLength(1);
-    expect((blocks[0].stack.at(-1)?.ul as ContentItem[]).map((b) => b.text)).toEqual([
+    expect(printedJobs(doc)[0].bullets).toEqual([
       "Shipped a job search product end to end",
       "Built the scoring engine",
       "Built the stockist map",
@@ -570,8 +730,15 @@ Bachelor in Business Administration
     return (end < 0 ? rest : rest.slice(0, end)).filter((c) => Array.isArray(c.stack));
   };
   const headOf = (block: ContentItem) => (block.stack as ContentItem[])[0]?.text;
-  const bulletsOf = (block: ContentItem) =>
-    (((block.stack as ContentItem[]).at(-1)?.ul ?? []) as ContentItem[]).map((b) => b.text);
+  /** Every bullet the block prints: the one kept with its heading, then the ones that
+   *  flow after it in a list of their own (see printedJobs). */
+  const bulletsOf = (doc: Record<string, unknown>, block: ContentItem) => {
+    const content = doc.content as ContentItem[];
+    const bullets = (((block.stack as ContentItem[]).at(-1)?.ul ?? []) as ContentItem[]).map((b) => b.text);
+    const next = content[content.indexOf(block) + 1];
+    if (next && Array.isArray(next.ul)) bullets.push(...(next.ul as ContentItem[]).map((b) => b.text));
+    return bullets;
+  };
 
   it("lifts ONE flagged entry into a Projects section, whole, right after experience", () => {
     const doc = buildStructuredCvDoc({ name: "", summary: "", cv: fourEntries([true, false, false, false]) });
@@ -593,7 +760,7 @@ Bachelor in Business Administration
       "Founder",
       "03/2026 - Present",
     ]);
-    expect(bulletsOf(project)).toEqual(["Built the scoring engine end to end"]);
+    expect(bulletsOf(doc, project)).toEqual(["Built the scoring engine end to end"]);
   });
 
   it("lifts SEVERAL, keeping their order, and takes them out of experience", () => {
@@ -634,7 +801,7 @@ Bachelor in Business Administration
     const all = fourEntries([false, false, false, false]).experience.flatMap((j) => j.bullets);
     for (const flags of [[true, true, false, false], [false, false, true, true], [true, true, true, true]] as const) {
       const doc = buildStructuredCvDoc({ name: "", summary: "", cv: fourEntries([...flags] as [boolean, boolean, boolean, boolean]) });
-      const printed = [...blocksUnder(doc, "PROFESSIONAL EXPERIENCE"), ...blocksUnder(doc, "PROJECTS")].flatMap(bulletsOf);
+      const printed = [...blocksUnder(doc, "PROFESSIONAL EXPERIENCE"), ...blocksUnder(doc, "PROJECTS")].flatMap((b) => bulletsOf(doc, b));
       expect([...printed].sort()).toEqual([...all].sort());
     }
   });
@@ -685,7 +852,7 @@ Bachelor in Business Administration
       expect(JSON.stringify(doc)).not.toContain("PROJECTS");
       expect(blocksUnder(doc, "PROFESSIONAL EXPERIENCE").map(headOf)).toEqual(["Northgoing", "Acme Corp"]);
       // Its lines print, once, under the entry it joined. It never vanishes.
-      expect(bulletsOf(blocksUnder(doc, "PROFESSIONAL EXPERIENCE")[0])).toEqual([
+      expect(bulletsOf(doc, blocksUnder(doc, "PROFESSIONAL EXPERIENCE")[0])).toEqual([
         "Built the scoring engine end to end",
         "Built the stockist map",
       ]);
@@ -696,7 +863,7 @@ Bachelor in Business Administration
       cv.experience[0].isProject = true;
       const doc = buildStructuredCvDoc({ name: "", summary: "", cv });
       expect(blocksUnder(doc, "PROJECTS").map(headOf)).toEqual(["Northgoing"]);
-      expect(bulletsOf(blocksUnder(doc, "PROJECTS")[0])).toEqual([
+      expect(bulletsOf(doc, blocksUnder(doc, "PROJECTS")[0])).toEqual([
         "Built the scoring engine end to end",
         "Built the stockist map",
       ]);
@@ -719,11 +886,11 @@ Bachelor in Business Administration
       ).cv;
       const doc = buildStructuredCvDoc({ name: "", summary: "", cv });
       // Globex joined Acme Corp, and it is still under Acme Corp, in the Projects section.
-      expect(bulletsOf(blocksUnder(doc, "PROJECTS")[0])).toEqual([
+      expect(bulletsOf(doc, blocksUnder(doc, "PROJECTS")[0])).toEqual([
         "Grew activation 40% by shipping an onboarding redesign",
         "Ran the weekly pricing review",
       ]);
-      expect(bulletsOf(blocksUnder(doc, "PROFESSIONAL EXPERIENCE")[0])).toEqual([
+      expect(bulletsOf(doc, blocksUnder(doc, "PROFESSIONAL EXPERIENCE")[0])).toEqual([
         "Built the scoring engine end to end",
       ]);
     });
@@ -753,11 +920,12 @@ Bachelor in Business Administration
       education: [],
     });
     expect(source).toContain("North\u2014going");
-    const block = blocksUnder(buildStructuredCvDoc({ name: "", summary: "", cv }), "PROJECTS")[0];
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv });
+    const block = blocksUnder(doc, "PROJECTS")[0];
     const stack = block.stack as ContentItem[];
     expect(stack[0].text).toBe("North-going");
     expect(stack[1].text).toBe('"Founder"');
-    expect(bulletsOf(block)).toEqual(["Built the engine... end to end"]);
+    expect(bulletsOf(doc, block)).toEqual(["Built the engine... end to end"]);
     expect(JSON.stringify(block)).not.toMatch(/[\u2014\u2013\u201C\u201D\u2026\u00A0]/);
   });
 });
