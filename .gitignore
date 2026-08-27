@@ -31,3 +31,7 @@ dist-ssr
 *.sw?
 .vercel
 .superpowers/
+
+# One-off geocoding measurement working dir (docs/geocoding-measurement-2026-08-27.md).
+.geo-measure/
+scripts/.geo-bundle.generated.mjs
