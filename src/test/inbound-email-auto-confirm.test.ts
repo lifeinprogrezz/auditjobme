@@ -66,3 +66,26 @@ describe("confirmGmailForwarding (mocked fetch)", () => {
     expect(await confirmGmailForwarding(VF_URL, fetchImpl)).toBe(true);
   });
 });
+
+// The link the CURRENT Gmail actually sends lives on mail-settings.google.com, and
+// that host does not redirect to mail.google.com. The landing check used to demand
+// mail.google.com exactly, so every current-account confirm link was fetched and
+// then silently rejected: auto-confirm could not fire at all (acceptance panel,
+// 2026-08-27). One CONFIRM_HOSTS list now feeds extractor, guard and landing check.
+describe("confirmGmailForwarding on the mail-settings host", () => {
+  const MS_URL = "https://mail-settings.google.com/mail/vf-%5BANGjdJ-AzkPg8TYF11%5D-8JA0s_VWEX";
+
+  it("accepts a confirmation that lands on mail-settings.google.com", async () => {
+    const fetchImpl = fakeFetch(200, "Confirmation Success!", MS_URL);
+    await expect(confirmGmailForwarding(MS_URL, fetchImpl)).resolves.toBe(true);
+  });
+
+  it("still refuses a consent interstitial that never lands on a confirmation host", async () => {
+    const fetchImpl = fakeFetch(
+      200,
+      "Choose an account",
+      "https://accounts.google.com/signin?continue=" + encodeURIComponent(MS_URL),
+    );
+    await expect(confirmGmailForwarding(MS_URL, fetchImpl)).resolves.toBe(false);
+  });
+});

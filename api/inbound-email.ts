@@ -24,6 +24,7 @@
 import { createClient } from "@supabase/supabase-js";
 import {
   atsFromSender,
+  CONFIRM_HOSTS,
   classifyInboundEmail,
   decideTransition,
   extractCompanyRole,
@@ -115,10 +116,15 @@ export async function confirmGmailForwarding(url: string, fetchImpl: typeof fetc
     // consent.google.com) instead of ever reaching the confirm page — and that
     // interstitial is itself a 200 whose body may not contain "error"/"invalid"/
     // "expired". The word check alone can't tell that apart from a real
-    // confirmation, so the final URL must have actually landed on Gmail.
+    // confirmation, so the final URL must have actually landed on Gmail — on
+    // EITHER confirmation host (CONFIRM_HOSTS). Pinning this to mail.google.com
+    // while the extractor accepted mail-settings.google.com made auto-confirm
+    // impossible for every current Gmail account: the link was extracted, stored
+    // and fetched, and then silently rejected here (found by the acceptance
+    // panel, 2026-08-27).
     let landedOnGmail = false;
     try {
-      landedOnGmail = new URL(res.url).hostname === "mail.google.com";
+      landedOnGmail = CONFIRM_HOSTS.has(new URL(res.url).hostname);
     } catch {
       landedOnGmail = false;
     }

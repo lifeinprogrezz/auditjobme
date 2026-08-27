@@ -138,6 +138,16 @@ export function extractGmailConfirmationLink(body: string | undefined | null): s
 }
 
 /**
+ * The Google hosts a forwarding confirmation link can live on. Older accounts get
+ * mail.google.com, current ones get mail-settings.google.com (measured 2026-08-26)
+ * and that host does NOT redirect to the other. One list so the extractor, the
+ * pre-fetch guard and the post-fetch landing check can never disagree again: they
+ * did on 2026-08-27, and auto-confirm could not fire for any current Gmail account
+ * even though the link was extracted and stored.
+ */
+export const CONFIRM_HOSTS = new Set(["mail.google.com", "mail-settings.google.com"]);
+
+/**
  * Issue #157 / LOCKED decision 7: api/inbound-email.ts follows the confirm link
  * server-side instead of waiting for a click. extractGmailConfirmationLink above
  * already matches only /mail/vf-..., but the auto-follow is the one action this
@@ -157,7 +167,7 @@ export function isConfirmUrl(url: string | undefined | null): boolean {
   const host = parsed.hostname;
   return (
     parsed.protocol === "https:" &&
-    (host === "mail.google.com" || host === "mail-settings.google.com") &&
+    CONFIRM_HOSTS.has(host) &&
     parsed.pathname.startsWith("/mail/vf-")
   );
 }
