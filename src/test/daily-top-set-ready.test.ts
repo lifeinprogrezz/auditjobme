@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { User } from "@supabase/supabase-js";
 
-let currentUser: { id: string } | null = { id: "user-1" };
+const currentUser: { id: string } | null = { id: "user-1" };
 vi.mock("@/components/AuthProvider", () => ({
   useAuth: () => ({ user: currentUser as unknown as User | null }),
 }));
