@@ -195,6 +195,155 @@ export function newSectionHeading(batchDate: string | null, now: Date = new Date
 }
 
 /**
+ * The UTC calendar day a "top matches" set is frozen for, e.g. "2026-08-27". The
+ * freeze and the rollover both key on this, never the browser's local day — a
+ * traveller crossing time zones must not get two fresh sets, or none, on the same
+ * server night.
+ */
+export function utcDayKey(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/** One user's frozen "top matches" set, as persisted in `daily_top_sets` (or its
+ *  localStorage fallback) — job ids only, in the order they were frozen. */
+export interface DailyTopSetSnapshot {
+  day: string;
+  jobIds: string[];
+}
+
+/** One row of the frozen daily top ten, resolved back to its job data. `done` never
+ *  removes the row — the slot stays visible and simply marks itself finished. */
+export interface DailyTopEntry {
+  job: RoleJob;
+  done: boolean;
+}
+
+export interface DailyTopTen {
+  day: string;
+  /** The frozen ids for this day — the source of truth for "N of 10", independent
+   *  of whether every id still resolves to a job row. */
+  jobIds: string[];
+  /** Resolved rows, in frozen order. An id with no matching job (a role dropped out
+   *  of the pool entirely) is skipped rather than rendered as a stub. */
+  entries: DailyTopEntry[];
+  doneCount: number;
+  total: number;
+  /** True when THIS call produced a brand-new freeze (no snapshot existed for
+   *  `todayKey`) — the caller's cue to persist `jobIds` as the day's snapshot. */
+  isNew: boolean;
+}
+
+/**
+ * LOCKED decision 2 (spec 2026-08-26-stranger-run-feedback-answers.md, item C1):
+ * "Your top matches" is a fixed daily set of 10, not a live ranking. The first time a
+ * user's Today render sees no snapshot for `todayKey`, the current best-ranked ten
+ * (`queueTop`, already company-collapsed and score-sorted by buildActionQueue) freeze
+ * as that day's set. Every later call with a snapshot for the SAME day ignores
+ * `queueTop` entirely and replays the frozen ids in their frozen order — applying or
+ * dismissing a role never pulls a new one in, it only flips that slot's `done` flag,
+ * because `appliedIds`/`dismissedIds` are read fresh every call. A snapshot from an
+ * earlier day is stale: the set freezes again for `todayKey`, same as having none.
+ *
+ * `jobs` is the lookup pool for resolving frozen ids back to job data — pass the full
+ * live pool plus any liveness-independent lists the caller already has (e.g.
+ * dismissedJobs), so a role that applying/dismissing removed from the live queue can
+ * still render as a done row instead of vanishing. Pure: same inputs, same output.
+ */
+export function dailyTopTen(
+  queueTop: QueueEntry[],
+  jobs: RoleJob[],
+  todayKey: string,
+  snapshot: DailyTopSetSnapshot | null,
+  appliedIds: ReadonlySet<string>,
+  dismissedIds: ReadonlySet<string>,
+): DailyTopTen {
+  const isFresh = snapshot != null && snapshot.day === todayKey;
+  const jobIds = isFresh ? (snapshot as DailyTopSetSnapshot).jobIds : queueTop.map((e) => e.job.id);
+
+  const byId = new Map(jobs.map((j) => [j.id, j]));
+  const entries: DailyTopEntry[] = [];
+  let doneCount = 0;
+  for (const id of jobIds) {
+    const job = byId.get(id);
+    // A frozen id that no longer resolves to any job row (dropped from the pool
+    // entirely — went is_live=false, or its posting died) can never be applied to
+    // or dismissed, so it can never flip `done` on its own. Count it done the
+    // moment it stops resolving, or completion is unreachable (issue #155
+    // fix-round-2 blocker 4): the header sticks at "9 of 10" forever with every
+    // other slot struck through.
+    const done = !job || appliedIds.has(id) || dismissedIds.has(id);
+    if (done) doneCount++;
+    if (job) entries.push({ job, done });
+  }
+
+  return { day: todayKey, jobIds, entries, doneCount, total: jobIds.length, isNew: !isFresh };
+}
+
+/**
+ * Whether /today may freeze today's top ten yet (issue #155 fix-round-1, blockers 1 +
+ * 3). The candidate ten (`top` on /today) is built from applied/saved/dismissed/
+ * inFlightCompanies/newIds, which resolve on separate own-row reads (applicationsQ/
+ * savedQ/dismissedQ, useDailyMatches) that useDailyTopSet's own `loading` knows
+ * nothing about — `profileChecked` covers the first four (useRolesData.ts:764),
+ * `!loading` covers the live pool+scores, and `!batchLoading` covers newIds' own
+ * source. Freezing before all three land risks locking an already-applied/dismissed/
+ * saved/tonight's-batch role into the day's row, which cannot self-heal (no
+ * UPDATE/DELETE policy on daily_top_sets). `!scoring || candidateCount >= 10`
+ * additionally holds off a freeze during a scoring drain until either scoring
+ * finishes or the ten is actually full, so the drain's first 1-3 scored roles don't
+ * freeze as the whole day's set. Pure: same inputs, same output.
+ */
+export function dailyTopSetReady(
+  profileChecked: boolean,
+  loading: boolean,
+  batchLoading: boolean,
+  scoring: boolean,
+  candidateCount: number,
+): boolean {
+  return profileChecked && !loading && !batchLoading && (!scoring || candidateCount >= 10);
+}
+
+/**
+ * Which saved roles the Saved section should render (issue #155 fix-round-1 blocker
+ * 2). A saved role that also sits in the frozen top ten already renders there — its
+ * footer's "Saved" state is the one place that says so — so Saved drops it rather
+ * than showing the same role twice on the page (the "keep them out of the action
+ * queue so nothing renders twice" rule, Rober 7-15 review, extended to this second
+ * duplication path). Pure: same inputs, same output.
+ */
+export function visibleSavedJobs(savedJobs: RoleJob[], frozenIds: ReadonlySet<string>): RoleJob[] {
+  return savedJobs.filter((j) => !frozenIds.has(j.id));
+}
+
+/**
+ * Which of tonight's batch the New section should render (issue #155 fix-round-2
+ * blocker 3). The nightly cron lands at 06:00 UTC; a visit between 00:00 and 06:00
+ * UTC can freeze today's top ten from roles that are already scored and in the pool
+ * but not yet in `daily_matches` — `queue`'s own exclusion of "new" only knows about
+ * YESTERDAY's batch at that hour. Once the 06:00 batch lands, resolveBatchJobs puts
+ * those same roles in New while the earlier freeze already holds them, so a role
+ * renders twice for the rest of the day. New drops anything already frozen, the
+ * same rule visibleSavedJobs applies to Saved. Pure: same inputs, same output.
+ */
+export function visibleNewJobs(newJobs: RoleJob[], frozenIds: ReadonlySet<string>): RoleJob[] {
+  return newJobs.filter((j) => !frozenIds.has(j.id));
+}
+
+/** "N of 10 done today" — the Today header line (issue #155). Uses the frozen set's
+ *  own size rather than a hardcoded 10, so a thin day (fewer than 10 scored roles)
+ *  still reads honestly. */
+export function dailyTopTenHeaderLine(doneCount: number, total: number): string {
+  return `${doneCount} of ${total} done today`;
+}
+
+/** The warm completion line once every slot in the frozen set is done. Null while
+ *  there is still something left, or when there was nothing to freeze at all. */
+export function dailyTopTenCompleteLine(doneCount: number, total: number): string | null {
+  if (total === 0 || doneCount < total) return null;
+  return "That is today's ten. New ones tomorrow morning.";
+}
+
+/**
  * Resolve a nightly batch to the live role rows it points at, in rank order
  * (daily_matches stores only job_url). Roles already applied to or dismissed drop
  * out — the section is a to-do list, not an archive. A URL with no matching live

@@ -355,7 +355,8 @@ declare
   -- Every table this check seeds and then asserts empty, as 'table.user_column'.
   seeded text[] := array[
     'applications.user_id', 'artifacts.user_id', 'audits.user_id',
-    'company_requests.user_id', 'connections.user_id', 'daily_matches.user_id', 'device_fingerprints.user_id',
+    'company_requests.user_id', 'connections.user_id', 'daily_matches.user_id', 'daily_top_sets.user_id',
+    'device_fingerprints.user_id',
     'dismissed_jobs.user_id', 'feedback.user_id', 'inbound_emails.user_id',
     'inbound_tokens.user_id', 'profiles.id', 'purchases.user_id',
     'referral_tokens.user_id', 'referrals.referee_id', 'referrals.referrer_id',
@@ -424,6 +425,9 @@ begin
            (theirs, 'CI Fixture Person', 'CI Fixture Co', 'ci fixture co');
   insert into public.daily_matches (user_id, job_url)
     values (mine, 'https://example.invalid/ci/gdpr-delete'), (theirs, 'https://example.invalid/ci/gdpr-delete');
+  -- daily_top_sets (issue #155): the frozen "top matches" set for the day.
+  insert into public.daily_top_sets (user_id, job_ids)
+    values (mine, array[jid]), (theirs, array[jid]);
   insert into public.device_fingerprints (fingerprint_id, user_id, audit_id)
     values ('ci-fixture-fp', mine, audit_mine), ('ci-fixture-fp', theirs, audit_theirs);
   insert into public.feedback (user_id, message) values (mine, 'ci fixture'), (theirs, 'ci fixture');

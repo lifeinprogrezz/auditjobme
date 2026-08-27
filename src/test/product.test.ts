@@ -6,11 +6,20 @@ import {
   buildActionQueue,
   companyKey,
   coverageSummary,
+  dailyTopSetReady,
+  dailyTopTen,
+  dailyTopTenCompleteLine,
+  dailyTopTenHeaderLine,
   inFlightCompanyKeys,
   newSectionHeading,
   resolveBatchJobs,
   selectLatestBatch,
+  utcDayKey,
+  visibleNewJobs,
+  visibleSavedJobs,
   WORTH_APPLYING_MIN,
+  type DailyTopSetSnapshot,
+  type QueueEntry,
 } from "@/lib/product";
 import { isInFlightStatus } from "@/lib/tracker";
 import type { RoleJob } from "@/lib/roles";
@@ -314,5 +323,141 @@ describe("resolveBatchJobs (issue #72 slice 1)", () => {
     expect(
       resolveBatchJobs(rowsCurrent, [job("j1", { url: "https://x/1", score: 3.1 })], { rubricVersion: "v9" })[0].score,
     ).toBe(3.1);
+  });
+});
+
+describe("utcDayKey", () => {
+  it("is the UTC calendar day, not the local one", () => {
+    expect(utcDayKey(new Date("2026-08-27T23:30:00Z"))).toBe("2026-08-27");
+  });
+});
+
+describe("dailyTopTen (issue #155, LOCKED decision 2 — a fixed daily set of 10)", () => {
+  const entry = (id: string): QueueEntry => ({ job: job(id), more: [] });
+  const jobs = ["j1", "j2", "j3"].map((id) => job(id, { score: 4 }));
+  const today = "2026-08-27";
+  const noOne = new Set<string>();
+
+  it("freezes the current top ten when no snapshot exists yet for today", () => {
+    const queueTop = [entry("j1"), entry("j2"), entry("j3")];
+    const result = dailyTopTen(queueTop, jobs, today, null, noOne, noOne);
+    expect(result.isNew).toBe(true);
+    expect(result.jobIds).toEqual(["j1", "j2", "j3"]);
+    expect(result.entries.map((e) => e.job.id)).toEqual(["j1", "j2", "j3"]);
+    expect(result.total).toBe(3);
+    expect(result.doneCount).toBe(0);
+  });
+
+  it("replays the SAME set and order on a later same-day call, ignoring a changed live queue", () => {
+    const snapshot: DailyTopSetSnapshot = { day: today, jobIds: ["j2", "j1", "j3"] };
+    // The live queue re-ranked (j3 now first) — the frozen order must win anyway.
+    const queueTop = [entry("j3"), entry("j1"), entry("j2")];
+    const result = dailyTopTen(queueTop, jobs, today, snapshot, noOne, noOne);
+    expect(result.isNew).toBe(false);
+    expect(result.jobIds).toEqual(["j2", "j1", "j3"]);
+    expect(result.entries.map((e) => e.job.id)).toEqual(["j2", "j1", "j3"]);
+  });
+
+  it("marks an applied or dismissed slot done WITHOUT removing it or pulling in a new role", () => {
+    const snapshot: DailyTopSetSnapshot = { day: today, jobIds: ["j1", "j2", "j3"] };
+    // The live queue would normally drop j1 (applied) and j2 (dismissed) and let a
+    // 4th role hop in — dailyTopTen must not follow it.
+    const queueTop = [entry("j3"), entry("j4")];
+    const result = dailyTopTen(queueTop, jobs, today, snapshot, new Set(["j1"]), new Set(["j2"]));
+    expect(result.jobIds).toEqual(["j1", "j2", "j3"]);
+    expect(result.entries.map((e) => e.job.id)).toEqual(["j1", "j2", "j3"]);
+    expect(result.entries.map((e) => e.done)).toEqual([true, true, false]);
+    expect(result.doneCount).toBe(2);
+    expect(result.total).toBe(3);
+  });
+
+  it("rolls over to a NEW frozen set on the next UTC day", () => {
+    const snapshot: DailyTopSetSnapshot = { day: "2026-08-26", jobIds: ["j1", "j2", "j3"] };
+    const queueTop = [entry("j3"), entry("j2")];
+    const result = dailyTopTen(queueTop, jobs, today, snapshot, noOne, noOne);
+    expect(result.isNew).toBe(true);
+    expect(result.jobIds).toEqual(["j3", "j2"]);
+  });
+
+  it("skips a frozen id with no resolvable job row instead of rendering a stub, and counts it done", () => {
+    // issue #155 fix-round-2 blocker 4: an unresolvable id can never be applied to
+    // or dismissed, so it must count itself done or completion is unreachable.
+    const snapshot: DailyTopSetSnapshot = { day: today, jobIds: ["j1", "gone", "j2"] };
+    const result = dailyTopTen([], jobs, today, snapshot, noOne, noOne);
+    expect(result.jobIds).toEqual(["j1", "gone", "j2"]);
+    expect(result.entries.map((e) => e.job.id)).toEqual(["j1", "j2"]);
+    expect(result.total).toBe(3);
+    expect(result.doneCount).toBe(1);
+  });
+});
+
+describe("dailyTopSetReady (issue #155 fix-round-1, blockers 1 + 3)", () => {
+  it("is not ready before every own-row read has landed", () => {
+    // profileChecked false: applied/saved/dismissed haven't loaded yet.
+    expect(dailyTopSetReady(false, false, false, false, 10)).toBe(false);
+    // the live pool+scores are still loading.
+    expect(dailyTopSetReady(true, true, false, false, 10)).toBe(false);
+    // tonight's batch (newIds) hasn't landed yet.
+    expect(dailyTopSetReady(true, false, true, false, 10)).toBe(false);
+  });
+
+  it("is ready once every read has landed and scoring is done", () => {
+    expect(dailyTopSetReady(true, false, false, false, 3)).toBe(true);
+  });
+
+  it("does not freeze a short queue while scoring is still draining", () => {
+    // Only 3 scored roles so far, and scoring is still active — wait.
+    expect(dailyTopSetReady(true, false, false, true, 3)).toBe(false);
+  });
+
+  it("freezes a full ten even while scoring continues in the background", () => {
+    expect(dailyTopSetReady(true, false, false, true, 10)).toBe(true);
+  });
+
+  it("freezes a genuinely thin day once scoring actually finishes", () => {
+    // A real thin day: fewer than 10 roles ever, but scoring has completed.
+    expect(dailyTopSetReady(true, false, false, false, 2)).toBe(true);
+  });
+});
+
+describe("visibleSavedJobs (issue #155 fix-round-1, blocker 2)", () => {
+  it("drops a saved role that's also in the frozen ten — it already renders there", () => {
+    const saved = [job("j1"), job("j2")];
+    const frozen = new Set(["j1"]);
+    expect(visibleSavedJobs(saved, frozen).map((j) => j.id)).toEqual(["j2"]);
+  });
+
+  it("keeps every saved role when none of them are frozen", () => {
+    const saved = [job("j1"), job("j2")];
+    expect(visibleSavedJobs(saved, new Set())).toHaveLength(2);
+  });
+});
+
+describe("visibleNewJobs (issue #155 fix-round-2, blocker 3)", () => {
+  it("drops a New-section role that's also in the frozen ten — a 00:00-06:00 UTC freeze can catch it first", () => {
+    const fresh = [job("j1"), job("j2")];
+    const frozen = new Set(["j1"]);
+    expect(visibleNewJobs(fresh, frozen).map((j) => j.id)).toEqual(["j2"]);
+  });
+
+  it("keeps every New-section role when none of them are frozen", () => {
+    const fresh = [job("j1"), job("j2")];
+    expect(visibleNewJobs(fresh, new Set())).toHaveLength(2);
+  });
+});
+
+describe("dailyTopTenHeaderLine / dailyTopTenCompleteLine (issue #155)", () => {
+  it("reads 'N of TOTAL done today'", () => {
+    expect(dailyTopTenHeaderLine(3, 10)).toBe("3 of 10 done today");
+    expect(dailyTopTenHeaderLine(0, 7)).toBe("0 of 7 done today");
+  });
+
+  it("has no completion line until every slot is done", () => {
+    expect(dailyTopTenCompleteLine(9, 10)).toBeNull();
+    expect(dailyTopTenCompleteLine(0, 0)).toBeNull();
+  });
+
+  it("shows the warm completion line once the set is fully done", () => {
+    expect(dailyTopTenCompleteLine(10, 10)).toBe("That is today's ten. New ones tomorrow morning.");
   });
 });

@@ -47,6 +47,11 @@
   },
   {
    "kind": "r",
+   "name": "daily_top_sets",
+   "rls": true
+  },
+  {
+   "kind": "r",
    "name": "device_fingerprints",
    "rls": true
   },
@@ -945,6 +950,51 @@
    "name": "user_id",
    "nullable": false,
    "table": "daily_matches",
+   "type": "uuid",
+   "udt": "uuid"
+  },
+  {
+   "default": "now()",
+   "generated": null,
+   "name": "created_at",
+   "nullable": false,
+   "table": "daily_top_sets",
+   "type": "timestamp with time zone",
+   "udt": "timestamptz"
+  },
+  {
+   "default": "CURRENT_DATE",
+   "generated": null,
+   "name": "day",
+   "nullable": false,
+   "table": "daily_top_sets",
+   "type": "date",
+   "udt": "date"
+  },
+  {
+   "default": "gen_random_uuid()",
+   "generated": null,
+   "name": "id",
+   "nullable": false,
+   "table": "daily_top_sets",
+   "type": "uuid",
+   "udt": "uuid"
+  },
+  {
+   "default": "'{}'::uuid[]",
+   "generated": null,
+   "name": "job_ids",
+   "nullable": false,
+   "table": "daily_top_sets",
+   "type": "ARRAY",
+   "udt": "_uuid"
+  },
+  {
+   "default": null,
+   "generated": null,
+   "name": "user_id",
+   "nullable": false,
+   "table": "daily_top_sets",
    "type": "uuid",
    "udt": "uuid"
   },
@@ -2395,6 +2445,21 @@
    "table": "daily_matches"
   },
   {
+   "def": "PRIMARY KEY (id)",
+   "name": "daily_top_sets_pkey",
+   "table": "daily_top_sets"
+  },
+  {
+   "def": "UNIQUE (user_id, day)",
+   "name": "daily_top_sets_user_id_day_key",
+   "table": "daily_top_sets"
+  },
+  {
+   "def": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+   "name": "daily_top_sets_user_id_fkey",
+   "table": "daily_top_sets"
+  },
+  {
    "def": "FOREIGN KEY (audit_id) REFERENCES audits(id) ON DELETE CASCADE",
    "name": "device_fingerprints_audit_id_fkey",
    "table": "device_fingerprints"
@@ -2782,6 +2847,21 @@
    "table": "daily_matches"
   },
   {
+   "def": "CREATE UNIQUE INDEX daily_top_sets_pkey ON public.daily_top_sets USING btree (id)",
+   "name": "daily_top_sets_pkey",
+   "table": "daily_top_sets"
+  },
+  {
+   "def": "CREATE UNIQUE INDEX daily_top_sets_user_id_day_key ON public.daily_top_sets USING btree (user_id, day)",
+   "name": "daily_top_sets_user_id_day_key",
+   "table": "daily_top_sets"
+  },
+  {
+   "def": "CREATE INDEX idx_daily_top_sets_user_day ON public.daily_top_sets USING btree (user_id, day)",
+   "name": "idx_daily_top_sets_user_day",
+   "table": "daily_top_sets"
+  },
+  {
    "def": "CREATE INDEX device_fingerprints_audit_id_idx ON public.device_fingerprints USING btree (audit_id)",
    "name": "device_fingerprints_audit_id_idx",
    "table": "device_fingerprints"
@@ -3152,6 +3232,24 @@
    "qual": "(auth.uid() = user_id)",
    "roles": "{authenticated}",
    "table": "daily_matches",
+   "with_check": null
+  },
+  {
+   "cmd": "INSERT",
+   "name": "Users freeze own daily top set",
+   "permissive": "PERMISSIVE",
+   "qual": null,
+   "roles": "{authenticated}",
+   "table": "daily_top_sets",
+   "with_check": "(( SELECT auth.uid() AS uid) = user_id)"
+  },
+  {
+   "cmd": "SELECT",
+   "name": "Users read own daily top sets",
+   "permissive": "PERMISSIVE",
+   "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+   "roles": "{authenticated}",
+   "table": "daily_top_sets",
    "with_check": null
   },
   {

@@ -16,11 +16,18 @@ import PaperLogo from "@/components/app/PaperLogo";
 import { Button } from "@/components/ui/button";
 import { useRolesData } from "@/hooks/useRolesData";
 import { useDailyMatches } from "@/hooks/useDailyMatches";
+import { useDailyTopSet } from "@/hooks/useDailyTopSet";
 import {
   buildActionQueue,
   coverageSummary,
+  dailyTopSetReady,
+  dailyTopTen,
+  dailyTopTenCompleteLine,
+  dailyTopTenHeaderLine,
   newSectionHeading,
   resolveBatchJobs,
+  visibleNewJobs,
+  visibleSavedJobs,
   type QueueEntry,
 } from "@/lib/product";
 import { geoVerdict, postedAgo, type RoleJob } from "@/lib/roles";
@@ -69,12 +76,14 @@ export default function Today() {
     eligibleCount,
     batchPending,
     eligibleIds,
+    profileChecked,
     applied,
     markApplied,
     saved,
     savedJobs,
     toggleSaved,
     dismissed,
+    dismissedJobs,
     toggleDismissed,
     inFlightCompanies,
     warmIndex,
@@ -126,8 +135,50 @@ export default function Today() {
     [aq.queue, saved, newIds],
   );
   // Page structure (Rober 7-16): the 10 best (one per company now) then the rest.
+  // `top` is the LIVE best-ranked ten — issue #155 (LOCKED decision 2) freezes it
+  // into a fixed set the first time a user sees Today on a given UTC day, so this
+  // value is used ONLY to seed that freeze; the section actually rendered below is
+  // `dailyTop`, which replays the frozen ids once one exists.
   const top = queue.slice(0, 10);
-  const more = queue.slice(10);
+  const topIds = useMemo(() => top.map((e) => e.job.id), [top]);
+  // Gate the freeze itself (issue #155 fix-round-1 blockers 1 + 3) — see
+  // dailyTopSetReady's own doc comment for why each input is needed.
+  const ready = dailyTopSetReady(profileChecked, loading, daily.loading, scoring, topIds.length);
+  const dailySet = useDailyTopSet(topIds, ready);
+  // Lookup pool for resolving the frozen ids back to job data even once applying or
+  // dismissing has dropped a role out of `queue` (and, for a dismissal, out of the
+  // action queue's source jobs too) — savedJobs/dismissedJobs are the same
+  // liveness-independent lists Settings' own undo lists use.
+  const freezeLookupJobs = useMemo(() => {
+    const byId = new Map<string, RoleJob>();
+    for (const j of jobs) byId.set(j.id, j);
+    for (const j of savedJobs) if (!byId.has(j.id)) byId.set(j.id, j);
+    for (const j of dismissedJobs) if (!byId.has(j.id)) byId.set(j.id, j);
+    return [...byId.values()];
+  }, [jobs, savedJobs, dismissedJobs]);
+  const dailyTop = useMemo(
+    () => dailyTopTen(top, freezeLookupJobs, dailySet.today, dailySet.snapshot, applied, dismissed),
+    [top, freezeLookupJobs, dailySet.today, dailySet.snapshot, applied, dismissed],
+  );
+  // The row-siblings ("+N more from {company}") a frozen entry had when it was
+  // ranked — still looked up from the LIVE queue, cap-1-per-company is a display
+  // grouping, not part of what's frozen.
+  const queueByJobId = useMemo(() => new Map(queue.map((e) => [e.job.id, e])), [queue]);
+  const frozenIds = useMemo(() => new Set(dailyTop.jobIds), [dailyTop.jobIds]);
+  // Issue #155 fix-round-1 blocker 2: a saved role that's ALSO in the frozen ten
+  // already renders there (its footer shows "Saved") — drop it from this section so
+  // it doesn't render twice on the page.
+  const visibleSaved = useMemo(() => visibleSavedJobs(savedJobs, frozenIds), [savedJobs, frozenIds]);
+  // Issue #155 fix-round-2 blocker 3: a 00:00-06:00 UTC visit can freeze today's ten
+  // from roles the nightly batch hasn't posted yet — once the 06:00 batch lands they
+  // ALSO show in New, doubling the row. Drop anything already frozen before render.
+  const visibleNew = useMemo(() => visibleNewJobs(newJobs, frozenIds), [newJobs, frozenIds]);
+  const doneHeaderLine = dailyTopTenHeaderLine(dailyTop.doneCount, dailyTop.total);
+  const doneCompleteLine = dailyTopTenCompleteLine(dailyTop.doneCount, dailyTop.total);
+  // Rule 3 (issue #155): "More matches" is the live remainder, excluding whatever
+  // is frozen into today's ten — it keeps re-ranking normally, only the top ten
+  // stopped moving.
+  const more = queue.filter((e) => !frozenIds.has(e.job.id));
 
   // Infinite reveal (Rober 7-25): the queue is uncapped now, so "More matches"
   // must scroll as deep as the scored pool goes — but 800+ cards mounted at once
@@ -174,9 +225,9 @@ export default function Today() {
   // `siblings` carries the company's other actionable roles (issue #73 cap-1/company).
   const renderRow = (
     job: RoleJob,
-    opts: { rank?: number | null; showReason?: boolean; more?: RoleJob[] } = {},
+    opts: { rank?: number | null; showReason?: boolean; more?: RoleJob[]; done?: boolean } = {},
   ) => {
-    const { rank = null, showReason = false, more: siblings = [] } = opts;
+    const { rank = null, showReason = false, more: siblings = [], done = false } = opts;
     const ago = postedAgo(job.posted_at);
     const isApplied = applied.has(job.id);
     const isSaved = saved.has(job.id);
@@ -188,14 +239,27 @@ export default function Today() {
     return (
       <li
         key={job.id}
-        className="rounded-2xl border border-border bg-card p-6 shadow-page transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-px hover:border-foreground/20 hover:shadow-page-lift"
+        className={`rounded-2xl border border-border bg-card p-6 shadow-page transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-px hover:border-foreground/20 hover:shadow-page-lift ${done ? "opacity-60" : ""}`}
       >
         <div className="flex items-start gap-4">
-          {rank != null && (
-            <span className="w-5 shrink-0 pt-2.5 text-right font-mono text-caption tabular-nums text-muted-foreground" aria-hidden="true">
-              {rank}
-            </span>
-          )}
+          {rank != null &&
+            (done ? (
+              // A slot in the frozen top ten that's done (issue #155): the rank
+              // stays, marked finished, instead of the row disappearing and the
+              // next one hopping up into it.
+              <span
+                className="flex w-5 shrink-0 items-center justify-center pt-2.5 text-foreground"
+                aria-label="Done"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </span>
+            ) : (
+              <span className="w-5 shrink-0 pt-2.5 text-right font-mono text-caption tabular-nums text-muted-foreground" aria-hidden="true">
+                {rank}
+              </span>
+            ))}
           <PaperLogo domain={job.domain} company={job.company} size={40} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -206,7 +270,7 @@ export default function Today() {
               href={job.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-0.5 block truncate font-display text-title text-foreground underline-offset-2 hover:underline text-balance"
+              className={`mt-0.5 block truncate font-display text-title underline-offset-2 hover:underline text-balance ${done ? "text-muted-foreground line-through" : "text-foreground"}`}
             >
               {job.title}
             </a>
@@ -355,19 +419,19 @@ export default function Today() {
 
       {/* New (issue #72 slice 1): the exact roles the nightly email just sent, in the
           same rank order, still actionable. */}
-      {newJobs.length > 0 && (
+      {visibleNew.length > 0 && (
         <section className="mt-8">
           <h2 className="font-display text-section text-foreground">{newHeading}</h2>
           <p className="mt-1 text-caption text-muted-foreground">
             The roles we emailed you, new since your last batch.
           </p>
           <ol className="mt-3 flex flex-col gap-4">
-            {newJobs.map((job, i) => renderRow(job, { rank: i + 1, showReason: true }))}
+            {visibleNew.map((job, i) => renderRow(job, { rank: i + 1, showReason: true }))}
           </ol>
         </section>
       )}
 
-      {savedJobs.length > 0 && (
+      {visibleSaved.length > 0 && (
         <section className="mt-8">
           {/* Section headings carry the page's wayfinding — full display size in ink,
               not micro-caps whispers (Rober 7-16: they were too hard to find). */}
@@ -375,7 +439,7 @@ export default function Today() {
           <ul className="mt-3 flex flex-col gap-3">
             {/* The CARD opens the prep page (Rober 7-16); only the role title itself
                 links out to the posting. The inner link/button opt out via closest(). */}
-            {savedJobs.map((job) => (
+            {visibleSaved.map((job) => (
               <li
                 key={job.id}
                 role="button"
@@ -419,8 +483,8 @@ export default function Today() {
         </section>
       )}
 
-      {queue.length === 0 ? (
-        newJobs.length === 0 && (
+      {dailyTop.total === 0 && more.length === 0 ? (
+        visibleNew.length === 0 && (
           <div className="mt-8 rounded-2xl border border-border bg-card p-6 text-body text-muted-foreground shadow-page text-pretty">
             Nothing left in your queue right now. Everything scored is either applied or below your bar. Fresh roles
             arrive with tomorrow's scan.
@@ -428,10 +492,32 @@ export default function Today() {
         )
       ) : (
         <>
-          {/* Renamed from "Top 10 to apply today" (issue #72 slice 2): this section
-              ranks the whole live scored pool in score order and has nothing to do
-              with a posting date. The dated section above is the one that's new. */}
-          {renderSection("Your top matches", top, true)}
+          {/* Issue #155 (LOCKED decision 2): "Your top matches" is a FIXED set of 10
+              for the UTC day, frozen by useDailyTopSet on first render and replayed
+              from there — applying or dismissing a role marks its slot done, it does
+              NOT pull the next role up into the ten. Renamed from "Top 10 to apply
+              today" (issue #72 slice 2). */}
+          {dailyTop.total > 0 && (
+            <section className="mt-8">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <h2 className="font-display text-section text-foreground">Your top matches</h2>
+                <span className="font-mono text-caption tabular-nums text-muted-foreground">{doneHeaderLine}</span>
+              </div>
+              {doneCompleteLine && (
+                <p className="mt-1 text-caption text-muted-foreground">{doneCompleteLine}</p>
+              )}
+              <ol className="mt-3 flex flex-col gap-4">
+                {dailyTop.entries.map((entry, i) =>
+                  renderRow(entry.job, {
+                    rank: i + 1,
+                    showReason: true,
+                    more: queueByJobId.get(entry.job.id)?.more ?? [],
+                    done: entry.done,
+                  }),
+                )}
+              </ol>
+            </section>
+          )}
           {/* No count on the tail (Rober 7-16) — just scroll; slices reveal as
               the sentinel below approaches (Rober 7-25 infinite scroll). */}
           {more.length > 0 && renderSection("More matches", more.slice(0, moreShown), false)}
