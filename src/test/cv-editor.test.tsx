@@ -221,3 +221,92 @@ describe("CvEditor — order and grouping", () => {
     expect(written.experience[0].groupedIntoPrevious).toBeUndefined();
   });
 });
+
+// The projects tick box. Same control pattern as the grouping one, with one
+// deliberate difference: it is valid on every entry, the first one included.
+describe("CvEditor — showing an entry under Projects", () => {
+  const openExperience = async () => {
+    fireEvent.click(await screen.findByRole("button", { name: /^Experience/i }));
+  };
+  const saved = async () => {
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/i }));
+    await waitFor(() => expect(saveCvStructured).toHaveBeenCalled());
+    return saveCvStructured.mock.calls.at(-1)?.[1] as CvStructured;
+  };
+
+  beforeEach(() => {
+    cleanup();
+    ensureCvStructured.mockReset().mockResolvedValue(structuredClone(CV_TWO));
+    parseAndSaveCv.mockReset().mockResolvedValue(structuredClone(CV_TWO));
+    saveCvStructured.mockReset().mockResolvedValue(true);
+  });
+
+  it("ticking it marks the entry as a project, and that is what Save writes", async () => {
+    render(<CvEditor userId="u1" cvText="some cv text" />);
+    await openExperience();
+    const box = screen.getByLabelText(/Show Northgoing under Projects instead of Experience/i);
+    expect(box).not.toBeChecked();
+    fireEvent.click(box);
+    const written = await saved();
+    expect(written.experience[1].isProject).toBe(true);
+    // The words are untouched: the flag moves where the entry prints, nothing else.
+    expect(written.experience[1].company).toBe("Northgoing");
+    expect(written.experience[1].role).toBe("Founder");
+    expect(written.experience[1].start).toBe("2025");
+    expect(written.experience[1].bullets).toEqual(["Built the scoring engine"]);
+    expect(written.experience[0].isProject).toBeUndefined();
+  });
+
+  it("unticking it puts the entry back among the jobs, with no flag left behind", async () => {
+    const flagged = structuredClone(CV_TWO);
+    flagged.experience[1].isProject = true;
+    ensureCvStructured.mockResolvedValue(flagged);
+    render(<CvEditor userId="u1" cvText="some cv text" />);
+    await openExperience();
+    const box = screen.getByLabelText(/Show Northgoing under Projects instead of Experience/i);
+    expect(box).toBeChecked();
+    fireEvent.click(box);
+    expect((await saved()).experience[1].isProject).toBeUndefined();
+  });
+
+  it("works on the FIRST entry too, unlike grouping: it is not disabled there", async () => {
+    render(<CvEditor userId="u1" cvText="some cv text" />);
+    await openExperience();
+    const box = screen.getByLabelText(/Show Acme Corp under Projects instead of Experience/i);
+    expect(box).toBeEnabled();
+    // The grouping box on that same entry is off, so the two are plainly different.
+    expect(screen.getByLabelText(/Show Acme Corp as part of the entry above/i)).toBeDisabled();
+    fireEvent.click(box);
+    expect((await saved()).experience[0].isProject).toBe(true);
+  });
+
+  it("each entry gets its own box, and one tick does not tick the others", async () => {
+    render(<CvEditor userId="u1" cvText="some cv text" />);
+    await openExperience();
+    expect(screen.getAllByLabelText(/under Projects instead of Experience/i)).toHaveLength(2);
+    fireEvent.click(screen.getByLabelText(/Show Acme Corp under Projects instead of Experience/i));
+    expect(screen.getByLabelText(/Show Northgoing under Projects instead of Experience/i)).not.toBeChecked();
+  });
+
+  it("says on screen what a ticked entry keeps", async () => {
+    render(<CvEditor userId="u1" cvText="some cv text" />);
+    await openExperience();
+    expect(
+      screen.getAllByText(/keeps its own name, title, dates and lines, in a Projects section/i).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("tells an entry that is BOTH grouped and a project that grouping is what happens", async () => {
+    const flagged = structuredClone(CV_TWO);
+    flagged.experience[1].groupedIntoPrevious = true;
+    flagged.experience[1].isProject = true;
+    ensureCvStructured.mockResolvedValue(flagged);
+    render(<CvEditor userId="u1" cvText="some cv text" />);
+    await openExperience();
+    expect(screen.getByText(/goes wherever that entry goes/i)).toBeInTheDocument();
+    // Both flags survive the save: neither control quietly deletes the other.
+    const written = await saved();
+    expect(written.experience[1].groupedIntoPrevious).toBe(true);
+    expect(written.experience[1].isProject).toBe(true);
+  });
+});
