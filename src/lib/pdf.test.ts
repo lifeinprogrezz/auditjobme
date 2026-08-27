@@ -7,6 +7,7 @@ import {
   buildStructuredCvDoc,
   contactLines,
   foldGroupedExperience,
+  splitProjectBlocks,
   coverDateLine,
   formatDateEN,
   jobMetaLine,
@@ -497,6 +498,235 @@ Founder
     ];
     expect(foldGroupedExperience(first)).toHaveLength(1);
     expect(foldGroupedExperience(first)[0].head.company).toBe("Acme");
+  });
+});
+
+// The owner's projects flag. His CV lists Northgoing and DistroNow under a "Projects"
+// heading with their own names, titles and dates, so the parse reads them as his two
+// most recent jobs. The parse is right and it stays as it is; he moves them in the
+// editor, and they print whole, word for word, in a section of their own.
+describe("projects lifted out of experience", () => {
+  const PROJECTS_SOURCE = `Jane Doe
+
+Projects
+
+Northgoing
+Founder
+03/2026 - Present
+- Built the scoring engine end to end
+
+DistroNow
+Founder
+2025 - 2026
+- Built the stockist map
+
+Professional Experience
+
+Acme Corp
+Product Manager
+09/2021 - 12/2024
+- Grew activation 40% by shipping an onboarding redesign
+
+Globex
+Analyst
+2019 - 2021
+- Ran the weekly pricing review
+
+Education
+University of Vigo
+Bachelor in Business Administration
+09/2015 - 06/2020`;
+
+  /** Four entries in his own order: the two projects on top, then the two jobs. */
+  const fourEntries = (flags: [boolean, boolean, boolean, boolean]): CvStructured =>
+    validateCvStructured(
+      {
+        contact: { name: "Jane Doe", links: [] },
+        experience: [
+          { company: "Northgoing", role: "Founder", start: "03/2026", end: "Present", bullets: ["Built the scoring engine end to end"], isProject: flags[0] },
+          { company: "DistroNow", role: "Founder", start: "2025", end: "2026", bullets: ["Built the stockist map"], isProject: flags[1] },
+          { company: "Acme Corp", role: "Product Manager", start: "09/2021", end: "12/2024", bullets: ["Grew activation 40% by shipping an onboarding redesign"], isProject: flags[2] },
+          { company: "Globex", role: "Analyst", start: "2019", end: "2021", bullets: ["Ran the weekly pricing review"], isProject: flags[3] },
+        ],
+        education: [{ school: "University of Vigo", degree: "Bachelor in Business Administration", start: "09/2015", end: "06/2020" }],
+      },
+      PROJECTS_SOURCE,
+    ).cv;
+
+  /** Every heading and block head the document prints, in the order it prints them. */
+  const outline = (doc: Record<string, unknown>): string[] =>
+    (doc.content as ContentItem[]).flatMap((c) => {
+      if (typeof c.text === "string") return [c.text];
+      if (Array.isArray(c.stack)) return [`  ${(c.stack as ContentItem[])[0]?.text as string}`];
+      return [];
+    });
+
+  const blocksUnder = (doc: Record<string, unknown>, header: string): ContentItem[] => {
+    const content = doc.content as ContentItem[];
+    const start = content.findIndex((c) => c.text === header);
+    if (start < 0) return [];
+    const rest = content.slice(start + 1);
+    const end = rest.findIndex((c) => typeof c.text === "string");
+    return (end < 0 ? rest : rest.slice(0, end)).filter((c) => Array.isArray(c.stack));
+  };
+  const headOf = (block: ContentItem) => (block.stack as ContentItem[])[0]?.text;
+  const bulletsOf = (block: ContentItem) =>
+    (((block.stack as ContentItem[]).at(-1)?.ul ?? []) as ContentItem[]).map((b) => b.text);
+
+  it("lifts ONE flagged entry into a Projects section, whole, right after experience", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: fourEntries([true, false, false, false]) });
+    expect(outline(doc)).toEqual([
+      "Jane Doe",
+      "PROFESSIONAL EXPERIENCE",
+      "  DistroNow",
+      "  Acme Corp",
+      "  Globex",
+      "PROJECTS",
+      "  Northgoing",
+      "EDUCATION",
+      "  University of Vigo",
+    ]);
+    // It keeps its own name, title, dates and lines, all of them verbatim.
+    const project = blocksUnder(doc, "PROJECTS")[0];
+    expect((project.stack as ContentItem[]).slice(0, 3).map((s) => s.text)).toEqual([
+      "Northgoing",
+      "Founder",
+      "03/2026 - Present",
+    ]);
+    expect(bulletsOf(project)).toEqual(["Built the scoring engine end to end"]);
+  });
+
+  it("lifts SEVERAL, keeping their order, and takes them out of experience", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: fourEntries([true, true, false, false]) });
+    expect(blocksUnder(doc, "PROJECTS").map(headOf)).toEqual(["Northgoing", "DistroNow"]);
+    expect(blocksUnder(doc, "PROFESSIONAL EXPERIENCE").map(headOf)).toEqual(["Acme Corp", "Globex"]);
+  });
+
+  it("keeps the relative order the owner set, even when a job sits between two projects", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: fourEntries([true, false, false, true]) });
+    expect(blocksUnder(doc, "PROJECTS").map(headOf)).toEqual(["Northgoing", "Globex"]);
+    expect(blocksUnder(doc, "PROFESSIONAL EXPERIENCE").map(headOf)).toEqual(["DistroNow", "Acme Corp"]);
+  });
+
+  it("emits NO Projects heading when nothing is flagged", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: fourEntries([false, false, false, false]) });
+    expect(JSON.stringify(doc)).not.toContain("PROJECTS");
+    expect(blocksUnder(doc, "PROFESSIONAL EXPERIENCE").map(headOf)).toEqual([
+      "Northgoing",
+      "DistroNow",
+      "Acme Corp",
+      "Globex",
+    ]);
+  });
+
+  it("an unflagged profile builds the document it built before the flag existed, byte for byte", () => {
+    const plain = fourEntries([false, false, false, false]);
+    const before = buildStructuredCvDoc({ name: "", summary: "Tailored.", cv: plain });
+    // The same profile with the field written out as false is still the plain render.
+    const withFalse = structuredClone(plain);
+    for (const job of withFalse.experience) job.isProject = false;
+    expect(JSON.stringify(buildStructuredCvDoc({ name: "", summary: "Tailored.", cv: withFalse }))).toBe(
+      JSON.stringify(before),
+    );
+  });
+
+  it("drops NO bullet and invents none, whichever entries are flagged", () => {
+    const all = fourEntries([false, false, false, false]).experience.flatMap((j) => j.bullets);
+    for (const flags of [[true, true, false, false], [false, false, true, true], [true, true, true, true]] as const) {
+      const doc = buildStructuredCvDoc({ name: "", summary: "", cv: fourEntries([...flags] as [boolean, boolean, boolean, boolean]) });
+      const printed = [...blocksUnder(doc, "PROFESSIONAL EXPERIENCE"), ...blocksUnder(doc, "PROJECTS")].flatMap(bulletsOf);
+      expect([...printed].sort()).toEqual([...all].sort());
+    }
+  });
+
+  it("every entry flagged leaves a Projects section and NO experience heading", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: fourEntries([true, true, true, true]) });
+    expect(JSON.stringify(doc)).not.toContain("PROFESSIONAL EXPERIENCE");
+    expect(blocksUnder(doc, "PROJECTS").map(headOf)).toEqual(["Northgoing", "DistroNow", "Acme Corp", "Globex"]);
+  });
+
+  it("gives the Projects section the same block spacing, its first block collapsed", () => {
+    const doc = buildStructuredCvDoc({ name: "", summary: "", cv: fourEntries([true, true, false, false]) });
+    expect(blocksUnder(doc, "PROJECTS").map((b) => b.margin)).toEqual([
+      [0, 3, 0, 0],
+      [0, 9.75, 0, 0],
+    ]);
+  });
+
+  it("splitProjectBlocks partitions the folded blocks and mutates nothing", () => {
+    const jobs = fourEntries([true, false, false, true]).experience;
+    const split = splitProjectBlocks(jobs);
+    expect(split.projects.map((b) => b.head.company)).toEqual(["Northgoing", "Globex"]);
+    expect(split.experience.map((b) => b.head.company)).toEqual(["DistroNow", "Acme Corp"]);
+    expect(jobs.map((j) => j.company)).toEqual(["Northgoing", "DistroNow", "Acme Corp", "Globex"]);
+    expect(splitProjectBlocks([])).toEqual({ experience: [], projects: [] });
+  });
+
+  // BOTH FLAGS ON ONE ENTRY. Grouping is resolved first, so it always means what it
+  // says and always finds the parent it found before. An entry that was folded away
+  // has no block of its own left to put in a section, so its own projects flag has no
+  // effect and its lines travel with the entry it joined. Nothing vanishes either way.
+  describe("an entry carrying both flags", () => {
+    const bothFlags = (): CvStructured =>
+      validateCvStructured(
+        {
+          contact: { name: "Jane Doe", links: [] },
+          experience: [
+            { company: "Northgoing", role: "Founder", start: "03/2026", end: "Present", bullets: ["Built the scoring engine end to end"] },
+            { company: "DistroNow", role: "Founder", start: "2025", end: "2026", bullets: ["Built the stockist map"], groupedIntoPrevious: true, isProject: true },
+            { company: "Acme Corp", role: "Product Manager", start: "09/2021", end: "12/2024", bullets: ["Grew activation 40% by shipping an onboarding redesign"] },
+          ],
+        },
+        PROJECTS_SOURCE,
+      ).cv;
+
+    it("folds it into the entry above and its own projects flag does nothing", () => {
+      const doc = buildStructuredCvDoc({ name: "", summary: "", cv: bothFlags() });
+      expect(JSON.stringify(doc)).not.toContain("PROJECTS");
+      expect(blocksUnder(doc, "PROFESSIONAL EXPERIENCE").map(headOf)).toEqual(["Northgoing", "Acme Corp"]);
+      // Its lines print, once, under the entry it joined. It never vanishes.
+      expect(bulletsOf(blocksUnder(doc, "PROFESSIONAL EXPERIENCE")[0])).toEqual([
+        "Built the scoring engine end to end",
+        "Built the stockist map",
+      ]);
+    });
+
+    it("travels into Projects when the entry it joined is the project one", () => {
+      const cv = bothFlags();
+      cv.experience[0].isProject = true;
+      const doc = buildStructuredCvDoc({ name: "", summary: "", cv });
+      expect(blocksUnder(doc, "PROJECTS").map(headOf)).toEqual(["Northgoing"]);
+      expect(bulletsOf(blocksUnder(doc, "PROJECTS")[0])).toEqual([
+        "Built the scoring engine end to end",
+        "Built the stockist map",
+      ]);
+      expect(blocksUnder(doc, "PROFESSIONAL EXPERIENCE").map(headOf)).toEqual(["Acme Corp"]);
+    });
+
+    it("keeps a grouped entry with the SAME parent when a project sits in between", () => {
+      // Grouping first is what makes this true: split first would re-parent the last
+      // entry onto Northgoing the moment Acme Corp lifted out.
+      const cv = validateCvStructured(
+        {
+          contact: { name: "Jane Doe", links: [] },
+          experience: [
+            { company: "Northgoing", role: "Founder", start: "03/2026", end: "Present", bullets: ["Built the scoring engine end to end"] },
+            { company: "Acme Corp", role: "Product Manager", start: "09/2021", end: "12/2024", bullets: ["Grew activation 40% by shipping an onboarding redesign"], isProject: true },
+            { company: "Globex", role: "Analyst", start: "2019", end: "2021", bullets: ["Ran the weekly pricing review"], groupedIntoPrevious: true },
+          ],
+        },
+        PROJECTS_SOURCE,
+      ).cv;
+      const doc = buildStructuredCvDoc({ name: "", summary: "", cv });
+      // Globex joined Acme Corp, and it is still under Acme Corp, in the Projects section.
+      expect(bulletsOf(blocksUnder(doc, "PROJECTS")[0])).toEqual([
+        "Grew activation 40% by shipping an onboarding redesign",
+        "Ran the weekly pricing review",
+      ]);
+      expect(bulletsOf(blocksUnder(doc, "PROFESSIONAL EXPERIENCE")[0])).toEqual([
+        "Built the scoring engine end to end",
+      ]);
+    });
   });
 });
 

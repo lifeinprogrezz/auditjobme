@@ -13,7 +13,9 @@
 // The parse stays faithful to the CV: a project written up with its own dates and
 // title parses as a job, and it should. Only the owner knows it is really part of the
 // entry above, so only the owner can say so, with the tick box on that entry
-// (groupedIntoPrevious). Nothing here rewrites a word: it moves entries and it moves
+// (groupedIntoPrevious). The second tick box says the entry is a project rather than a
+// job (isProject), and it prints, whole and word for word, in a Projects section under
+// the work history. Nothing here rewrites a word: it moves entries and it moves
 // bullets. Removing is not final either, "Read my CV again" brings the upload back.
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -160,6 +162,16 @@ export default function CvEditor({ userId, cvText }: Props) {
       else delete draft.experience[index].groupedIntoPrevious;
     });
 
+  /**
+   * The owner's projects call. Same shape as the grouping one, and valid on every
+   * entry: a project needs nothing above it, so the first entry can carry it too.
+   */
+  const setJobIsProject = (index: number, isProject: boolean) =>
+    edit((draft) => {
+      if (isProject) draft.experience[index].isProject = true;
+      else delete draft.experience[index].isProject;
+    });
+
   const handleSave = async () => {
     if (!cv || busy) return;
     setBusy("save");
@@ -250,9 +262,11 @@ export default function CvEditor({ userId, cvText }: Props) {
 
       <Fold title="Experience" count={cv.experience.length}>
         <p className={`${LABEL} text-pretty`}>
-          Put these in the order you want them read. If one of them is really part of the entry above it, a project
-          or a short stint, tick its box and its lines print there instead. Nothing here is final: "Read my CV again"
-          brings the whole thing back from your upload.
+          Put these in the order you want them read. If one of them is really part of the entry above it, a short
+          stint or a strand of the same work, tick its first box and its lines print there instead. If one is a
+          project rather than a job, tick its second box and it prints in a Projects section under your work history,
+          keeping its own name, title, dates and lines. Nothing here is final: "Read my CV again" brings the whole
+          thing back from your upload.
         </p>
         {cv.experience.map((job, i) => (
           <div key={i} className="rounded-[12px] border border-border p-3">
@@ -308,6 +322,21 @@ export default function CvEditor({ userId, cvText }: Props) {
                 {i === 0
                   ? "This one is at the top, so there is nothing above it to join."
                   : "Its lines print under that entry, and its own title and dates stay off the page."}
+              </span>
+            </label>
+            <label className="mt-2 flex items-start gap-2">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={job.isProject === true}
+                aria-label={`Show ${entryName(job, i)} under Projects instead of Experience`}
+                onChange={(e) => setJobIsProject(i, e.target.checked)}
+              />
+              <span className={`${LABEL} text-pretty`}>
+                Show under Projects instead of Experience.{" "}
+                {job.groupedIntoPrevious === true
+                  ? "You have also ticked the box above, so this one prints as part of the entry above and goes wherever that entry goes."
+                  : "It keeps its own name, title, dates and lines, in a Projects section under your work history."}
               </span>
             </label>
             <div className="mt-3 flex flex-wrap items-center gap-4">

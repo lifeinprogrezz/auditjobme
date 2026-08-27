@@ -39,6 +39,19 @@ export type CvExperience = {
    * above it to join.
    */
   groupedIntoPrevious?: boolean;
+  /**
+   * The owner's second layout call, also made in the editor: print this entry in a
+   * PROJECTS section of its own, below the work history, instead of among the jobs.
+   * A CV that lists a project with its own name, title and dates parses as a job,
+   * because the extracted text reads the same either way, and the parse must keep
+   * mirroring the CV. So the parser NEVER sets this. Absent or false is exactly the
+   * render as it was. The entry keeps its own name, title, dates and bullets, all
+   * verbatim: only the section it prints in changes.
+   *
+   * Unlike groupedIntoPrevious this is valid on ANY entry, the first one included,
+   * because a project needs nothing above it to join.
+   */
+  isProject?: boolean;
 };
 
 export type CvEducation = {
@@ -158,6 +171,9 @@ export function coerceCvStructured(raw: unknown): CvStructured {
     // Only a real `true` is carried, and never on the first kept entry. An absent
     // flag leaves the stored shape identical to what it was before the flag existed.
     if (e.groupedIntoPrevious === true && cv.experience.length > 0) entry.groupedIntoPrevious = true;
+    // Same rule for the projects flag, minus the first-entry exception: a project
+    // stands on its own, so the top entry may carry it. Only a real `true` is kept.
+    if (e.isProject === true) entry.isProject = true;
     cv.experience.push(entry);
   }
 
@@ -200,9 +216,10 @@ export function coerceCvStructured(raw: unknown): CvStructured {
  * in a layout the text extraction can split, and they carry no claim about what the
  * person did. Bullets and dates are where a fabricated claim would live.
  *
- * groupedIntoPrevious is not grounded either, and never can be: it is a layout choice
- * the owner makes in the editor, not a claim the CV makes. coerceCvStructured has
- * already dropped it from the first entry by the time this returns.
+ * groupedIntoPrevious and isProject are not grounded either, and never can be: they
+ * are layout choices the owner makes in the editor, not claims the CV makes.
+ * coerceCvStructured has already dropped the grouping flag from the first entry by
+ * the time this returns, and has kept only a literal `true` for either of them.
  */
 export function validateCvStructured(raw: unknown, cvText: string): CvValidation {
   const cv = coerceCvStructured(raw);

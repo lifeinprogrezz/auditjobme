@@ -15,8 +15,11 @@
 //    with real bullets and dates. Every bullet and date in it was checked against
 //    cv_text before it was stored, and the render is a pure function of the stored
 //    structure, so the same profile prints the same document every time. The one
-//    layout choice the owner gets is groupedIntoPrevious: an entry marked in the
-//    editor prints its bullets under the entry above it (foldGroupedExperience).
+//    layout choices the owner gets are groupedIntoPrevious, where an entry marked in
+//    the editor prints its bullets under the entry above it (foldGroupedExperience),
+//    and isProject, where a marked entry lifts out of the work history into a PROJECTS
+//    section of its own below it (splitProjectBlocks). Both move where words print and
+//    neither writes one.
 //  - TEXT (fallback, unchanged): cv_text printed verbatim, whitespace preserved, for
 //    a profile that has not been parsed yet.
 import { stripLeadingSummary } from "./cvHtml";
@@ -203,6 +206,47 @@ export function foldGroupedExperience(experience: CvExperience[]): CvExperienceB
   return blocks;
 }
 
+/** The experience list, split into the two sections it prints as. */
+export type CvExperienceSections = {
+  /** Everything that prints under PROFESSIONAL EXPERIENCE, in its existing order. */
+  experience: CvExperienceBlock[];
+  /** Everything the owner moved to PROJECTS, in its existing relative order. */
+  projects: CvExperienceBlock[];
+};
+
+/**
+ * Split the folded blocks into work history and projects.
+ *
+ * His CV lists Northgoing and DistroNow under a "Projects" heading, each with its own
+ * name, title and dates, so the parse reads them as his two most recent jobs. That is
+ * correct and it stays correct: the parse mirrors the CV. Only the owner knows which
+ * entries are projects, and he says so with a tick box on the entry (isProject). Every
+ * flagged entry KEEPS its own company, role, dates and bullets, all verbatim: the only
+ * thing that changes is which section it prints in.
+ *
+ * HOW THIS MEETS THE GROUPING FLAG (#184), explicitly, because an entry can carry both:
+ * grouping is resolved FIRST, by foldGroupedExperience, exactly as it was. So
+ * groupedIntoPrevious always keeps its plain meaning, "print my lines under the entry
+ * above", and it always finds the same parent it found before this existed. isProject
+ * then decides where each surviving BLOCK prints. An entry that was folded away has no
+ * block of its own and therefore no section to choose: its own isProject has no effect
+ * and its bullets travel with the entry it was folded into, wherever that lands. The
+ * other order (split first, then fold) would silently re-parent a grouped entry onto a
+ * different job whenever a project entry sat between it and its parent, so it is not
+ * used. Nothing is dropped either way: every bullet of every entry prints exactly once.
+ *
+ * With no entry flagged, `projects` is empty and `experience` is foldGroupedExperience's
+ * own output, unchanged, so the document is the one it was before this existed.
+ */
+export function splitProjectBlocks(experience: CvExperience[]): CvExperienceSections {
+  const sections: CvExperienceSections = { experience: [], projects: [] };
+  for (const block of foldGroupedExperience(experience)) {
+    if (block.head.isProject === true) sections.projects.push(block);
+    else sections.experience.push(block);
+  }
+  return sections;
+}
+
 /**
  * The deterministic CV: the personal engine's layout, built from the parsed profile.
  * Pure — same structure in, byte-identical document definition out (pinned in
@@ -224,10 +268,13 @@ export function buildStructuredCvDoc({ name, summary, cv }: { name: string; summ
   }
 
   // Blocks, not entries: an entry the owner marked prints inside the one above it.
-  const experienceBlocks = foldGroupedExperience(cv.experience);
-  if (experienceBlocks.length > 0) {
-    content.push({ text: "PROFESSIONAL EXPERIENCE", ...CV_SECTION_HEADER });
-    experienceBlocks.forEach(({ head: job, bullets: raw }, i) => {
+  // Then the blocks he marked as projects lift out into their own section below.
+  const sections = splitProjectBlocks(cv.experience);
+  /** One headed run of experience blocks. Empty run, no header: never an empty section. */
+  const pushBlocks = (header: string, blocks: CvExperienceBlock[]) => {
+    if (blocks.length === 0) return;
+    content.push({ text: header, ...CV_SECTION_HEADER });
+    blocks.forEach(({ head: job, bullets: raw }, i) => {
       const stack: DocDef[] = [];
       if (job.company) stack.push({ text: ats(job.company), ...COMPANY_STYLE });
       if (job.role) stack.push({ text: ats(job.role), ...ROLE_STYLE });
@@ -239,7 +286,11 @@ export function buildStructuredCvDoc({ name, summary, cv }: { name: string; summ
       if (bullets.length > 0) stack.push(bulletList(bullets.map((text) => ({ text }))));
       content.push({ stack, unbreakable: true, margin: blockMargin(i) });
     });
-  }
+  };
+  pushBlocks("PROFESSIONAL EXPERIENCE", sections.experience);
+  // Directly after experience and before education, in the same layout as a job, so a
+  // project reads as work rather than as a footnote.
+  pushBlocks("PROJECTS", sections.projects);
 
   if (cv.education.length > 0) {
     content.push({ text: "EDUCATION", ...CV_SECTION_HEADER });

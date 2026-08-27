@@ -196,6 +196,73 @@ describe("groupedIntoPrevious — the owner's grouping flag", () => {
   });
 });
 
+// The owner's second layout choice: "this entry is a project, not a job". Same rule as
+// the grouping flag — the parse never sets it, only the editor does — and one deliberate
+// difference: it is valid on every entry, the first one included.
+describe("isProject — the owner's projects flag", () => {
+  /** Two entries, both real in the CV above, so grounding never gets in the way. */
+  const twoJobs = (isProject?: boolean) => ({
+    ...HONEST,
+    experience: [
+      HONEST.experience[0],
+      {
+        company: "Acme Corp",
+        role: "Product Manager",
+        start: "",
+        end: "",
+        bullets: ["Led a team of 5 engineers"],
+        ...(isProject === undefined ? {} : { isProject }),
+      },
+    ],
+  });
+
+  it("round-trips a flagged entry through validate, storage and the read back", () => {
+    const validated = validateCvStructured(twoJobs(true), CV).cv;
+    expect(validated.experience[1].isProject).toBe(true);
+    const read = readCvStructured(JSON.parse(JSON.stringify(validated)));
+    expect(read?.experience[1].isProject).toBe(true);
+  });
+
+  it("leaves an unflagged structure exactly as it was: the field is absent, not false", () => {
+    const validated = validateCvStructured(twoJobs(), CV).cv;
+    expect("isProject" in validated.experience[1]).toBe(false);
+    // An explicit false is the same thing as no flag at all, and is stored as no flag.
+    const explicitlyFalse = validateCvStructured(twoJobs(false), CV).cv;
+    expect(JSON.stringify(explicitlyFalse)).toBe(JSON.stringify(validated));
+  });
+
+  it("KEEPS the flag on the first entry, unlike grouping: a project needs nothing above it", () => {
+    const first = { ...HONEST, experience: [{ ...HONEST.experience[0], isProject: true }] };
+    const validated = validateCvStructured(first, CV).cv;
+    expect(validated.experience[0].isProject).toBe(true);
+    expect(readCvStructured(JSON.parse(JSON.stringify(validated)))?.experience[0].isProject).toBe(true);
+  });
+
+  it("takes only a real true, never a truthy string or a number", () => {
+    for (const truthy of ["yes", 1, {}, []]) {
+      const junk = { ...HONEST, experience: [{ ...HONEST.experience[0], isProject: truthy }] };
+      expect(coerceCvStructured(junk).experience[0].isProject).toBeUndefined();
+    }
+  });
+
+  it("carries both flags at once when the owner set both, and neither touches the words", () => {
+    const both = {
+      ...HONEST,
+      experience: [HONEST.experience[0], { ...twoJobs(true).experience[1], groupedIntoPrevious: true }],
+    };
+    const validated = validateCvStructured(both, CV).cv;
+    expect(validated.experience[1].isProject).toBe(true);
+    expect(validated.experience[1].groupedIntoPrevious).toBe(true);
+    expect(validated.experience[1].bullets).toEqual(["Led a team of 5 engineers"]);
+  });
+
+  it("never asks the model for it: the parse prompt has no projects field", () => {
+    const prompt = buildCvParsePrompt(CV);
+    expect(prompt).not.toContain("isProject");
+    expect(prompt.toLowerCase()).not.toContain("project");
+  });
+});
+
 describe("reading a stored structure", () => {
   it("keeps dates on the way back out (they were grounded before they were written)", () => {
     const stored = validateCvStructured(HONEST, CV).cv;
