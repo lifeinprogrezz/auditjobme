@@ -3596,6 +3596,17 @@
    "name": "spend_alert_snapshot",
    "returns": "jsonb",
    "security_definer": true
+  },
+  {
+   "args": "worker text",
+   "body_md5": "6edf46193dc2da75a482338aafdf4942",
+   "config": [
+    "search_path=\"\""
+   ],
+   "language": "plpgsql",
+   "name": "tick_worker",
+   "returns": "void",
+   "security_definer": true
   }
  ],
  "triggers": [
