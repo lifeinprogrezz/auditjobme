@@ -4,6 +4,7 @@ import {
   decideDispatch,
   buildWatchdogSubject,
   buildWatchdogBody,
+  describeDispatch,
   STALE_AFTER_HOURS,
   DISPATCH_MIN_GAP_HOURS,
 } from "./scrapeWatchdog";
@@ -135,7 +136,7 @@ describe("the email the owner reads", () => {
     expect(subject + body).not.toContain("—");
   });
 
-  it("says so in the subject when it is restarting the workflow itself", () => {
+  it("says so in the subject when it really did restart the workflow itself", () => {
     const verdict = decideDataplaneFreshness({ updatedAt: null, problem: null }, NOW);
     const decision = decideDispatch({
       alert: true,
@@ -144,6 +145,61 @@ describe("the email the owner reads", () => {
       lastDispatchAt: null,
       nowMs: NOW,
     });
-    expect(buildWatchdogSubject(verdict, decision)).toContain("restarting the scrape");
+    // The outcome argument is required to claim a restart. Omitting it makes the
+    // email under-claim rather than over-claim, which is the safe direction.
+    expect(buildWatchdogSubject(verdict, decision, true)).toContain("restarting the scrape");
+    expect(buildWatchdogSubject(verdict, decision)).not.toContain("restarting the scrape");
+  });
+});
+
+// The email is the only surface a person reads, so it must report what actually
+// happened, not what was decided. An email that says "restarting the scrape"
+// when GitHub refused the restart costs the whole day: the reader stops looking.
+describe("the email never claims a restart that did not happen", () => {
+  const staleVerdict = decideDataplaneFreshness({ updatedAt: hoursAgo(27), problem: null }, NOW);
+  const willDispatch = decideDispatch({
+    alert: true,
+    tokenPresent: true,
+    runHistoryReadable: true,
+    lastDispatchAt: null,
+    nowMs: NOW,
+  });
+
+  it("says it is restarting only when GitHub accepted the restart", () => {
+    const subject = buildWatchdogSubject(staleVerdict, willDispatch, true);
+    expect(subject).toContain("restarting the scrape");
+    expect(buildWatchdogBody(staleVerdict, willDispatch, "now", true)).toContain("Starting the scrape workflow now");
+  });
+
+  it("says the restart failed when GitHub refused it, and tells the reader to act", () => {
+    const subject = buildWatchdogSubject(staleVerdict, willDispatch, false);
+    const body = buildWatchdogBody(staleVerdict, willDispatch, "now", false);
+    expect(subject).not.toContain("restarting the scrape");
+    expect(subject).toContain("could not restart it");
+    expect(body).not.toContain("Starting the scrape workflow now");
+    expect(body).toContain("GitHub refused");
+    expect(body).toContain("by hand");
+  });
+
+  it("leaves the decision line alone when no restart was attempted", () => {
+    const noToken = decideDispatch({
+      alert: true,
+      tokenPresent: false,
+      runHistoryReadable: false,
+      lastDispatchAt: null,
+      nowMs: NOW,
+    });
+    const told = describeDispatch(noToken, null);
+    expect(told.restarted).toBe(false);
+    expect(told.failed).toBe(false);
+    expect(told.line).toBe(noToken.reason);
+    expect(buildWatchdogSubject(staleVerdict, noToken, null)).not.toContain("restart");
+  });
+
+  it("keeps the warm voice with no em-dashes on the failed-restart path", () => {
+    const text =
+      buildWatchdogSubject(staleVerdict, willDispatch, false) +
+      buildWatchdogBody(staleVerdict, willDispatch, "now", false);
+    expect(text).not.toContain("\u2014");
   });
 });

@@ -211,9 +211,44 @@ export function decideDispatch(input: DispatchInput): DispatchDecision {
   return { dispatch: true, reason: "Starting the scrape workflow now." };
 }
 
-export function buildWatchdogSubject(verdict: WatchdogVerdict, dispatch: DispatchDecision): string {
+/**
+ * What actually happened on the dispatch side, as opposed to what was decided.
+ * `null` means no restart was attempted, so the decision line stands as written.
+ * `true` means GitHub accepted it. `false` means GitHub refused it or the call
+ * never landed.
+ *
+ * The email must never claim a restart that did not happen. A person who reads
+ * "restarting the scrape" stops looking, and if the restart was refused the day
+ * is lost exactly as if the watchdog had said nothing. So the outcome, not the
+ * intention, is what the owner reads. Pinned by scrapeWatchdog.test.ts.
+ */
+export type DispatchOutcome = boolean | null;
+
+/** The one line about the restart that the subject and the body both build on. */
+export function describeDispatch(dispatch: DispatchDecision, outcome: DispatchOutcome): {
+  restarted: boolean;
+  failed: boolean;
+  line: string;
+} {
+  if (!dispatch.dispatch || outcome === null) {
+    return { restarted: false, failed: false, line: dispatch.reason };
+  }
+  if (outcome) return { restarted: true, failed: false, line: dispatch.reason };
+  return {
+    restarted: false,
+    failed: true,
+    line: "The watchdog tried to restart the scrape workflow and GitHub refused the request, so nothing was started. Start it by hand from the Actions tab.",
+  };
+}
+
+export function buildWatchdogSubject(
+  verdict: WatchdogVerdict,
+  dispatch: DispatchDecision,
+  outcome: DispatchOutcome = null,
+): string {
   const head = verdict.state === "stale" ? "the job pool did not refresh" : "cannot confirm the job pool refreshed";
-  const tail = dispatch.dispatch ? " (restarting the scrape)" : "";
+  const told = describeDispatch(dispatch, outcome);
+  const tail = told.restarted ? " (restarting the scrape)" : told.failed ? " (could not restart it)" : "";
   return `Northgoing scrape watchdog: ${head}${tail}`;
 }
 
@@ -221,7 +256,9 @@ export function buildWatchdogBody(
   verdict: WatchdogVerdict,
   dispatch: DispatchDecision,
   checkedAt: string,
+  outcome: DispatchOutcome = null,
 ): string {
+  const told = describeDispatch(dispatch, outcome);
   const lines = [
     verdict.state === "stale"
       ? "The daily scrape did not publish a fresh job pool."
@@ -229,7 +266,7 @@ export function buildWatchdogBody(
     "",
     ...verdict.reasons,
     "",
-    dispatch.reason,
+    told.line,
     "",
     "What to check, in this order:",
     "1. The Scrape jobs workflow in the repository's Actions tab. A red run tells you which step broke.",

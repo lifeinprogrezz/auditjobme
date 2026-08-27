@@ -71,7 +71,13 @@ async function sendEmail(apiKey: string, to: string, subject: string, text: stri
     }
     return true;
   } catch (e) {
+    // Sentry, not just console: the Vercel runtime log is not readable on this
+    // plan, so a console line here IS silence, and silence is the one outcome a
+    // watchdog may never have.
     console.warn("[scrape-watchdog] Resend fetch failed:", e);
+    reportApiError("[scrape-watchdog] alert email could not be sent", {
+      cause: e instanceof Error ? e.name : "unknown",
+    });
     return false;
   }
 }
@@ -156,6 +162,9 @@ async function dispatchWorkflow(repo: string, token: string): Promise<boolean> {
     return true;
   } catch (e) {
     console.warn("[scrape-watchdog] GitHub dispatch failed:", e);
+    reportApiError("[scrape-watchdog] GitHub dispatch threw", {
+      cause: e instanceof Error ? e.name : "unknown",
+    });
     return false;
   }
 }
@@ -176,6 +185,22 @@ async function handler(req: Req, res: Res): Promise<void> {
   const dispatchToken = (process.env.SCRAPE_DISPATCH_TOKEN ?? "").trim();
   const repo = process.env.SCRAPE_DISPATCH_REPO || DEFAULT_REPO;
   if (!supabaseUrl || !serviceKey) {
+    // A misconfigured watchdog is a dead watchdog, and it would die without a
+    // word. Report it, and email it too when there is any way to.
+    reportApiError("[scrape-watchdog] cannot run: missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY");
+    if (resendKey) {
+      await sendEmail(
+        resendKey,
+        ownerEmail,
+        "Northgoing scrape watchdog: the watchdog itself cannot run",
+        [
+          "The scrape watchdog could not start, so nothing is checking that the daily job scrape ran.",
+          "",
+          "Its Supabase settings are missing: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set on the deployment.",
+          "Until that is fixed, check the Scrape jobs workflow in the Actions tab by hand.",
+        ].join("\n"),
+      );
+    }
     res.status(500).json({ error: "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY" });
     return;
   }
@@ -200,19 +225,24 @@ async function handler(req: Req, res: Res): Promise<void> {
     nowMs: now.getTime(),
   });
 
-  let dispatched = false;
+  // The restart is attempted BEFORE the email is composed, so the email can say
+  // what actually happened. `null` means no restart was attempted at all.
+  let dispatched: boolean | null = null;
   if (decision.dispatch) dispatched = await dispatchWorkflow(repo, dispatchToken);
 
   let emailed = false;
   if (verdict.alert) {
     if (!resendKey) {
       console.warn("[scrape-watchdog] alert tripped but RESEND_API_KEY is missing; not emailed");
+      reportApiError("[scrape-watchdog] alert tripped but RESEND_API_KEY is missing", {
+        state: verdict.state,
+      });
     } else {
       emailed = await sendEmail(
         resendKey,
         ownerEmail,
-        buildWatchdogSubject(verdict, decision),
-        buildWatchdogBody(verdict, decision, now.toISOString()),
+        buildWatchdogSubject(verdict, decision, dispatched),
+        buildWatchdogBody(verdict, decision, now.toISOString(), dispatched),
       );
     }
   }
@@ -223,7 +253,8 @@ async function handler(req: Req, res: Res): Promise<void> {
     ageHours: verdict.ageHours,
     dataplaneUpdatedAt: probe.updatedAt,
     dispatchPlanned: decision.dispatch,
-    dispatched,
+    dispatched: dispatched === true,
+    dispatchFailed: dispatched === false,
     emailed,
   };
   console.log("[scrape-watchdog]", JSON.stringify({ ...summary, reasons: verdict.reasons }));
