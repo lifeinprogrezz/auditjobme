@@ -52,8 +52,8 @@ import {
   handleMatchesName,
   candidateDomains,
   siteProbeVerdict,
-  iconProbeVerdict,
   isParkingBody,
+  isHoldingPage,
   pageNamesCompany,
   bodyLinksAtsTenant,
   classifyFetchError,
@@ -263,6 +263,12 @@ async function probeSite(domain, name) {
     body = "";
   }
   if (isParkingBody(body)) return { verdict: "parked", status: res.status };
+  // isHoldingPage runs BESIDE the name gate, never behind it: a parked or
+  // reserved domain titles itself with its own domain, that domain is built
+  // from the company handle, so pageNamesCompany always says yes. Measured live
+  // on 2026-08-27 it waved through finto.com, nevis.com, neuralconcept.ai and
+  // sessions.com -- four wrong logos in one 39-write sample.
+  if (isHoldingPage(body, domain)) return { verdict: "holding", status: res.status };
   if (!pageNamesCompany(body, name)) return { verdict: "other-brand", status: res.status };
   return { verdict: "ok", status: res.status, body };
 }
@@ -290,31 +296,6 @@ async function fetchCareersPage(domain) {
   }
 }
 
-/** Second chance for a site that refuses a plain read but still serves its
- *  icon. Only a 200 with real image bytes counts. */
-async function probeIcon(domain) {
-  try {
-    const res = await fetch(`https://${domain}/favicon.ico`, {
-      headers: { Range: "bytes=0-0", "User-Agent": PROBE_USER_AGENT },
-      redirect: "follow",
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    });
-    try {
-      await res.body?.cancel();
-    } catch {
-      /* nothing to release */
-    }
-    const verdict = iconProbeVerdict({
-      status: res.status === 206 ? 200 : res.status,
-      contentType: res.headers.get("content-type"),
-      contentLength: res.headers.get("content-length"),
-    });
-    return { verdict, status: res.status };
-  } catch {
-    return { verdict: "reject", status: 0 };
-  }
-}
-
 /** No answer either way from this candidate -- see classifyFetchError. */
 const UNKNOWN = Symbol("unreachable");
 
@@ -333,10 +314,13 @@ async function validate(domain, name) {
   if (probesUsed >= MAX_PROBES) return null; // out of budget: leave it for the next run
   probesUsed++;
   tally.candidatesTried++;
-  let { verdict, status, body } = await probeSite(domain, name);
-  // "parked", "offsite" and "other-brand" are answers, not silence: a site that
-  // says it belongs to somebody else is never re-asked through its favicon.
-  if (verdict === "dead") ({ verdict, status } = await probeIcon(domain));
+  // A read of the page is the ONLY thing that can admit a candidate. A favicon
+  // probe used to give a second chance to a root that refused to be read; it
+  // was removed in review, because an image proves the domain resolves and
+  // nothing about who owns it, so a domain admitted that way skipped both the
+  // holding-page and the name gate. It also never passed once in a 60-company
+  // live replay, so a candidate that will not be read is simply not written.
+  const { verdict, status, body } = await probeSite(domain, name);
   if (verdict === "unreachable") {
     // No answer either way. Not remembered, so the next run asks again.
     tally.unreachable++;
@@ -346,6 +330,7 @@ async function validate(domain, name) {
   if (ok) tally.validated++;
   else tally.rejected++;
   if (verdict === "other-brand") tally.otherBrand++;
+  if (verdict === "holding") tally.holdingPage++;
   cacheWrites.push({ domain, ok, status: status || null, reason: verdict });
   return ok ? { body: body || "" } : false;
 }

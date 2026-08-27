@@ -18,9 +18,13 @@
  *   2. the candidate must not be a hosted-ATS/platform host (checked by the
  *      caller through logo-lib's domainFromUrl, so one host list stays canonical);
  *   3. the candidate must ANSWER on the network (scripts/logo-backfill.mjs),
- *      on itself, and not from a for-sale lander (siteProbeVerdict, isParkingBody);
- *   4. the page that answers must name the company (pageNamesCompany), because a
- *      live site on a name-shaped domain can still be somebody else's;
+ *      on itself, and not from a for-sale lander (siteProbeVerdict, isParkingBody).
+ *      Only a read of the page counts: an icon probe was tried and removed, see
+ *      the note where iconProbeVerdict used to be;
+ *   4. the page that answers must name the company (pageNamesCompany) AND must
+ *      not be a holding page (isHoldingPage) -- both, because a live site on a
+ *      name-shaped domain can still be somebody else's, and a parked or
+ *      reserved one titles itself with the domain, which carries the name;
  *   5. and exactly ONE of the company's candidates may pass, or nothing is
  *      written (the caller's runPlan). Granola, Faculty and Axelera all have a
  *      .com owned by a different business AND a .ai that is theirs, so "first
@@ -419,6 +423,18 @@ export function isParkingBody(body) {
   return text.length < 400 && /location\.(href|replace)/.test(text) && /\/(lander|park|default)\b/.test(text);
 }
 
+/** Every name the page gives ITSELF: title, og:site_name, og:title,
+ *  application-name, twitter:title. Read once, used by both gates below. */
+function selfNames(head) {
+  const html = String(head || "");
+  return [
+    (html.match(/<title[^>]*>([^<]*)/i) || [])[1],
+    ...[...html.matchAll(/<meta[^>]+(?:property|name)=["'](?:og:site_name|og:title|application-name|twitter:title)["'][^>]*>/gi)].map(
+      (m) => (m[0].match(/content=["']([^"']*)/i) || [])[1],
+    ),
+  ].filter(Boolean);
+}
+
 /**
  * Does the page that answered actually belong to this company? The candidate
  * domain is built from a handle, so a live site on it can still be somebody
@@ -429,20 +445,71 @@ export function isParkingBody(body) {
  *
  * A page that names itself nothing in the first few KB is a reject: a missed
  * logo is a coloured initial, a wrong one is another company's mark.
+ *
+ * NOT sufficient on its own -- see isHoldingPage below, which has to run beside
+ * it. This check ASKS whether the name is there and a holding page always says
+ * yes, because it titles itself with the domain and the domain carries the name.
  */
 export function pageNamesCompany(head, name) {
   const n = normalizeName(name);
   if (!n) return false;
-  const html = String(head || "");
-  const parts = [
-    (html.match(/<title[^>]*>([^<]*)/i) || [])[1],
-    ...[...html.matchAll(/<meta[^>]+(?:property|name)=["'](?:og:site_name|og:title|application-name|twitter:title)["'][^>]*>/gi)].map(
-      (m) => (m[0].match(/content=["']([^"']*)/i) || [])[1],
-    ),
-  ].filter(Boolean);
+  const parts = selfNames(head);
   if (!parts.length) return false;
   const haystack = fold(parts.join(" ")).replace(/[^a-z0-9]/g, "");
   return haystack.includes(n);
+}
+
+/** Wording that only ever appears on a page with no company behind it yet. */
+const HOLDING_MARKERS = [
+  "under construction",
+  "coming soon",
+  "site is being built",
+  "website is being built",
+  "default web page",
+  "default page",
+  "welcome to nginx",
+  "apache2 ubuntu default",
+  "index of /",
+  "en construccion",
+  "proximamente",
+  "demnachst",
+  "im aufbau",
+];
+
+/**
+ * Is this page a holding page rather than a company? It has to be asked
+ * SEPARATELY from pageNamesCompany, because that gate cannot answer it: a
+ * holding page names itself with its own domain, the domain is built from the
+ * company handle, so the company name is always in there and the gate always
+ * says yes. Measured live on 2026-08-27, four of them passed it:
+ *   finto.com          <title>finto.com</title>, a 980-byte Above.com stub
+ *   neuralconcept.ai   <title>neuralconcept.ai</title> (the company is .com,
+ *                      whose own title is a tagline, so the name gate REJECTED
+ *                      the real site and ACCEPTED the placeholder)
+ *   nevis.com          <title>Nevis is under construction</title>
+ *   sessions.com       <title>Sessions.com</title>
+ * Two shapes, both narrow on purpose:
+ *   1. every name the page gives itself IS the candidate domain, dot and all.
+ *      A real company titles its home page with a brand or a tagline, not with
+ *      "example.com"; a parked or reserved domain almost always does. Titling
+ *      with the bare brand ("Callosum", "Noah Labs") is NOT this shape.
+ *   2. it says in words that there is nothing here yet.
+ */
+export function isHoldingPage(head, candidate) {
+  const parts = selfNames(head);
+  const domain = String(candidate || "")
+    .toLowerCase()
+    .replace(/^www\./, "");
+  if (domain && parts.length) {
+    const bare = (s) =>
+      fold(s)
+        .replace(/^www\./, "")
+        .replace(/[^a-z0-9.-]/g, "")
+        .replace(/\.+$/, "");
+    if (parts.every((p) => bare(p) === domain)) return true;
+  }
+  const text = fold(parts.join(" ")).replace(/\s+/g, " ");
+  return HOLDING_MARKERS.some((m) => text.includes(m));
 }
 
 // ── The tie-breaker: does this site hire through the SAME ATS tenant? ────────
@@ -507,18 +574,14 @@ export function bodyLinksAtsTenant(body, ats, handle) {
   return atsTenantMarkers(ats, handle).some((m) => text.includes(m));
 }
 
-/**
- * Verdict for an icon probe: only a 200 carrying real image bytes counts. A
- * host that answers a missing icon with an HTML error page, or with a
- * zero-length body, is not proof of anything.
- */
-export function iconProbeVerdict({ status, contentType, contentLength }) {
-  if (status !== 200) return "reject";
-  const type = String(contentType || "").toLowerCase();
-  if (!/^image\//.test(type.split(";")[0].trim())) return "reject";
-  if (contentLength != null && Number(contentLength) === 0) return "reject";
-  return "ok";
-}
+// An icon probe used to sit here as a second chance for a candidate whose root
+// refused to be read. It was removed on 2026-08-27, in review: a 200 with image
+// bytes at /favicon.ico proves the domain resolves and serves a file, and
+// NOTHING about who owns it -- the icon carries no company name, so a domain
+// admitted this way skipped the name gate and the parking gate and went
+// straight to a write. Replayed over 60 companies of the live pool it cost 70
+// requests (41% of the run's budget, and it was not counted against
+// --max-probes) and produced zero passes, so removing it costs no coverage.
 
 /**
  * A request that never got an answer: was that proof there is no site there, or
@@ -583,6 +646,7 @@ export function newHandleTally() {
     validated: 0,
     rejected: 0,
     otherBrand: 0,
+    holdingPage: 0,
     unreachable: 0,
     ambiguous: 0,
     tieBreakFetches: 0,
@@ -596,7 +660,7 @@ export function handleSummaryLine(t, { apply }) {
   return (
     `logo-backfill(handle): ${t.companies} company(ies) with an ATS handle to try` +
     ` · candidates ${t.candidatesTried} · cache hits ${t.cacheHits}` +
-    ` · validated ${t.validated} · rejected ${t.rejected} (other brand ${t.otherBrand})` +
+    ` · validated ${t.validated} · rejected ${t.rejected} (other brand ${t.otherBrand}, holding page ${t.holdingPage})` +
     ` · unreachable ${t.unreachable} · tie-broken ${t.tieBroken} (${t.tieBreakFetches} careers reads) · ambiguous ${t.ambiguous} · no handle ${t.noHandle} · name mismatch ${t.nameMismatch} · no candidate ${t.noCandidate}` +
     (t.budgetExhausted ? ` · budget exhausted on ${t.budgetExhausted}` : "") +
     (apply ? ` · wrote ${t.written}` : " · [dry run] no writes")

@@ -1,7 +1,7 @@
 // Pins the ATS-handle logo derivation (scripts/logo-handle-lib.mjs), issue #153.
 // Contract: a handle is a GUESS, so it only becomes a logo domain after a name
 // gate, a hosted-ATS gate, a network probe, a check that the page which answers
-// names the company, and a tie-break for when two do. Everything here is
+// names the company AND is not a holding page, and a tie-break for when two do. Everything here is
 // offline: the probe helpers are fed response shapes, never a real request.
 //
 // Every URL below is a real shape from the live pool (2026-08-26 dataplane
@@ -15,8 +15,8 @@ import {
   handleMatchesName,
   candidateDomains,
   siteProbeVerdict,
-  iconProbeVerdict,
   isParkingBody,
+  isHoldingPage,
   pageNamesCompany,
   bodyLinksAtsTenant,
   atsTenantMarkers,
@@ -255,20 +255,6 @@ describe("siteProbeVerdict", () => {
   });
 });
 
-describe("iconProbeVerdict", () => {
-  it("accepts only a 200 carrying image bytes", () => {
-    expect(iconProbeVerdict({ status: 200, contentType: "image/x-icon", contentLength: "1" })).toBe("ok");
-    expect(iconProbeVerdict({ status: 200, contentType: "image/png; charset=binary", contentLength: null })).toBe("ok");
-  });
-
-  it("rejects a non-image answer, an empty body and any non-200", () => {
-    expect(iconProbeVerdict({ status: 200, contentType: "text/html", contentLength: "512" })).toBe("reject");
-    expect(iconProbeVerdict({ status: 200, contentType: "image/png", contentLength: "0" })).toBe("reject");
-    expect(iconProbeVerdict({ status: 404, contentType: "image/png", contentLength: "10" })).toBe("reject");
-    expect(iconProbeVerdict({ status: 200, contentType: null, contentLength: "10" })).toBe("reject");
-  });
-});
-
 describe("isParkingBody", () => {
   it("spots a for-sale lander served on the candidate's own host", () => {
     expect(isParkingBody("<html><title>acme.com</title><h1>This domain is for sale</h1>")).toBe(true);
@@ -316,6 +302,43 @@ describe("pageNamesCompany — the gate that catches a live site owned by someon
   it("rejects a page that names itself nothing at all", () => {
     expect(pageNamesCompany("<html><body>hello</body></html>", "Acme")).toBe(false);
     expect(pageNamesCompany("", "Acme")).toBe(false);
+  });
+});
+
+describe("isHoldingPage — the gate pageNamesCompany cannot be", () => {
+  // Every page below answered 200 on the live pool on 2026-08-27, passed
+  // pageNamesCompany, and was WRITTEN as that company's logo domain. All four
+  // are wrong. A holding page names itself with its own domain, and the domain
+  // is built from the company handle, so the name gate can never catch them.
+  it("rejects a page whose only name for itself is its own domain", () => {
+    expect(isHoldingPage("<title>finto.com</title>", "finto.com")).toBe(true);
+    expect(isHoldingPage("<title>neuralconcept.ai</title>", "neuralconcept.ai")).toBe(true);
+    expect(isHoldingPage("<title>Sessions.com</title>", "sessions.com")).toBe(true);
+    // The name gate says yes to all three, which is the whole point.
+    expect(pageNamesCompany("<title>finto.com</title>", "Finto")).toBe(true);
+    expect(pageNamesCompany("<title>neuralconcept.ai</title>", "Neuralconcept")).toBe(true);
+  });
+
+  it("rejects a page that says in words there is nothing there yet", () => {
+    expect(isHoldingPage("<title>Nevis is under construction</title>", "nevis.com")).toBe(true);
+    expect(isHoldingPage("<title>Acme — coming soon</title>", "acme.com")).toBe(true);
+    expect(isHoldingPage("<title>Welcome to nginx!</title>", "acme.com")).toBe(true);
+  });
+
+  it("leaves a real company alone, including one titled with just its brand", () => {
+    // callosum.com and noah-labs.com are real sites titled with the bare brand.
+    expect(isHoldingPage("<title>Callosum</title>", "callosum.com")).toBe(false);
+    expect(isHoldingPage("<title>Noah Labs</title>", "noah-labs.com")).toBe(false);
+    // A domain-shaped brand still passes when it carries anything else.
+    expect(isHoldingPage("<title>Vibiz.ai | AI Lead Generation</title>", "vibiz.ai")).toBe(false);
+    expect(isHoldingPage("<title>Griffin - The bank you can build on</title>", "griffin.com")).toBe(false);
+    expect(isHoldingPage("", "griffin.com")).toBe(false);
+  });
+
+  it("needs EVERY self-name to be the domain, not just the title", () => {
+    expect(
+      isHoldingPage('<title>sessions.com</title><meta property="og:site_name" content="Sessions">', "sessions.com"),
+    ).toBe(false);
   });
 });
 
