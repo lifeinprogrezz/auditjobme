@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   decideDataplaneFreshness,
   decideDispatch,
+  isWatchdogRestart,
+  WATCHDOG_RUN_MARKER,
   buildWatchdogSubject,
   buildWatchdogBody,
   describeDispatch,
@@ -201,5 +203,29 @@ describe("the email never claims a restart that did not happen", () => {
       buildWatchdogSubject(staleVerdict, willDispatch, false) +
       buildWatchdogBody(staleVerdict, willDispatch, "now", false);
     expect(text).not.toContain("\u2014");
+  });
+});
+
+describe("isWatchdogRestart: telling the watchdog's own restart from a person's run", () => {
+  // Why this matters: the once-a-day bound is a bound on the WATCHDOG. On
+  // 2026-08-28 a run Rober started by hand 20.8 hours earlier spent that budget
+  // while the job pool sat 15.6 hours stale, so the restart never happened.
+  it("recognises the run the workflow names when the watchdog asked for it", () => {
+    expect(isWatchdogRestart({ display_title: "Scrape jobs (watchdog restart)" })).toBe(true);
+    expect(isWatchdogRestart({ name: "Scrape jobs (watchdog restart)" })).toBe(true);
+  });
+
+  it("does NOT recognise a run started by hand, which is the whole point", () => {
+    expect(isWatchdogRestart({ display_title: "Scrape jobs" })).toBe(false);
+    expect(isWatchdogRestart({ name: "Scrape jobs", display_title: "Scrape jobs" })).toBe(false);
+  });
+
+  it("treats a run with no name at all as somebody else's, so the bound is never spent on a guess", () => {
+    expect(isWatchdogRestart({})).toBe(false);
+    expect(isWatchdogRestart({ name: null, display_title: null })).toBe(false);
+  });
+
+  it("reads the marker case-insensitively, since it is matched and never parsed", () => {
+    expect(isWatchdogRestart({ display_title: `Scrape jobs (${WATCHDOG_RUN_MARKER.toUpperCase()})` })).toBe(true);
   });
 });

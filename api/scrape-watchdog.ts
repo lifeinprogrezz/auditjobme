@@ -37,6 +37,8 @@ import {
   decideDispatch,
   buildWatchdogSubject,
   buildWatchdogBody,
+  isWatchdogRestart,
+  WATCHDOG_DISPATCH_REASON,
   type DataplaneProbe,
 } from "../src/lib/scrapeWatchdog.js";
 import { reportApiError, setRunSummary, withSentry } from "../src/lib/apiSentry.js";
@@ -139,9 +141,16 @@ const githubHeaders = (token: string) => ({
 });
 
 /**
- * When did a dispatch last start this workflow? `null` inside `readable: true`
+ * When did THE WATCHDOG last start this workflow? `null` inside `readable: true`
  * means it never has. A failed read returns `readable: false`, which stops the
  * dispatch: the once-a-day bound has to be provable, not assumed.
+ *
+ * Only runs the watchdog started count. A run a person dispatched by hand is
+ * skipped, because the bound exists to stop the WATCHDOG looping the runner, and
+ * on 2026-08-28 a manual run 20.8 hours earlier spent that budget while the pool
+ * sat 15.6 hours stale. The marker comes from the workflow's run-name; see
+ * WATCHDOG_RUN_MARKER. One page is read rather than one run, since manual runs
+ * can now sit in front of the watchdog's own.
  */
 async function lastDispatchedRun(
   repo: string,
@@ -149,15 +158,18 @@ async function lastDispatchedRun(
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ readable: boolean; lastDispatchAt: string | null }> {
   try {
-    const url = `https://api.github.com/repos/${repo}/actions/workflows/${WORKFLOW_FILE}/runs?event=workflow_dispatch&per_page=1`;
+    const url = `https://api.github.com/repos/${repo}/actions/workflows/${WORKFLOW_FILE}/runs?event=workflow_dispatch&per_page=30`;
     const res = await fetchImpl(url, { headers: githubHeaders(token) });
     if (!res.ok) {
       console.warn(`[scrape-watchdog] GitHub runs ${res.status}:`, await res.text().catch(() => ""));
       return { readable: false, lastDispatchAt: null };
     }
-    const body = (await res.json()) as { workflow_runs?: { created_at?: string | null }[] };
-    const created = body.workflow_runs?.[0]?.created_at ?? null;
-    return { readable: true, lastDispatchAt: created };
+    const body = (await res.json()) as {
+      workflow_runs?: { created_at?: string | null; name?: string | null; display_title?: string | null }[];
+    };
+    // The list arrives newest first, so the first match is the latest restart.
+    const mine = (body.workflow_runs ?? []).find((r) => isWatchdogRestart(r));
+    return { readable: true, lastDispatchAt: mine?.created_at ?? null };
   } catch (e) {
     console.warn("[scrape-watchdog] GitHub runs fetch failed:", e);
     return { readable: false, lastDispatchAt: null };
@@ -171,7 +183,9 @@ async function dispatchWorkflow(repo: string, token: string, fetchImpl: typeof f
     const res = await fetchImpl(url, {
       method: "POST",
       headers: { ...githubHeaders(token), "Content-Type": "application/json" },
-      body: JSON.stringify({ ref: WORKFLOW_REF }),
+      // `reason` is what marks the run as the watchdog's own in the run list,
+      // so the once-a-day bound above can find it again tomorrow.
+      body: JSON.stringify({ ref: WORKFLOW_REF, inputs: { reason: WATCHDOG_DISPATCH_REASON } }),
     });
     if (!res.ok) {
       console.warn(`[scrape-watchdog] GitHub dispatch ${res.status}:`, await res.text().catch(() => ""));

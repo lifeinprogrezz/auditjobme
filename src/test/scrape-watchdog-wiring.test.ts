@@ -43,7 +43,7 @@ function fakeStorage(result: ListResult) {
   return { client, listed };
 }
 
-type Call = { url: string; method: string };
+type Call = { url: string; method: string; body?: string };
 
 /** Records every outbound call and answers Resend and GitHub the way they do. */
 function recordingFetch(calls: Call[], runsBody: unknown = { workflow_runs: [] }): typeof fetch {
@@ -56,7 +56,7 @@ function recordingFetch(calls: Call[], runsBody: unknown = { workflow_runs: [] }
     }) as unknown as Response;
   return (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
-    calls.push({ url, method: init?.method ?? "GET" });
+    calls.push({ url, method: init?.method ?? "GET", body: typeof init?.body === "string" ? init.body : undefined });
     if (url.includes("/runs?")) return reply(200, runsBody);
     if (url.endsWith("/dispatches")) return reply(204, {});
     if (url.startsWith("https://api.resend.com")) return reply(200, { id: "email_test" });
@@ -143,16 +143,18 @@ describe("the endpoint's wiring", () => {
   it("does not start the workflow when the decision said not to start it (mutant: drop the `if (decision.dispatch)` guard)", async () => {
     // The maximal near-miss: the pool IS stale, a token IS present, the run
     // history IS readable, so every condition for a restart holds except the one
-    // that matters. A dispatch went out two hours ago, and the workflow may be
-    // started at most once a day, so the decision is no. Without the guard the
-    // endpoint would restart the runner on every stale morning, which is the
-    // runaway the once-a-day bound exists to prevent.
+    // that matters. THE WATCHDOG dispatched a run two hours ago -- the run-name
+    // marker is what says so -- and it may start one at most once a day, so the
+    // decision is no. Without the guard the endpoint would restart the runner on
+    // every stale morning, which is the runaway the bound exists to prevent.
     const { client, listed } = fakeStorage({
       data: [{ name: "dataplane.json", updated_at: ago(30 * HOUR) }],
       error: null,
     });
     const calls: Call[] = [];
-    const fetchImpl = recordingFetch(calls, { workflow_runs: [{ created_at: ago(2 * HOUR) }] });
+    const fetchImpl = recordingFetch(calls, {
+      workflow_runs: [{ created_at: ago(2 * HOUR), display_title: "Scrape jobs (watchdog restart)" }],
+    });
     const { res, seen } = fakeRes();
 
     await handler(authed, res, { createStorageClient: () => client, fetchImpl });
@@ -169,6 +171,65 @@ describe("the endpoint's wiring", () => {
     // what makes the absent dispatch a decision rather than an early return.
     expect(calls.some((c) => c.url.startsWith("https://api.resend.com"))).toBe(true);
     expect(seen.body).toMatchObject({ emailed: true });
+  });
+
+  it("restarts the workflow when the only recent dispatch was started BY HAND (regression: 2026-08-28)", async () => {
+    // What actually happened on 2026-08-28, and the reason this test exists.
+    // The pool was 15.6 hours stale. The watchdog emailed correctly and then
+    // refused to restart anything, reporting "already started this workflow 20.8
+    // hours ago". It had not. Rober had dispatched that run by hand the previous
+    // morning. The once-a-day bound is a bound on the WATCHDOG's restarts, and a
+    // person's run must not spend it -- otherwise the self-healing layer is
+    // disabled by the very act of a human checking on it.
+    //
+    // The fixture is that morning: a manual run 20.8 hours ago sitting in FRONT
+    // of the watchdog's own last restart, which is 30 hours old and so outside
+    // the bound. Reading only the newest dispatch is what produced the bug, so
+    // the newest dispatch here is the manual one.
+    const { client } = fakeStorage({
+      data: [{ name: "dataplane.json", updated_at: ago(15.6 * HOUR) }],
+      error: null,
+    });
+    const calls: Call[] = [];
+    const fetchImpl = recordingFetch(calls, {
+      workflow_runs: [
+        { created_at: ago(20.8 * HOUR), display_title: "Scrape jobs" },
+        { created_at: ago(30 * HOUR), display_title: "Scrape jobs (watchdog restart)" },
+      ],
+    });
+    const { res, seen } = fakeRes();
+
+    await handler(authed, res, { createStorageClient: () => client, fetchImpl });
+
+    const dispatches = calls.filter((c) => c.url.endsWith("/dispatches"));
+    expect(dispatches).toHaveLength(1);
+    expect(seen.body).toMatchObject({ state: "stale", alert: true, dispatchPlanned: true, dispatched: true });
+    // And the restart marks ITSELF, so tomorrow's run of this same check can find
+    // it. Without the input the fix would work once and then forget.
+    expect(JSON.parse(dispatches[0].body ?? "{}")).toMatchObject({ inputs: { reason: "watchdog" } });
+  });
+
+  it("control: the watchdog's OWN restart inside the window still blocks a second one", async () => {
+    // The pair to the case above. Same stale pool, same two runs, except the
+    // watchdog's own restart is now the recent one. If this dispatched too, the
+    // fix above would have removed the bound rather than corrected it.
+    const { client } = fakeStorage({
+      data: [{ name: "dataplane.json", updated_at: ago(15.6 * HOUR) }],
+      error: null,
+    });
+    const calls: Call[] = [];
+    const fetchImpl = recordingFetch(calls, {
+      workflow_runs: [
+        { created_at: ago(3 * HOUR), display_title: "Scrape jobs (watchdog restart)" },
+        { created_at: ago(20.8 * HOUR), display_title: "Scrape jobs" },
+      ],
+    });
+    const { res, seen } = fakeRes();
+
+    await handler(authed, res, { createStorageClient: () => client, fetchImpl });
+
+    expect(calls.filter((c) => c.url.endsWith("/dispatches"))).toEqual([]);
+    expect(seen.body).toMatchObject({ dispatchPlanned: false, emailed: true });
   });
 
   it("refuses an unauthenticated request and never reads Storage (mutant: delete the cronAuthResult guard)", async () => {

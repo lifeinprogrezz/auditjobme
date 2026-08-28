@@ -39,6 +39,39 @@ export const STALE_AFTER_HOURS = 12;
 export const DISPATCH_MIN_GAP_HOURS = 24;
 
 /**
+ * The name a run carries when THIS watchdog started it. The scrape workflow sets
+ * its run-name from the `reason` dispatch input, so a restart the watchdog asked
+ * for is legible in the run list and a run a person started by hand is not.
+ *
+ * WHY THIS EXISTS (2026-08-28). The once-a-day bound above is a bound on the
+ * WATCHDOG's restarts: it stops a repeating failure from looping the runner. The
+ * first version proved that bound by reading the newest `workflow_dispatch` run,
+ * which counts every hand-started run too. On 2026-08-28 the pool was 15.6 hours
+ * stale, the watchdog emailed correctly, and it then declined to restart anything
+ * because a PERSON had dispatched the same workflow 20.8 hours earlier. The guard
+ * spent its daily budget on somebody else's run, on the one morning the restart
+ * was the whole point. A manual run must never stand in for the watchdog's own.
+ */
+export const WATCHDOG_RUN_MARKER = "watchdog restart";
+
+/** The value the watchdog sends as the workflow's `reason` input. */
+export const WATCHDOG_DISPATCH_REASON = "watchdog";
+
+/** One row of the workflow-run list, narrowed to the names a run is known by. */
+export type WorkflowRunName = { name?: string | null; display_title?: string | null };
+
+/**
+ * Did the watchdog start this run, as opposed to a person? Matches the marker in
+ * either name GitHub reports, because `run-name` lands in `display_title` and,
+ * for a named workflow, in `name` as well. Case-insensitive: the marker is read,
+ * never parsed for meaning. Pinned by scrapeWatchdog.test.ts.
+ */
+export function isWatchdogRestart(run: WorkflowRunName): boolean {
+  const marker = WATCHDOG_RUN_MARKER.toLowerCase();
+  return [run.display_title, run.name].some((n) => (n ?? "").toLowerCase().includes(marker));
+}
+
+/**
  * A timestamp up to this far in the future is read as "now" rather than as a
  * broken clock. Beyond it, the two clocks disagree enough that the age is not
  * trustworthy, so the verdict is unknown and it alerts.
@@ -152,7 +185,11 @@ export type DispatchInput = {
    * Without it the once-a-day bound cannot be proven, so nothing is dispatched.
    */
   runHistoryReadable: boolean;
-  /** When the workflow was last started by a dispatch, or null when never. */
+  /**
+   * When THE WATCHDOG last started the workflow, or null when it never has.
+   * Runs a person dispatched by hand do not belong here: the caller filters them
+   * out with isWatchdogRestart before filling this in. See WATCHDOG_RUN_MARKER.
+   */
   lastDispatchAt: string | null;
   nowMs: number;
   minGapHours?: number;
