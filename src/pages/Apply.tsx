@@ -45,7 +45,6 @@ import {
 } from "@/lib/devFixture";
 import { domainFor } from "@/lib/logodev";
 import { cityOf } from "@/lib/geo";
-import { auditHref } from "@/lib/auditLink";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AUDIT_STAGES, runAudit, type AuditData, type AuditStageStatus } from "@/lib/audit/runAudit";
 import { auditProgressOf } from "@/lib/audit/auditProgress";
@@ -939,16 +938,7 @@ export default function Apply() {
                     <p className="mt-2 text-pretty">
                       <b className="text-foreground">What it costs you:</b> nothing. It's the most expensive thing we
                       run, so it's two audits free, and the button tells you when they're gone. The audit is private to
-                      you unless you publish it yourself on the{" "}
-                      <a
-                        href={auditHref(job.url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-foreground underline underline-offset-2"
-                      >
-                        full audit page
-                      </a>
-                      .
+                      you unless you publish it yourself on the full audit page.
                     </p>
                   </PopoverContent>
                 </Popover>

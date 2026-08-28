@@ -174,7 +174,7 @@ describe("CvEditor — order and grouping", () => {
   it("the section says a removal is not final, because 'Read my CV again' undoes it", async () => {
     render(<CvEditor userId="u1" cvText="some cv text" />);
     await openExperience();
-    expect(screen.getByText(/Read my CV again" brings the whole thing back/i)).toBeInTheDocument();
+    expect(screen.getByText(/Read my CV again" restores your upload/i)).toBeInTheDocument();
   });
 
   it("the tick box marks an entry as part of the one above, and that is what Save writes", async () => {
@@ -202,11 +202,13 @@ describe("CvEditor — order and grouping", () => {
     expect((await saved()).experience[1].groupedIntoPrevious).toBeUndefined();
   });
 
-  it("the first entry cannot be grouped, and says why", async () => {
+  it("the first entry cannot be grouped, and does NOT explain why (Rober, 2026-08-28)", async () => {
     render(<CvEditor userId="u1" cvText="some cv text" />);
     await openExperience();
     expect(screen.getByLabelText(/Show Acme Corp as part of the entry above/i)).toBeDisabled();
-    expect(screen.getByText(/nothing above it to join/i)).toBeInTheDocument();
+    // The disabled box and the move up/down controls already say it. The old
+    // sentence read as if something were wrong; it must not come back.
+    expect(screen.queryByText(/nothing above it to join/i)).not.toBeInTheDocument();
   });
 
   it("a flag that ends up on the first entry is dropped when the order changes", async () => {
@@ -288,11 +290,12 @@ describe("CvEditor — showing an entry under Projects", () => {
     expect(screen.getByLabelText(/Show Northgoing under Projects instead of Experience/i)).not.toBeChecked();
   });
 
-  it("says on screen what a ticked entry keeps", async () => {
+  it("keeps the Projects label to one line (Rober, 2026-08-28)", async () => {
     render(<CvEditor userId="u1" cvText="some cv text" />);
     await openExperience();
+    expect(screen.queryByText(/keeps its own name, title, dates and lines, in a Projects section/i)).toBeNull();
     expect(
-      screen.getAllByText(/keeps its own name, title, dates and lines, in a Projects section/i).length,
+      screen.getAllByText(/Show under Projects instead of Experience/i).length,
     ).toBeGreaterThan(0);
   });
 
@@ -303,7 +306,7 @@ describe("CvEditor — showing an entry under Projects", () => {
     ensureCvStructured.mockResolvedValue(flagged);
     render(<CvEditor userId="u1" cvText="some cv text" />);
     await openExperience();
-    expect(screen.getByText(/goes wherever that entry goes/i)).toBeInTheDocument();
+    expect(screen.getByText(/The box above is ticked too, so it prints there instead/i)).toBeInTheDocument();
     // Both flags survive the save: neither control quietly deletes the other.
     const written = await saved();
     expect(written.experience[1].groupedIntoPrevious).toBe(true);
