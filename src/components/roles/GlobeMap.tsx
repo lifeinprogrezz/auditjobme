@@ -13,6 +13,10 @@ export type GlobeMapProps = {
   jobs: RoleJob[];
   scored: boolean;
   focusLngLats: [number, number][] | null;
+  /** The company whose role is open in the panel. Its pin is lifted above the
+   *  others and drawn slightly larger, because a teal ring alone did not make it
+   *  findable in a busy city (Rober, 2026-08-28). */
+  selectedCompany?: string | null;
   /** Panel-card click → ease the camera to this role's city (same reveal a
    *  single-city bubble click performs). The nonce re-fires even when the city
    *  is unchanged, so reopening the same role re-flies. */
@@ -571,7 +575,7 @@ function applyFocus(map: maplibregl.Map, focus: [number, number][] | null): void
 // `scored` stays in the props type for the page contract, but the map needs no
 // scored logic: marker bucket classes are permanent and CSS gates them on the
 // root .scored class.
-export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeFrame, light = false, onCompanyClick, onCityClick, onResetView }: GlobeMapProps) {
+export default function GlobeMap({ jobs, focusLngLats, selectedCompany = null, flyTo, cityFrame, europeFrame, light = false, onCompanyClick, onCityClick, onResetView }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const haloRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -581,6 +585,9 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
   // Latest props for the async load handler (map init effect runs once).
   const jobsRef = useRef(jobs);
   const focusRef = useRef(focusLngLats);
+  // Read inside syncMarkers, which keeps its first-render closure — a ref is the
+  // only way the listeners see a later selection.
+  const selectedRef = useRef(selectedCompany);
   const themeRef = useRef<"dark" | "light">(light ? "light" : "dark");
   // Pin click handlers are attached once at marker build — read through a ref
   // so they always call the latest callback.
@@ -676,6 +683,9 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
     }
   };
 
+  // Held in a ref so an effect can repaint on demand (a selection change), without
+  // the listeners' first-render closure going stale.
+  const syncMarkersRef = useRef<(() => void) | null>(null);
   // One sync for BOTH marker kinds (glass cluster bubbles + logo pins). Reads
   // only refs so the moveend/idle listeners' first-render closure stays valid.
   const syncMarkers = () => {
@@ -699,9 +709,13 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
       const key = isCluster ? `c${props.cluster_id}` : `p${props.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      const isSelected =
+        !isCluster && selectedRef.current != null && props.co === selectedRef.current;
       const sig = isCluster
         ? `${props.roleCount}|${props.maxScore}`
-        : `${showLogos ? "L" : "B"}|${pinSig(props as unknown as PinProps)}`;
+        // The selection is part of the signature, so a marker rebuilds the moment
+        // it is selected or deselected rather than keeping a stale look.
+        : `${showLogos ? "L" : "B"}|${isSelected ? "S" : ""}|${pinSig(props as unknown as PinProps)}`;
       const coords = (f.geometry as GeoPoint).coordinates as [number, number];
       const existing = pins.get(key);
       if (existing) {
@@ -800,6 +814,9 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
       } else {
         const pin = props as unknown as PinProps;
         el = buildPin(pin);
+        // The open role's pin: lifted above its neighbours and drawn larger. The
+        // teal ring alone was not enough to find it in a busy city.
+        if (isSelected) el.classList.add("sel");
         const co = String(pin.co);
         const cty = pin.city ? String(pin.city) : null;
         el.addEventListener("click", (e) => {
@@ -818,6 +835,8 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
       }
     }
   };
+
+  syncMarkersRef.current = syncMarkers;
 
   useEffect(() => {
     // StrictMode double-mount guard: the first pass's cleanup nulls mapRef.
@@ -1035,6 +1054,13 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
     applyFocus(map, focusLngLats);
 
   }, [focusLngLats]);
+
+  // Selecting a role has to repaint the markers, or the lift only appears the next
+  // time the camera happens to move.
+  useEffect(() => {
+    selectedRef.current = selectedCompany;
+    syncMarkersRef.current?.();
+  }, [selectedCompany]);
 
   // Panel-card click flies the camera to the role's city — the same easeTo reveal a
   // single-city bubble click performs (Rober 7-06). The nonce lets reopening the

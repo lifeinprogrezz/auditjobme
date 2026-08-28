@@ -124,3 +124,35 @@ export function buildReadyBody(
   ].join("\n");
   return { text, html };
 }
+
+/**
+ * Put a role the user explicitly ASKED for into their backlog, even though their
+ * labels do not select it.
+ *
+ * Why it has to exist: the backlog is built from `prefilterWithTier`, the
+ * deterministic prune over the user's own target labels (#114). A role someone
+ * asks for is, by definition, one those labels did NOT select — it is showing
+ * "Not scored yet, outside your targets", which is exactly why they are asking.
+ * So the priority ordering in partitionOnboarding had nothing to reorder and the
+ * button did nothing at all (Rober: "I click on the score this role and nothing
+ * happens", 2026-08-28).
+ *
+ * Deliberately narrow. It adds AT MOST one role, only one a signed-in user named,
+ * only if it is live in the pool, and never one already scored or already in
+ * flight. `eligible` itself is untouched, so the completion count and the
+ * "your roles are ready" email keep running over the labelled slice only — a
+ * pruned-out job must still never hold the pass open (#114).
+ */
+export function withPriorityJob<T extends { id: string }>(
+  backlog: T[],
+  pool: T[],
+  priorityId: string | null | undefined,
+  alreadyScored: ReadonlySet<string>,
+  inFlight: ReadonlySet<string>,
+): T[] {
+  if (!priorityId) return backlog;
+  if (backlog.some((j) => j.id === priorityId)) return backlog;
+  if (alreadyScored.has(priorityId) || inFlight.has(priorityId)) return backlog;
+  const asked = pool.find((j) => j.id === priorityId);
+  return asked ? [asked, ...backlog] : backlog;
+}
