@@ -12,7 +12,7 @@ import { hashCv, readCvStash, clearCvStash, normalizeTargetRoles } from "@/lib/l
 import { normalizeTargetSectors } from "@/lib/sectors";
 import { prefilterJobs } from "@/lib/scorePrefilter";
 import { shouldPromptCv } from "@/lib/deviceSession";
-import { cityOf, coordsOf } from "@/lib/geo";
+import { cityOf, coordsOf, fallbackCity } from "@/lib/geo";
 import { domainFor } from "@/lib/logodev";
 import type { DataplaneCompany, DataplaneOffice } from "@/lib/dataplane";
 import { DEV_FIXTURE, DEV_FIXTURE_PROFILE, devFixtureScores } from "@/lib/devFixture";
@@ -267,12 +267,24 @@ function enrichAll(
   rows: JobsRow[],
   dims: Map<string, CompanyDim>,
   officesBySlug: Map<string, [number, number][]>,
+  officeCitiesBySlug: Map<string, string[]> = new Map(),
 ): RoleJob[] {
   const cityById = new Map<string, string | null>();
   const companiesByCity = new Map<string, Set<string>>(); // city -> set of normalized company names
   const companyIdByGroup = new Map<string, string | null>(); // `${city}|${co}` -> a representative company_id
   for (const r of rows) {
-    const city = cityOf(r.location);
+    // A location that names a city resolves directly. One that names only a
+    // COUNTRY or a region ("United Kingdom", "Germany", "Europe", or nothing at
+    // all) used to end here with no city and therefore no pin — 1,283 roles,
+    // 15.7% of the pool, counted in the scope bar and listed in the panel while
+    // being invisible on the map. Such a role now borrows the city of an office
+    // the company actually has, and ONLY when that office is in the country the
+    // role names; fallbackCity refuses every ambiguous case rather than guess.
+    // Everything downstream is unchanged: the borrowed city goes through the same
+    // office match, disc placement and de-stacking as any other.
+    const city =
+      cityOf(r.location) ??
+      (r.company_id ? fallbackCity(r.location, officeCitiesBySlug.get(r.company_id) ?? []) : null);
     cityById.set(r.id, city);
     if (city) {
       const set = companiesByCity.get(city) ?? new Set<string>();
@@ -454,10 +466,25 @@ export function useRolesData() {
     });
     return m;
   }, [offices]);
+  // The same offices by NAME, for the country-only fallback below. Separate from
+  // the coordinate map on purpose: that one answers "where exactly", this one
+  // answers "in which country", and only the second may stand in for a location
+  // that never named a city. An artifact published before the `city` column was
+  // added simply yields an empty map and the fallback finds nothing.
+  const officeCitiesBySlug = useMemo(() => {
+    const m = new Map<string, string[]>();
+    (offices ?? []).forEach((o: DataplaneOffice) => {
+      if (!o.city) return;
+      const arr = m.get(o.company_slug) ?? [];
+      arr.push(o.city);
+      m.set(o.company_slug, arr);
+    });
+    return m;
+  }, [offices]);
 
   const enriched = useMemo(
-    () => enrichAll(poolJobs ?? [], dims, officesBySlug),
-    [poolJobs, dims, officesBySlug],
+    () => enrichAll(poolJobs ?? [], dims, officesBySlug, officeCitiesBySlug),
+    [poolJobs, dims, officesBySlug, officeCitiesBySlug],
   );
   // ── Issue #54, the non-urgent half. THE DEFERRAL LIVES HERE, and it has to: a
   // `startTransition` around the cache write does nothing, because `useQuery` subscribes

@@ -46,6 +46,11 @@ export interface DataplaneCompany {
 
 export interface DataplaneOffice {
   company_slug: string;
+  /** The office's own city — used to check it sits in the country a role names
+   *  before that office stands in for a country-only location (geo.fallbackCity).
+   *  Optional: an artifact published before 2026-08-28 does not carry it, and the
+   *  fallback simply finds no candidate rather than throwing. */
+  city?: string | null;
   lat: number;
   lng: number;
 }

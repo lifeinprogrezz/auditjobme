@@ -14,7 +14,12 @@ export const JOBS_COLUMNS =
   "id, company, title, url, location, remote, source, seniority, posted_at, first_seen_at, company_id, extraction, role_family, workplace, has_jd";
 export const COMPANIES_COLUMNS =
   "slug, logo_domain, lat, lng, website, sector, stage, headcount_bucket, hq_city, hq_country, linkedin_url, description, founded_year, uk_sponsor_status";
-export const OFFICES_COLUMNS = "company_slug, lat, lng";
+// `city` rides along so the client can tell WHICH COUNTRY an office is in. A role
+// whose location names only a country ("United Kingdom") is placed at the company's
+// office in that country, and without the city there is no way to check the country
+// matches — placing them blind put 361 roles in the wrong country (measured
+// 2026-08-28). See fallbackCity in src/lib/geo.ts.
+export const OFFICES_COLUMNS = "company_slug, city, lat, lng";
 
 export const DATAPLANE_VERSION = 1;
 

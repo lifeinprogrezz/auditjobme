@@ -2,6 +2,68 @@
 // One messy free-text location column in → canonical city + jittered [lng,lat] out.
 // Pure functions, no I/O, no Math.random (map pins must be stable across renders).
 
+/**
+ * Canonical city → the country it sits in. Same keys as CITY_COORDS, kept next to
+ * it so the two never drift; a city missing here simply has no country and is
+ * never used to satisfy a country-matched fallback.
+ *
+ * WHY THIS EXISTS (2026-08-28). 1,283 roles (15.7%) had no map pin because their
+ * location names a COUNTRY or a region, not a city: "United Kingdom", "Germany",
+ * "Europe", "Remote - United Kingdom". They showed in the header count and the
+ * list panel and never on the map. Most can be placed at the company's own known
+ * office instead of a guessed point — but only when that office is in the country
+ * the role actually names. Measured over the live dataplane, placing them without
+ * that check would have put 361 roles in the WRONG country (a company with a
+ * Berlin office and a role advertised in the United Kingdom appearing in Germany).
+ * A confident pin in the wrong place is worse than no pin.
+ */
+export const CITY_COUNTRY: Record<string, string> = {
+  Barcelona: "Spain", Madrid: "Spain", Valencia: "Spain", "Málaga": "Spain",
+  Bilbao: "Spain", Sevilla: "Spain",
+  London: "United Kingdom", Cambridge: "United Kingdom", Oxford: "United Kingdom",
+  Manchester: "United Kingdom", Edinburgh: "United Kingdom", Bristol: "United Kingdom",
+  Dublin: "Ireland",
+  Paris: "France", Lyon: "France", Toulouse: "France", Bordeaux: "France",
+  Marseille: "France", Nantes: "France", Lille: "France",
+  Berlin: "Germany", Munich: "Germany", Hamburg: "Germany", Cologne: "Germany",
+  Frankfurt: "Germany", Stuttgart: "Germany", "Düsseldorf": "Germany",
+  Leipzig: "Germany", Karlsruhe: "Germany",
+  Amsterdam: "Netherlands", Rotterdam: "Netherlands", Utrecht: "Netherlands",
+  Eindhoven: "Netherlands", "The Hague": "Netherlands",
+  Brussels: "Belgium", Antwerp: "Belgium", Ghent: "Belgium",
+  Luxembourg: "Luxembourg",
+  Zurich: "Switzerland", Geneva: "Switzerland", Basel: "Switzerland",
+  Lausanne: "Switzerland", Bern: "Switzerland",
+  Vienna: "Austria", Graz: "Austria",
+  Stockholm: "Sweden", Gothenburg: "Sweden", "Malmö": "Sweden",
+  Copenhagen: "Denmark", Aarhus: "Denmark",
+  Oslo: "Norway", Helsinki: "Finland", Tampere: "Finland", Reykjavik: "Iceland",
+  Milan: "Italy", Rome: "Italy", Turin: "Italy", Bologna: "Italy", Florence: "Italy",
+  Lisbon: "Portugal", Porto: "Portugal", Braga: "Portugal",
+  Warsaw: "Poland", "Kraków": "Poland", "Wrocław": "Poland", "Gdańsk": "Poland",
+  "Poznań": "Poland",
+  Prague: "Czechia", Brno: "Czechia", Bratislava: "Slovakia",
+  Budapest: "Hungary", Bucharest: "Romania", "Cluj-Napoca": "Romania",
+  Sofia: "Bulgaria", Athens: "Greece", Thessaloniki: "Greece",
+  Zagreb: "Croatia", Ljubljana: "Slovenia", Belgrade: "Serbia",
+  Tallinn: "Estonia", Riga: "Latvia", Vilnius: "Lithuania",
+  Kyiv: "Ukraine", Istanbul: "Turkey", Nicosia: "Cyprus", Valletta: "Malta",
+  Toronto: "Canada", Vancouver: "Canada",
+};
+
+/** Spellings a free-text location may use for a country in CITY_COUNTRY. */
+const COUNTRY_ALIASES: Record<string, string> = {
+  uk: "United Kingdom", "u.k.": "United Kingdom", gb: "United Kingdom",
+  britain: "United Kingdom", "great britain": "United Kingdom", england: "United Kingdom",
+  scotland: "United Kingdom", wales: "United Kingdom", deutschland: "Germany",
+  espana: "Spain", "españa": "Spain", eire: "Ireland", holland: "Netherlands",
+  nederland: "Netherlands", suomi: "Finland", sverige: "Sweden", norge: "Norway",
+  danmark: "Denmark", italia: "Italy", polska: "Poland", portugal: "Portugal",
+  schweiz: "Switzerland", suisse: "Switzerland", osterreich: "Austria",
+  "österreich": "Austria", belgie: "Belgium", "belgië": "Belgium", belgique: "Belgium",
+  czech: "Czechia", "czech republic": "Czechia", turkiye: "Turkey", "türkiye": "Turkey",
+};
+
 /** Canonical city → [lng, lat] (2-decimal precision is enough at globe zoom). */
 export const CITY_COORDS: Record<string, [number, number]> = {
   // Spain
@@ -256,4 +318,68 @@ export function sunflowerLngLat(
   // stretch lng by 1/cos(lat) so the disc stays visually circular on the map
   const lng = base[0] + (r * Math.cos(theta)) / Math.max(0.3, Math.cos((lat * Math.PI) / 180));
   return [lng, lat];
+}
+
+/** Every country name the fallback understands, folded for matching. */
+const COUNTRY_BY_FOLD: Record<string, string> = {};
+for (const c of new Set(Object.values(CITY_COUNTRY))) COUNTRY_BY_FOLD[fold(c)] = c;
+for (const [alias, canonical] of Object.entries(COUNTRY_ALIASES)) COUNTRY_BY_FOLD[fold(alias)] = canonical;
+
+/**
+ * EVERY country a free-text location names. Word-boundary matched on the folded
+ * string, so "Remote - United Kingdom", "Spain (Remote)" and "Germany" resolve
+ * while "New Zealand" does not become "Zealand". Longest name first, so
+ * "United Kingdom" is matched before a bare "uk" inside it.
+ *
+ * All of them, not the first: boards really do post one role across a list, e.g.
+ * "Belgium; Dubai; Portugal; United Kingdom; United States". Taking only the
+ * leading match would pick a country out of that list arbitrarily.
+ */
+export function countriesInLocation(location: string | null): string[] {
+  let f = fold(location ?? "");
+  if (!f) return [];
+  // Longest name first so "united kingdom" is consumed before a bare "uk" inside
+  // it; the hits are re-ordered by where they appear at the end.
+  const hits: { country: string; at: number }[] = [];
+  for (const n of Object.keys(COUNTRY_BY_FOLD).sort((a, b) => b.length - a.length)) {
+    const esc = n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const m = f.match(new RegExp(`(^|[^a-z0-9])${esc}($|[^a-z0-9])`));
+    if (!m || m.index == null) continue;
+    const c = COUNTRY_BY_FOLD[n];
+    if (!hits.some((h) => h.country === c)) hits.push({ country: c, at: m.index });
+    // Blank the match so a shorter alias inside it cannot match again.
+    f = f.replace(new RegExp(esc, "g"), " ".repeat(n.length));
+  }
+  return hits.sort((a, b) => a.at - b.at).map((h) => h.country);
+}
+
+/** The first country a location names, or null. Thin read over countriesInLocation. */
+export function countryInLocation(location: string | null): string | null {
+  return countriesInLocation(location)[0] ?? null;
+}
+
+/**
+ * A city for a role whose OWN location names no city — chosen from the cities the
+ * company actually has an office in, never invented.
+ *
+ * The rule, and the reason it is this strict: when the role names a country, only
+ * an office IN that country may stand in for it. Measured over the live dataplane,
+ * dropping that condition places 361 roles in the wrong country. When the role
+ * names no country at all (an empty location, "Europe", "EMEA - Remote") the
+ * company's office is the only honest signal there is, so it is used — but only
+ * when the company has exactly ONE office city, because picking among several
+ * would be a guess about which one the role belongs to.
+ *
+ * Returns null whenever it cannot be sure. A role with no pin is correct; a role
+ * with a confident pin in the wrong place is not.
+ */
+export function fallbackCity(location: string | null, officeCities: string[]): string | null {
+  const known = [...new Set(officeCities.map((c) => cityOf(c)).filter((c): c is string => !!c))];
+  if (known.length === 0) return null;
+  const wanted = countriesInLocation(location);
+  if (wanted.length) {
+    const inCountry = known.filter((c) => wanted.includes(CITY_COUNTRY[c]));
+    return inCountry.length === 1 ? inCountry[0] : null;
+  }
+  return known.length === 1 ? known[0] : null;
 }
