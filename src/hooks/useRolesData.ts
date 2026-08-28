@@ -13,6 +13,11 @@ import { normalizeTargetSectors } from "@/lib/sectors";
 import { prefilterJobs } from "@/lib/scorePrefilter";
 import { shouldPromptCv } from "@/lib/deviceSession";
 import { cityOf, coordsOf, fallbackCity } from "@/lib/geo";
+import { shouldReveal } from "@/lib/scoreReveal";
+import { RUBRIC_VERSION } from "@/lib/score";
+
+/** How often the held CV screen re-reads the scored count. Cheap: a HEAD count. */
+const REVEAL_POLL_MS = 2_000;
 import { domainFor } from "@/lib/logodev";
 import type { DataplaneCompany, DataplaneOffice } from "@/lib/dataplane";
 import { DEV_FIXTURE, DEV_FIXTURE_PROFILE, devFixtureScores } from "@/lib/devFixture";
@@ -412,6 +417,9 @@ export function useRolesData() {
   const queryClient = useQueryClient();
   // Job ids with a "score this role" ask in flight — button copy only.
   const [scoreRequested, setScoreRequested] = useState<Set<string>>(() => new Set());
+  // How many roles are scored while the CV screen is held open, for its progress
+  // line. Null once nothing is waiting.
+  const [revealScored, setRevealScored] = useState<number | null>(null);
 
   const poolQ = useQuery(publicPoolQuery());
   const scoresQ = useQuery({ ...scoresQuery(userId), enabled: signedIn });
@@ -1170,13 +1178,46 @@ export function useRolesData() {
     if (!userId) return false;
     const cvText = text.trim();
     if (!cvText) return false;
-    return applyCv(userId, {
+    const ok = await applyCv(userId, {
       cv_text: cvText,
       cv_hash: hashCv(cvText),
       target_roles: labels.roles,
       target_sectors: labels.sectors,
     });
+    if (!ok) return false;
+    // HOLD THE SCREEN until the first roles carry a score (Rober, 2026-08-28).
+    // applyCv has already kicked the worker; this waits on the result rather than
+    // dropping the user onto their own map with nothing on it. The modal stays open
+    // for exactly as long as this promise is pending, which is why the wait lives
+    // here and not in a separate reveal flag. shouldReveal fails OPEN at the cap, so
+    // a slow or failed drain costs a plainer first view and never a stuck screen.
+    await waitForFirstScores(userId);
+    return true;
   };
+
+  /** Poll this user's scored count until the reveal gate opens. Never throws: a
+   *  failed read is treated as "nothing scored yet" and the cap still releases. */
+  async function waitForFirstScores(uid: string): Promise<void> {
+    const startedMs = Date.now();
+    setRevealScored(0);
+    for (;;) {
+      const elapsed = Date.now() - startedMs;
+      let count = 0;
+      try {
+        const { count: n } = await supabase
+          .from("scores")
+          .select("job_id", { count: "exact", head: true })
+          .eq("user_id", uid)
+          .eq("rubric_version", RUBRIC_VERSION);
+        count = n ?? 0;
+      } catch {
+        // Treated as nothing scored; the cap below is what guarantees an exit.
+      }
+      setRevealScored(count);
+      if (shouldReveal(count, elapsed)) return;
+      await new Promise((r) => setTimeout(r, REVEAL_POLL_MS));
+    }
+  }
 
   // Saved roles for the Today section: live saved roles (enriched, score-carrying) plus
   // any saved role that has since expired out of the live pool (from savedJobsRaw),
@@ -1254,6 +1295,7 @@ export function useRolesData() {
     scoreMore,
     scoreRole,
     scoreRequested,
+    revealScored,
     submitCv,
     /** Post-CV state: the score reveal keys on a CV being present. */
     scored: hasCv,

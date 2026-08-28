@@ -62,6 +62,7 @@ export default function RolesMap() {
     toggleSaved,
     scoreRole,
     scoreRequested,
+    revealScored,
     dismissed,
     toggleDismissed,
     scoreMore,
@@ -704,6 +705,7 @@ export default function RolesMap() {
         signedIn={signedIn}
         sectorOptions={targetSectorOptions}
         onSubmit={submitCv}
+        revealScored={revealScored}
       />
       {/* ProfileModal is GONE (Rober 7-25): its settings body lives on the routed
           /settings page, and the avatar opens the unified AccountMenu popover

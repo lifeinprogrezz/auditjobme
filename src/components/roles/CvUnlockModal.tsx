@@ -19,6 +19,7 @@ import {
 } from "@/lib/labels";
 import { track } from "@/lib/analytics";
 import type { FilterOption } from "./FilterChip";
+import { revealProgressLabel } from "@/lib/scoreReveal";
 
 
 type Stage = "idle" | "reading" | "parsed";
@@ -32,6 +33,10 @@ export type CvUnlockModalProps = {
   sectorOptions: FilterOption[];
   /** Writes the CV + labels to the profile and reveals + scores in-session (signed-in path). */
   onSubmit: (text: string, labels: { roles: string[]; sectors: string[] }) => Promise<boolean>;
+  /** Roles scored so far while this screen is held open, or null when nothing is
+   *  waiting. The screen stays up until the first batch lands (Rober, 2026-08-28),
+   *  so it has to say what that wait is for. */
+  revealScored?: number | null;
 };
 
 function toggleCapped(list: string[], value: string, cap: number): string[] {
@@ -46,6 +51,7 @@ export default function CvUnlockModal({
   signedIn,
   sectorOptions,
   onSubmit,
+  revealScored,
 }: CvUnlockModalProps) {
   const [stage, setStage] = useState<Stage>("idle");
   const [cvText, setCvText] = useState("");
@@ -350,15 +356,25 @@ export default function CvUnlockModal({
         {error && <p className="cverr">{error}</p>}
 
         {stage === "parsed" && (
-          <button className="cvcta" onClick={handleSubmit} disabled={submitting}>
-            {submitting
-              ? signedIn
-                ? "Scoring your matches…"
-                : "Redirecting to Google…"
-              : signedIn
-                ? "Reveal my matches"
-                : "Continue with Google"}
-          </button>
+          <>
+            <button className="cvcta" onClick={handleSubmit} disabled={submitting}>
+              {submitting
+                ? signedIn
+                  ? "Scoring your matches…"
+                  : "Redirecting to Google…"
+                : signedIn
+                  ? "Reveal my matches"
+                  : "Continue with Google"}
+            </button>
+            {/* The wait is real and about a minute, so it gets a count rather than a
+                spinner. Without it the button just said "Scoring…" for 60 seconds
+                and looked stuck (Rober, 2026-08-28). */}
+            {submitting && signedIn && revealScored != null && (
+              <p className="cvhint" role="status" aria-live="polite">
+                {revealProgressLabel(revealScored)} roles scored. Your map opens as soon as the first are ready.
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>
