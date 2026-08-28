@@ -58,9 +58,15 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      # PINNED, not `latest` (2026-08-28). Resolving "latest" is an unauthenticated
+      # GitHub API call from the runner, and it hit "rate limit exceeded" on main
+      # today: no CLI installed, every later step died with `supabase: command not
+      # found`, and a snapshot-only change went red for nothing. Same free-tier
+      # limit that starved the scrape schedule this morning. Bump this on purpose,
+      # in its own change, when a newer CLI is wanted.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.116.0
 
       - name: Ensure psql client
         run: command -v psql >/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client)
