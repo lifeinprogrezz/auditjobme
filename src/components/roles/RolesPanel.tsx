@@ -26,6 +26,7 @@ import {
 import { ROLE_FAMILY_OPTIONS } from "@/lib/labels";
 import { logoUrl, faviconUrls } from "@/lib/logodev";
 import { hasReadableJd, pendingLabelOf, scoreStatusOf } from "@/lib/scorePrefilter";
+import { useFlip } from "@/hooks/useFlip";
 import { ScoringProgress } from "@/components/roles/ScoringProgress";
 import { useTheme } from "@/lib/theme";
 import { track } from "@/lib/analytics";
@@ -184,6 +185,12 @@ export default function RolesPanel({
     track("role_detail_opened", { scored, score: j.score ?? null });
     onOpenDetail(j);
   };
+
+  // The list is score-sorted, so a role that gains a score re-ranks — and used to
+  // teleport to its new slot (Rober, 2026-08-28: "can you make that jump
+  // smoother?"). useFlip records where each card was and glides it to where it is.
+  const cardsRef = useRef<HTMLDivElement>(null);
+  useFlip(cardsRef, "[data-flip]");
 
   // Active-filter chips: map selection (co/city) + every headbar filter, each
   // removable. They read/write the SAME filter state the headbar uses, so the two
@@ -397,7 +404,7 @@ export default function RolesPanel({
           {selCo || selCity ? "Try removing a filter above." : "Try clearing filters."}
         </div>
       ) : (
-        <div className="cards" onMouseMove={handleCardsMove}>
+        <div className="cards" ref={cardsRef} onMouseMove={handleCardsMove}>
           {shown.length === 0 && (
             <div className="panel-note">
               <b>No companies match</b>
@@ -415,6 +422,7 @@ export default function RolesPanel({
             return (
               <article
                 key={job.id}
+                data-flip={job.id}
                 className={"card" + (scored && i === 0 ? " hero" : "")}
                 role="button"
                 tabIndex={0}
@@ -694,26 +702,28 @@ export default function RolesPanel({
                   <div className="hlt">Not scored yet</div>
                   <div className="hls">
                     Outside your targets, so it was not scored automatically.
-                    {onScoreRole && hasReadableJd(job)
-                      ? " You can ask for it."
-                      : " Widen them in Settings to score this role."}
+                    {onScoreRole && hasReadableJd(job) ? "" : " Widen them in Settings to score this role."}
                   </div>
-                  {/* The same ask as the card's button. Sending someone to Settings
-                      to widen their targets was the only route before, which is a
-                      long way round for one role they are already looking at. */}
-                  {onScoreRole && hasReadableJd(job) && (
-                    <button
-                      type="button"
-                      className="btn g"
-                      disabled={scoreRequested?.has(job.id)}
-                      onClick={() => onScoreRole(job)}
-                    >
-                      {scoreRequested?.has(job.id) ? "Scoring…" : "Score this role"}
-                    </button>
-                  )}
                 </div>
               </>
             )}
+          </div>
+        )}
+        {/* "Score this role" in its OWN row under the hero (Rober, 2026-08-28). The
+            first version put it inside the hero's text block, which sits in a
+            centred flex row beside the chip — a taller block re-centred the chip
+            and the "—" drifted out of line with the title. Same .dacts/.dsave
+            tokens as Save and Not interested, so it reads as one family. */}
+        {hasCv && job.score == null && onScoreRole && hasReadableJd(job) && (
+          <div className="dacts">
+            <button
+              type="button"
+              className="dsave"
+              disabled={scoreRequested?.has(job.id)}
+              onClick={() => onScoreRole(job)}
+            >
+              {scoreRequested?.has(job.id) ? "Scoring…" : "Score this role"}
+            </button>
           </div>
         )}
         {hasCv && summary && <p className="dsum">{summary}</p>}
