@@ -1,5 +1,14 @@
 name: Scrape jobs
 
+# The run's own name says who asked for it. The scrape watchdog restarts this
+# workflow at most once a day, and it proves it has stayed inside that bound by
+# reading the run list. Until 2026-08-28 it read the newest workflow_dispatch run
+# of any kind, so a run Rober started by hand spent the watchdog's daily budget:
+# on that morning the pool was 15.6 hours stale and the restart was skipped
+# because of a manual run 20.8 hours earlier. A marked run-name separates the two.
+# Read by api/scrape-watchdog.ts through isWatchdogRestart (src/lib/scrapeWatchdog.ts).
+run-name: ${{ inputs.reason == 'watchdog' && 'Scrape jobs (watchdog restart)' || 'Scrape jobs' }}
+
 # Daily refresh of the shared `jobs` pool (scripts/scrape.mjs).
 #
 # ACTIVATION (one-time, by Rober): add two repo secrets under
@@ -18,7 +27,16 @@ on:
     # enrich finish well inside the hour; if this ever slips past 06:00 the scorer
     # just sees yesterday's jobs once, it never breaks.
     - cron: "0 5 * * *"
-  workflow_dispatch: {} # manual trigger from the Actions tab
+  workflow_dispatch:
+    # Manual trigger from the Actions tab. Leave `reason` alone when you start a
+    # run yourself: only the watchdog sends 'watchdog', and only that value marks
+    # the run as one of its own once-a-day restarts.
+    inputs:
+      reason:
+        description: "Who asked for this run"
+        required: false
+        default: manual
+        type: string
 
 permissions:
   contents: read
