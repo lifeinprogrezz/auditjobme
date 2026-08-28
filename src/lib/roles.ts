@@ -107,12 +107,22 @@ export function fitLabel(score: number): string {
   return b === "great" ? "Strong fit" : b === "mid" ? "Fair fit" : "Weak fit";
 }
 
-/** The rail heading (issue #154, retiring "Best fit"): "Your matches" always
- *  once signed in with a CV (`scored`), and also once anything has narrowed the
- *  view away from the default landing — the anon/no-CV "Hot right now" showcase
- *  is the only other state. */
-export function railHeading(scored: boolean, defaultView: boolean): string {
-  return scored || !defaultView ? "Your matches" : "Hot right now";
+/**
+ * The rail heading (issue #154 retired "Best fit").
+ *
+ * "Your matches" ONLY while the matches filter is actually on. It used to be the
+ * heading for every signed-in view, which put the same two words on the header and
+ * on the chip immediately beside it — two different controls wearing one name.
+ * Rober, walking the product 2026-08-28: "does it make sense to call the menu
+ * 'Your matches' in the same way as the filter?" It did not.
+ *
+ * So the chip keeps the name (it is the thing you toggle) and the heading says
+ * what you are looking at: "All roles" for the whole pool, "Your matches" once
+ * that filter narrows it. The anon/no-CV "Hot right now" showcase is unchanged.
+ */
+export function railHeading(scored: boolean, defaultView: boolean, mineActive = false): string {
+  if (mineActive) return "Your matches";
+  return scored || !defaultView ? "All roles" : "Hot right now";
 }
 
 /** Geo / work-authorization verdict for a role (issue #42, finishing the RolesPanel

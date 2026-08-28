@@ -60,6 +60,8 @@ export default function RolesMap() {
     applied,
     saved,
     toggleSaved,
+    scoreRole,
+    scoreRequested,
     dismissed,
     toggleDismissed,
     scoreMore,
@@ -618,6 +620,8 @@ export default function RolesMap() {
           onCloseDetail={() => setDetailJob(null)}
           onScoreMore={scoreMore}
           onToggleSaved={toggleSaved}
+          onScoreRole={signedIn && scored ? scoreRole : null}
+          scoreRequested={scoreRequested}
           onToggleHidden={() => setPanelHidden((v) => !v)}
         />
         <div className="scope" aria-label="Catalog scope">

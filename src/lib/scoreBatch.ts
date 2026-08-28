@@ -96,14 +96,28 @@ export function chunkForBatch<T>(items: T[]): { head: T[]; rest: T[] } {
  * the whole remainder batches.
  *
  * `sliceSize <= 0` disables the synchronous slice entirely (everything batches).
+ *
+ * ONE EXCEPTION: `priorityId`. When a user points at a single role and asks for it
+ * (Rober, 2026-08-28: "if someone starts to look for something in concrete the
+ * user can ask for score this specific role"), that role is scored synchronously
+ * whatever pass this is. Batch turnaround measured 46-54 minutes and up to five
+ * hours, so batching an explicit request would answer it long after the person who
+ * asked has gone. It is exactly one role, and only one a signed-in user named.
  */
-export function partitionOnboarding<T>(
+export function partitionOnboarding<T extends { id: string }>(
   backlog: T[],
   isFirstPass: boolean,
   sliceSize: number,
+  priorityId?: string | null,
 ): { sync: T[]; batched: T[] } {
-  if (!isFirstPass || sliceSize <= 0) return { sync: [], batched: backlog };
-  return { sync: backlog.slice(0, sliceSize), batched: backlog.slice(sliceSize) };
+  const wanted = priorityId ? backlog.find((j) => j.id === priorityId) : undefined;
+  const rest = wanted ? backlog.filter((j) => j.id !== wanted.id) : backlog;
+  if (!isFirstPass || sliceSize <= 0) {
+    return wanted ? { sync: [wanted], batched: rest } : { sync: [], batched: rest };
+  }
+  const sync = rest.slice(0, wanted ? Math.max(0, sliceSize - 1) : sliceSize);
+  const batched = rest.slice(sync.length);
+  return { sync: wanted ? [wanted, ...sync] : sync, batched };
 }
 
 export type BatchResultKind = "succeeded" | "errored" | "canceled" | "expired";

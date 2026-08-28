@@ -410,6 +410,8 @@ export function useRolesData() {
   const userId = user?.id ?? null;
   const signedIn = Boolean(userId);
   const queryClient = useQueryClient();
+  // Job ids with a "score this role" ask in flight — button copy only.
+  const [scoreRequested, setScoreRequested] = useState<Set<string>>(() => new Set());
 
   const poolQ = useQuery(publicPoolQuery());
   const scoresQ = useQuery({ ...scoresQuery(userId), enabled: signedIn });
@@ -1116,6 +1118,47 @@ export function useRolesData() {
   };
 
   /**
+   * Ask for ONE role to be scored now (Rober, 2026-08-28: "if someone starts to
+   * look for something in concrete the user can ask for score this specific role").
+   *
+   * The named role jumps to the front of that user's drain AND is scored
+   * synchronously whatever pass this is — batch turnaround runs 46-54 minutes, so
+   * an explicit request answered by batch is answered after the person has gone
+   * (api/score-kick.ts + partitionOnboarding's priorityId).
+   *
+   * The id is remembered locally only so the button can say "Scoring…"; the score
+   * itself arrives through the normal poll, exactly like every other score.
+   */
+  const scoreRole = (job: RoleJob) => {
+    if (!userId || !profile?.cv_text?.trim() || job.score != null) return;
+    if (scoreRequested.has(job.id)) return;
+    setScoreRequested((prev) => new Set(prev).add(job.id));
+    void (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        await fetch("/api/score-kick", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId: job.id }),
+          keepalive: true,
+        });
+        await refreshScores(userId);
+      } catch {
+        // Best effort, same as kickScoringWorker: the scheduled worker still owns
+        // the backlog, so a failed ask costs the button's spinner and nothing else.
+      } finally {
+        setScoreRequested((prev) => {
+          const next = new Set(prev);
+          next.delete(job.id);
+          return next;
+        });
+      }
+    })();
+  };
+
+  /**
    * Signed-in CV submit (from the CV-unlock modal): write the CV + labels to the
    * profile and reveal + score in-session. The anon path stashes instead and the
    * handoff effect above picks it up after sign-in. Returns true on success.
@@ -1209,6 +1252,8 @@ export function useRolesData() {
     removeConnections,
     saveTargets,
     scoreMore,
+    scoreRole,
+    scoreRequested,
     submitCv,
     /** Post-CV state: the score reveal keys on a CV being present. */
     scored: hasCv,

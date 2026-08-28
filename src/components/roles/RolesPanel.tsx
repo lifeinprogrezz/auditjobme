@@ -62,6 +62,11 @@ export type RolesPanelProps = {
   /** Dismiss / restore this role. */
   onToggleDismissed: (job: RoleJob) => void;
   onOpenDetail: (j: RoleJob) => void;
+  /** Ask for ONE role to be scored now (Rober, 2026-08-28). Null while the user has
+   *  no CV to score against; the buttons hide themselves in that case. */
+  onScoreRole?: ((j: RoleJob) => void) | null;
+  /** Job ids with a score request in flight, so the button can say so. */
+  scoreRequested?: ReadonlySet<string>;
   onCloseDetail: () => void;
   onScoreMore: () => void;
   /** Save / unsave the role for later (Rober 7-15). */
@@ -143,6 +148,8 @@ export default function RolesPanel({
   dismissed,
   onToggleDismissed,
   onOpenDetail,
+  onScoreRole,
+  scoreRequested,
   onCloseDetail,
   onScoreMore,
   onToggleSaved,
@@ -290,10 +297,10 @@ export default function RolesPanel({
             .sprog track for space — see .phead/.phead-top/.sprog in
             roles.css. */}
         <div className="phead-top">
-          {/* "Your matches" always, once signed in with a CV — "Best fit" is
-              retired (issue #154); the default-view/narrowed split only still
-              matters for the anon "Hot right now" showcase. */}
-          <h1 className="ptitle">{railHeading(scored, Boolean(defaultView))}</h1>
+          {/* The heading names the LIST; the chip beside it names the FILTER. Both
+              used to read "Your matches" at once (Rober, 2026-08-28), so the
+              heading now says "All roles" until that filter is actually on. */}
+          <h1 className="ptitle">{railHeading(scored, Boolean(defaultView), Boolean(filters.mine))}</h1>
           {/* Disabled for a logged-out/no-CV visitor, but NEVER while active (fix
               round 1, blocker 2) — a stale active state must stay dismissable. */}
           <MineChip
@@ -452,6 +459,24 @@ export default function RolesPanel({
                       }}
                     >
                       Prepare application
+                    </button>
+                  </div>
+                )}
+                {/* Ask for THIS role (Rober, 2026-08-28: "if someone starts to look
+                    for something in concrete"). Only when it has no score yet —
+                    a scored role has nothing to ask for. Inside .acts so the click
+                    never opens the card underneath it. */}
+                {scored && job.score == null && onScoreRole && (
+                  <div className="acts">
+                    <button
+                      className="btn"
+                      disabled={scoreRequested?.has(job.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onScoreRole(job);
+                      }}
+                    >
+                      {scoreRequested?.has(job.id) ? "Scoring…" : "Score this role"}
                     </button>
                   </div>
                 )}
@@ -663,7 +688,23 @@ export default function RolesPanel({
                 <FitChip score={null} size="lg" pendingLabel="Not scored yet" />
                 <div className="dhl">
                   <div className="hlt">Not scored yet</div>
-                  <div className="hls">Outside your targets. Widen them in Settings to score this role.</div>
+                  <div className="hls">
+                    Outside your targets, so it was not scored automatically.
+                    {onScoreRole ? " You can ask for it." : " Widen them in Settings to score this role."}
+                  </div>
+                  {/* The same ask as the card's button. Sending someone to Settings
+                      to widen their targets was the only route before, which is a
+                      long way round for one role they are already looking at. */}
+                  {onScoreRole && (
+                    <button
+                      type="button"
+                      className="btn g"
+                      disabled={scoreRequested?.has(job.id)}
+                      onClick={() => onScoreRole(job)}
+                    >
+                      {scoreRequested?.has(job.id) ? "Scoring…" : "Score this role"}
+                    </button>
+                  )}
                 </div>
               </>
             )}
