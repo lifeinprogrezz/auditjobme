@@ -545,14 +545,15 @@ export default function RolesMap() {
           setSel({ co: null, city });
           setPanelHidden(false);
         }}
+        // The globe control is CAMERA ONLY (Rober, 2026-08-28): it eases the map back
+        // to the Europe landing and touches nothing else — every filter, the selected
+        // company or city chip, and the open role all stay. It used to be the same
+        // full reset as the wordmark, so "let me look at the whole map again" also
+        // threw away everything you had narrowed to. The wordmark (onBrand below) is
+        // the one that means "home": camera AND state. The camera move itself runs in
+        // GlobeMap's control; all this side keeps is the explored flag, which is
+        // camera state.
         onResetView={() => {
-          setSel({ co: null, city: null });
-          setDetailJob(null);
-          // "Your matches" is scope, not a narrowing filter (see isDefaultView) —
-          // a reset/clear must not silently turn it off (issue #154 fix round 1,
-          // blocker 2), or a scored user's brand-click "home" would show the full
-          // 8,155-role catalog while a page reload shows their matches.
-          setFilters((f) => ({ ...EMPTY_FILTERS, mine: f.mine }));
           setHasExplored(false);
         }}
       />
@@ -580,8 +581,10 @@ export default function RolesMap() {
           onAddCv={() => setCvModalOpen(true)}
           onSignIn={signInWithGoogle}
           onToggleMine={toggleMine}
-          // Brand = home: same state reset as the map's reset control, plus a camera
-          // re-frame to the Europe landing (europeFrame bump eases the globe back).
+          // Brand = HOME: the full reset — selection, open role, every filter (keeping
+          // "Your matches", which is scope, not a narrowing filter — issue #154 fix
+          // round 1, blocker 2) — plus the camera re-frame to the Europe landing. The
+          // globe control next to the map is deliberately weaker: camera only.
           onBrand={() => {
             setSel({ co: null, city: null });
             setDetailJob(null);
