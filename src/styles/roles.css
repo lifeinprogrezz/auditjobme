@@ -992,6 +992,12 @@
  * gate the map's own sector filter doesn't have. Same size/color as .cvcap,
  * as a block under the chip row rather than inline with the label. */
 .roles-theme .cvhint { margin: 8px 0 0; font-size: 11px; color: var(--subtle); }
+/* The hold-until-scored wait (Rober, 2026-08-28): the count is the only thing on
+ * screen for about a minute, so it reads in the text colour, not the hint grey, and
+ * a thin bar turns the number into motion. Reuses .sprog-track/.sprog-fill. */
+.roles-theme .cvwait { margin: 12px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.roles-theme .cvwait-line { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text); }
+.roles-theme .cvwait-line b { font-weight: 700; }
 .roles-theme .cvchip {
   padding: 7px 13px; border-radius: 999px; font: inherit; font-size: 12.5px; font-weight: 600;
   color: var(--muted); background: rgba(255, 255, 255, 0.05); border: 1px solid var(--hair);

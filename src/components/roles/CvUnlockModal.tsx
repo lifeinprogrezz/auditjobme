@@ -19,7 +19,7 @@ import {
 } from "@/lib/labels";
 import { track } from "@/lib/analytics";
 import type { FilterOption } from "./FilterChip";
-import { revealProgressLabel } from "@/lib/scoreReveal";
+import { revealProgressLabel, REVEAL_MIN_SCORES } from "@/lib/scoreReveal";
 
 
 type Stage = "idle" | "reading" | "parsed";
@@ -370,9 +370,21 @@ export default function CvUnlockModal({
                 spinner. Without it the button just said "Scoring…" for 60 seconds
                 and looked stuck (Rober, 2026-08-28). */}
             {submitting && signedIn && revealScored != null && (
-              <p className="cvhint" role="status" aria-live="polite">
-                {revealProgressLabel(revealScored)} roles scored. Your map opens as soon as the first are ready.
-              </p>
+              <div className="cvwait" role="status" aria-live="polite">
+                {/* Foreground text, not the muted hint grey: this is the one thing on
+                    screen for a minute and it read as an afterthought (Rober,
+                    2026-08-28). The bar is the same thin track the panel's scoring
+                    whisper uses, so the two waits look like one system. */}
+                <div className="sprog-track" aria-hidden="true">
+                  <div
+                    className="sprog-fill"
+                    style={{ width: `${Math.round((100 * Math.min(revealScored, REVEAL_MIN_SCORES)) / REVEAL_MIN_SCORES)}%` }}
+                  />
+                </div>
+                <p className="cvwait-line">
+                  <b>{revealProgressLabel(revealScored)}</b> roles scored. Your map opens as soon as the first are ready.
+                </p>
+              </div>
             )}
           </>
         )}
