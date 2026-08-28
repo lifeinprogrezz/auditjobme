@@ -460,24 +460,22 @@ export default function RolesPanel({
                     >
                       Prepare application
                     </button>
-                  </div>
-                )}
-                {/* Ask for THIS role (Rober, 2026-08-28: "if someone starts to look
-                    for something in concrete"). Only when it has no score yet —
-                    a scored role has nothing to ask for. Inside .acts so the click
-                    never opens the card underneath it. */}
-                {scored && job.score == null && onScoreRole && (
-                  <div className="acts">
-                    <button
-                      className="btn"
-                      disabled={scoreRequested?.has(job.id)}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onScoreRole(job);
-                      }}
-                    >
-                      {scoreRequested?.has(job.id) ? "Scoring…" : "Score this role"}
-                    </button>
+                    {/* To the RIGHT of Prepare application, same row (Rober,
+                        2026-08-28). Only when the role has no score yet — a scored
+                        role has nothing to ask for. Inside .acts so the click never
+                        opens the card underneath it. */}
+                    {job.score == null && onScoreRole && (
+                      <button
+                        className="btn"
+                        disabled={scoreRequested?.has(job.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onScoreRole(job);
+                        }}
+                      >
+                        {scoreRequested?.has(job.id) ? "Scoring…" : "Score this role"}
+                      </button>
+                    )}
                   </div>
                 )}
               </article>

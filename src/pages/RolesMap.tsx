@@ -518,6 +518,7 @@ export default function RolesMap() {
         jobs={visible}
         scored={scored}
         focusLngLats={focusLngLats}
+        selectedCompany={detailLive?.company ?? null}
         flyTo={flyTarget}
         cityFrame={cityFrame}
         europeFrame={europeFrame}

@@ -1,12 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  selectBacklog,
-  prioritizeUsers,
-  runPool,
-  shouldSendReadyEmail,
-  buildReadySubject,
-  buildReadyBody,
-} from "@/lib/scoreBacklog";
+import { selectBacklog, prioritizeUsers, runPool, shouldSendReadyEmail, buildReadySubject, buildReadyBody, withPriorityJob } from "@/lib/scoreBacklog";
 
 describe("selectBacklog", () => {
   const jobs = [{ id: "a" }, { id: "b" }, { id: "c" }];
@@ -141,5 +134,54 @@ describe("email copy", () => {
   it("zero-strong body stays honest, no fabricated matches", () => {
     const { text } = buildReadyBody(0, 100, "https://northgoing.com/", "targeted");
     expect(text).toContain("None cleared the strong-match bar");
+  });
+});
+
+// The bug Rober hit immediately: "I click on the score this role and nothing
+// happens." The backlog is built from the label prefilter (#114), and a role
+// someone ASKS for is by definition one their labels did not select — so the
+// priority ordering had nothing to reorder and the click did nothing at all.
+describe("withPriorityJob — the named role has to get INTO the list first", () => {
+  const pool = [{ id: "a" }, { id: "b" }, { id: "asked" }];
+  const none = new Set<string>();
+
+  it("adds a named role the labels pruned out, at the front (mutant: return backlog untouched)", () => {
+    const backlog = [{ id: "a" }, { id: "b" }];
+    expect(withPriorityJob(backlog, pool, "asked", none, none).map((j) => j.id)).toEqual([
+      "asked",
+      "a",
+      "b",
+    ]);
+  });
+
+  it("changes nothing when no role was named", () => {
+    const backlog = [{ id: "a" }];
+    expect(withPriorityJob(backlog, pool, null, none, none)).toEqual(backlog);
+    expect(withPriorityJob(backlog, pool, undefined, none, none)).toEqual(backlog);
+  });
+
+  it("does not duplicate a role the labels already selected", () => {
+    const backlog = [{ id: "asked" }, { id: "a" }];
+    expect(withPriorityJob(backlog, pool, "asked", none, none).map((j) => j.id)).toEqual([
+      "asked",
+      "a",
+    ]);
+  });
+
+  it("refuses to re-buy a role that is already scored", () => {
+    expect(withPriorityJob([{ id: "a" }], pool, "asked", new Set(["asked"]), none).map((j) => j.id)).toEqual(["a"]);
+  });
+
+  it("refuses a role already in flight, so an impatient second click costs nothing", () => {
+    expect(withPriorityJob([{ id: "a" }], pool, "asked", none, new Set(["asked"])).map((j) => j.id)).toEqual(["a"]);
+  });
+
+  it("ignores an id that is not in the live pool at all", () => {
+    expect(withPriorityJob([{ id: "a" }], pool, "ghost", none, none).map((j) => j.id)).toEqual(["a"]);
+  });
+
+  it("adds AT MOST one role — it is a request, not a way around the prune", () => {
+    const out = withPriorityJob([{ id: "a" }], pool, "asked", none, none);
+    expect(out).toHaveLength(2);
   });
 });

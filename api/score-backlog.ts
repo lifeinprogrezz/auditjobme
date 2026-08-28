@@ -26,6 +26,7 @@ import {
   SCORE_CONCURRENCY,
   STRONG_SCORE,
   selectBacklog,
+  withPriorityJob,
   prioritizeUsers,
   runPool,
   shouldSendReadyEmail,
@@ -448,8 +449,16 @@ export async function runBacklog(
 
       // ── Phase 2: what is still unscored and not already in flight ───────────
       // Roles this user has never had scored at all.
-      const unscored = selectBacklog(eligible, new Set(scoreByJob.keys())).filter(
-        (j) => !inFlightJobIds.has(j.id),
+      // A role the user NAMED is added even though their labels do not select it —
+      // that is the whole reason they asked. `eligible` stays untouched, so the
+      // completion count and the ready email still run over the labelled slice
+      // only (#114). See withPriorityJob.
+      const unscored = withPriorityJob(
+        selectBacklog(eligible, new Set(scoreByJob.keys())).filter((j) => !inFlightJobIds.has(j.id)),
+        liveJobs,
+        opts.priorityJobId,
+        new Set(scoreByJob.keys()),
+        inFlightJobIds,
       );
 
       // Roles whose score was computed from a PREVIOUS CV (#123). They already
