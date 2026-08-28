@@ -152,10 +152,23 @@ export function geoVerdict(job: RoleJob): GeoVerdict {
   return { kind: "unverified", label: "Work eligibility not stated", onCard: false };
 }
 
-/** Cluster bubble tier — startupmap-matched count breaks (<15 / ≥15 / ≥50 / ≥150).
- *  Light glass below 50, ink above (their light→dark hub split); z-index ladder
- *  so bigger hubs win marker overlaps. No sublabel: the "roles" word under the
- *  count pushed the number off the bubble's center (Rober 7-05). */
+/** Cluster bubble tier — startupmap-matched ladder, now keyed on ROLES
+ *  (<60 / ≥60 / ≥200 / ≥600). Light glass below the 200 break, ink above (their
+ *  light→dark hub split); z-index ladder so bigger hubs win marker overlaps.
+ *  No sublabel: the "roles" word under the count pushed the number off the
+ *  bubble's center (Rober 7-05).
+ *
+ *  THE BREAKS WERE 15/50/150 AND COUNTED PINS. A bubble now reports the roles
+ *  inside it rather than the companies (GlobeMap's `roleCount` cluster property),
+ *  and a pin holds ~4.8 roles, so the old breaks would have pushed nearly every
+ *  cluster into the mega tier and flattened the ladder.
+ *
+ *  The new numbers are MEASURED, not scaled by that ratio: grouping the live
+ *  dataplane by city gives today's spread as 445 small / 15 mid / 6 hub / 3 mega,
+ *  and 60/200/600 reproduces it at 449/12/6/2. Multiplying by the 4.84 average
+ *  instead (73/242/726) thins the mid tier to 9, because the median city holds
+ *  1.7 roles per pin while the hubs run 4-8x (Dublin 7.7x) — the average sits in
+ *  neither place. Re-measure the same way before moving these again. */
 export type ClusterTier = {
   size: number;
   fontSize: number;
@@ -164,9 +177,9 @@ export type ClusterTier = {
   zIndex: number;
 };
 export function clusterTier(count: number): ClusterTier {
-  if (count >= 150) return { size: 76, fontSize: 17, light: false, zIndex: 24 };
-  if (count >= 50) return { size: 64, fontSize: 15, light: false, zIndex: 22 };
-  if (count >= 15) return { size: 54, fontSize: 14, light: true, zIndex: 20 };
+  if (count >= 600) return { size: 76, fontSize: 17, light: false, zIndex: 24 };
+  if (count >= 200) return { size: 64, fontSize: 15, light: false, zIndex: 22 };
+  if (count >= 60) return { size: 54, fontSize: 14, light: true, zIndex: 20 };
   return { size: 44, fontSize: 13.5, light: true, zIndex: 20 };
 }
 

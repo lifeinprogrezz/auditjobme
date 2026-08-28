@@ -500,7 +500,19 @@ function addRolesLayers(map: maplibregl.Map, data: FeatureCollection): void {
     // still clustered at the z10.6 reveal target, so a city click landed on
     // sub-cluster bubbles that were a click dead-end (live-verified on London).
     clusterMaxZoom: 9,
-    clusterProperties: { maxScore: ["max", ["coalesce", ["get", "score"], -1]] },
+    // `roleCount` sums each pin's own role count up the cluster tree, so a bubble
+    // reports ROLES, not pins. One pin is one company-in-a-city and carries all
+    // that company's roles there (see featureCollection), so point_count counted
+    // companies while the panel and the scope bar counted roles: at globe zoom the
+    // bubble read 1,693 with "8,189 roles" one line above it, and the two numbers
+    // looked like a contradiction (Rober, walking the product cold 2026-08-28).
+    // Now every number on screen means the same thing and no label is needed —
+    // the label was tried on 7-05 and removed, since a word under the count pushes
+    // the digits off the bubble's centre.
+    clusterProperties: {
+      maxScore: ["max", ["coalesce", ["get", "score"], -1]],
+      roleCount: ["+", ["get", "count"]],
+    },
   } as maplibregl.SourceSpecification);
   // Clusters + pins render as DOM markers (synced below) — but a source with NO
   // layer never loads tiles, and querySourceFeatures would return nothing. This
@@ -686,7 +698,7 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
       if (seen.has(key)) continue;
       seen.add(key);
       const sig = isCluster
-        ? `${props.point_count}|${props.maxScore}`
+        ? `${props.roleCount}|${props.maxScore}`
         : `${showLogos ? "L" : "B"}|${pinSig(props as unknown as PinProps)}`;
       const coords = (f.geometry as GeoPoint).coordinates as [number, number];
       const existing = pins.get(key);
@@ -707,7 +719,7 @@ export default function GlobeMap({ jobs, focusLngLats, flyTo, cityFrame, europeF
       }
       let el: HTMLDivElement;
       if (isCluster) {
-        el = buildCluster(Number(props.point_count), Number(props.maxScore));
+        el = buildCluster(Number(props.roleCount), Number(props.maxScore));
         const clusterId = props.cluster_id as number;
         el.addEventListener("click", () => {
           const src = map.getSource("roles") as maplibregl.GeoJSONSource | undefined;
