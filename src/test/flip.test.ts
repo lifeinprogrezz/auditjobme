@@ -7,14 +7,31 @@ import { planFlip, FLIP_MIN_PX } from "@/lib/flip";
 describe("planFlip", () => {
   const layout = (pairs: [string, number][]) => new Map(pairs);
 
-  it("moves a card by the distance it travelled — old top minus new top (mutant: flip the sign)", () => {
+  it("moves the card by the distance it travelled — old top minus new top (mutant: flip the sign)", () => {
     const prev = layout([["a", 0], ["b", 100], ["c", 200]]);
     const next = layout([["c", 0], ["a", 100], ["b", 200]]); // c jumped to the top
-    expect(planFlip(prev, next, false)).toEqual([
-      { key: "c", dy: 200 }, // it WAS 200px lower, so it starts +200 and glides to 0
-      { key: "a", dy: -100 },
-      { key: "b", dy: -100 },
-    ]);
+    // c WAS 200px lower, so it starts +200 and glides to 0. a and b merely made
+    // room (one slot each) and must NOT animate — see the next case.
+    expect(planFlip(prev, next, false)).toEqual([{ key: "c", dy: 200 }]);
+  });
+
+  // The "super fast crazy scroll" (Rober, 2026-08-28): one card climbs, twenty
+  // others each drop one slot, and animating all of them reads as the whole list
+  // scrolling. Only the climber glides; the room-makers just land.
+  it("does NOT animate the cards that only shifted one slot to make room (mutant: drop the outlier filter)", () => {
+    const h = 96;
+    const ids = Array.from({ length: 20 }, (_, i) => `r${i}`);
+    const prev = layout(ids.map((id, i) => [id, i * h]));
+    // r19 climbs to the top; everyone else moves down exactly one slot
+    const order = ["r19", ...ids.slice(0, 19)];
+    const next = layout(order.map((id, i) => [id, i * h]));
+    expect(planFlip(prev, next, false)).toEqual([{ key: "r19", dy: 19 * h }]);
+  });
+
+  it("still glides a lone mover, however small the move", () => {
+    const prev = layout([["a", 0], ["b", 100]]);
+    const next = layout([["a", 0], ["b", 140]]);
+    expect(planFlip(prev, next, false)).toEqual([{ key: "b", dy: -40 }]);
   });
 
   it("does nothing for a list that did not re-rank", () => {
