@@ -464,7 +464,13 @@ export default function RolesPanel({
                         2026-08-28). Only when the role has no score yet — a scored
                         role has nothing to ask for. Inside .acts so the click never
                         opens the card underneath it. */}
-                    {job.score == null && onScoreRole && (
+                    {/* Only a role with a real description can be asked for. Without
+                        one the score would be judged on title and company alone, and
+                        applyLandedScores refuses to display it (#130) — the button
+                        would spend money and then look like it did nothing, which is
+                        exactly what Rober hit. That role already has its own honest
+                        state: "We'll score this role once the source publishes one." */}
+                    {job.score == null && hasReadableJd(job) && onScoreRole && (
                       <button
                         className="btn"
                         disabled={scoreRequested?.has(job.id)}
@@ -688,12 +694,14 @@ export default function RolesPanel({
                   <div className="hlt">Not scored yet</div>
                   <div className="hls">
                     Outside your targets, so it was not scored automatically.
-                    {onScoreRole ? " You can ask for it." : " Widen them in Settings to score this role."}
+                    {onScoreRole && hasReadableJd(job)
+                      ? " You can ask for it."
+                      : " Widen them in Settings to score this role."}
                   </div>
                   {/* The same ask as the card's button. Sending someone to Settings
                       to widen their targets was the only route before, which is a
                       long way round for one role they are already looking at. */}
-                  {onScoreRole && (
+                  {onScoreRole && hasReadableJd(job) && (
                     <button
                       type="button"
                       className="btn g"

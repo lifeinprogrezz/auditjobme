@@ -33,7 +33,7 @@ import {
   buildReadySubject,
   buildReadyBody,
 } from "../src/lib/scoreBacklog.js";
-import { prefilterWithTier } from "../src/lib/scorePrefilter.js";
+import { prefilterWithTier, hasReadableJd } from "../src/lib/scorePrefilter.js";
 import { isDebounced, selectStaleRefresh, shouldRefreshStale, STALE_REFRESH_BUDGET } from "../src/lib/scoreRefresh.js";
 import {
   SYNC_ONBOARDING_SLICE,
@@ -459,6 +459,9 @@ export async function runBacklog(
         opts.priorityJobId,
         new Set(scoreByJob.keys()),
         inFlightJobIds,
+        // Never buy a score for a role with no description: the client refuses to
+        // display one (#130), so it would be spend that can never be shown.
+        hasReadableJd,
       );
 
       // Roles whose score was computed from a PREVIOUS CV (#123). They already

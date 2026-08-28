@@ -344,11 +344,17 @@
 .roles-theme .pinwrap { width: 38px; height: 38px; cursor: pointer; }
 /* The open role's pin (Rober, 2026-08-28). A teal ring on its own did not make it
  * findable in a busy city: the logo has to sit ON TOP of its neighbours and read
- * as bigger. Above hover's z-index so a passing cursor cannot bury the selection,
- * and the same transition as .pin so selecting animates rather than jumps. */
-.roles-theme .pinwrap:has(.pin.sel) { z-index: 10000; }
-.roles-theme .pin.sel { transform: scale(1.35); border-color: #1fd8b8; box-shadow: 0 10px 26px -4px rgba(0, 0, 0, 0.75), 0 0 0 3px #1fd8b8; }
-.roles-theme .pinwrap:hover .pin.sel { transform: scale(1.45); }
+ * as bigger, for as long as that role is open in the panel. Above hover's z-index
+ * so a passing cursor cannot bury the selection; .pin's own transition makes it
+ * grow rather than jump.
+ *
+ * The class is on .pinwrap, NOT .pin — buildPin returns the wrapper, so the first
+ * version of these rules targeted `.pin.sel` and matched nothing. The pin still
+ * came out on top, by accident of DOM order, and was never resized: exactly what
+ * Rober reported seeing. */
+.roles-theme .pinwrap.sel { z-index: 10000; }
+.roles-theme .pinwrap.sel .pin { transform: scale(1.45); border-color: #1fd8b8; box-shadow: 0 12px 30px -6px rgba(0, 0, 0, 0.8), 0 0 0 4px #1fd8b8; }
+.roles-theme .pinwrap.sel:hover .pin { transform: scale(1.55); }
 .roles-theme .pin { position: relative; width: 38px; height: 38px; border-radius: 50%; background: #fff; display: grid; place-items: center; cursor: pointer; overflow: visible; border: 2px solid #fff; box-shadow: 0 6px 18px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 0, 0, 0.25); transition: transform 0.15s cubic-bezier(0, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0, 0, 0.2, 1), border-color 0.15s cubic-bezier(0, 0, 0.2, 1); }
 /* Startupmap's hover choreography: 1.25x scale in 150ms ease-out, marker
  * lifted above its neighbors, tooltip fading in over 200ms. Hover-capable

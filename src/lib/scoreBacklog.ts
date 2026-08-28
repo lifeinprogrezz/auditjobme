@@ -142,6 +142,13 @@ export function buildReadyBody(
  * flight. `eligible` itself is untouched, so the completion count and the
  * "your roles are ready" email keep running over the labelled slice only — a
  * pruned-out job must still never hold the pass open (#114).
+ *
+ * `isScoreable` is the guard that money depends on. A role with NO DESCRIPTION was
+ * scored on its title and company alone, and the client then refused to show the
+ * result — applyLandedScores drops a score whose role has no description (#130), so
+ * the number was bought and could never be displayed. Rober saw the button say
+ * "Scoring…" and then go back to what it was; the two roles behind it cost $0.0087
+ * and neither had a single character of job description.
  */
 export function withPriorityJob<T extends { id: string }>(
   backlog: T[],
@@ -149,10 +156,12 @@ export function withPriorityJob<T extends { id: string }>(
   priorityId: string | null | undefined,
   alreadyScored: ReadonlySet<string>,
   inFlight: ReadonlySet<string>,
+  isScoreable: (job: T) => boolean = () => true,
 ): T[] {
   if (!priorityId) return backlog;
   if (backlog.some((j) => j.id === priorityId)) return backlog;
   if (alreadyScored.has(priorityId) || inFlight.has(priorityId)) return backlog;
   const asked = pool.find((j) => j.id === priorityId);
-  return asked ? [asked, ...backlog] : backlog;
+  if (!asked || !isScoreable(asked)) return backlog;
+  return [asked, ...backlog];
 }
