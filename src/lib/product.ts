@@ -304,15 +304,26 @@ export function dailyTopSetReady(
 }
 
 /**
- * Which saved roles the Saved section should render (issue #155 fix-round-1 blocker
- * 2). A saved role that also sits in the frozen top ten already renders there — its
- * footer's "Saved" state is the one place that says so — so Saved drops it rather
- * than showing the same role twice on the page (the "keep them out of the action
- * queue so nothing renders twice" rule, Rober 7-15 review, extended to this second
- * duplication path). Pure: same inputs, same output.
+ * Which saved roles the Saved section should render: ALL of them.
+ *
+ * This REVERSES issue #155 fix-round-1 blocker 2, deliberately and at Rober's
+ * instruction (walking the product, 2026-08-28). That rule dropped a saved role
+ * from Saved whenever it also sat in the frozen top ten, so the page never showed
+ * one role twice. The cost only appears the next day: you save something out of
+ * today's ten, go to Saved to check it is there, and it is not — the one place
+ * that names your saved roles is the one place it is missing. Tomorrow the ten
+ * re-ranks, it drops out, and the thing you deliberately kept looks lost.
+ *
+ * Showing it in both places is now the intent, not a bug: the top ten says what is
+ * worth doing today, Saved says what you chose to keep, and a role can honestly be
+ * both. The frozen-set filter still applies to New (visibleNewJobs), where the
+ * duplicate is an accident of timing rather than a thing the user asked for.
+ *
+ * Kept as a function, rather than dropping the call, so the decision has a place to
+ * live and a test to hold it. Pure: same inputs, same output.
  */
-export function visibleSavedJobs(savedJobs: RoleJob[], frozenIds: ReadonlySet<string>): RoleJob[] {
-  return savedJobs.filter((j) => !frozenIds.has(j.id));
+export function visibleSavedJobs(savedJobs: RoleJob[]): RoleJob[] {
+  return savedJobs;
 }
 
 /**
@@ -322,8 +333,8 @@ export function visibleSavedJobs(savedJobs: RoleJob[], frozenIds: ReadonlySet<st
  * but not yet in `daily_matches` — `queue`'s own exclusion of "new" only knows about
  * YESTERDAY's batch at that hour. Once the 06:00 batch lands, resolveBatchJobs puts
  * those same roles in New while the earlier freeze already holds them, so a role
- * renders twice for the rest of the day. New drops anything already frozen, the
- * same rule visibleSavedJobs applies to Saved. Pure: same inputs, same output.
+ * renders twice for the rest of the day. New drops anything already frozen. Saved
+ * deliberately does NOT — see visibleSavedJobs. Pure: same inputs, same output.
  */
 export function visibleNewJobs(newJobs: RoleJob[], frozenIds: ReadonlySet<string>): RoleJob[] {
   return newJobs.filter((j) => !frozenIds.has(j.id));
