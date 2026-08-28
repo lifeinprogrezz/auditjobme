@@ -174,6 +174,15 @@ export default function ForwardingSection() {
 
           <ol className="mt-4 list-decimal space-y-2 pl-5 text-body text-muted-foreground">
             <li>Add this address as a forwarding address in Gmail, under Settings, then "Forwarding and POP/IMAP".</li>
+            {/* Rober, setting it up himself 2026-08-28: the confirmation takes about
+                two minutes, and with no step for it the page looked stuck between
+                adding the address and building the filter. Gmail emails us a
+                confirmation link and the server presses it (issue #185); the status
+                line above turns green on its own. */}
+            <li>
+              Wait about two minutes. Gmail sends a confirmation and we accept it for you — the status above turns
+              green when it lands. Nothing to click.
+            </li>
             <li>
               Create one filter: in the Gmail search bar, open filter options, paste the sender list below into the
               "From" field, choose "Create filter", and tick "Forward it" to your tracking address.

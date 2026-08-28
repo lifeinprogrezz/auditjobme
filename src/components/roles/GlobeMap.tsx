@@ -531,9 +531,11 @@ function addRolesLayers(map: maplibregl.Map, data: FeatureCollection): void {
     id: "hl",
     type: "circle",
     source: "hl",
-    // City-zoom only (Rober 7-11): the rings mark city CENTROIDS, so they only
-    // line up with pins once the logo cloud has fanned out (clusterMaxZoom 9).
-    // Wider than that they floated over empty map as unlabeled teal circles.
+    // City-zoom only. The rings now sit on the company's own PIN coordinate rather
+    // than the city centroid (RolesMap focusLngLats, 2026-08-28), so they land
+    // exactly on the marker — but below clusterMaxZoom 9 there are no individual
+    // pins to land on, only cluster bubbles, and a ring there floats over empty
+    // map as an unlabeled teal circle (Rober 7-11). The floor stays.
     minzoom: 9,
     paint: {
       "circle-radius": 17,
