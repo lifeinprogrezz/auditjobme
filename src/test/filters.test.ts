@@ -426,21 +426,36 @@ describe("readStoredMine / writeStoredMine (issue #154 per-browser persistence)"
   });
 });
 
-describe("railHeading (issue #154 — 'Best fit' retired)", () => {
-  it("reads 'Your matches' for a scored user on the default landing", () => {
-    expect(railHeading(true, true)).toBe("Your matches");
+describe("railHeading (issue #154 retired 'Best fit'; Rober 2026-08-28 split it from the chip)", () => {
+  // The heading names the LIST, the chip beside it names the FILTER. They used to
+  // read "Your matches" at the same time, which is what Rober caught: two controls,
+  // one name. The heading now only borrows that name while the filter is really on.
+  it("says 'Your matches' ONLY while the matches filter is on", () => {
+    expect(railHeading(true, true, true)).toBe("Your matches");
+    expect(railHeading(true, false, true)).toBe("Your matches");
+    expect(railHeading(false, false, true)).toBe("Your matches");
   });
-  it("reads 'Your matches' once anything has narrowed the view, scored or not", () => {
-    expect(railHeading(true, false)).toBe("Your matches");
-    expect(railHeading(false, false)).toBe("Your matches");
+
+  it("says 'All roles' for a scored user with that filter off (mutant: return 'Your matches' regardless)", () => {
+    expect(railHeading(true, true, false)).toBe("All roles");
+    expect(railHeading(true, false, false)).toBe("All roles");
+    expect(railHeading(false, false, false)).toBe("All roles");
   });
+
+  it("defaults to the filter being off, so an un-updated caller cannot resurrect the clash", () => {
+    expect(railHeading(true, true)).toBe("All roles");
+  });
+
   it("reads 'Hot right now' only for the anon/no-CV default landing", () => {
-    expect(railHeading(false, true)).toBe("Hot right now");
+    expect(railHeading(false, true, false)).toBe("Hot right now");
   });
+
   it("never returns 'Best fit'", () => {
     for (const scored of [true, false]) {
       for (const defaultView of [true, false]) {
-        expect(railHeading(scored, defaultView)).not.toBe("Best fit");
+        for (const mine of [true, false]) {
+          expect(railHeading(scored, defaultView, mine)).not.toBe("Best fit");
+        }
       }
     }
   });

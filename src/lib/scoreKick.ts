@@ -28,6 +28,30 @@
  *  scoring. */
 export const KICK_COOLDOWN_MS = 120_000;
 
+/**
+ * A kick that NAMES one role gets its own, shorter window (Rober, 2026-08-28:
+ * "if someone starts to look for something in concrete the user can ask for score
+ * this specific role").
+ *
+ * It cannot share the two-minute window: a person who asks for one role and then
+ * spots a second would be refused, and the button would look broken. It cannot be
+ * unlimited either, because every kick drains that user's whole backlog behind the
+ * named role. Fifteen seconds is slower than a person clicking through cards and
+ * fast enough that asking never feels blocked.
+ */
+export const PRIORITY_KICK_COOLDOWN_MS = 15_000;
+
+/**
+ * Is this a job id the endpoint may act on? A uuid and nothing else — the value
+ * reaches a database filter, so an unrecognised shape is refused here rather than
+ * passed along. An absent id is legal: that is an ordinary whole-backlog kick.
+ */
+export function priorityJobId(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const v = raw.trim().toLowerCase();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v) ? v : null;
+}
+
 /** The token out of an `Authorization: Bearer <jwt>` header. Null when the header
  *  is absent, repeated (an array), or not a Bearer header. */
 export function bearerToken(header: string | string[] | undefined | null): string | null {

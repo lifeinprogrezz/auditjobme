@@ -179,7 +179,7 @@ describe("parseBatchResults", () => {
 });
 
 describe("partitionOnboarding — the split Rober sizes", () => {
-  const backlog = Array.from({ length: 100 }, (_, i) => i);
+  const backlog = Array.from({ length: 100 }, (_, i) => ({ id: `j${i}` }));
 
   it("gives a first-pass user the synchronous slice and batches the tail", () => {
     const { sync, batched } = partitionOnboarding(backlog, true, 40);
@@ -200,9 +200,38 @@ describe("partitionOnboarding — the split Rober sizes", () => {
   });
 
   it("does not over-slice a backlog smaller than the slice", () => {
-    const { sync, batched } = partitionOnboarding([1, 2], true, 40);
-    expect(sync).toEqual([1, 2]);
+    const two = [{ id: "a" }, { id: "b" }];
+    const { sync, batched } = partitionOnboarding(two, true, 40);
+    expect(sync).toEqual(two);
     expect(batched).toEqual([]);
+  });
+
+  // A role the user pointed at and asked for. Batch turnaround was measured at
+  // 46-54 minutes and up to five hours, so batching an explicit request answers it
+  // long after the person who asked has gone.
+  it("scores a NAMED role synchronously even for a returning user (mutant: ignore priorityId)", () => {
+    const { sync, batched } = partitionOnboarding(backlog, false, 40, "j77");
+    expect(sync).toEqual([{ id: "j77" }]);
+    expect(batched).not.toContainEqual({ id: "j77" });
+    expect(sync.length + batched.length).toBe(backlog.length); // nothing lost
+  });
+
+  it("puts the named role FIRST in a first pass, without growing the slice", () => {
+    const { sync, batched } = partitionOnboarding(backlog, true, 40, "j77");
+    expect(sync[0]).toEqual({ id: "j77" });
+    expect(sync).toHaveLength(40);
+    expect(sync.length + batched.length).toBe(backlog.length);
+  });
+
+  it("scores the named role even when the slice is disabled", () => {
+    const { sync } = partitionOnboarding(backlog, true, 0, "j5");
+    expect(sync).toEqual([{ id: "j5" }]);
+  });
+
+  it("ignores a priority id that is not in the backlog — it is already scored", () => {
+    const { sync, batched } = partitionOnboarding(backlog, false, 40, "nope");
+    expect(sync).toEqual([]);
+    expect(batched).toEqual(backlog);
   });
 
   it("keeps the slice size a single named constant", () => {

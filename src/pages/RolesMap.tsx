@@ -60,6 +60,9 @@ export default function RolesMap() {
     applied,
     saved,
     toggleSaved,
+    scoreRole,
+    scoreRequested,
+    revealScored,
     dismissed,
     toggleDismissed,
     scoreMore,
@@ -618,6 +621,8 @@ export default function RolesMap() {
           onCloseDetail={() => setDetailJob(null)}
           onScoreMore={scoreMore}
           onToggleSaved={toggleSaved}
+          onScoreRole={signedIn && scored ? scoreRole : null}
+          scoreRequested={scoreRequested}
           onToggleHidden={() => setPanelHidden((v) => !v)}
         />
         <div className="scope" aria-label="Catalog scope">
@@ -700,6 +705,7 @@ export default function RolesMap() {
         signedIn={signedIn}
         sectorOptions={targetSectorOptions}
         onSubmit={submitCv}
+        revealScored={revealScored}
       />
       {/* ProfileModal is GONE (Rober 7-25): its settings body lives on the routed
           /settings page, and the avatar opens the unified AccountMenu popover

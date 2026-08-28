@@ -27,16 +27,30 @@
 // The .js specifiers are load-bearing for Node ESM — see scorePrefilter.ts.
 import { createClient } from "@supabase/supabase-js";
 import { runBacklog } from "./score-backlog.js";
-import { bearerToken, createKickLimiter, kickRequestError } from "../src/lib/scoreKick.js";
+import {
+  bearerToken,
+  createKickLimiter,
+  kickRequestError,
+  priorityJobId,
+  PRIORITY_KICK_COOLDOWN_MS,
+} from "../src/lib/scoreKick.js";
 // #145: thrown errors go to Sentry (ids and counts only). No DSN → no-op.
 import { withSentry } from "../src/lib/apiSentry.js";
 
-type Req = { method?: string; headers: Record<string, string | string[] | undefined> };
+type Req = {
+  method?: string;
+  headers: Record<string, string | string[] | undefined>;
+  /** Vercel parses a JSON body into this. `{ jobId }` names one role to score first. */
+  body?: unknown;
+};
 type Res = { status: (code: number) => Res; json: (body: unknown) => void };
 
 // Module scope, so it survives between invocations on a warm instance. A cold
 // start forgets it, which is exactly the "best-effort" in the header.
 const limiter = createKickLimiter();
+// A kick that names one role has its own shorter window, so asking for a second
+// role straight after the first is not refused. See PRIORITY_KICK_COOLDOWN_MS.
+const priorityLimiter = createKickLimiter(PRIORITY_KICK_COOLDOWN_MS);
 
 async function handler(req: Req, res: Res): Promise<void> {
   const token = bearerToken(req.headers["authorization"]);
@@ -62,7 +76,10 @@ async function handler(req: Req, res: Res): Promise<void> {
     return;
   }
 
-  const verdict = limiter.take(userId, Date.now());
+  // One named role, or the whole backlog. An unrecognised id is treated as absent
+  // rather than refused: the worst case is an ordinary kick, never a bad filter.
+  const wanted = priorityJobId((req.body as { jobId?: unknown } | undefined)?.jobId);
+  const verdict = (wanted ? priorityLimiter : limiter).take(userId, Date.now());
   if (!verdict.allowed) {
     res.status(429).json({ error: "Already scoring", retry_after_ms: verdict.retryAfterMs });
     return;
@@ -72,7 +89,7 @@ async function handler(req: Req, res: Res): Promise<void> {
   // user. Concurrency with a cron tick is possible and only costs a repeat of
   // work already in flight; correctness is unaffected, because every landed score
   // upserts on (user, job, rubric).
-  const { status, body } = await runBacklog({ onlyUserId: userId });
+  const { status, body } = await runBacklog({ onlyUserId: userId, priorityJobId: wanted ?? undefined });
   res.status(status).json(body);
 }
 

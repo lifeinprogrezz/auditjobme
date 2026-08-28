@@ -206,7 +206,7 @@ export type BacklogRunResult = { status: number; body: Record<string, unknown> }
  * catalog, so the whole catalog is the input.
  */
 export async function runBacklog(
-  opts: { onlyUserId?: string } = {},
+  opts: { onlyUserId?: string; priorityJobId?: string } = {},
 ): Promise<BacklogRunResult> {
   const startedMs = Date.now();
   const deadlineMs = startedMs + RUN_BUDGET_MS;
@@ -490,8 +490,12 @@ export async function runBacklog(
         // The split (issue #96): a brand-new user gets SYNC_ONBOARDING_SLICE roles
         // at full price so their screen fills immediately; the long tail goes to
         // batch at half price. Returning users have nobody watching — all batch.
+        // `priorityJobId` is one role a signed-in user pointed at and asked for
+        // (api/score-kick.ts). It is scored synchronously whatever pass this is,
+        // because batch turnaround runs 46-54 minutes and answering an explicit
+        // request an hour later is the same as not answering it.
         const { sync: syncSlice, batched } = batchAvailable
-          ? partitionOnboarding(backlog, isFirstPass, SYNC_ONBOARDING_SLICE)
+          ? partitionOnboarding(backlog, isFirstPass, SYNC_ONBOARDING_SLICE, opts.priorityJobId)
           : { sync: backlog, batched: [] };
 
         // ── Phase 3: submit the tail. One batch per tick keeps the retrieval hop

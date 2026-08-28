@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  KICK_COOLDOWN_MS,
-  bearerToken,
-  createKickLimiter,
-  kickRequestError,
-} from "@/lib/scoreKick";
+import { KICK_COOLDOWN_MS, bearerToken, createKickLimiter, kickRequestError, priorityJobId, PRIORITY_KICK_COOLDOWN_MS } from "@/lib/scoreKick";
 
 // The kick endpoint spends money on behalf of one user (issue #149). These are
 // the two gates in front of that spend: who may call, and how often. Both are
@@ -77,5 +72,43 @@ describe("createKickLimiter — one kick per user per cooldown", () => {
     expect(limiter.size()).toBe(2);
     limiter.take("u3", KICK_COOLDOWN_MS);
     expect(limiter.size()).toBe(1); // u1 and u2 aged out, only u3 is held
+  });
+});
+
+// A kick that NAMES one role (Rober, 2026-08-28: "the user can ask for score this
+// specific role"). The id reaches a database filter, so anything that is not a
+// uuid is refused here and the request degrades to an ordinary whole-backlog kick.
+describe("priorityJobId", () => {
+  it("accepts a uuid, lowercased and trimmed", () => {
+    expect(priorityJobId("87A817A9-0FFB-46DB-9D54-8BC2D3DB447E")).toBe(
+      "87a817a9-0ffb-46db-9d54-8bc2d3db447e",
+    );
+    expect(priorityJobId("  87a817a9-0ffb-46db-9d54-8bc2d3db447e  ")).toBe(
+      "87a817a9-0ffb-46db-9d54-8bc2d3db447e",
+    );
+  });
+
+  it("refuses anything that is not a uuid (mutant: pass the raw value through)", () => {
+    for (const bad of ["", "not-a-uuid", "1; drop table jobs", "87a817a9", 42, null, undefined, {}]) {
+      expect(priorityJobId(bad)).toBeNull();
+    }
+  });
+
+  it("treats an absent id as an ordinary kick rather than an error", () => {
+    expect(priorityJobId(undefined)).toBeNull();
+  });
+});
+
+describe("PRIORITY_KICK_COOLDOWN_MS", () => {
+  it("is shorter than the whole-backlog window, or asking for a second role is refused", () => {
+    expect(PRIORITY_KICK_COOLDOWN_MS).toBeLessThan(KICK_COOLDOWN_MS);
+    expect(PRIORITY_KICK_COOLDOWN_MS).toBeGreaterThan(0);
+  });
+
+  it("lets a second named role through after its own window, on its own limiter", () => {
+    const priority = createKickLimiter(PRIORITY_KICK_COOLDOWN_MS);
+    expect(priority.take("u1", 0).allowed).toBe(true);
+    expect(priority.take("u1", PRIORITY_KICK_COOLDOWN_MS - 1).allowed).toBe(false);
+    expect(priority.take("u1", PRIORITY_KICK_COOLDOWN_MS).allowed).toBe(true);
   });
 });
