@@ -165,10 +165,12 @@ export default function Today() {
   // grouping, not part of what's frozen.
   const queueByJobId = useMemo(() => new Map(queue.map((e) => [e.job.id, e])), [queue]);
   const frozenIds = useMemo(() => new Set(dailyTop.jobIds), [dailyTop.jobIds]);
-  // Issue #155 fix-round-1 blocker 2: a saved role that's ALSO in the frozen ten
-  // already renders there (its footer shows "Saved") — drop it from this section so
-  // it doesn't render twice on the page.
-  const visibleSaved = useMemo(() => visibleSavedJobs(savedJobs, frozenIds), [savedJobs, frozenIds]);
+  // A saved role that is ALSO in the frozen ten now renders in BOTH sections
+  // (Rober, 2026-08-28) — reversing issue #155 fix-round-1 blocker 2. Saving from
+  // today's ten used to hide the role from Saved, so the one list that names your
+  // saved roles was the one place it was missing, and tomorrow's re-rank made it
+  // look lost. See visibleSavedJobs for the whole reasoning.
+  const visibleSaved = useMemo(() => visibleSavedJobs(savedJobs), [savedJobs]);
   // Issue #155 fix-round-2 blocker 3: a 00:00-06:00 UTC visit can freeze today's ten
   // from roles the nightly batch hasn't posted yet — once the 06:00 batch lands they
   // ALSO show in New, doubling the row. Drop anything already frozen before render.

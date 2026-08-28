@@ -458,15 +458,26 @@ export default function RolesMap() {
     if (coords.length) setCityFrame((prev) => ({ coords, nonce: (prev?.nonce ?? 0) + 1 }));
   }, [filters.cities]);
 
-  // Detail highlight: the selected company's cities, unjittered (mockup behavior).
+  // Detail highlight: the selected company's ACTUAL pin positions.
+  //
+  // It used to ring the city CENTROID (coordsOf(city)). A pin does not sit on the
+  // centroid — it sits on the company's office, or on a spot in the scatter disc —
+  // so in any busy city the ring landed somewhere near, but not on, the thing you
+  // clicked. Rober, walking it 2026-08-28: you open a role from Your matches, the
+  // map flies to the city, and you still cannot tell which of the pins is yours.
+  // Ringing the same coordinate the pin is drawn at makes the answer exact.
   const focusLngLats = useMemo(() => {
     if (!detailLive) return null;
-    const cities = [
-      ...new Set(
-        jobs.filter((j) => j.company === detailLive.company && j.city).map((j) => j.city as string),
-      ),
-    ];
-    return cities.map((c) => coordsOf(c)).filter((c): c is [number, number] => c !== null);
+    const seen = new Set<string>();
+    const out: [number, number][] = [];
+    for (const j of jobs) {
+      if (j.company !== detailLive.company || !j.lngLat) continue;
+      const key = j.lngLat.join(",");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(j.lngLat);
+    }
+    return out;
   }, [detailLive, jobs]);
 
   // Opening a role from the panel list (hot showcase OR a search result) flies the

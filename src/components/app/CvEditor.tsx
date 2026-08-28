@@ -262,11 +262,7 @@ export default function CvEditor({ userId, cvText }: Props) {
 
       <Fold title="Experience" count={cv.experience.length}>
         <p className={`${LABEL} text-pretty`}>
-          Put these in the order you want them read. If one of them is really part of the entry above it, a short
-          stint or a strand of the same work, tick its first box and its lines print there instead. If one is a
-          project rather than a job, tick its second box and it prints in a Projects section under your work history,
-          keeping its own name, title, dates and lines. Nothing here is final: "Read my CV again" brings the whole
-          thing back from your upload.
+          Put these in the order you want them read. Nothing here is final — "Read my CV again" restores your upload.
         </p>
         {cv.experience.map((job, i) => (
           <div key={i} className="rounded-[12px] border border-border p-3">
@@ -319,9 +315,7 @@ export default function CvEditor({ userId, cvText }: Props) {
               />
               <span className={`${LABEL} text-pretty`}>
                 Show as part of the entry above.{" "}
-                {i === 0
-                  ? "This one is at the top, so there is nothing above it to join."
-                  : "Its lines print under that entry, and its own title and dates stay off the page."}
+                {i === 0 ? "" : "Its lines print under that entry, and its own title and dates stay off the page."}
               </span>
             </label>
             <label className="mt-2 flex items-start gap-2">
@@ -335,8 +329,8 @@ export default function CvEditor({ userId, cvText }: Props) {
               <span className={`${LABEL} text-pretty`}>
                 Show under Projects instead of Experience.{" "}
                 {job.groupedIntoPrevious === true
-                  ? "You have also ticked the box above, so this one prints as part of the entry above and goes wherever that entry goes."
-                  : "It keeps its own name, title, dates and lines, in a Projects section under your work history."}
+                  ? "The box above is ticked too, so it prints there instead."
+                  : ""}
               </span>
             </label>
             <div className="mt-3 flex flex-wrap items-center gap-4">

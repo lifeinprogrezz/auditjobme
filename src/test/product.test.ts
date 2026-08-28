@@ -420,16 +420,28 @@ describe("dailyTopSetReady (issue #155 fix-round-1, blockers 1 + 3)", () => {
   });
 });
 
-describe("visibleSavedJobs (issue #155 fix-round-1, blocker 2)", () => {
-  it("drops a saved role that's also in the frozen ten — it already renders there", () => {
+describe("visibleSavedJobs (reversal of issue #155 fix-round-1 blocker 2, Rober 2026-08-28)", () => {
+  // The old rule hid a saved role from Saved whenever it also sat in the frozen
+  // ten. The failure showed up a day later: you save something out of today's ten,
+  // open Saved to check, and it is not there; tomorrow the ten re-ranks and the
+  // role you deliberately kept looks lost. Both places is now the intent.
+  it("KEEPS a saved role that is also in today's frozen ten, so it shows in both places", () => {
     const saved = [job("j1"), job("j2")];
-    const frozen = new Set(["j1"]);
-    expect(visibleSavedJobs(saved, frozen).map((j) => j.id)).toEqual(["j2"]);
+    expect(visibleSavedJobs(saved).map((j) => j.id)).toEqual(["j1", "j2"]);
   });
 
-  it("keeps every saved role when none of them are frozen", () => {
-    const saved = [job("j1"), job("j2")];
-    expect(visibleSavedJobs(saved, new Set())).toHaveLength(2);
+  it("keeps every saved role, frozen or not, and in the order given", () => {
+    const saved = [job("j3"), job("j1"), job("j2")];
+    expect(visibleSavedJobs(saved).map((j) => j.id)).toEqual(["j3", "j1", "j2"]);
+  });
+
+  // New still drops frozen duplicates: there the double row is an accident of the
+  // 00:00-06:00 UTC batch timing, not something anyone asked for. The two sections
+  // are meant to differ, so this guards them not being "tidied" back together.
+  it("differs from visibleNewJobs on purpose — New still drops what Saved keeps", () => {
+    const frozen = new Set(["j1"]);
+    expect(visibleSavedJobs([job("j1")]).map((j) => j.id)).toEqual(["j1"]);
+    expect(visibleNewJobs([job("j1")], frozen).map((j) => j.id)).toEqual([]);
   });
 });
 

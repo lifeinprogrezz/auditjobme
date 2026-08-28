@@ -341,8 +341,13 @@ export default function SettingsPanel({
         )}
       </section>
 
+      {/* ONE card for both pickers and the save button (Rober, walking it 2026-08-28).
+          Two bordered cards with the button floating under them read as two
+          independent settings, so "Save targets" looked like it belonged to
+          industries alone. It always saved both; the layout said otherwise. */}
       <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
-        <h2 className="font-display text-section text-foreground">Target roles</h2>
+        <h2 className="font-display text-section text-foreground">Targets</h2>
+        <h3 className="mt-4 font-display text-foreground">Target roles</h3>
         <p className="mt-1 text-caption text-muted-foreground">Pick up to {ROLE_CAP}.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {ROLE_PICKER_OPTIONS.map((r) => {
@@ -361,10 +366,8 @@ export default function SettingsPanel({
             );
           })}
         </div>
-      </section>
 
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-page">
-        <h2 className="font-display text-section text-foreground">Target industries</h2>
+        <h3 className="mt-6 font-display text-foreground">Target industries</h3>
         <p className="mt-1 text-caption text-muted-foreground">Pick up to {SECTOR_CAP}.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {industryOptions.map((s) => {
@@ -419,15 +422,14 @@ export default function SettingsPanel({
             )}
           </div>
         )}
-      </section>
 
-      {/* Save targets sits directly under Target industries — it belongs to the
-          two pickers above, not to Not interested or the account section below
-          (issue #156). */}
-      <p className="text-caption text-muted-foreground">
-        Changing this re-scores your roles over the next hours; you keep your current scores meanwhile.
-      </p>
-      <div className="flex items-center gap-4">
+        {/* Inside the card, under BOTH pickers: it saves roles and industries
+            together, and being outside made it look like it saved only the last
+            one (issue #156 put it here; 2026-08-28 moved it in). */}
+        <p className="mt-6 text-caption text-muted-foreground">
+          Changing this re-scores your roles over the next hours; you keep your current scores meanwhile.
+        </p>
+        <div className="mt-3 flex items-center gap-4">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save targets"}
         </Button>
@@ -439,7 +441,8 @@ export default function SettingsPanel({
             Saved
           </span>
         )}
-      </div>
+        </div>
+      </section>
 
       {/* Dismissed roles (issue #73 slice 4): saying no has to be undoable, or nobody
           uses it. Collapsible and collapsed by default (issue #156) so a long list
