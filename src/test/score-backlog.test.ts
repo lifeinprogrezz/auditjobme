@@ -184,4 +184,24 @@ describe("withPriorityJob — the named role has to get INTO the list first", ()
     const out = withPriorityJob([{ id: "a" }], pool, "asked", none, none);
     expect(out).toHaveLength(2);
   });
+
+  // THE MONEY GUARD, and the bug Rober hit second: the button said "Scoring…" and
+  // then went back to what it was. The server HAD scored the role — from its title
+  // and company alone, because it has no job description — and the client then
+  // refused to display a score whose role has no description (#130). $0.0087 bought
+  // two numbers that could never be shown.
+  it("REFUSES a role with no description (mutant: drop the isScoreable guard)", () => {
+    const readable = (j: { id: string }) => j.id !== "asked";
+    expect(withPriorityJob([{ id: "a" }], pool, "asked", none, none, readable).map((j) => j.id)).toEqual([
+      "a",
+    ]);
+  });
+
+  it("still adds a named role that DOES have a description, so the guard is not a block", () => {
+    const readable = () => true;
+    expect(withPriorityJob([{ id: "a" }], pool, "asked", none, none, readable).map((j) => j.id)).toEqual([
+      "asked",
+      "a",
+    ]);
+  });
 });
