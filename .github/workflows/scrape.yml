@@ -31,6 +31,14 @@ on:
     # Manual trigger from the Actions tab. Leave `reason` alone when you start a
     # run yourself: only the watchdog sends 'watchdog', and only that value marks
     # the run as one of its own once-a-day restarts.
+    #
+    # TESTING THE MARKER COSTS THE REAL BUDGET. A run dispatched by hand with
+    # reason=watchdog is indistinguishable from the watchdog's own, so it spends
+    # tomorrow's restart: the 08:00 UTC check reads it, sees a restart inside the
+    # 24-hour window, and holds off during a genuine outage. That happened while
+    # verifying this on 2026-08-28. Cancel AND delete the run afterwards
+    # (`gh api -X DELETE repos/<repo>/actions/runs/<id>`, only once it has
+    # finished cancelling), or the verification recreates the bug it proved fixed.
     inputs:
       reason:
         description: "Who asked for this run"
