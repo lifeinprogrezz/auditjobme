@@ -166,7 +166,7 @@ describe("the endpoint's wiring", () => {
     expect(seen.status).toBe(200);
     expect(seen.body).toMatchObject({ state: "stale", alert: true, dispatchPlanned: false, dispatched: false });
     // Held back by the once-a-day bound, not by some earlier return.
-    expect(String(seen.body?.dispatchReason)).toContain("at most once every 24 hours");
+    expect(String(seen.body?.dispatchReason)).toContain("at most once every 20 hours");
     // The owner still hears about it. The run got far enough to email, which is
     // what makes the absent dispatch a decision rather than an early return.
     expect(calls.some((c) => c.url.startsWith("https://api.resend.com"))).toBe(true);
