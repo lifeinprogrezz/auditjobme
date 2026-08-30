@@ -35,8 +35,14 @@ export const STALE_AFTER_HOURS = 12;
 /**
  * The workflow is re-dispatched at most once in this many hours. A failure that
  * repeats must cost one run and one email a day, never a loop of runs.
+ *
+ * Strictly less than a day on purpose (2026-08-30). The check runs once a day at
+ * the same minute, so its own restart from the previous morning is always
+ * ~23.99 hours old at the next check. At 24 the guard read that as "already
+ * started 24 hours ago", declined, and a stale morning after a stale morning was
+ * not restarted. 20 still bounds a repeating failure to one run a day.
  */
-export const DISPATCH_MIN_GAP_HOURS = 24;
+export const DISPATCH_MIN_GAP_HOURS = 20;
 
 /**
  * The name a run carries when THIS watchdog started it. The scrape workflow sets

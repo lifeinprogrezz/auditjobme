@@ -104,6 +104,15 @@ describe("decideDispatch", () => {
     expect(decideDispatch({ ...alerting, lastDispatchAt: hoursAgo(DISPATCH_MIN_GAP_HOURS + 1) }).dispatch).toBe(true);
   });
 
+  // 2026-08-30 08:00 UTC: the pool was 20.4 hours stale and the watchdog's own
+  // restart from the previous morning's check was 23.997 hours old — the same
+  // clock, one day later. It said "already started 24 hours ago" and did nothing,
+  // so a stale morning after a stale morning went unrestarted. The check runs
+  // once a day; the gap must sit strictly inside that day.
+  it("restarts on the next morning's check, one day after its own restart", () => {
+    expect(decideDispatch({ ...alerting, lastDispatchAt: hoursAgo(23.95) }).dispatch).toBe(true);
+  });
+
   it("holds off when the run history cannot be read, because the bound must be provable", () => {
     expect(decideDispatch({ ...alerting, runHistoryReadable: false }).dispatch).toBe(false);
   });
