@@ -521,4 +521,20 @@ describe("nightlyRunVerdict (a total failure must not report success)", () => {
     expect(v.ok).toBe(false);
     expect(v.status).toBe(500);
   });
+
+  // 2026-08-30 06:00 UTC, the first pg_cron tick of the night: all 4 users had a
+  // scoring batch SUBMITTED (4x POST score_batches 201) and nothing else, because a
+  // batch completes on a later tick. The verdict saw {processed:0, done:0} and paged
+  // Sentry as an outage; the 06:05 tick then served 4/4 users. Work in flight is
+  // progress, not a lost night.
+  it("succeeds on the submit-only tick (processed 0, done 0, submitted N)", () => {
+    const v = nightlyRunVerdict({ users: 4, processed: 0, failed: 0, done: 0, submitted: 4 });
+    expect(v.ok).toBe(true);
+    expect(v.status).toBe(200);
+  });
+
+  it("still FAILS when nothing was submitted either", () => {
+    const v = nightlyRunVerdict({ users: 4, processed: 0, failed: 0, done: 0, submitted: 0 });
+    expect(v.ok).toBe(false);
+  });
 });
