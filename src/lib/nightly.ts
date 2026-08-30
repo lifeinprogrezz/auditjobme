@@ -394,21 +394,33 @@ export function buildEmailBody(
  * every follow-up tick from 2026-08-20 to 08-26 and the Action went red 4-5 times a
  * morning after a real success. Loud error-skips (history or batch read failed) are NOT
  * counted here on purpose: a tick where every user hit one of those is still an outage.
+ *
+ * `submitted` counts roles handed to the Batch API this tick. Since the workers moved
+ * to pg_cron (2026-08-27) a night is split across 5-minute ticks: the first tick SUBMITS
+ * every user's batch and serves nobody, a later tick completes it. On 2026-08-30 06:00
+ * UTC that first tick was {users:4, processed:0, done:0, submitted:N} and this guard
+ * paged Sentry as an outage while the 06:05 tick served 4/4. Work in flight is progress.
  */
-export function nightlyRunVerdict(run: { users: number; processed: number; failed: number; done?: number }): {
+export function nightlyRunVerdict(run: {
+  users: number;
+  processed: number;
+  failed: number;
+  done?: number;
+  submitted?: number;
+}): {
   ok: boolean;
   status: 200 | 500;
   failed: number;
   reason?: string;
 } {
-  const { users, processed, failed, done = 0 } = run;
-  if (users > 0 && processed === 0 && done === 0) {
+  const { users, processed, failed, done = 0, submitted = 0 } = run;
+  if (users > 0 && processed === 0 && done === 0 && submitted === 0) {
     return {
       ok: false,
       status: 500,
       failed,
       reason:
-        `no user completed: ${users} active, 0 processed, 0 already done today, ${failed} recorded as failed — ` +
+        `no user completed: ${users} active, 0 processed, 0 already done today, 0 submitted, ${failed} recorded as failed — ` +
         `treating as an outage, not a quiet night`,
     };
   }
