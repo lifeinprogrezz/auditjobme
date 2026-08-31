@@ -25,9 +25,9 @@
 
 /**
  * The dataplane must have been rewritten within this many hours for the pipeline
- * to count as healthy. The scrape workflow starts at 05:00 UTC and this check
- * runs at 08:00 UTC, so a run that succeeded this morning is about 3 hours old
- * and a run that never happened is about 27 hours old. Twelve hours sits well
+ * to count as healthy. The scrape workflow starts at 03:47 UTC and this check
+ * runs at 08:00 UTC, so a run that succeeded this morning is about 4 hours old
+ * and a run that never happened is about 28 hours old. Twelve hours sits well
  * clear of both, so neither a slow run nor an early check can move the verdict.
  */
 export const STALE_AFTER_HOURS = 12;
@@ -167,7 +167,7 @@ export function decideDataplaneFreshness(
       state: "stale",
       reasons: [
         `The job pool has not been refreshed for ${round1(ageHours)} hours. The scrape workflow publishes the dataplane as its last step, so this means the daily run did not finish.`,
-        `Anything over ${staleAfterHours} hours counts as a miss. The workflow is scheduled for 05:00 UTC and this check runs at 08:00 UTC.`,
+        `Anything over ${staleAfterHours} hours counts as a miss. The workflow is scheduled for 03:47 UTC and this check runs at 08:00 UTC.`,
       ],
       ageHours: round1(ageHours),
     };

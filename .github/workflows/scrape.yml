@@ -21,12 +21,18 @@ run-name: ${{ inputs.reason == 'watchdog' && 'Scrape jobs (watchdog restart)' ||
 
 on:
   schedule:
-    # 05:00 UTC, ONE HOUR BEFORE the nightly scorer (nightly.yml repeat trigger:
+    # 03:47 UTC, WELL BEFORE the nightly scorer (nightly.yml repeat trigger:
     # /api/nightly, kicks off at 06:00) — both used to fire at 06:00, so scoring
     # raced the scrape and could read yesterday's pool (Track D S6). Scrape+extract+
     # enrich finish well inside the hour; if this ever slips past 06:00 the scorer
     # just sees yesterday's jobs once, it never breaks.
-    - cron: "0 5 * * *"
+    #
+    # Was "0 5 * * *" until 2026-08-31: GitHub top-of-the-hour cron slots are
+    # congested and the 05:00 fire drifted past 10:00 or dropped entirely three
+    # days running (8-29 fired 11:29, 8-30 fired 10:17, 8-31 never fired), so the
+    # 06:00 scorer matched a day-old pool. An off-peak odd minute keeps >2h of
+    # drift headroom before the scorer.
+    - cron: "47 3 * * *"
   workflow_dispatch:
     # Manual trigger from the Actions tab. Leave `reason` alone when you start a
     # run yourself: only the watchdog sends 'watchdog', and only that value marks
