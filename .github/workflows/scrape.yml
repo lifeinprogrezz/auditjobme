@@ -40,7 +40,7 @@ on:
     #
     # TESTING THE MARKER COSTS THE REAL BUDGET. A run dispatched by hand with
     # reason=watchdog is indistinguishable from the watchdog's own, so it spends
-    # tomorrow's restart: the 08:00 UTC check reads it, sees a restart inside the
+    # tomorrow's restart: the 05:15 UTC check reads it, sees a restart inside the
     # 24-hour window, and holds off during a genuine outage. That happened while
     # verifying this on 2026-08-28. Cancel AND delete the run afterwards
     # (`gh api -X DELETE repos/<repo>/actions/runs/<id>`, only once it has

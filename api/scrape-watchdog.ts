@@ -23,8 +23,9 @@
 // deps argument on the handler, plus the fetchImpl argument on the three calls
 // that leave the machine, all defaulting to the real thing.
 //
-// Scheduled by pg_cron at 08:00 UTC, four hours after the scrape workflow's
-// 03:47 schedule (supabase/migrations/20260827200000_scrape_watchdog.sql).
+// Scheduled by pg_cron at 05:15 UTC — after the scrape workflow's 03:47
+// schedule, BEFORE the 06:00 nightly scorer, so a restart refills the pool in
+// time for the digest (supabase/migrations/20260831160000_scrape_watchdog_0515.sql).
 //
 // Env: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / RESEND_API_KEY / CRON_SECRET
 // (same contract as api/spend-alert.ts) + optional OWNER_ALERT_EMAIL,
